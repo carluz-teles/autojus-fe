@@ -1,9 +1,14 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 // Next.js 16 renomeou Middleware → Proxy (mesma funcionalidade). clerkMiddleware
-// injeta o contexto de auth (JWT/JWKS) em toda request; o handler lê o token e o
-// BE resolve org_id→tenant_id. Sem lógica de sessão pesada aqui (só optimistic checks).
-export default clerkMiddleware();
+// injeta o contexto de auth (JWT/JWKS); o BE resolve org_id→tenant_id.
+// Público = telas de auth; todo o resto exige sessão (auth.protect() redireciona
+// para NEXT_PUBLIC_CLERK_SIGN_IN_URL quando não autenticado).
+const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
+
+export default clerkMiddleware(async (auth, req) => {
+  if (!isPublicRoute(req)) await auth.protect();
+});
 
 export const config = {
   matcher: [
