@@ -17,6 +17,8 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
@@ -36,89 +38,165 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-fraunces);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ── "Ledger" light: papel quente, tinta verde-perene, acento latão ────────── */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.5rem;
+
+  --background: oklch(0.985 0.006 95);
+  --foreground: oklch(0.24 0.02 165);
+
+  --card: oklch(0.995 0.004 95);
+  --card-foreground: oklch(0.24 0.02 165);
+  --popover: oklch(0.995 0.004 95);
+  --popover-foreground: oklch(0.24 0.02 165);
+
+  --primary: oklch(0.42 0.068 168);
+  --primary-foreground: oklch(0.98 0.012 95);
+
+  --secondary: oklch(0.95 0.011 95);
+  --secondary-foreground: oklch(0.3 0.03 168);
+
+  --muted: oklch(0.955 0.008 95);
+  --muted-foreground: oklch(0.49 0.02 165);
+
+  --accent: oklch(0.93 0.03 90);
+  --accent-foreground: oklch(0.3 0.03 168);
+
+  --gold: oklch(0.72 0.11 76);
+  --gold-foreground: oklch(0.26 0.04 70);
+
+  --destructive: oklch(0.55 0.2 27);
+
+  --border: oklch(0.9 0.012 90);
+  --input: oklch(0.9 0.012 90);
+  --ring: oklch(0.42 0.068 168);
+
+  --chart-1: oklch(0.42 0.068 168);
+  --chart-2: oklch(0.72 0.11 76);
+  --chart-3: oklch(0.55 0.09 200);
+  --chart-4: oklch(0.62 0.12 145);
+  --chart-5: oklch(0.5 0.13 40);
+
+  --sidebar: oklch(0.972 0.01 100);
+  --sidebar-foreground: oklch(0.32 0.02 165);
+  --sidebar-primary: oklch(0.42 0.068 168);
+  --sidebar-primary-foreground: oklch(0.98 0.012 95);
+  --sidebar-accent: oklch(0.93 0.022 100);
+  --sidebar-accent-foreground: oklch(0.28 0.03 168);
+  --sidebar-border: oklch(0.9 0.012 95);
+  --sidebar-ring: oklch(0.42 0.068 168);
 }
 
+/* ── "Ledger" dark: tinta profunda esverdeada, primário luminoso ───────────── */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
+  --background: oklch(0.19 0.016 168);
+  --foreground: oklch(0.95 0.008 95);
+
+  --card: oklch(0.23 0.018 168);
+  --card-foreground: oklch(0.95 0.008 95);
+  --popover: oklch(0.23 0.018 168);
+  --popover-foreground: oklch(0.95 0.008 95);
+
+  --primary: oklch(0.8 0.1 168);
+  --primary-foreground: oklch(0.2 0.02 168);
+
+  --secondary: oklch(0.27 0.02 168);
+  --secondary-foreground: oklch(0.95 0.008 95);
+
+  --muted: oklch(0.27 0.02 168);
+  --muted-foreground: oklch(0.72 0.02 120);
+
+  --accent: oklch(0.3 0.025 100);
+  --accent-foreground: oklch(0.95 0.008 95);
+
+  --gold: oklch(0.78 0.11 78);
+  --gold-foreground: oklch(0.22 0.03 70);
+
+  --destructive: oklch(0.7 0.19 22);
+
+  --border: oklch(1 0 0 / 11%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.8 0.1 168);
+
+  --chart-1: oklch(0.8 0.1 168);
+  --chart-2: oklch(0.78 0.11 78);
+  --chart-3: oklch(0.68 0.1 210);
+  --chart-4: oklch(0.72 0.12 145);
+  --chart-5: oklch(0.68 0.13 40);
+
+  --sidebar: oklch(0.21 0.017 168);
+  --sidebar-foreground: oklch(0.9 0.008 95);
+  --sidebar-primary: oklch(0.8 0.1 168);
+  --sidebar-primary-foreground: oklch(0.2 0.02 168);
+  --sidebar-accent: oklch(0.28 0.02 168);
+  --sidebar-accent-foreground: oklch(0.95 0.008 95);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.8 0.1 168);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground font-sans;
+    /* Textura sutil: dá profundidade de "papel" sem competir com o conteúdo. */
+    background-image:
+      radial-gradient(
+        ellipse 80% 50% at 50% -10%,
+        color-mix(in oklch, var(--primary) 7%, transparent),
+        transparent 60%
+      ),
+      radial-gradient(
+        ellipse 60% 40% at 100% 0%,
+        color-mix(in oklch, var(--gold) 6%, transparent),
+        transparent 55%
+      );
+    background-attachment: fixed;
+  }
+
+  /* Números tabulares em dados (tabelas, valores, timers) evitam "pulos" de layout. */
+  .tabular-nums,
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .font-display {
+    font-family: var(--font-display), Georgia, "Times New Roman", serif;
+    font-optical-sizing: auto;
+  }
+}
+
+/* Reveal escalonado no load — alto impacto, sutil. Desligado em reduced-motion. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility reveal {
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    animation: none;
   }
 }
