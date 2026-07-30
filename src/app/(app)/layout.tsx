@@ -19,13 +19,15 @@ export default async function AppLayout({
 
   // Onboarding concluído = /identity/me.onboarding_completed_at preenchido.
   // apiFetch continua sendo o único ponto de I/O (aqui com o token do server).
-  let onboardingCompleted = true;
+  // Fail-CLOSED: se não conseguimos confirmar a conclusão, mandamos ao wizard —
+  // ele é idempotente e a própria /onboarding devolve ao dashboard quem já
+  // concluiu, então não há lockout (só um passo extra num /identity/me fora do ar).
+  let onboardingCompleted = false;
   try {
     const me = await apiFetch<Me>("/v1/identity/me", { getToken });
     onboardingCompleted = me.onboarding_completed_at != null;
   } catch {
-    // Não trava o app se o /identity/me estiver indisponível (evita lockout).
-    onboardingCompleted = true;
+    onboardingCompleted = false;
   }
   if (!onboardingCompleted) redirect("/onboarding");
 

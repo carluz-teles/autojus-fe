@@ -156,6 +156,19 @@ export function useCompanyForm({ onDone }: { onDone: () => void }) {
     }
   });
 
+  // Teto do provisionamento: se o tenant não surgir em ~40s, para o "Preparando…"
+  // e devolve o controle com uma mensagem de retry (em vez de pollar pra sempre).
+  useEffect(() => {
+    if (phase !== "provisioning") return;
+    const timer = setTimeout(() => {
+      setPhase("idle");
+      setOrgError(
+        "Está demorando mais que o esperado para preparar sua conta. Tente novamente em instantes.",
+      );
+    }, 40_000);
+    return () => clearTimeout(timer);
+  }, [phase]);
+
   // Tenant provisionado durante o "provisioning" → grava o perfil e avança. Só
   // faz setState nos callbacks assíncronos; os deps [phase, tenantReady] só
   // mudam uma vez, então não há reentrada.
