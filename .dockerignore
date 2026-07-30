@@ -1,0 +1,9 @@
+node_modules
+.next
+out
+.git
+e2e
+playwright.config.ts
+.env*
+!.env.example
+npm-debug.log*

@@ -1,0 +1,96 @@
+name: Pipeline
+
+# Pipeline gated: test -> build -> deploy (encadeado por `needs`), mesmo padrão do
+# repo do backend. `test` roda em todo push/PR; `build`/`deploy` só no main.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint, format & build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      # NEXT_PUBLIC_* embutidas no bundle — placeholders bastam pro type-check e
+      # pro build de verificação (o build real de deploy usa os valores de prod).
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ci_placeholder
+          NEXT_PUBLIC_API_URL: http://localhost:8080
+          CLERK_SECRET_KEY: sk_test_ci_placeholder
+
+  build:
+    name: Build & push image
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          build-args: |
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+            NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/jus-fe-web:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/jus-fe-web:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Redeploy on Railway
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trigger Railway redeploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          PROJECT_NAME: court-legal
+          SERVICE_NAME: web
+        run: bash infra/railway/redeploy.sh
