@@ -1,0 +1,45 @@
+name: CI
+
+# Green gate REUTILIZÁVEL (workflow_call): lint + format + build. Usa placeholders nos
+# NEXT_PUBLIC_* (o build de verdade, com valores reais em build-arg, é no CD). Sem secret.
+on:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint & format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: ESLint
+        run: npm run lint
+      - name: Prettier (format:check)
+        run: npm run format:check
+
+  build:
+    name: Next build
+    needs: lint
+    runs-on: ubuntu-latest
+    # next build faz o typecheck (não há script tsc dedicado). Placeholders nos NEXT_PUBLIC_*.
+    env:
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      CLERK_SECRET_KEY: sk_test_ci_placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
