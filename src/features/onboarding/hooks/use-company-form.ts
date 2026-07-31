@@ -1,12 +1,12 @@
 "use client";
 
-import { useOrganizationList, useUser } from "@clerk/nextjs";
+import { useOrganizationList } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import type { OrgProfileInput, SyncIdentityInput } from "../types";
+import type { OrgProfileInput } from "../types";
 import { useOnboarding } from "./use-onboarding";
 
 const onlyDigits = (value: string) => value.replace(/\D/g, "");
@@ -30,27 +30,20 @@ const schema = z.object({
 
 export type CompanyFormValues = z.infer<typeof schema>;
 
-// Máquina de estados do passo 2: cria a org no Clerk → provisiona o tenant de forma
-// SÍNCRONA via POST /identity/sync (JIT, sem pollar o webhook) → grava o perfil.
-// Enquanto ≠ "idle", mostramos "preparando sua conta…".
-type Phase = "idle" | "creating" | "syncing" | "saving";
+// Máquina de estados do passo 2: cria a org no Clerk → aguarda o BE provisionar o
+// tenant (poll /identity/me) → grava o perfil. Enquanto ≠ "idle", mostramos
+// "preparando sua conta…".
+type Phase = "idle" | "creating" | "provisioning" | "saving";
 
 /**
  * Passo 2 (empresa). Concentra toda a lógica: RHF + Zod, autofetch de CNPJ/CEP,
- * criação da Clerk Organization e o provisionamento síncrono do tenant antes do PUT.
+ * criação da Clerk Organization e a espera pelo tenant provisionado antes do PUT.
  */
 export function useCompanyForm({ onDone }: { onDone: () => void }) {
   const { isLoaded, createOrganization, setActive } = useOrganizationList();
-  const { user } = useUser();
   const [phase, setPhase] = useState<Phase>("idle");
-  const {
-    tenantReady,
-    syncIdentity,
-    updateOrgProfile,
-    profileError,
-    lookupCnpj,
-    lookupCep,
-  } = useOnboarding();
+  const { tenantReady, updateOrgProfile, profileError, lookupCnpj, lookupCep } =
+    useOnboarding({ poll: phase === "provisioning" });
 
   const [lookupState, setLookupState] = useState<"idle" | "loading" | "failed">(
     "idle",
@@ -131,77 +124,65 @@ export function useCompanyForm({ onDone }: { onDone: () => void }) {
     }
   };
 
-  const persistProfile = async (input: OrgProfileInput) => {
+  const persistProfile = (input: OrgProfileInput) => {
     setPhase("saving");
-    try {
-      await updateOrgProfile(input);
-      setPhase("idle");
-      onDone();
-    } catch {
-      setPhase("idle"); // erro exposto em profileError
-    }
-  };
-
-  // setActive troca a org ativa, mas o token que o apiFetch anexa pode levar um
-  // instante pra carregar o novo org_id — enquanto isso o /sync devolve 401
-  // ("missing organization in token"). Re-tentamos curto (~2s no total); o /sync é
-  // idempotente, então repetir é seguro. Substitui o antigo poll de 40s do /me.
-  const syncWithRetry = async (input: SyncIdentityInput) => {
-    let lastErr: unknown;
-    for (let i = 0; i < 4; i++) {
-      try {
-        await syncIdentity(input);
-        return;
-      } catch (err) {
-        lastErr = err;
-        await new Promise((r) => setTimeout(r, 500));
-      }
-    }
-    throw lastErr;
+    updateOrgProfile(input)
+      .then(() => {
+        setPhase("idle");
+        onDone();
+      })
+      .catch(() => setPhase("idle")); // erro exposto em profileError
   };
 
   const submit = handleSubmit(async (values) => {
     setOrgError(null);
 
-    // Tenant já provisionado (ex.: usuário voltou ao passo) → grava direto.
+    // Org já provisionada (ex.: usuário voltou ao passo) → grava direto.
     if (tenantReady) {
-      await persistProfile(toInput(values));
+      persistProfile(toInput(values));
       return;
     }
 
     if (!isLoaded || !createOrganization || !setActive) return;
-
-    // 1) Cria a Clerk Organization e a torna ativa (dá ao token o org_id).
     setPhase("creating");
     try {
       const org = await createOrganization({ name: values.trade_name.trim() });
       await setActive({ organization: org.id });
+      // Liga o polling de /identity/me; o efeito conclui quando o tenant surgir.
+      setPhase("provisioning");
     } catch {
       setPhase("idle");
       setOrgError("Não foi possível criar sua organização. Tente novamente.");
-      return;
     }
+  });
 
-    // 2) Provisiona o tenant de forma SÍNCRONA (JIT): o BE cria tenant+user+
-    //    membership do org_id do token e devolve o Me na hora — sem pollar o webhook.
-    setPhase("syncing");
-    try {
-      await syncWithRetry({
-        email: user?.primaryEmailAddress?.emailAddress ?? "",
-        name: user?.fullName ?? "",
-        org_name: values.trade_name.trim(),
-      });
-    } catch {
+  // Teto do provisionamento: se o tenant não surgir em ~40s, para o "Preparando…"
+  // e devolve o controle com uma mensagem de retry (em vez de pollar pra sempre).
+  useEffect(() => {
+    if (phase !== "provisioning") return;
+    const timer = setTimeout(() => {
       setPhase("idle");
       setOrgError(
-        "Não foi possível preparar sua conta. Tente novamente em instantes.",
+        "Está demorando mais que o esperado para preparar sua conta. Tente novamente em instantes.",
       );
-      return;
-    }
+    }, 40_000);
+    return () => clearTimeout(timer);
+  }, [phase]);
 
-    // 3) Tenant pronto → grava o perfil e avança.
-    await persistProfile(toInput(values));
-  });
+  // Tenant provisionado durante o "provisioning" → grava o perfil e avança. Só
+  // faz setState nos callbacks assíncronos; os deps [phase, tenantReady] só
+  // mudam uma vez, então não há reentrada.
+  useEffect(() => {
+    if (phase !== "provisioning" || !tenantReady) return;
+    updateOrgProfile(toInput(getValues()))
+      .then(() => {
+        setPhase("idle");
+        onDone();
+      })
+      .catch(() => setPhase("idle")); // erro exposto em profileError
+    // toInput/getValues/updateOrgProfile/onDone são estáveis o bastante.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, tenantReady]);
 
   return {
     register,

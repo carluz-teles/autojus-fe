@@ -36,17 +36,6 @@ export interface Me {
   onboarding_completed_at: string | null;
 }
 
-/**
- * POST /v1/identity/sync — atributos de display do provisionamento JIT. O BE deriva
- * tenant/role do JWT; nunca enviamos tenant_id/org_id. Só `email` é obrigatório no BE
- * (app_user.email é NOT NULL); `name`/`org_name` são de conveniência.
- */
-export interface SyncIdentityInput {
-  email: string;
-  name: string;
-  org_name: string;
-}
-
 /** PUT /v1/organization/profile (Auth ADMIN). */
 export interface OrgProfileInput {
   cnpj: string;
