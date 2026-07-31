@@ -1,8 +1,8 @@
-# main.tf — o serviço `web` (Next.js) no projeto court-legal, environment stg.
+# main.tf — o serviço `web` (Next.js) no projeto court-legal (PRODUÇÃO), env production.
 #
 # Split-state: NÃO declaramos o projeto nem os serviços do BE — só o `web`, referenciando o
-# projeto court-legal-stg (var.railway_project_id) e seu environment (var.stg_environment_id)
-# por ID. O TF do BE cria e é dono do projeto/serviços do BE; este é dono só do `web`.
+# projeto court-legal (var.railway_project_id) e o env production (var.environment_id) por ID.
+# O TF do BE é dono do projeto/serviços do BE (via import); este é dono só do `web` (novo).
 #
 # NEXT_PUBLIC_* NÃO entram aqui como fonte da verdade do CLIENTE: eles são assados na IMAGEM
 # em build-time (--build-arg no docker build do CD). As variable collections abaixo carregam
@@ -28,17 +28,17 @@ resource "railway_service" "web" {
   source_image = "${var.image_registry}/jus-fe-web:${var.image_tag}"
 }
 
-# ===== Variáveis do web no environment stg =====
+# ===== Variáveis do web no env production =====
 resource "railway_variable_collection" "web" {
-  environment_id = var.stg_environment_id
+  environment_id = var.environment_id
   service_id     = railway_service.web.id
 
   variables = [for k, v in local.web_vars : { name = k, value = v }]
 }
 
-# ===== Domínio auto-gerado da Railway pro web no stg =====
+# ===== Domínio auto-gerado da Railway pro web =====
 resource "railway_service_domain" "web" {
   subdomain      = var.web_subdomain
-  environment_id = var.stg_environment_id
+  environment_id = var.environment_id
   service_id     = railway_service.web.id
 }
