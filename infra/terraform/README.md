@@ -1,9 +1,9 @@
 # infra/terraform (FE) — serviço `web` no court-legal
 
 Split-state: este módulo gerencia **só o serviço `web`** (Next.js), dentro do projeto
-**court-legal** que já existe (o TF do BE é dono do projeto/env/serviços). Deploya no
-environment **stg**, com domínio auto-gerado da Railway. **State em workspace TFC próprio**
-(`autojus-terraform-fe`) — não o do BE, senão os states se sobrepõem.
+**court-legal-stg** que o TF do BE cria. Deploya no environment default do stg, com domínio
+auto-gerado da Railway. **State em workspace TFC próprio** (`autojus-terraform-fe`) — não o do
+BE, senão os states se sobrepõem.
 
 ## O que é build-time vs runtime (crucial no Next.js)
 
@@ -14,9 +14,9 @@ environment **stg**, com domínio auto-gerado da Railway. **State em workspace T
 
 ## Dependência do BE
 
-Este módulo precisa do **`stg_environment_id`** (o env stg é criado pelo TF do BE). Pegue do
-output `stg_environment_id` do BE e passe como var `STG_ENVIRONMENT_ID` (GH var). O projeto é
-o court-legal (`0f0790a9-…`, default).
+Este módulo precisa dos outputs do TF do BE: **`project_id`** (→ var `RAILWAY_PROJECT_ID`) e
+**`stg_environment_id`** (→ var `STG_ENVIRONMENT_ID`), ambos GH vars. O BE precisa ter
+aplicado antes (o projeto court-legal-stg e seu environment precisam existir).
 
 ## Rodar (local)
 

@@ -57,8 +57,8 @@ jobs:
       TF_CLOUD_ORGANIZATION: ${{ vars.TF_CLOUD_ORGANIZATION }}   # = Autojus
       TF_WORKSPACE: autojus-terraform-fe
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}          # court-legal 0f0790a9-…
-      STG_ENVIRONMENT_ID: ${{ vars.STG_ENVIRONMENT_ID }}          # output do TF do BE
+      RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}          # court-legal-stg (output project_id do BE)
+      STG_ENVIRONMENT_ID: ${{ vars.STG_ENVIRONMENT_ID }}          # output stg_environment_id do BE
       IMAGE_TAG: ${{ github.sha }}
       IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
       CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}

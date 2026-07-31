@@ -1,8 +1,8 @@
 # main.tf — o serviço `web` (Next.js) no projeto court-legal, environment stg.
 #
 # Split-state: NÃO declaramos o projeto nem os serviços do BE — só o `web`, referenciando o
-# projeto (var.railway_project_id) e o env stg (var.stg_environment_id) por ID. O TF do BE é
-# dono do projeto/env/serviços do BE; este é dono só do `web`. Sem sobreposição.
+# projeto court-legal-stg (var.railway_project_id) e seu environment (var.stg_environment_id)
+# por ID. O TF do BE cria e é dono do projeto/serviços do BE; este é dono só do `web`.
 #
 # NEXT_PUBLIC_* NÃO entram aqui como fonte da verdade do CLIENTE: eles são assados na IMAGEM
 # em build-time (--build-arg no docker build do CD). As variable collections abaixo carregam

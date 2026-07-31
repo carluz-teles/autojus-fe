@@ -2,6 +2,7 @@
 # infra/terraform/_env.sh (FE) — mapeia env do projeto -> TF_VAR_* (DRY). Sourced pelo apply.sh.
 # RAILWAY_TOKEN o provider lê direto do env. Secrets = os mesmos do GitHub Actions.
 : "${RAILWAY_TOKEN:?RAILWAY_TOKEN obrigatório}"
+: "${RAILWAY_PROJECT_ID:?RAILWAY_PROJECT_ID obrigatório (output project_id do court-legal-stg do BE)}"
 : "${STG_ENVIRONMENT_ID:?STG_ENVIRONMENT_ID obrigatório (output stg_environment_id do TF do BE)}"
 : "${CLERK_SECRET_KEY:?}"
 : "${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:?}"

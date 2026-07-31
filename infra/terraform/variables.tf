@@ -4,13 +4,12 @@
 # ---- Referências ao court-legal (gerenciado pelo TF do BE; aqui só referenciamos) ----
 variable "railway_project_id" {
   type        = string
-  description = "ID do projeto court-legal (já existe)."
-  default     = "0f0790a9-235b-499d-af63-c8f83b5dba0b"
+  description = "ID do projeto court-legal-stg (criado pelo TF do BE; pegue do output project_id do BE)."
 }
 
 variable "stg_environment_id" {
   type        = string
-  description = "ID do environment stg (criado pelo TF do BE; pegue do output stg_environment_id do BE)."
+  description = "ID do environment default do court-legal-stg (output stg_environment_id do BE)."
 }
 
 # ---- Imagem do web ----
