@@ -1,0 +1,8 @@
+# Estado e artefatos locais — o .terraform.lock.hcl NÃO é ignorado (pina o provider).
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+crash.*.log
+.env.railway
