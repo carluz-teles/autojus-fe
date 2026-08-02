@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api/errors";
+import { BR_UFS } from "@/lib/br";
 import { maskCep, maskCnpj, maskPhone } from "@/lib/masks";
 
-import { BR_UFS, onboardingCopy } from "../copy";
+import { onboardingCopy } from "../copy";
 import { useCompanyForm } from "../hooks/use-company-form";
 
 const t = onboardingCopy.company;

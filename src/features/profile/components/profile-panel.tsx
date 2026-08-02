@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { useProfile } from "../hooks/use-profile";
 import { PasswordForm } from "./password-form";
 import { PersonalForm } from "./personal-form";
+import { SecurityPanel } from "./security-panel";
 
 // Painel headless da conta do usuário — substitui o <UserProfile/> do Clerk. Mostra
 // avatar + e-mail (read-only), edita nome (user.update) e troca senha
@@ -108,7 +109,7 @@ export function ProfilePanel() {
       {passwordEnabled ? (
         <Card className="flex flex-col gap-4 p-6">
           <div>
-            <h2 className="text-lg font-medium">Segurança</h2>
+            <h2 className="text-lg font-medium">Senha</h2>
             <p className="text-muted-foreground text-sm">
               Trocar a senha desconecta as outras sessões.
             </p>
@@ -116,6 +117,8 @@ export function ProfilePanel() {
           <PasswordForm saving={savingPassword} onSave={updatePassword} />
         </Card>
       ) : null}
+
+      <SecurityPanel />
     </div>
   );
 }

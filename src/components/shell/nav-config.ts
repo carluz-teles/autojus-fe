@@ -1,11 +1,4 @@
-import {
-  Building2,
-  CreditCard,
-  LayoutDashboard,
-  type LucideIcon,
-  Plug,
-  UserRound,
-} from "lucide-react";
+import { LayoutDashboard, type LucideIcon, Settings } from "lucide-react";
 
 export interface NavItem {
   href: string;
@@ -13,11 +6,9 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
-// Fonte única da navegação do shell autenticado. Cada rota tem sua page em src/app/(app).
+// Fonte única da navegação do shell autenticado. Organização, Integrações,
+// Cobrança e Perfil vivem dentro de Configurações (abas em /settings).
 export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/integrations", label: "Integrações", icon: Plug },
-  { href: "/organization", label: "Organização", icon: Building2 },
-  { href: "/billing", label: "Cobrança", icon: CreditCard },
-  { href: "/profile", label: "Perfil", icon: UserRound },
+  { href: "/settings", label: "Configurações", icon: Settings },
 ];

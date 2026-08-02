@@ -4,115 +4,41 @@ import { useOrganization, useOrganizationList } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 
+import {
+  EMPTY_ADDRESS,
+  makeOrgProfileSchema,
+  type OrgProfileFormValues,
+  orgProfileToInput,
+} from "@/lib/forms/org-profile";
 import { maskCep } from "@/lib/masks";
 
 import { onboardingCopy } from "../copy";
-import type { Address, OrgProfileInput } from "../types";
+import type { OrgProfileInput } from "../types";
 import { useOnboarding } from "./use-onboarding";
 
 const t = onboardingCopy.company;
 
 const onlyDigits = (value: string) => value.replace(/\D/g, "");
 
-// Endereço é OPCIONAL como um todo: vazio inteiro passa; qualquer campo
-// preenchido exige o núcleo (cep 8 dígitos, logradouro, cidade, uf) — mesma regra
-// do BE (Address parcial é 400).
-const addressSchema = z
-  .object({
-    cep: z.string(),
-    logradouro: z.string(),
-    numero: z.string().optional(),
-    complemento: z.string().optional(),
-    bairro: z.string().optional(),
-    cidade: z.string(),
-    uf: z.string(),
-  })
-  .superRefine((a, ctx) => {
-    const values = [
-      a.cep,
-      a.logradouro,
-      a.numero,
-      a.complemento,
-      a.bairro,
-      a.cidade,
-      a.uf,
-    ];
-    const touched = values.some((v) => (v ?? "").trim() !== "");
-    if (!touched) return;
-    if (onlyDigits(a.cep).length !== 8) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["cep"],
-        message: t.fields.address.cep.invalid,
-      });
-    }
-    if (!a.logradouro.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["logradouro"],
-        message: t.fields.address.logradouro.required,
-      });
-    }
-    if (!a.cidade.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["cidade"],
-        message: t.fields.address.cidade.required,
-      });
-    }
-    if (a.uf.trim().length !== 2) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["uf"],
-        message: t.fields.address.uf.invalid,
-      });
-    }
-  });
-
-const schema = z.object({
-  trade_name: z.string().trim().min(1, t.fields.name.required),
-  cnpj: z
-    .string()
-    .refine((v) => onlyDigits(v).length === 14, t.fields.cnpj.invalid),
-  // Telefone do escritório — opcional; quando preenchido, 10-11 dígitos.
-  phone: z
-    .string()
-    .refine((v) => {
-      const d = onlyDigits(v);
-      return d.length === 0 || d.length === 10 || d.length === 11;
-    }, t.fields.phone.invalid)
-    .optional(),
-  // E-mail da organização — opcional; formato validado quando preenchido.
-  email: z
-    .string()
-    .trim()
-    .refine((v) => v === "" || z.string().email().safeParse(v).success, {
-      message: t.fields.email.invalid,
-    })
-    .optional(),
-  // Razão social não tem UI: o lookup de CNPJ preenche por baixo (fallback no
-  // toInput = nome da empresa). O BE continua exigindo legal_name.
-  legal_name: z.string().optional(),
-  address: addressSchema,
+// Schema/mapeamento compartilhados com a página /organization (fonte única em
+// lib/forms/org-profile) — aqui só injetamos as mensagens do onboarding.
+const schema = makeOrgProfileSchema({
+  nameRequired: t.fields.name.required,
+  cnpjInvalid: t.fields.cnpj.invalid,
+  phoneInvalid: t.fields.phone.invalid,
+  emailInvalid: t.fields.email.invalid,
+  cepInvalid: t.fields.address.cep.invalid,
+  logradouroRequired: t.fields.address.logradouro.required,
+  cidadeRequired: t.fields.address.cidade.required,
+  ufInvalid: t.fields.address.uf.invalid,
 });
 
-export type CompanyFormValues = z.infer<typeof schema>;
+export type CompanyFormValues = OrgProfileFormValues;
 
 // Máquina de estados do passo da empresa: cria a org no Clerk (+ logo staged) →
 // aguarda o BE provisionar o tenant (poll /identity/me) → grava o perfil.
 type Phase = "idle" | "creating" | "provisioning" | "saving";
-
-const EMPTY_ADDRESS = {
-  cep: "",
-  logradouro: "",
-  numero: "",
-  complemento: "",
-  bairro: "",
-  cidade: "",
-  uf: "",
-};
 
 /**
  * Passo da empresa. Concentra toda a lógica: RHF + Zod, autofetch de CNPJ/CEP,
@@ -170,32 +96,6 @@ export function useCompanyForm({ onDone }: { onDone: () => void }) {
     },
   });
   const { register, handleSubmit, setValue, getValues, formState } = form;
-
-  const toInput = (values: CompanyFormValues): OrgProfileInput => {
-    const addressTouched = Object.values(values.address).some(
-      (v) => (v ?? "").trim() !== "",
-    );
-    const address: Address | undefined = addressTouched
-      ? {
-          cep: onlyDigits(values.address.cep),
-          logradouro: values.address.logradouro.trim(),
-          numero: values.address.numero?.trim() || undefined,
-          complemento: values.address.complemento?.trim() || undefined,
-          bairro: values.address.bairro?.trim() || undefined,
-          cidade: values.address.cidade.trim(),
-          uf: values.address.uf.trim().toUpperCase(),
-        }
-      : undefined;
-
-    return {
-      cnpj: onlyDigits(values.cnpj),
-      phone: onlyDigits(values.phone ?? "") || undefined,
-      email: values.email?.trim() || undefined,
-      legal_name: values.legal_name?.trim() || values.trade_name.trim(),
-      trade_name: values.trade_name.trim(),
-      address,
-    };
-  };
 
   // Autofetch por CNPJ (blur com 14 dígitos): pré-preenche nome/razão e, quando o
   // registro traz endereço, REVELA a seção já preenchida (valor visível > seção
@@ -278,7 +178,7 @@ export function useCompanyForm({ onDone }: { onDone: () => void }) {
     // Org já provisionada (ex.: usuário voltou ao passo) → logo + perfil direto.
     if (tenantReady) {
       if (activeOrg) await uploadLogo(activeOrg);
-      persistProfile(toInput(values));
+      persistProfile(orgProfileToInput(values));
       return;
     }
 
@@ -310,7 +210,7 @@ export function useCompanyForm({ onDone }: { onDone: () => void }) {
   // Tenant provisionado durante o "provisioning" → grava o perfil e avança.
   useEffect(() => {
     if (phase !== "provisioning" || !tenantReady) return;
-    updateOrgProfile(toInput(getValues()))
+    updateOrgProfile(orgProfileToInput(getValues()))
       .then(() => {
         setPhase("idle");
         onDone();

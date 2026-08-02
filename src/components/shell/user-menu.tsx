@@ -82,7 +82,7 @@ export function UserMenu() {
           </div>
           <Link
             role="menuitem"
-            href="/profile"
+            href="/settings/profile"
             onClick={() => setOpen(false)}
             className="hover:bg-accent block px-3 py-2 text-sm"
           >

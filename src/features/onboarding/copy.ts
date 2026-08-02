@@ -13,37 +13,6 @@ export const ONBOARDING_STEPS = [
   { id: 3, label: "Seu time" },
 ] as const;
 
-// UFs do Brasil (27) — dado da feature, usado no select de estado do endereço.
-export const BR_UFS = [
-  "AC",
-  "AL",
-  "AP",
-  "AM",
-  "BA",
-  "CE",
-  "DF",
-  "ES",
-  "GO",
-  "MA",
-  "MT",
-  "MS",
-  "MG",
-  "PA",
-  "PB",
-  "PR",
-  "PE",
-  "PI",
-  "RJ",
-  "RN",
-  "RS",
-  "RO",
-  "RR",
-  "SC",
-  "SP",
-  "SE",
-  "TO",
-] as const;
-
 export const onboardingCopy = {
   page: {
     title: "Vamos configurar sua conta",
