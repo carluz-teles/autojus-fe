@@ -1,4 +1,4 @@
-import { LayoutDashboard, type LucideIcon, Settings } from "lucide-react";
+import { LayoutDashboard, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   href: string;
@@ -6,9 +6,9 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
-// Fonte única da navegação do shell autenticado. Organização, Integrações,
-// Cobrança e Perfil vivem dentro de Configurações (abas em /settings).
+// Fonte única da navegação PRINCIPAL do shell autenticado. Configurações fica no
+// rodapé (SidebarFooter), separada; Organização/Integrações/Cobrança/Perfil são
+// abas dentro de /settings.
 export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/settings", label: "Configurações", icon: Settings },
 ];

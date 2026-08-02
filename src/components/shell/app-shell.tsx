@@ -1,12 +1,12 @@
-import { Wordmark } from "./brand-mark";
+import { SidebarFooter } from "./sidebar-footer";
 import { SidebarNav } from "./sidebar-nav";
 import { SidebarOrg } from "./sidebar-org";
 import { UserMenu } from "./user-menu";
 
 // Chrome do app autenticado (Server Component). A auth já é garantida no proxy.
 // A sidebar carrega a identidade do tenant no topo (SidebarOrg: logo + nome da
-// org, → /organization) e a marca do produto (Wordmark + v0) no rodapé. O header
-// fica enxuto: só a conta (UserMenu), já que a org está na sidebar.
+// org, → /organization) e, no rodapé, uma seção separada com Configurações + a
+// versão (SidebarFooter). O header fica enxuto: só a conta (UserMenu).
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-full flex-1">
@@ -15,12 +15,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <SidebarOrg />
         </div>
         <SidebarNav />
-        <div className="mt-auto flex flex-col gap-2 px-5 py-4">
-          <Wordmark />
-          <span className="text-muted-foreground/70 text-xs">
-            v0 · fundação
-          </span>
-        </div>
+        <SidebarFooter />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
