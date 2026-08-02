@@ -79,6 +79,22 @@ export function useActivateForm() {
     await activate({ sources: values.sources, scope: { oab: values.oab } });
   });
 
+  // Variante imperativa para fluxos que precisam saber se DEU CERTO antes de
+  // avançar (ex.: o "Continuar" do onboarding salva e só então troca de passo).
+  // Validação reprovada ou activate rejeitado → false; os erros ficam no form.
+  const submitAsync = async (): Promise<boolean> => {
+    let ok = false;
+    try {
+      await handleSubmit(async (values) => {
+        await activate({ sources: values.sources, scope: { oab: values.oab } });
+        ok = true;
+      })();
+    } catch {
+      ok = false;
+    }
+    return ok;
+  };
+
   return {
     sources,
     oab,
@@ -88,6 +104,7 @@ export function useActivateForm() {
     addOab,
     removeOab,
     onSubmit,
+    submitAsync,
     isActivating,
     activateError,
     justSucceeded: formState.isSubmitSuccessful && !activateError,

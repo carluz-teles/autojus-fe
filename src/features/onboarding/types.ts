@@ -39,9 +39,13 @@ export interface Me {
 /** PUT /v1/organization/profile (Auth ADMIN). */
 export interface OrgProfileInput {
   cnpj: string;
-  /** Telefone do escritório (10-11 dígitos), opcional — persistência chega com a fatia tenant.phone do BE. */
+  /** Telefone do escritório (10-11 dígitos), opcional. */
   phone?: string;
+  /** E-mail da organização, opcional (persistência via tenant.email do BE). */
+  email?: string;
+  /** Razão social — sem UI própria: vem do lookup de CNPJ (fallback: nome da empresa). */
   legal_name: string;
   trade_name: string;
-  address: Address;
+  /** Endereço é opcional no produto ("Adicionar endereço"); ausente = não enviado. */
+  address?: Address;
 }

@@ -63,6 +63,11 @@ export const onboardingCopy = {
   company: {
     title: "Sua empresa",
     description: "Os dados do escritório que você representa.",
+    logo: {
+      alt: "Logo da organização",
+      edit: "Editar logo",
+      hint: "Aparece para o seu time e nos documentos.",
+    },
     fields: {
       cnpj: {
         label: "CNPJ",
@@ -77,13 +82,20 @@ export const onboardingCopy = {
         placeholder: "(11) 3000-0000",
         invalid: "Telefone com 10 ou 11 dígitos.",
       },
-      tradeName: {
-        label: "Nome fantasia",
-        required: "Informe o nome fantasia.",
+      name: {
+        label: "Nome da empresa",
+        required: "Informe o nome da empresa.",
       },
-      legalName: { label: "Razão social", required: "Informe a razão social." },
+      email: {
+        label: "E-mail da organização",
+        placeholder: "contato@escritorio.com.br",
+        invalid: "Informe um e-mail válido.",
+      },
       address: {
         legend: "Endereço",
+        add: "Adicionar endereço",
+        remove: "Remover endereço",
+        incomplete: "Complete o endereço ou remova a seção.",
         cep: {
           label: "CEP",
           placeholder: "00000-000",
@@ -118,6 +130,19 @@ export const onboardingCopy = {
     title: "Convide seu time",
     description:
       "Cada advogado convidado traz a própria OAB — mais processos monitorados no escritório.",
-    invitedHint: "Convites enviados aparecem em Organização.",
+    fields: {
+      email: {
+        label: "E-mail do convidado",
+        placeholder: "advogado@escritorio.com",
+        invalid: "Informe um e-mail válido.",
+        duplicate: "Esse e-mail já está na lista.",
+      },
+      role: { label: "Papel" },
+    },
+    add: "Adicionar",
+    stagedHint: "Os convites são enviados quando você concluir.",
+    sending: "Enviando convites…",
+    sendError:
+      "Não foi possível enviar alguns convites — os pendentes seguem na lista. Tente novamente.",
   },
 } as const;
