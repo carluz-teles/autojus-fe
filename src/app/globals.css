@@ -49,7 +49,13 @@
 
 /* ── "Ledger" light: papel quente, tinta verde-perene, acento latão ────────── */
 :root {
-  --radius: 0.5rem;
+  --radius: 0.625rem;
+
+  /* Degradê do fundo: branco puro no topo → papel aquecido (latão) na base.
+     O pastel atual é claro demais pra contrastar com branco sozinho, então a
+     base ganha um mergulho de gold pra dar viagem tonal visível. */
+  --sheen: oklch(1 0 0);
+  --sheen-deep: color-mix(in oklch, var(--gold) 14%, var(--background));
 
   --background: oklch(0.985 0.006 95);
   --foreground: oklch(0.24 0.02 165);
@@ -98,6 +104,11 @@
 
 /* ── "Ledger" dark: tinta profunda esverdeada, primário luminoso ───────────── */
 .dark {
+  /* No escuro o "branco" vira um brilho sutil e a base escurece um tom —
+     mesmo degradê, outra energia. */
+  --sheen: oklch(1 0 0 / 4%);
+  --sheen-deep: oklch(0 0 0 / 22%);
+
   --background: oklch(0.19 0.016 168);
   --foreground: oklch(0.95 0.008 95);
 
@@ -150,7 +161,8 @@
 
   body {
     @apply bg-background text-foreground font-sans;
-    /* Textura sutil: dá profundidade de "papel" sem competir com o conteúdo. */
+    /* Atmosfera: degradê branco→pastel (o "papel" clareia no topo) + véus de
+       primário e latão. --sheen adapta ao dark (lá o branco vira um brilho de 3%). */
     background-image:
       radial-gradient(
         ellipse 80% 50% at 50% -10%,
@@ -161,6 +173,12 @@
         ellipse 60% 40% at 100% 0%,
         color-mix(in oklch, var(--gold) 6%, transparent),
         transparent 55%
+      ),
+      linear-gradient(
+        180deg,
+        var(--sheen) 0%,
+        transparent 38%,
+        var(--sheen-deep) 100%
       );
     background-attachment: fixed;
   }

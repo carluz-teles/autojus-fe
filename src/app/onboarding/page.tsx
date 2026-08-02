@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { Wordmark } from "@/components/shell/brand-mark";
 import { OnboardingWizard } from "@/features/onboarding/components/onboarding-wizard";
+import { onboardingCopy } from "@/features/onboarding/copy";
 import type { Me } from "@/features/onboarding/types";
 import { apiFetch } from "@/lib/api/client";
 
@@ -25,15 +26,15 @@ export default async function OnboardingPage() {
   if (completed) redirect("/dashboard");
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-4 py-12">
-      <div className="reveal flex flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 px-4 py-16">
+      <div className="reveal flex flex-col items-center gap-4 text-center">
         <Wordmark />
         <div>
           <h1 className="font-display text-2xl leading-tight tracking-tight">
-            Vamos configurar sua conta
+            {onboardingCopy.page.title}
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Três passos rápidos para começar a monitorar seus processos.
+            {onboardingCopy.page.subtitle}
           </p>
         </div>
       </div>

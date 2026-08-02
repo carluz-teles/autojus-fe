@@ -5,7 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api/errors";
 
+import { onboardingCopy } from "../copy";
 import { useCompanyForm } from "../hooks/use-company-form";
+
+const t = onboardingCopy.step2;
+const common = onboardingCopy.common;
 
 export function Step2Company({
   onDone,
@@ -33,12 +37,17 @@ export function Step2Company({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-6" noValidate>
+      <div>
+        <h2 className="text-lg font-medium">{t.title}</h2>
+        <p className="text-muted-foreground text-sm">{t.description}</p>
+      </div>
+
       <div className="flex flex-col gap-2">
-        <Label htmlFor="cnpj">CNPJ</Label>
+        <Label htmlFor="cnpj">{t.fields.cnpj.label}</Label>
         <Input
           id="cnpj"
           inputMode="numeric"
-          placeholder="00.000.000/0000-00"
+          placeholder={t.fields.cnpj.placeholder}
           aria-invalid={errors.cnpj ? true : undefined}
           aria-describedby="cnpj-help"
           {...cnpj}
@@ -48,9 +57,7 @@ export function Step2Company({
           }}
         />
         <p id="cnpj-help" className="text-muted-foreground text-xs">
-          {isLookingUpCnpj
-            ? "Buscando dados da empresa…"
-            : "Preenchemos os dados automaticamente ao sair do campo."}
+          {isLookingUpCnpj ? t.fields.cnpj.searching : t.fields.cnpj.help}
         </p>
         {errors.cnpj ? (
           <p className="text-destructive text-sm">{errors.cnpj.message}</p>
@@ -60,14 +67,14 @@ export function Step2Company({
             className="text-sm text-amber-600 dark:text-amber-500"
             role="status"
           >
-            Não foi possível buscar o CNPJ, preencha manualmente.
+            {t.fields.cnpj.lookupFailed}
           </p>
         ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="trade_name">Nome fantasia</Label>
+          <Label htmlFor="trade_name">{t.fields.tradeName.label}</Label>
           <Input
             id="trade_name"
             aria-invalid={errors.trade_name ? true : undefined}
@@ -81,7 +88,7 @@ export function Step2Company({
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="legal_name">Razão social</Label>
+          <Label htmlFor="legal_name">{t.fields.legalName.label}</Label>
           <Input
             id="legal_name"
             aria-invalid={errors.legal_name ? true : undefined}
@@ -96,15 +103,17 @@ export function Step2Company({
       </div>
 
       <fieldset className="flex flex-col gap-4">
-        <legend className="mb-1 text-sm font-medium">Endereço</legend>
+        <legend className="mb-1 text-sm font-medium">
+          {t.fields.address.legend}
+        </legend>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_2fr]">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="cep">CEP</Label>
+            <Label htmlFor="cep">{t.fields.address.cep.label}</Label>
             <Input
               id="cep"
               inputMode="numeric"
-              placeholder="00000-000"
+              placeholder={t.fields.address.cep.placeholder}
               aria-invalid={errors.address?.cep ? true : undefined}
               {...cep}
               onBlur={(e) => {
@@ -120,7 +129,9 @@ export function Step2Company({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="logradouro">Logradouro</Label>
+            <Label htmlFor="logradouro">
+              {t.fields.address.logradouro.label}
+            </Label>
             <Input
               id="logradouro"
               autoComplete="address-line1"
@@ -137,22 +148,24 @@ export function Step2Company({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_2fr]">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="numero">Número</Label>
+            <Label htmlFor="numero">{t.fields.address.numero.label}</Label>
             <Input id="numero" {...register("address.numero")} />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="complemento">Complemento</Label>
+            <Label htmlFor="complemento">
+              {t.fields.address.complemento.label}
+            </Label>
             <Input id="complemento" {...register("address.complemento")} />
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[2fr_2fr_1fr]">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="bairro">Bairro</Label>
+            <Label htmlFor="bairro">{t.fields.address.bairro.label}</Label>
             <Input id="bairro" {...register("address.bairro")} />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="cidade">Cidade</Label>
+            <Label htmlFor="cidade">{t.fields.address.cidade.label}</Label>
             <Input
               id="cidade"
               aria-invalid={errors.address?.cidade ? true : undefined}
@@ -165,7 +178,7 @@ export function Step2Company({
             ) : null}
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="uf">UF</Label>
+            <Label htmlFor="uf">{t.fields.address.uf.label}</Label>
             <Input
               id="uf"
               maxLength={2}
@@ -191,13 +204,13 @@ export function Step2Company({
         <p className="text-destructive text-sm" role="alert">
           {profileError instanceof ApiError
             ? profileError.message
-            : "Não foi possível salvar o perfil. Tente novamente."}
+            : t.profileError}
         </p>
       ) : null}
 
       {isPreparing ? (
         <p className="text-muted-foreground text-sm" role="status">
-          Preparando sua conta…
+          {t.preparingAccount}
         </p>
       ) : null}
 
@@ -208,10 +221,10 @@ export function Step2Company({
           onClick={onBack}
           disabled={isPreparing}
         >
-          Voltar
+          {common.back}
         </Button>
         <Button type="submit" disabled={isPreparing || !isReady}>
-          {isPreparing ? "Preparando…" : "Continuar"}
+          {isPreparing ? common.preparing : common.next}
         </Button>
       </div>
     </form>

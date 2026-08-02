@@ -6,25 +6,30 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { onboardingCopy } from "../copy";
 import type { OrgProfileInput } from "../types";
 import { useOnboarding } from "./use-onboarding";
+
+const t = onboardingCopy.step2;
 
 const onlyDigits = (value: string) => value.replace(/\D/g, "");
 
 const schema = z.object({
   cnpj: z
     .string()
-    .refine((v) => onlyDigits(v).length === 14, "CNPJ deve ter 14 dígitos."),
-  legal_name: z.string().trim().min(1, "Informe a razão social."),
-  trade_name: z.string().trim().min(1, "Informe o nome fantasia."),
+    .refine((v) => onlyDigits(v).length === 14, t.fields.cnpj.invalid),
+  legal_name: z.string().trim().min(1, t.fields.legalName.required),
+  trade_name: z.string().trim().min(1, t.fields.tradeName.required),
   address: z.object({
-    cep: z.string().refine((v) => onlyDigits(v).length === 8, "CEP inválido."),
-    logradouro: z.string().trim().min(1, "Informe o logradouro."),
+    cep: z
+      .string()
+      .refine((v) => onlyDigits(v).length === 8, t.fields.address.cep.invalid),
+    logradouro: z.string().trim().min(1, t.fields.address.logradouro.required),
     numero: z.string().trim().optional(),
     complemento: z.string().trim().optional(),
     bairro: z.string().trim().optional(),
-    cidade: z.string().trim().min(1, "Informe a cidade."),
-    uf: z.string().trim().length(2, "UF com 2 letras."),
+    cidade: z.string().trim().min(1, t.fields.address.cidade.required),
+    uf: z.string().trim().length(2, t.fields.address.uf.invalid),
   }),
 });
 
@@ -152,7 +157,7 @@ export function useCompanyForm({ onDone }: { onDone: () => void }) {
       setPhase("provisioning");
     } catch {
       setPhase("idle");
-      setOrgError("Não foi possível criar sua organização. Tente novamente.");
+      setOrgError(t.orgError);
     }
   });
 
@@ -162,9 +167,7 @@ export function useCompanyForm({ onDone }: { onDone: () => void }) {
     if (phase !== "provisioning") return;
     const timer = setTimeout(() => {
       setPhase("idle");
-      setOrgError(
-        "Está demorando mais que o esperado para preparar sua conta. Tente novamente em instantes.",
-      );
+      setOrgError(t.timeout);
     }, 40_000);
     return () => clearTimeout(timer);
   }, [phase]);
