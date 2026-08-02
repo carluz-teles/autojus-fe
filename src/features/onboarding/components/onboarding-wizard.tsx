@@ -7,16 +7,18 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 import { ONBOARDING_STEPS, onboardingCopy } from "../copy";
-import { Step1Person } from "./step1-person";
+import { StepTeam } from "./step-team";
 import { Step2Company } from "./step2-company";
 import { Step3Sources } from "./step3-sources";
 
 /**
  * Casca client do onboarding: stepper centralizado + o conteúdo do passo num Card.
- * Os passos e toda a linguagem vêm de ../copy (fonte única). O estado do passo é
- * UI efêmera (useState); a lógica de cada passo vive nos hooks das steps. Passos
- * 1 e 2 ficam montados (ocultos) para preservar os dados ao voltar; o 3 monta sob
- * demanda (o ActivateForm só busca integrações após a org existir).
+ * Os passos e toda a linguagem vêm de ../copy (fonte única). Fluxo de valor:
+ * ① Sua empresa (cria a org/tenant) → ② Seus processos (OAB/fontes — o "aha") →
+ * ③ Convide seu time. O nome vem do sign-up do Clerk e a foto vive no /profile,
+ * então não há passo de dados pessoais. O passo da empresa fica montado (oculto)
+ * para preservar o form ao voltar; os demais montam sob demanda (precisam da org
+ * ativa, que só existe após o passo 1).
  */
 export function OnboardingWizard() {
   const router = useRouter();
@@ -68,13 +70,13 @@ export function OnboardingWizard() {
       {/* O filete de latão no topo é a assinatura "Ledger" do card do wizard. */}
       <Card className="border-t-gold/70 border-t-2 p-8 shadow-md sm:p-12">
         <div className={cn(step !== 1 && "hidden")}>
-          <Step1Person onDone={() => goTo(2)} />
+          <Step2Company onDone={() => goTo(2)} />
         </div>
-        <div className={cn(step !== 2 && "hidden")}>
-          <Step2Company onDone={() => goTo(3)} onBack={() => goTo(1)} />
-        </div>
+        {step === 2 ? (
+          <Step3Sources onFinish={() => goTo(3)} onBack={() => goTo(1)} />
+        ) : null}
         {step === 3 ? (
-          <Step3Sources onFinish={finish} onBack={() => goTo(2)} />
+          <StepTeam onFinish={finish} onBack={() => goTo(2)} />
         ) : null}
       </Card>
     </div>

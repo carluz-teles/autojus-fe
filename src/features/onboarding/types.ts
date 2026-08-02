@@ -39,6 +39,8 @@ export interface Me {
 /** PUT /v1/organization/profile (Auth ADMIN). */
 export interface OrgProfileInput {
   cnpj: string;
+  /** Telefone do escritório (10-11 dígitos), opcional — persistência chega com a fatia tenant.phone do BE. */
+  phone?: string;
   legal_name: string;
   trade_name: string;
   address: Address;

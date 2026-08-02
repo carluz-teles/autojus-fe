@@ -6,11 +6,13 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { maskCep } from "@/lib/masks";
+
 import { onboardingCopy } from "../copy";
 import type { OrgProfileInput } from "../types";
 import { useOnboarding } from "./use-onboarding";
 
-const t = onboardingCopy.step2;
+const t = onboardingCopy.company;
 
 const onlyDigits = (value: string) => value.replace(/\D/g, "");
 
@@ -18,6 +20,14 @@ const schema = z.object({
   cnpj: z
     .string()
     .refine((v) => onlyDigits(v).length === 14, t.fields.cnpj.invalid),
+  // Telefone do escritório — opcional; quando preenchido, 10-11 dígitos (fixo/celular).
+  phone: z
+    .string()
+    .refine((v) => {
+      const d = onlyDigits(v);
+      return d.length === 0 || d.length === 10 || d.length === 11;
+    }, t.fields.phone.invalid)
+    .optional(),
   legal_name: z.string().trim().min(1, t.fields.legalName.required),
   trade_name: z.string().trim().min(1, t.fields.tradeName.required),
   address: z.object({
@@ -35,30 +45,36 @@ const schema = z.object({
 
 export type CompanyFormValues = z.infer<typeof schema>;
 
-// Máquina de estados do passo 2: cria a org no Clerk → aguarda o BE provisionar o
-// tenant (poll /identity/me) → grava o perfil. Enquanto ≠ "idle", mostramos
-// "preparando sua conta…".
+// Máquina de estados do passo da empresa: cria a org no Clerk → aguarda o BE
+// provisionar o tenant (poll /identity/me) → grava o perfil. Enquanto ≠ "idle",
+// mostramos "preparando sua conta…".
 type Phase = "idle" | "creating" | "provisioning" | "saving";
 
 /**
- * Passo 2 (empresa). Concentra toda a lógica: RHF + Zod, autofetch de CNPJ/CEP,
+ * Passo da empresa. Concentra toda a lógica: RHF + Zod, autofetch de CNPJ/CEP,
  * criação da Clerk Organization e a espera pelo tenant provisionado antes do PUT.
  */
 export function useCompanyForm({ onDone }: { onDone: () => void }) {
   const { isLoaded, createOrganization, setActive } = useOrganizationList();
   const [phase, setPhase] = useState<Phase>("idle");
-  const { tenantReady, updateOrgProfile, profileError, lookupCnpj, lookupCep } =
-    useOnboarding({ poll: phase === "provisioning" });
+  const {
+    tenantReady,
+    updateOrgProfile,
+    profileError,
+    lookupCnpj,
+    isCnpjLoading,
+    cnpjLookupFailed,
+    lookupCep,
+    isCepLoading,
+  } = useOnboarding({ poll: phase === "provisioning" });
 
-  const [lookupState, setLookupState] = useState<"idle" | "loading" | "failed">(
-    "idle",
-  );
   const [orgError, setOrgError] = useState<string | null>(null);
 
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       cnpj: "",
+      phone: "",
       legal_name: "",
       trade_name: "",
       address: {
@@ -76,6 +92,7 @@ export function useCompanyForm({ onDone }: { onDone: () => void }) {
 
   const toInput = (values: CompanyFormValues): OrgProfileInput => ({
     cnpj: onlyDigits(values.cnpj),
+    phone: onlyDigits(values.phone ?? "") || undefined,
     legal_name: values.legal_name.trim(),
     trade_name: values.trade_name.trim(),
     address: {
@@ -89,31 +106,33 @@ export function useCompanyForm({ onDone }: { onDone: () => void }) {
     },
   });
 
-  // Autofetch por CNPJ (blur com 14 dígitos): pré-preenche os campos. Degrada em
-  // timeout/404 → mantém tudo editável e sinaliza `lookupFailed`.
+  // Autofetch por CNPJ (blur com 14 dígitos): pré-preenche os campos. O estado
+  // (isPending/isError) é do React Query — aqui só o efeito de preencher o form.
+  // Falha degrada: tudo continua editável e `lookupFailed` mostra o aviso.
   const onCnpjBlur = async () => {
     const cnpj = onlyDigits(getValues("cnpj"));
     if (cnpj.length !== 14) return;
-    setLookupState("loading");
     try {
       const data = await lookupCnpj(cnpj);
       const opts = { shouldValidate: formState.isSubmitted };
       setValue("legal_name", data.legal_name, opts);
       setValue("trade_name", data.trade_name, opts);
-      setValue("address.cep", data.address.cep, opts);
+      setValue("address.cep", maskCep(data.address.cep), opts);
       setValue("address.logradouro", data.address.logradouro, opts);
       setValue("address.numero", data.address.numero ?? "", opts);
       setValue("address.complemento", data.address.complemento ?? "", opts);
       setValue("address.bairro", data.address.bairro ?? "", opts);
       setValue("address.cidade", data.address.cidade, opts);
       setValue("address.uf", data.address.uf, opts);
-      setLookupState("idle");
     } catch {
-      setLookupState("failed");
+      // cnpjLookupFailed (isError da mutation) cobre o aviso na UI
     }
   };
 
-  // Autofetch por CEP (blur com 8 dígitos): completa o endereço; degrada em silêncio.
+  // Autofetch por CEP (blur com 8 dígitos): completa o endereço. Enquanto busca,
+  // a UI mostra spinner no campo e DESABILITA os campos que serão preenchidos
+  // (o usuário não digita por cima do que o fetch vai sobrescrever). Falha
+  // degrada em silêncio — endereço segue editável manualmente.
   const onCepBlur = async () => {
     const cep = onlyDigits(getValues("address.cep"));
     if (cep.length !== 8) return;
@@ -193,8 +212,9 @@ export function useCompanyForm({ onDone }: { onDone: () => void }) {
     errors: formState.errors,
     onCnpjBlur,
     onCepBlur,
-    isLookingUpCnpj: lookupState === "loading",
-    lookupFailed: lookupState === "failed",
+    isCnpjLoading,
+    isCepLoading,
+    lookupFailed: cnpjLookupFailed,
     isPreparing: phase !== "idle",
     isReady: isLoaded,
     orgError,

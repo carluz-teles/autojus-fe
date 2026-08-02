@@ -22,6 +22,26 @@ export function useProfile() {
   const { user, isLoaded } = useUser();
   const [savingName, setSavingName] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
+  // Upload imediato (diferente do onboarding: aqui não há "Continuar" — trocar a
+  // foto É a ação). O resource do Clerk é reativo: imageUrl re-renderiza sozinho.
+  const uploadPhoto = useCallback(
+    async (file: File) => {
+      if (!user) return;
+      setPhotoError(null);
+      setUploadingPhoto(true);
+      try {
+        await user.setProfileImage({ file });
+      } catch (e) {
+        setPhotoError(clerkErr(e, "Não foi possível enviar a foto."));
+      } finally {
+        setUploadingPhoto(false);
+      }
+    },
+    [user],
+  );
 
   const updateName = useCallback(
     async (firstName: string, lastName: string) => {
@@ -71,6 +91,11 @@ export function useProfile() {
     user,
     email: user?.primaryEmailAddress?.emailAddress,
     passwordEnabled: user?.passwordEnabled ?? false,
+    // hasImage separa a foto real do placeholder default do Clerk.
+    photoUrl: user?.hasImage ? user.imageUrl : null,
+    uploadPhoto,
+    uploadingPhoto,
+    photoError,
     savingName,
     savingPassword,
     updateName,

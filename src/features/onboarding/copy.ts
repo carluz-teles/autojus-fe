@@ -1,17 +1,53 @@
 // Fonte ÚNICA da linguagem e dos passos do onboarding. Nenhum componente/hook da
 // feature declara string solta: mudar um texto = mudar aqui (tom consistente,
 // revisão num lugar só). Os passos são a config que o wizard renderiza.
+//
+// Desenho do fluxo (decisão de produto): o sign-up do Clerk já coleta o nome, e a
+// foto vive no /profile — então o wizard vai direto ao que gera valor: a empresa
+// (tenant), os processos (OAB/fontes — o "aha" do produto) e o time (cada advogado
+// convidado traz a própria OAB → mais processos monitorados).
 
 export const ONBOARDING_STEPS = [
-  { id: 1, label: "Seus dados" },
-  { id: 2, label: "Sua empresa" },
-  { id: 3, label: "Fontes" },
+  { id: 1, label: "Sua empresa" },
+  { id: 2, label: "Seus processos" },
+  { id: 3, label: "Seu time" },
+] as const;
+
+// UFs do Brasil (27) — dado da feature, usado no select de estado do endereço.
+export const BR_UFS = [
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO",
 ] as const;
 
 export const onboardingCopy = {
   page: {
     title: "Vamos configurar sua conta",
-    subtitle: "Três passos rápidos para começar a monitorar seus processos.",
+    subtitle: "Três passos rápidos para os seus processos chegarem sozinhos.",
   },
   stepper: {
     aria: "Progresso do onboarding",
@@ -24,23 +60,7 @@ export const onboardingCopy = {
     saving: "Salvando…",
     preparing: "Preparando…",
   },
-  step1: {
-    title: "Seus dados",
-    description: "Como você aparece para o seu escritório.",
-    photo: {
-      alt: "Sua foto",
-      edit: "Editar foto",
-      hint: "Sua foto aparece para os membros do escritório.",
-      error: "Não foi possível enviar a foto. Tente novamente.",
-    },
-    fields: {
-      firstName: { label: "Nome", required: "Informe seu nome." },
-      lastName: { label: "Sobrenome", required: "Informe seu sobrenome." },
-    },
-    submitError:
-      "Não foi possível salvar seus dados. Tente novamente em instantes.",
-  },
-  step2: {
+  company: {
     title: "Sua empresa",
     description: "Os dados do escritório que você representa.",
     fields: {
@@ -51,6 +71,11 @@ export const onboardingCopy = {
         searching: "Buscando dados da empresa…",
         invalid: "CNPJ deve ter 14 dígitos.",
         lookupFailed: "Não foi possível buscar o CNPJ, preencha manualmente.",
+      },
+      phone: {
+        label: "Telefone",
+        placeholder: "(11) 3000-0000",
+        invalid: "Telefone com 10 ou 11 dígitos.",
       },
       tradeName: {
         label: "Nome fantasia",
@@ -69,7 +94,11 @@ export const onboardingCopy = {
         complemento: { label: "Complemento" },
         bairro: { label: "Bairro" },
         cidade: { label: "Cidade", required: "Informe a cidade." },
-        uf: { label: "UF", invalid: "UF com 2 letras." },
+        uf: {
+          label: "UF",
+          placeholder: "UF",
+          invalid: "Selecione a UF.",
+        },
       },
     },
     orgError: "Não foi possível criar sua organização. Tente novamente.",
@@ -78,8 +107,17 @@ export const onboardingCopy = {
       "Está demorando mais que o esperado para preparar sua conta. Tente novamente em instantes.",
     preparingAccount: "Preparando sua conta…",
   },
-  step3: {
-    title: "Fontes",
-    description: "Conecte as fontes que alimentam seus processos.",
+  processes: {
+    title: "Seus processos",
+    description:
+      "Informe as OABs do escritório e conecte a fonte — seus processos passam a chegar e atualizar sozinhos.",
+    skipCost:
+      "Dá para ativar depois em Integrações — até lá, nenhum processo é monitorado.",
+  },
+  team: {
+    title: "Convide seu time",
+    description:
+      "Cada advogado convidado traz a própria OAB — mais processos monitorados no escritório.",
+    invitedHint: "Convites enviados aparecem em Organização.",
   },
 } as const;

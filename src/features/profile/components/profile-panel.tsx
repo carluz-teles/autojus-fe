@@ -1,5 +1,8 @@
 "use client";
 
+import { Pencil } from "lucide-react";
+import { useRef } from "react";
+
 import { Card } from "@/components/ui/card";
 
 import { useProfile } from "../hooks/use-profile";
@@ -15,11 +18,16 @@ export function ProfilePanel() {
     user,
     email,
     passwordEnabled,
+    photoUrl,
+    uploadPhoto,
+    uploadingPhoto,
+    photoError,
     savingName,
     savingPassword,
     updateName,
     updatePassword,
   } = useProfile();
+  const fileRef = useRef<HTMLInputElement>(null);
 
   if (!isLoaded || !user) {
     return (
@@ -33,26 +41,54 @@ export function ProfilePanel() {
     <div className="reveal mt-8 flex flex-col gap-8">
       <Card className="flex flex-col gap-6 p-6">
         <div className="flex items-center gap-4">
-          <div className="size-14 overflow-hidden rounded-full">
-            {user.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={user.imageUrl}
-                alt=""
-                className="size-full object-cover"
-              />
-            ) : (
-              <span className="bg-primary/10 text-primary flex size-full items-center justify-center text-lg font-medium">
-                {(user.fullName ?? email ?? "?").slice(0, 1).toUpperCase()}
-              </span>
-            )}
-          </div>
+          {/* Avatar editável: overlay de caneta, upload imediato ao escolher. */}
+          <button
+            type="button"
+            aria-label="Editar foto"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploadingPhoto}
+            className="group focus-visible:ring-ring/50 relative shrink-0 rounded-full outline-none focus-visible:ring-3 disabled:opacity-60"
+          >
+            <span className="bg-muted ring-border flex size-16 items-center justify-center overflow-hidden rounded-full ring-1">
+              {photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={photoUrl}
+                  alt="Sua foto"
+                  className="size-full object-cover"
+                />
+              ) : (
+                <span className="bg-primary/10 text-primary flex size-full items-center justify-center text-lg font-medium">
+                  {(user.fullName ?? email ?? "?").slice(0, 1).toUpperCase()}
+                </span>
+              )}
+            </span>
+            <span className="bg-primary text-primary-foreground ring-card absolute -right-0.5 -bottom-0.5 flex size-6 items-center justify-center rounded-full shadow-sm ring-2 transition-transform group-hover:scale-110">
+              <Pencil className="size-3" />
+            </span>
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void uploadPhoto(file);
+              e.target.value = "";
+            }}
+          />
           <div className="min-w-0">
             <p className="truncate font-medium">
               {user.fullName ?? "Sua conta"}
             </p>
             {email ? (
               <p className="text-muted-foreground truncate text-sm">{email}</p>
+            ) : null}
+            {photoError ? (
+              <p className="text-destructive text-sm" role="alert">
+                {photoError}
+              </p>
             ) : null}
           </div>
         </div>

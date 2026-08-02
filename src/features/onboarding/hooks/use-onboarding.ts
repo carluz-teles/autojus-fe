@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
 
 import { useApi } from "@/lib/api/use-api";
 
@@ -23,27 +22,29 @@ function useUpdateOrgProfile() {
   });
 }
 
-// Sub-hook privado (não exportado): lookups sob demanda (blur), não são cache-first.
+// Sub-hook privado (não exportado): lookups sob demanda (blur). São mutations —
+// fetch imperativo disparado por evento, não estado de servidor cacheável — e é o
+// React Query quem carrega o estado (isPending/isError), não useState na mão.
 function useLookups() {
   const fetcher = useApi();
-  return {
-    lookupCnpj: useCallback(
-      (cnpj: string) => lookupCnpj(fetcher, cnpj),
-      [fetcher],
-    ),
-    lookupCep: useCallback((cep: string) => lookupCep(fetcher, cep), [fetcher]),
-  };
+  const cnpj = useMutation({
+    mutationFn: (value: string) => lookupCnpj(fetcher, value),
+  });
+  const cep = useMutation({
+    mutationFn: (value: string) => lookupCep(fetcher, value),
+  });
+  return { cnpj, cep };
 }
 
 /**
  * Hook público da feature — compõe /identity/me + escrita do perfil + lookups.
  * `poll` habilita o polling que se auto-desliga em useMe (usado durante o
- * "preparando sua conta" do passo 2).
+ * "preparando sua conta" do passo da empresa).
  */
 export function useOnboarding({ poll = false } = {}) {
   const me = useMe(poll);
   const profile = useUpdateOrgProfile();
-  const { lookupCnpj: fetchCnpj, lookupCep: fetchCep } = useLookups();
+  const { cnpj, cep } = useLookups();
 
   return {
     me: me.data,
@@ -51,7 +52,10 @@ export function useOnboarding({ poll = false } = {}) {
     updateOrgProfile: profile.mutateAsync,
     isSavingProfile: profile.isPending,
     profileError: profile.error,
-    lookupCnpj: fetchCnpj,
-    lookupCep: fetchCep,
+    lookupCnpj: cnpj.mutateAsync,
+    isCnpjLoading: cnpj.isPending,
+    cnpjLookupFailed: cnpj.isError,
+    lookupCep: cep.mutateAsync,
+    isCepLoading: cep.isPending,
   };
 }
