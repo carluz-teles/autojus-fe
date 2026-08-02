@@ -1,3 +1,5 @@
+"use client";
+
 import { NAV_ITEMS } from "./nav-config";
 import { NavLink } from "./nav-link";
 
