@@ -5,17 +5,23 @@ import { AppShell } from "@/components/shell/app-shell";
 import type { Me } from "@/features/onboarding/types";
 import { apiFetch } from "@/lib/api/client";
 
-// Gating do shell (Server Component). O proxy já garante a sessão; aqui exigimos
-// org (tenant) + onboarding concluído. Sem qualquer um dos dois → /onboarding.
+// Gating do shell (Server Component). O proxy já garante a sessão. A conclusão do
+// onboarding é a ÚNICA verdade, e vem do BE: /identity/me.onboarding_completed_at,
+// que resolve pelo USER do token (independe da org ATIVA na sessão).
+//
+// NÃO gateamos por auth().orgId: com "Membership optional" o Clerk pode deixar a
+// sessão sem org ativa (contexto pessoal) no refresh, mesmo o usuário tendo
+// escritório. Gatear por orgId jogava de volta pro onboarding quem já concluiu —
+// e como /onboarding devolve os concluídos ao /dashboard, virava LOOP, ignorando
+// o onboarding_completed_at. A org ativa é garantida no client (EnsureActiveOrg),
+// concern separado do gating.
 export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { userId, orgId, getToken } = await auth();
-
-  // Sem org ativa: passos 1–2 do onboarding ainda não terminaram.
-  if (!userId || !orgId) redirect("/onboarding");
+  const { userId, getToken } = await auth();
+  if (!userId) redirect("/sign-in");
 
   // Onboarding concluído = /identity/me.onboarding_completed_at preenchido.
   // apiFetch continua sendo o único ponto de I/O (aqui com o token do server).
