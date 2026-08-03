@@ -31,8 +31,8 @@ export default async function PecaEditorPage({
         <div className="bg-card mt-6 rounded-xl border p-6">
           <div className="text-muted-foreground flex min-h-96 items-center justify-center rounded-lg border border-dashed text-center text-sm">
             <span className="max-w-sm px-4">
-              Editor da minuta. A IA redige a partir dos autos (document/chunk) e
-              você revisa antes de assinar e protocolar.
+              Editor da minuta. A IA redige a partir dos autos (document/chunk)
+              e você revisa antes de assinar e protocolar.
             </span>
           </div>
           <div className="mt-4 flex justify-end gap-2">
@@ -55,14 +55,19 @@ export default async function PecaEditorPage({
           </p>
           <div className="mt-4 space-y-2 text-sm">
             <Finding ok label="Prazo de 10 dias" cite="fl. 142 — certidão" />
-            <Finding ok label="Valor exequendo" cite="fl. 3 — nota promissória" />
+            <Finding
+              ok
+              label="Valor exequendo"
+              cite="fl. 3 — nota promissória"
+            />
             <Finding label="Endereço do executado" cite="sem base nos autos" />
           </div>
         </div>
         <div className="bg-card rounded-xl border p-4 text-sm">
           <p className="text-muted-foreground text-xs">Cobertura</p>
           <p className="font-display mt-1 text-2xl leading-none tabular-nums">
-            2/3 <span className="text-muted-foreground text-sm">verificado</span>
+            2/3{" "}
+            <span className="text-muted-foreground text-sm">verificado</span>
           </p>
         </div>
       </aside>
@@ -82,7 +87,11 @@ function Finding({
   return (
     <div className="flex items-start gap-2 rounded-lg border p-2.5">
       <ShieldCheck
-        className={ok ? "size-4 shrink-0 text-emerald-600" : "text-muted-foreground/50 size-4 shrink-0"}
+        className={
+          ok
+            ? "size-4 shrink-0 text-emerald-600"
+            : "text-muted-foreground/50 size-4 shrink-0"
+        }
       />
       <div>
         <p className="font-medium">{label}</p>

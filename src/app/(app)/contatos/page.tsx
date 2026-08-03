@@ -42,7 +42,7 @@ export default function ContatosPage() {
 
       <div className="reveal bg-card mt-8 overflow-hidden rounded-xl border shadow-sm">
         <table className="w-full text-sm">
-          <thead className="text-muted-foreground border-b text-left text-xs uppercase tracking-wide">
+          <thead className="text-muted-foreground border-b text-left text-xs tracking-wide uppercase">
             <tr>
               <th className="px-5 py-3 font-medium">Nome</th>
               <th className="px-5 py-3 font-medium">Celular</th>
@@ -64,7 +64,9 @@ export default function ContatosPage() {
                 <td className="text-muted-foreground px-5 py-4 tabular-nums">
                   {row.celular}
                 </td>
-                <td className="text-muted-foreground px-5 py-4">{row.cidade}</td>
+                <td className="text-muted-foreground px-5 py-4">
+                  {row.cidade}
+                </td>
                 <td className="text-muted-foreground px-5 py-4 tabular-nums">
                   {row.cadastro}
                 </td>

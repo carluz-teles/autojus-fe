@@ -46,7 +46,7 @@ export default function IntimacoesPage() {
       <div className="reveal mt-6 flex items-center gap-2 rounded-lg border border-emerald-200/70 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
         <CheckCircle2 className="size-4 shrink-0" />
         <span className="font-medium">Todos os termos sincronizados</span>
-        <span className="text-emerald-700/70 dark:text-emerald-400/70 ml-auto text-xs">
+        <span className="ml-auto text-xs text-emerald-700/70 dark:text-emerald-400/70">
           Atualizado às 14:39
         </span>
       </div>
@@ -61,7 +61,7 @@ export default function IntimacoesPage() {
 
       <div className="reveal bg-card mt-4 overflow-hidden rounded-xl border shadow-sm">
         <table className="w-full text-sm">
-          <thead className="text-muted-foreground border-b text-left text-xs uppercase tracking-wide">
+          <thead className="text-muted-foreground border-b text-left text-xs tracking-wide uppercase">
             <tr>
               <th className="px-5 py-3 font-medium">Processo</th>
               <th className="px-5 py-3 font-medium">Publicação</th>

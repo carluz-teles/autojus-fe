@@ -68,7 +68,7 @@ export default function ProcessosPage() {
 
       <div className="reveal bg-card mt-4 overflow-hidden rounded-xl border shadow-sm">
         <table className="w-full text-sm">
-          <thead className="text-muted-foreground border-b text-left text-xs uppercase tracking-wide">
+          <thead className="text-muted-foreground border-b text-left text-xs tracking-wide uppercase">
             <tr>
               <th className="px-5 py-3 font-medium">Partes</th>
               <th className="px-5 py-3 font-medium">Tipo de ação</th>
