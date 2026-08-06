@@ -1,3 +1,4 @@
+import { NotificationBell } from "@/features/notifications/components/notification-bell";
 import { NotificationStream } from "@/features/notifications/notification-stream";
 
 import { EnsureActiveOrg } from "./ensure-active-org";
@@ -25,7 +26,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="bg-background/80 sticky top-0 z-20 flex h-16 items-center justify-end gap-4 border-b px-6 backdrop-blur-sm">
+        <header className="bg-background/80 sticky top-0 z-20 flex h-16 items-center justify-end gap-2 border-b px-6 backdrop-blur-sm">
+          <NotificationBell />
           <UserMenu />
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">

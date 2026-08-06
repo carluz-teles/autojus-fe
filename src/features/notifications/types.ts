@@ -1,6 +1,5 @@
-// Formato do aviso empurrado pelo BE no stream SSE (o publisher do worker serializa
-// {id,type,title,body,created_at} no canal notif:{tenant}). É o mesmo shape que os
-// read models REST devolvem (3a), então serve para lista e para o push.
+// Formato do aviso: o read model REST (GET /v1/notifications) devolve isto; o push
+// SSE traz o mesmo shape MENOS `read` (um aviso recém-empurrado é sempre não-lido).
 export type NotificationType = "import_finished" | "new_andamento" | string;
 
 export type NotificationView = {
@@ -8,5 +7,15 @@ export type NotificationView = {
   type: NotificationType;
   title: string;
   body: string;
+  read: boolean;
   created_at: string;
 };
+
+// Envelope paginado por cursor do BE: { data, page: { next_cursor, limit } }.
+export interface PageEnvelope<T> {
+  data: T[];
+  page: {
+    next_cursor: string | null;
+    limit: number;
+  };
+}
