@@ -1,3 +1,5 @@
+import { NotificationStream } from "@/features/notifications/notification-stream";
+
 import { EnsureActiveOrg } from "./ensure-active-org";
 import { SidebarFooter } from "./sidebar-footer";
 import { SidebarNav } from "./sidebar-nav";
@@ -12,6 +14,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-full flex-1">
       <EnsureActiveOrg />
+      {/* Conexão SSE de notificações: sem UI, empurra toast + invalida as queries. */}
+      <NotificationStream />
       <aside className="border-sidebar-border bg-sidebar sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r md:flex">
         <div className="px-3 py-4">
           <SidebarOrg />
