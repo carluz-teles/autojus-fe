@@ -6,6 +6,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/shell/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ImportBanner } from "@/features/import-status/components/import-banner";
 import { useProcessos } from "@/features/processos/hooks/use-processos";
 import type { ProcessoView } from "@/features/processos/types";
 
@@ -55,6 +56,8 @@ export default function ProcessosPage() {
           </Button>
         }
       />
+
+      <ImportBanner />
 
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {stats.map(({ label, value, icon: Icon }, i) => (

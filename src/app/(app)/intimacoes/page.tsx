@@ -6,6 +6,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/shell/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ImportBanner } from "@/features/import-status/components/import-banner";
 import { useIntimacoes } from "@/features/intimacoes/hooks/use-intimacoes";
 import type { IntimacaoStatus } from "@/features/intimacoes/types";
 
@@ -38,6 +39,8 @@ export default function IntimacoesPage() {
         title="Intimações"
         description="Publicações capturadas do DJEN pelas OABs monitoradas."
       />
+
+      <ImportBanner />
 
       <div className="reveal mt-6 flex items-center gap-2 rounded-lg border border-emerald-200/70 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
         <CheckCircle2 className="size-4 shrink-0" />
