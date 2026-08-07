@@ -22,6 +22,18 @@ export type CheckoutReturnParam = "success" | "canceled" | null;
  * em efeito) seguindo o padrão do React de "resetar estado quando uma prop
  * muda" — evita o cascading-render que `setState` síncrono dentro de efeito
  * causaria. Só o timeout, que depende de um timer real, usa `useEffect`.
+ *
+ * `prevCheckoutParam` começa em `undefined` (fora do domínio de
+ * `CheckoutReturnParam`), não no valor atual de `checkoutParam` — o caso que
+ * importa de fato é o redirect da Stripe chegando com `?checkout=success` já
+ * presente no primeiro mount, e um sentinel que nasce igual ao valor atual
+ * nunca detectaria essa "mudança".
+ *
+ * Enquanto `enabled` for `false` (ex.: org do Clerk ainda carregando em
+ * `BillingPanel`), `checkoutParam === "success"` não é "consumido" — não
+ * marcamos `prevCheckoutParam` como já visto — para não perder a transição
+ * quando `enabled` virar `true` num render seguinte sem o valor da query
+ * string ter mudado de novo.
  */
 export function useCheckoutConfirmation({
   enabled = true,
@@ -31,8 +43,9 @@ export function useCheckoutConfirmation({
   const searchParams = useSearchParams();
   const checkoutParam = searchParams.get("checkout") as CheckoutReturnParam;
 
-  const [prevCheckoutParam, setPrevCheckoutParam] =
-    useState<CheckoutReturnParam>(checkoutParam);
+  const [prevCheckoutParam, setPrevCheckoutParam] = useState<
+    CheckoutReturnParam | undefined
+  >(undefined);
   const [baselineStatus, setBaselineStatus] = useState<string | null>(null);
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [confirmationTimedOut, setConfirmationTimedOut] = useState(false);
@@ -42,7 +55,10 @@ export function useCheckoutConfirmation({
     refetchInterval: isConfirmingPayment ? POLL_INTERVAL_MS : false,
   });
 
-  if (checkoutParam !== prevCheckoutParam) {
+  if (
+    checkoutParam !== prevCheckoutParam &&
+    (checkoutParam !== "success" || enabled)
+  ) {
     setPrevCheckoutParam(checkoutParam);
     if (checkoutParam === "success" && enabled) {
       setBaselineStatus(query.subscription?.status ?? null);
@@ -58,6 +74,13 @@ export function useCheckoutConfirmation({
     currentStatus !== baselineStatus
   ) {
     setIsConfirmingPayment(false);
+  }
+  if (
+    confirmationTimedOut &&
+    !query.isLoading &&
+    currentStatus !== baselineStatus
+  ) {
+    setConfirmationTimedOut(false);
   }
 
   useEffect(() => {
