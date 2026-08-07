@@ -6,11 +6,27 @@ import { usePlans } from "../hooks/use-plans";
 import { useStartCheckout } from "../hooks/use-start-checkout";
 import { BillingError } from "./billing-error";
 import { BillingSkeleton } from "./billing-skeleton";
+import { ManageSubscriptionButton } from "./manage-subscription-button";
 import { PlanCard } from "./plan-card";
 
 export function PlanCatalog() {
   const { plans, isLoading, error, refetch } = usePlans();
   const checkout = useStartCheckout();
+
+  // 409 CONFLICT (ErrAlreadySubscribed): tentou assinar já estando ativo/trialing
+  // (cache desatualizado, duplo clique, outra aba). Não repete o erro cru da
+  // API — oferece direto a ação de gerenciar a assinatura existente.
+  if (checkout.isConflict) {
+    return (
+      <div className="mt-8 flex flex-col items-start gap-3 rounded-xl border p-6">
+        <p className="text-sm">
+          Sua organização já tem uma assinatura ativa. Gerencie por aqui em vez
+          de assinar de novo.
+        </p>
+        <ManageSubscriptionButton />
+      </div>
+    );
+  }
 
   if (isLoading) return <BillingSkeleton />;
 
