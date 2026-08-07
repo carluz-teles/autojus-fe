@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { useIsOrgAdmin } from "@/features/organization/hooks/use-org-role";
 import { cn } from "@/lib/utils";
 
 // Abas de Configurações — fonte única das seções. Cada uma tem sua page em
@@ -16,13 +17,21 @@ export const SETTINGS_TABS = [
 
 export function SettingsNav() {
   const pathname = usePathname();
+  const { isAdmin } = useIsOrgAdmin();
+
+  // Cobrança é ADMIN-only no BE (RequireRole(ADMIN)) — a UX não deve nem
+  // oferecer a aba pra quem vai receber 403. Some por padrão até confirmar
+  // o papel (evita mostrar e esconder em seguida pra não-admin).
+  const tabs = SETTINGS_TABS.filter(
+    (tab) => tab.href !== "/settings/billing" || isAdmin,
+  );
 
   return (
     <nav
       aria-label="Seções de configurações"
       className="-mb-px flex gap-1 overflow-x-auto border-b"
     >
-      {SETTINGS_TABS.map(({ href, label }) => {
+      {tabs.map(({ href, label }) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
         return (
           <Link

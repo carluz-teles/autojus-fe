@@ -1,8 +1,6 @@
-import { ComingSoon } from "@/components/shell/page-header";
+import { BillingPanel } from "@/features/billing/components/billing-panel";
 
-// Seção Cobrança: plano e faturamento (placeholder — pagamento numa fatia futura).
+// Seção Cobrança: assinatura Stripe (catálogo, estado atual, portal de gerenciamento).
 export default function SettingsBillingPage() {
-  return (
-    <ComingSoon note="Placeholder de billing — integração de pagamento numa fatia futura." />
-  );
+  return <BillingPanel />;
 }
