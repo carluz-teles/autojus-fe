@@ -8,6 +8,7 @@ import { BillingAdminOnlyNotice } from "./billing-admin-only-notice";
 import { BillingError } from "./billing-error";
 import { BillingSkeleton } from "./billing-skeleton";
 import { PlanCatalog } from "./plan-catalog";
+import { SubscriptionCard } from "./subscription-card";
 
 export function BillingPanel() {
   const { isLoaded: isOrgLoaded, isAdmin } = useIsOrgAdmin();
@@ -32,12 +33,11 @@ export function BillingPanel() {
     );
   }
 
-  if (!subscription) return <PlanCatalog />;
-
-  // Estado "assinante" completo chega na Fase 3 (status/limite/portal).
-  return (
-    <p className="text-muted-foreground mt-8 text-sm">
-      Sua organização já tem uma assinatura ativa.
-    </p>
+  return subscription ? (
+    <div className="mt-8">
+      <SubscriptionCard subscription={subscription} />
+    </div>
+  ) : (
+    <PlanCatalog />
   );
 }
