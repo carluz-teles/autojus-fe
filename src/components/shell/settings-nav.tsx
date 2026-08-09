@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 export const SETTINGS_TABS = [
   { href: "/settings/organization", label: "Organização" },
   { href: "/settings/integrations", label: "Integrações" },
+  { href: "/settings/termos", label: "Termos" },
   { href: "/settings/billing", label: "Cobrança" },
   { href: "/settings/profile", label: "Perfil" },
 ] as const;

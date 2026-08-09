@@ -11,21 +11,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api/errors";
 
 import { useActivateForm } from "../hooks/use-activate-form";
-import { ACTIVATABLE_SOURCES, SOURCE_LABELS } from "../types";
 
-export function ActivateForm() {
+// Termos monitorados: as OABs que guiam a descoberta (e, no futuro, CNPJs e
+// outros termos). Substitui o antigo ActivateForm — mesma lógica (useActivateForm),
+// agora semeada com o scope JÁ ativo para editar em vez de recomeçar do zero.
+export function TermsSection({ initialOab }: { initialOab?: string[] }) {
   const {
-    sources,
     oab,
     oabDraft,
     setOabDraft,
-    toggleSource,
     addOab,
     removeOab,
     onSubmit,
@@ -33,51 +32,25 @@ export function ActivateForm() {
     activateError,
     justSucceeded,
     errors,
-  } = useActivateForm();
+  } = useActivateForm({ initialOab });
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="font-display text-lg tracking-tight">
-          Configurar fontes
+          Termos monitorados
         </CardTitle>
         <CardDescription>
-          Escolha as fontes e as OABs a monitorar. Ao salvar, iniciamos o
-          backfill histórico e o acompanhamento contínuo.
+          O que vigiamos nas fontes de descoberta: as OABs abaixo guiam a
+          captura no DJEN (CNPJs e nomes de parte em breve). Alterações valem
+          para as próximas capturas — a diária continua sozinha.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
-          <fieldset className="flex flex-col gap-3">
-            <legend className="mb-1 text-sm font-medium">Fontes</legend>
-            {ACTIVATABLE_SOURCES.map((source) => (
-              <Label
-                key={source}
-                className="flex cursor-pointer items-center gap-2.5 text-sm font-normal"
-              >
-                <Checkbox
-                  checked={sources.includes(source)}
-                  onCheckedChange={() => toggleSource(source)}
-                />
-                <span>
-                  <span className="font-medium">{source}</span>
-                  <span className="text-muted-foreground">
-                    {" "}
-                    — {SOURCE_LABELS[source].split(" — ")[1]}
-                  </span>
-                </span>
-              </Label>
-            ))}
-            {errors.sources ? (
-              <p className="text-destructive text-sm">
-                {errors.sources.message}
-              </p>
-            ) : null}
-          </fieldset>
-
+        <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="oab-input">OABs monitoradas</Label>
-            <div className="flex gap-2">
+            <Label htmlFor="oab-input">OABs</Label>
+            <div className="flex max-w-md gap-2">
               <Input
                 id="oab-input"
                 placeholder="ex.: SP123456"
@@ -134,13 +107,13 @@ export function ActivateForm() {
           ) : null}
           {justSucceeded ? (
             <p className="text-primary text-sm" role="status">
-              Fontes atualizadas.
+              Termos atualizados.
             </p>
           ) : null}
 
           <div>
             <Button type="submit" disabled={isActivating}>
-              {isActivating ? "Salvando…" : "Salvar fontes"}
+              {isActivating ? "Salvando…" : "Salvar termos"}
             </Button>
           </div>
         </form>

@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
@@ -29,8 +29,12 @@ export type ActivateFormValues = z.infer<typeof schema>;
 /**
  * Toda a lógica do formulário de ativação vive aqui (RHF + Zod + mutation).
  * O componente apenas amarra o JSX aos valores/handlers retornados.
+ * `initialOab` (opcional) semeia o form com o scope JÁ ativo — a tela de
+ * integrações edita as OABs existentes; o onboarding parte do vazio.
  */
-export function useActivateForm() {
+export function useActivateForm({
+  initialOab,
+}: { initialOab?: string[] } = {}) {
   const { activate, isActivating, activateError } = useIntegrations();
   const [oabDraft, setOabDraft] = useState("");
 
@@ -39,6 +43,17 @@ export function useActivateForm() {
     defaultValues: { sources: [...ACTIVATABLE_SOURCES], oab: [] },
   });
   const { setValue, getValues, control, handleSubmit, formState } = form;
+
+  // Semeia UMA vez, quando o scope atual chega (fetch assíncrono) e o usuário
+  // ainda não mexeu na lista — nunca sobrescreve edição em andamento.
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current || !initialOab?.length) return;
+    if (getValues("oab").length === 0) setValue("oab", [...initialOab]);
+    seeded.current = true;
+    // getValues/setValue são estáveis no RHF.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialOab]);
 
   // useWatch (em vez de watch()) é o padrão compatível com o react-compiler.
   const sources = useWatch({ control, name: "sources" });
