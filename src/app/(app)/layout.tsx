@@ -32,7 +32,13 @@ export default async function AppLayout({
   try {
     const me = await apiFetch<Me>("/v1/identity/me", { getToken });
     onboardingCompleted = me.onboarding_completed_at != null;
-  } catch {
+  } catch (err) {
+    // Fail-closed, mas NUNCA silencioso: sem este log, um /me quebrado no
+    // server manda todo mundo pro wizard sem deixar rastro em lugar nenhum.
+    console.error(
+      "[gate] /identity/me falhou no server — mandando ao wizard:",
+      err,
+    );
     onboardingCompleted = false;
   }
   if (!onboardingCompleted) redirect("/onboarding");

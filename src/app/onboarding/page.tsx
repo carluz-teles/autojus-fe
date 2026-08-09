@@ -19,7 +19,9 @@ export default async function OnboardingPage() {
     try {
       const me = await apiFetch<Me>("/v1/identity/me", { getToken });
       completed = me.onboarding_completed_at != null;
-    } catch {
+    } catch (err) {
+      // Espelho do gate do (app): a falha do /me no server precisa deixar rastro.
+      console.error("[onboarding] /identity/me falhou no server:", err);
       completed = false;
     }
   }
