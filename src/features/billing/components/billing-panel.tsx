@@ -44,7 +44,7 @@ export function BillingPanel() {
     <>
       {confirmationTimedOut ? (
         <p role="status" className="text-muted-foreground mt-8 text-sm">
-          Ainda processando seu pagamento — isso pode levar alguns instantes.{" "}
+          Ainda confirmando sua assinatura — isso pode levar alguns instantes.{" "}
           <button
             type="button"
             onClick={() => refetch()}
