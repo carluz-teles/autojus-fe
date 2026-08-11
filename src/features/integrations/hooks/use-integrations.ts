@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { ApiError } from "@/lib/api/errors";
 import { useApi } from "@/lib/api/use-api";
 
 import {
@@ -37,6 +38,13 @@ export function useIntegrations() {
   const query = useIntegrationsQuery();
   const activate = useActivateMutation();
 
+  // 403 FORBIDDEN no POST de ativação: hoje o único motivo é o tenant ter
+  // atingido o active_process_limit do plano (gating de entitlements na
+  // borda). Mesmo padrão do isConflict em useStartCheckout — troca o erro
+  // genérico por uma ação específica (upgrade) em vez de mostrar o erro cru.
+  const isForbidden =
+    activate.error instanceof ApiError && activate.error.kind === "FORBIDDEN";
+
   return {
     integrations: query.data ?? [],
     isLoading: query.isLoading,
@@ -44,5 +52,6 @@ export function useIntegrations() {
     activate: activate.mutateAsync,
     isActivating: activate.isPending,
     activateError: activate.error,
+    isForbidden,
   };
 }

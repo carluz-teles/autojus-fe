@@ -35,7 +35,8 @@ export type ActivateFormValues = z.infer<typeof schema>;
 export function useActivateForm({
   initialOab,
 }: { initialOab?: string[] } = {}) {
-  const { activate, isActivating, activateError } = useIntegrations();
+  const { activate, isActivating, activateError, isForbidden } =
+    useIntegrations();
   const [oabDraft, setOabDraft] = useState("");
 
   const form = useForm<ActivateFormValues>({
@@ -122,6 +123,7 @@ export function useActivateForm({
     submitAsync,
     isActivating,
     activateError,
+    isForbidden,
     justSucceeded: formState.isSubmitSuccessful && !activateError,
     errors: formState.errors,
   };
