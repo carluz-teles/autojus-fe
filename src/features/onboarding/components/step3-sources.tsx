@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ export function Step3Sources({
     submitAsync,
     isActivating,
     activateError,
+    isForbidden,
     errors,
   } = useActivateForm();
 
@@ -136,7 +138,17 @@ export function Step3Sources({
         ) : null}
       </div>
 
-      {activateError ? (
+      {isForbidden ? (
+        <p className="text-destructive text-sm" role="alert">
+          Você atingiu o limite de processos ativos do seu plano.{" "}
+          <Link
+            href="/settings/billing"
+            className="font-medium underline underline-offset-2"
+          >
+            Fazer upgrade
+          </Link>
+        </p>
+      ) : activateError ? (
         <p className="text-destructive text-sm" role="alert">
           {activateError instanceof ApiError
             ? activateError.message
