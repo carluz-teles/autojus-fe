@@ -1,14 +1,15 @@
 "use client";
 
 import { Archive, CheckCircle2, Scale } from "lucide-react";
-import Link from "next/link";
 
 import { PageHeader } from "@/components/shell/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ImportBanner } from "@/features/import-status/components/import-banner";
+import { ProcessoDetail } from "@/features/processos/components/processo-detail";
 import { useProcessos } from "@/features/processos/hooks/use-processos";
 import type { ProcessoView } from "@/features/processos/types";
+import { useDetailDrawer } from "@/lib/hooks/use-detail-drawer";
 
 // Lista de processos consolidados (court_case / court_record), capturados do DJEN e
 // enriquecidos pelo DATAJUD. Dados reais via GET /v1/processos (read model do BE).
@@ -34,6 +35,9 @@ export default function ProcessosPage() {
     fetchNextPage,
     isFetchingNextPage,
   } = useProcessos();
+
+  const { selected, open, openItem, onOpenChange, onOpenChangeComplete } =
+    useDetailDrawer(processos);
 
   const stats = [
     {
@@ -115,14 +119,23 @@ export default function ProcessosPage() {
               </tr>
             ) : (
               processos.map((p) => (
-                <tr key={p.id} className="hover:bg-muted/40 transition-colors">
-                  <td className="px-5 py-4 tabular-nums">
-                    <Link
-                      href={`/processos/${p.id}`}
-                      className="hover:text-gold font-medium underline-offset-4 hover:underline"
-                    >
-                      {p.cnj_number}
-                    </Link>
+                <tr
+                  key={p.id}
+                  onClick={() => openItem(p)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openItem(p);
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Abrir processo ${p.cnj_number}`}
+                  aria-current={selected?.id === p.id ? "true" : undefined}
+                  className="hover:bg-muted/40 focus-visible:ring-ring/50 aria-[current=true]:bg-gold/5 cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset"
+                >
+                  <td className="hover:text-gold px-5 py-4 font-medium tabular-nums">
+                    {p.cnj_number}
                   </td>
                   <td className="px-5 py-4">
                     <span className="text-muted-foreground">{p.court}</span>
@@ -158,6 +171,13 @@ export default function ProcessosPage() {
           </Button>
         </div>
       ) : null}
+
+      <ProcessoDetail
+        processo={selected}
+        open={open}
+        onOpenChange={onOpenChange}
+        onOpenChangeComplete={onOpenChangeComplete}
+      />
     </>
   );
 }

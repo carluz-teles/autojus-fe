@@ -1,14 +1,15 @@
 "use client";
 
 import { ArrowUpDown, CheckCircle2, Filter, Printer } from "lucide-react";
-import Link from "next/link";
 
 import { PageHeader } from "@/components/shell/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ImportBanner } from "@/features/import-status/components/import-banner";
+import { IntimacaoDetail } from "@/features/intimacoes/components/intimacao-detail";
 import { useIntimacoes } from "@/features/intimacoes/hooks/use-intimacoes";
 import type { IntimacaoStatus } from "@/features/intimacoes/types";
+import { useDetailDrawer } from "@/lib/hooks/use-detail-drawer";
 
 // Inbox das intimações capturadas do DJEN pelas OABs monitoradas. Dados reais via
 // GET /v1/intimacoes (intimation → read model do BE).
@@ -32,6 +33,9 @@ export default function IntimacoesPage() {
     fetchNextPage,
     isFetchingNextPage,
   } = useIntimacoes();
+
+  const { selected, open, openItem, onOpenChange, onOpenChangeComplete } =
+    useDetailDrawer(intimacoes);
 
   return (
     <>
@@ -98,14 +102,23 @@ export default function IntimacoesPage() {
               </tr>
             ) : (
               intimacoes.map((it) => (
-                <tr key={it.id} className="hover:bg-muted/40 transition-colors">
-                  <td className="px-5 py-4 tabular-nums">
-                    <Link
-                      href={`/intimacoes/${it.id}`}
-                      className="hover:text-gold font-medium underline-offset-4 hover:underline"
-                    >
-                      {it.cnj_number}
-                    </Link>
+                <tr
+                  key={it.id}
+                  onClick={() => openItem(it)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openItem(it);
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Abrir intimação ${it.cnj_number}`}
+                  aria-current={selected?.id === it.id ? "true" : undefined}
+                  className="hover:bg-muted/40 focus-visible:ring-ring/50 aria-[current=true]:bg-gold/5 cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset"
+                >
+                  <td className="hover:text-gold px-5 py-4 font-medium tabular-nums">
+                    {it.cnj_number}
                   </td>
                   <td className="text-muted-foreground px-5 py-4 tabular-nums">
                     {fmtDate(it.made_available_at)}
@@ -148,6 +161,13 @@ export default function IntimacoesPage() {
           </Button>
         </div>
       ) : null}
+
+      <IntimacaoDetail
+        intimacao={selected}
+        open={open}
+        onOpenChange={onOpenChange}
+        onOpenChangeComplete={onOpenChangeComplete}
+      />
     </>
   );
 }

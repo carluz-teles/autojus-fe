@@ -1,21 +1,29 @@
 "use client";
 
-import { CheckCircle2, CircleAlert, Loader2 } from "lucide-react";
-import { Fragment, useState } from "react";
+import {
+  CheckCircle2,
+  ChevronRight,
+  CircleAlert,
+  FileText,
+  Gavel,
+  Loader2,
+} from "lucide-react";
+import Link from "next/link";
 
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 import type {
-  ReconciliationRun,
-  ReconciliationRunStatus,
+  Reconciliation,
+  ReconciliationStatus,
   ReconciliationsView,
 } from "../types";
 
 // Aba Reconciliações: a resposta permanente a "o que o sistema fez com meus
-// dados?". Progresso da importação em cima (backfill_job) e o histórico de
-// execuções por janela embaixo (sync_run) — status, itens novos, dedupados e o
-// erro de cada janela, com filtro "somente erros".
+// dados?". Em cima, o estado da importação corrente (backfill_job); embaixo, um
+// card-"reconciliação" por importação — processos e intimações que trouxe, a janela
+// de prazo geral e o desfecho. O detalhamento por janela abre na tela dedicada.
 
 const fmtDay = new Intl.DateTimeFormat("pt-BR", {
   day: "2-digit",
@@ -40,29 +48,49 @@ function windowLabel(from: string, to: string): string {
   if (Number.isNaN(f.getTime()) || Number.isNaN(t.getTime())) {
     return `${from} – ${to}`;
   }
-  return `${fmtDay.format(f)} – ${fmtDayYear.format(t)}`;
+  // Mostra o ano também no início quando os anos diferem — senão "10/08 – 10/08/26"
+  // parece o mesmo dia. Em janela do mesmo ano (semanal), o ano fica só no fim.
+  const startFmt = f.getFullYear() !== t.getFullYear() ? fmtDayYear : fmtDay;
+  return `${startFmt.format(f)} – ${fmtDayYear.format(t)}`;
 }
 
-function StatusBadge({ status }: { status: ReconciliationRunStatus }) {
+const STATUS_META: Record<
+  ReconciliationStatus,
+  { label: string; className: string; icon: typeof CheckCircle2 }
+> = {
+  COMPLETED: {
+    label: "Concluída",
+    className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    icon: CheckCircle2,
+  },
+  PARTIAL: {
+    label: "Parcial",
+    className: "bg-amber-500/10 text-amber-700 dark:text-amber-500",
+    icon: CircleAlert,
+  },
+  RUNNING: {
+    label: "Importando",
+    className: "bg-amber-500/10 text-amber-700 dark:text-amber-500",
+    icon: Loader2,
+  },
+};
+
+function ReconciliationStatusChip({
+  status,
+}: {
+  status: ReconciliationStatus;
+}) {
+  const meta = STATUS_META[status] ?? STATUS_META.RUNNING;
+  const Icon = meta.icon;
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium",
-        status === "OK" &&
-          "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-        status === "FAILED" && "bg-destructive/10 text-destructive",
-        status === "RUNNING" &&
-          "bg-amber-500/10 text-amber-700 dark:text-amber-500",
+        meta.className,
       )}
     >
-      {status === "OK" ? (
-        <CheckCircle2 className="size-3" />
-      ) : status === "FAILED" ? (
-        <CircleAlert className="size-3" />
-      ) : (
-        <Loader2 className="size-3 animate-spin" />
-      )}
-      {status === "OK" ? "OK" : status === "FAILED" ? "Erro" : "Rodando"}
+      <Icon className={cn("size-3", status === "RUNNING" && "animate-spin")} />
+      {meta.label}
     </span>
   );
 }
@@ -161,6 +189,82 @@ function ImportSummary({ data }: { data: ReconciliationsView }) {
   );
 }
 
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <p className="font-display text-2xl leading-none tabular-nums">
+        {fmtInt.format(value)}
+      </p>
+      <p className="text-muted-foreground mt-1 text-xs">{label}</p>
+    </div>
+  );
+}
+
+// O card-reconciliação de uma importação, clicável — abre a tela de detalhe.
+function ReconciliationCard({ u }: { u: Reconciliation }) {
+  return (
+    <Link
+      href={`/reconciliacoes/${u.id}`}
+      aria-label={`Detalhe da importação ${u.source} de ${windowLabel(u.window_from, u.window_to)}`}
+      className="focus-visible:ring-ring/50 group bg-card hover:border-gold/40 block rounded-xl border p-5 shadow-sm transition-colors outline-none focus-visible:ring-2"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary">{u.source}</Badge>
+          <ReconciliationStatusChip status={u.status} />
+        </div>
+        <ChevronRight className="text-muted-foreground group-hover:text-gold size-4 shrink-0 transition-colors" />
+      </div>
+
+      <div className="mt-4 flex gap-8">
+        <div className="flex items-center gap-2">
+          <Gavel className="text-gold/70 size-4" />
+          <Metric label="Processos" value={u.processos} />
+        </div>
+        <div className="flex items-center gap-2">
+          <FileText className="text-gold/70 size-4" />
+          <Metric label="Intimações" value={u.intimacoes} />
+        </div>
+      </div>
+
+      <dl className="text-muted-foreground mt-4 flex flex-wrap gap-x-6 gap-y-1 border-t pt-3 text-xs">
+        <div className="flex items-center gap-1.5">
+          <dt>Janela</dt>
+          <dd className="text-foreground tabular-nums">
+            {windowLabel(u.window_from, u.window_to)}
+          </dd>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <dt>Janelas</dt>
+          <dd className="text-foreground tabular-nums">
+            {u.slices_ok}/{u.total_slices}
+            {u.slices_error > 0 ? (
+              <span className="text-amber-700 dark:text-amber-500">
+                {" "}
+                · {u.slices_error} com erro
+              </span>
+            ) : null}
+          </dd>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <dt>Início</dt>
+          <dd className="text-foreground tabular-nums">
+            {fmtWhen.format(new Date(u.started_at))}
+          </dd>
+        </div>
+        {u.finished_at ? (
+          <div className="flex items-center gap-1.5">
+            <dt>Fim</dt>
+            <dd className="text-foreground tabular-nums">
+              {fmtWhen.format(new Date(u.finished_at))}
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+    </Link>
+  );
+}
+
 export function ReconciliationsTab({
   data,
   isPending,
@@ -170,13 +274,11 @@ export function ReconciliationsTab({
   isPending: boolean;
   isError: boolean;
 }) {
-  const [onlyErrors, setOnlyErrors] = useState(false);
-
   if (isPending) {
     return (
       <div className="flex flex-col gap-4">
         <div className="bg-muted/40 h-24 animate-pulse rounded-xl border" />
-        <div className="bg-muted/40 h-64 animate-pulse rounded-xl border" />
+        <div className="bg-muted/40 h-40 animate-pulse rounded-xl border" />
       </div>
     );
   }
@@ -189,101 +291,31 @@ export function ReconciliationsTab({
     );
   }
 
-  const failed = data.runs.filter((r) => r.status === "FAILED").length;
-  const runs = onlyErrors
-    ? data.runs.filter((r) => r.status === "FAILED")
-    : data.runs;
+  // Guard defensivo: ?? [] cobre uma resposta sem a chave (BE anterior).
+  const recons = data.reconciliations ?? [];
 
   return (
     <div className="flex flex-col gap-4">
       <ImportSummary data={data} />
 
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">
-          Execuções{" "}
-          <span className="text-muted-foreground font-normal tabular-nums">
-            ({fmtInt.format(data.runs.length)})
-          </span>
-        </h3>
-        {failed > 0 ? (
-          <button
-            type="button"
-            aria-pressed={onlyErrors}
-            onClick={() => setOnlyErrors((v) => !v)}
-            className={cn(
-              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-              onlyErrors
-                ? "border-destructive/30 bg-destructive/10 text-destructive"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            Somente erros ({failed})
-          </button>
-        ) : null}
-      </div>
+      <h3 className="text-sm font-medium">
+        Importações{" "}
+        <span className="text-muted-foreground font-normal tabular-nums">
+          ({fmtInt.format(recons.length)})
+        </span>
+      </h3>
 
-      <div className="bg-card overflow-hidden rounded-xl border shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="text-muted-foreground border-b text-left text-xs tracking-wide uppercase">
-            <tr>
-              <th className="px-4 py-2.5 font-medium">Janela</th>
-              <th className="px-4 py-2.5 font-medium">Fonte</th>
-              <th className="px-4 py-2.5 font-medium">Status</th>
-              <th className="px-4 py-2.5 text-right font-medium">Novos</th>
-              <th className="px-4 py-2.5 text-right font-medium">Dedup.</th>
-              <th className="px-4 py-2.5 font-medium">Início</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {runs.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="text-muted-foreground px-4 py-10 text-center"
-                >
-                  {onlyErrors
-                    ? "Nenhuma execução com erro."
-                    : "Nenhuma execução ainda."}
-                </td>
-              </tr>
-            ) : (
-              runs.map((run: ReconciliationRun) => (
-                <Fragment key={run.id}>
-                  <tr className={cn(run.error && "border-b-0")}>
-                    <td className="px-4 py-2.5 font-mono text-xs whitespace-nowrap tabular-nums">
-                      {windowLabel(run.window_from, run.window_to)}
-                    </td>
-                    <td className="text-muted-foreground px-4 py-2.5">
-                      {run.source}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <StatusBadge status={run.status} />
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">
-                      {fmtInt.format(run.items_new)}
-                    </td>
-                    <td className="text-muted-foreground px-4 py-2.5 text-right tabular-nums">
-                      {fmtInt.format(run.items_deduped)}
-                    </td>
-                    <td className="text-muted-foreground px-4 py-2.5 text-xs whitespace-nowrap">
-                      {fmtWhen.format(new Date(run.started_at))}
-                    </td>
-                  </tr>
-                  {run.error ? (
-                    <tr>
-                      <td colSpan={6} className="px-4 pt-0 pb-2.5">
-                        <p className="bg-destructive/5 text-destructive rounded-md px-3 py-1.5 text-xs">
-                          {run.error}
-                        </p>
-                      </td>
-                    </tr>
-                  ) : null}
-                </Fragment>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {recons.length === 0 ? (
+        <p className="text-muted-foreground bg-card rounded-xl border px-4 py-10 text-center text-sm">
+          Nenhuma importação ainda.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {recons.map((u) => (
+            <ReconciliationCard key={u.id} u={u} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

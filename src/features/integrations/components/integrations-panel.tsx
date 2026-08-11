@@ -22,18 +22,20 @@ export function IntegrationsPanel() {
 
   const bySource = new Map(integrations.map((i) => [i.source, i]));
   const importing = recon.data?.import.importing ?? false;
-  const failedRuns =
-    recon.data?.runs.filter((r) => r.status === "FAILED").length ?? 0;
+  // Quantas janelas com erro no total das importações — o badge na aba. Guard
+  // defensivo: ?? [] cobre uma resposta sem a chave (ex.: BE numa versão anterior).
+  const recons = recon.data?.reconciliations ?? [];
+  const failedRuns = recons.reduce((n, u) => n + u.slices_error, 0);
 
-  // Rodapé do card DJEN: a última execução que terminou (o dado que responde
+  // Rodapé do card DJEN: a última importação que terminou (o dado que responde
   // "quando isso rodou pela última vez?" sem sair da aba Fontes).
-  const lastFinished = recon.data?.runs.find((r) => r.status !== "RUNNING");
+  const lastImport = recons.find((u) => u.status !== "RUNNING");
   const djenFooter = importing
     ? "Importação do histórico em andamento — acompanhe em Reconciliações."
-    : lastFinished
-      ? `Última reconciliação: ${fmtInt.format(lastFinished.items_new)} ${
-          lastFinished.items_new === 1 ? "item novo" : "itens novos"
-        }, ${fmtInt.format(lastFinished.items_deduped)} já conhecidos.`
+    : lastImport
+      ? `Última importação: ${fmtInt.format(lastImport.processos)} ${
+          lastImport.processos === 1 ? "processo" : "processos"
+        }, ${fmtInt.format(lastImport.intimacoes)} intimações.`
       : undefined;
 
   return (

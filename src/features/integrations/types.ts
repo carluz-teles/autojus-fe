@@ -79,19 +79,36 @@ export const SOURCE_CATALOG: SourceCatalogEntry[] = [
 ];
 
 // ——— Reconciliações ———
-// Contrato do read model GET /v1/acquisition/reconciliations (fatia de BE a
-// construir): o progresso do backfill_job + o histórico de sync_run por janela,
-// na visão do tenant. Espelhado das colunas reais dessas tabelas.
-export type ReconciliationRunStatus = "OK" | "FAILED" | "RUNNING";
+// Contrato do read model de reconciliações (GET /v1/acquisition/reconciliations e
+// derivados). O "reconciliação" é uma importação (backfill_job) agregando suas
+// janelas (sync_run); o detalhe abre as janelas e o collapse lista os itens que
+// cada janela trouxe (via sync_run_id).
+export type ReconciliationStatus = "RUNNING" | "COMPLETED" | "PARTIAL";
+export type SyncRunStatus = "OK" | "FAILED" | "RUNNING";
 
-export interface ReconciliationRun {
+export interface Reconciliation {
+  id: string;
+  source: string;
+  status: ReconciliationStatus;
+  window_from: string;
+  window_to: string;
+  processos: number;
+  intimacoes: number;
+  total_slices: number;
+  slices_ok: number;
+  slices_error: number;
+  started_at: string;
+  finished_at?: string | null;
+}
+
+export interface ReconciliationWindow {
   id: string;
   source: string;
   window_from: string;
   window_to: string;
-  status: ReconciliationRunStatus;
-  items_new: number;
-  items_deduped: number;
+  status: SyncRunStatus;
+  processos_new: number;
+  intimacoes_new: number;
   error?: string | null;
   started_at: string;
   finished_at?: string | null;
@@ -110,5 +127,33 @@ export interface ReconciliationImport {
 export interface ReconciliationsView {
   import: ReconciliationImport;
   totals: { court_records: number; intimations: number };
-  runs: ReconciliationRun[];
+  reconciliations: Reconciliation[];
+}
+
+export interface ReconciliationDetailView {
+  reconciliation: Reconciliation;
+  windows: ReconciliationWindow[];
+}
+
+export interface ProcessoLine {
+  id: string;
+  cnj_number: string;
+  court: string;
+  degree: string;
+  class: string;
+}
+
+export interface IntimacaoLine {
+  id: string;
+  cnj_number: string;
+  court: string;
+  degree: string;
+  type: string;
+  status: string;
+  made_available_at: string;
+}
+
+export interface SyncRunItemsView {
+  processos: ProcessoLine[];
+  intimacoes: IntimacaoLine[];
 }
