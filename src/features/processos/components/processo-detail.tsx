@@ -16,6 +16,7 @@ import type {
   ProcessoSecrecy,
   ProcessoView,
 } from "@/features/processos/types";
+import { ProcessoTasks } from "@/features/tasks/components/processo-tasks";
 
 const DEGREE_LABEL: Record<ProcessoDegree, string> = {
   UNKNOWN: "Grau não informado",
@@ -160,8 +161,16 @@ export function ProcessoDetail({
                 text="As intimações (DJEN) vinculadas a este processo aparecem aqui."
               />
             </TabsContent>
-            <TabsContent value="prazos" className="mt-5">
+            <TabsContent value="prazos" className="mt-5 flex flex-col gap-6">
+              {/* Prazos + Tarefas juntos: a tarefa nasce do prazo/intimação, então
+                  compartilham contexto — mais limpo que uma aba separada. */}
               <ProcessoPrazos processoId={processo.id} />
+              <div className="flex flex-col gap-2">
+                <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                  Tarefas
+                </h3>
+                <ProcessoTasks processoId={processo.id} />
+              </div>
             </TabsContent>
             <TabsContent value="pecas" className="mt-5">
               <EmptyTab
