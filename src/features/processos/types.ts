@@ -21,13 +21,5 @@ export interface ProcessoView {
   last_movement_at: string | null;
 }
 
-/** Envelope paginado por cursor do BE: { data, page: { next_cursor, limit } }. */
-export interface PageEnvelope<T> {
-  data: T[];
-  page: {
-    next_cursor: string | null;
-    limit: number;
-    total_count: number;
-    total: number;
-  };
-}
+// Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
+export type { PageEnvelope } from "@/lib/api/types";
