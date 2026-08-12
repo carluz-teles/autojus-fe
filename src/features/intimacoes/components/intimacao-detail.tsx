@@ -16,6 +16,7 @@ import type {
   IntimacaoType,
   IntimacaoView,
 } from "@/features/intimacoes/types";
+import { ConfirmarPrazo } from "@/features/prazos/components/confirmar-prazo";
 
 const DEGREE_LABEL: Record<IntimacaoDegree, string> = {
   UNKNOWN: "Grau não informado",
@@ -138,6 +139,10 @@ export function IntimacaoDetail({
               </SheetField>
               <SheetField label="Fonte">{intimacao.source || "—"}</SheetField>
             </dl>
+
+            <SheetSection title="Prazo & Tarefas">
+              <ConfirmarPrazo intimationId={intimacao.id} />
+            </SheetSection>
 
             {/* Placeholder da fase de IA — reserva o espaço da "tela-alma". */}
             <div className="border-gold/25 from-gold/[0.06] rounded-xl border border-dashed bg-gradient-to-br to-transparent p-5">

@@ -3,6 +3,8 @@ import type { ApiFetcher } from "@/lib/api/use-api";
 import type {
   PageEnvelope,
   PrazoAgendaView,
+  PrazoConfirmInput,
+  PrazoConfirmResult,
   PrazoDetalheView,
   PrazoStatus,
   PrazoView,
@@ -58,4 +60,29 @@ export async function getPrazo(
   id: string,
 ): Promise<PrazoDetalheView> {
   return fetcher<PrazoDetalheView>(`${ENDPOINT}/${id}`);
+}
+
+/**
+ * F2 — o prazo (0 ou 1) derivado de uma intimação. O BE devolve um PageEnvelope
+ * filtrado por intimation_id; pegamos o primeiro (ou null quando ainda não derivou).
+ */
+export async function getPrazoPorIntimacao(
+  fetcher: ApiFetcher,
+  intimationId: string,
+): Promise<PrazoAgendaView | null> {
+  const page = await fetcher<PageEnvelope<PrazoAgendaView>>(ENDPOINT, {
+    query: { intimation_id: intimationId, limit: 1 },
+  });
+  return page.data[0] ?? null;
+}
+
+/** F2 — "Aprovar tudo": abre o prazo (PENDING→OPEN) e cria as tarefas numa tacada. */
+export async function confirmarPrazo(
+  fetcher: ApiFetcher,
+  body: PrazoConfirmInput,
+): Promise<PrazoConfirmResult> {
+  return fetcher<PrazoConfirmResult>(`${ENDPOINT}/confirm`, {
+    method: "POST",
+    body,
+  });
 }

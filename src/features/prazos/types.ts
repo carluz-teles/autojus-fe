@@ -43,5 +43,42 @@ export interface PrazoDetalheView extends PrazoAgendaView {
   rules_version: string;
 }
 
+// ── F2: confirmar prazo ("Aprovar tudo") ──
+// POST /v1/prazos/confirm — o advogado ajusta o prazo derivado e monta as tarefas;
+// numa tacada o deadline vira OPEN + N tasks. Idempotente por intimation_id.
+
+/** Tarefa a criar junto do prazo. Só `title` é obrigatório. */
+export interface PrazoConfirmTask {
+  title: string;
+  kind?: string;
+  /** Vencimento no formato "YYYY-MM-DD" (date input); omitido = sem prazo. */
+  due_date?: string;
+  description?: string;
+  /** Id INTERNO do responsável (Me.user_id) — nunca org_id/tenant_id. */
+  assignee_user_id?: string;
+}
+
+/** Prazo ajustado pelo advogado antes de abrir. */
+export interface PrazoConfirmDeadline {
+  kind: string;
+  days: number;
+  counting: PrazoCounting;
+  doubled: boolean;
+  doubled_reason?: string;
+}
+
+/** Corpo do POST /v1/prazos/confirm (sem tenant_id/org_id — o BE resolve pelo JWT). */
+export interface PrazoConfirmInput {
+  intimation_id: string;
+  deadline: PrazoConfirmDeadline;
+  tasks: PrazoConfirmTask[];
+}
+
+/** Resposta 200: o prazo agora OPEN (confirmado) + as tarefas criadas. */
+export interface PrazoConfirmResult {
+  deadline: PrazoDetalheView & { confirmed_by?: string };
+  tasks: Array<{ id: string; title: string; due_date: string | null }>;
+}
+
 // Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
 export type { PageEnvelope } from "@/lib/api/types";
