@@ -16,3 +16,10 @@ export function formatDate(iso: string | null, fallback = "—"): string {
     ? fallback
     : date.toLocaleDateString("pt-BR");
 }
+
+const countFormatter = new Intl.NumberFormat("pt-BR");
+
+/** Formata uma contagem inteira no padrão pt-BR — ex. `1247` → "1.247". */
+export function formatCount(n: number): string {
+  return countFormatter.format(n);
+}
