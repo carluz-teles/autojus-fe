@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Gavel, ScrollText, Timer } from "lucide-react";
+import { FileText, Gavel, ScrollText } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,6 +10,7 @@ import {
   SheetSection,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ProcessoPrazos } from "@/features/prazos/components/processo-prazos";
 import type {
   ProcessoDegree,
   ProcessoSecrecy,
@@ -160,10 +161,7 @@ export function ProcessoDetail({
               />
             </TabsContent>
             <TabsContent value="prazos" className="mt-5">
-              <EmptyTab
-                icon={Timer}
-                text="Os prazos calculados a partir das intimações aparecem aqui."
-              />
+              <ProcessoPrazos processoId={processo.id} />
             </TabsContent>
             <TabsContent value="pecas" className="mt-5">
               <EmptyTab
