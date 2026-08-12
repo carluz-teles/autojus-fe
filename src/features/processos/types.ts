@@ -27,5 +27,7 @@ export interface PageEnvelope<T> {
   page: {
     next_cursor: string | null;
     limit: number;
+    total_count: number;
+    total: number;
   };
 }
