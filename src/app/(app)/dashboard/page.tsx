@@ -1,15 +1,25 @@
 import { CalendarClock, FileText, Inbox, Scale } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { PageHeader } from "@/components/shell/page-header";
 import { cn } from "@/lib/utils";
 
-// Cards de resumo (placeholders até a FE-2 ligar no BE). Layout bento leve.
-const STATS = [
+import { LiveTotal } from "./live-total";
+
+// Cards de resumo. "Processos monitorados" e "Publicações novas" leem o total real do
+// tenant (page.total via GET /v1/processos|intimacoes?limit=1). Os demais são
+// placeholders até as fatias de prazos/documentos.
+const STATS: {
+  label: string;
+  value: ReactNode;
+  icon: typeof Scale;
+  hint: string;
+}[] = [
   {
     label: "Processos monitorados",
-    value: "—",
+    value: <LiveTotal kind="processos" />,
     icon: Scale,
-    hint: "aguardando sync",
+    hint: "total do acervo",
   },
   {
     label: "Prazos nos próximos 7d",
@@ -17,7 +27,12 @@ const STATS = [
     icon: CalendarClock,
     hint: "sem dados",
   },
-  { label: "Publicações novas", value: "—", icon: Inbox, hint: "sem dados" },
+  {
+    label: "Publicações novas",
+    value: <LiveTotal kind="intimacoes" />,
+    icon: Inbox,
+    hint: "total capturado",
+  },
   { label: "Documentos", value: "—", icon: FileText, hint: "sem dados" },
 ];
 

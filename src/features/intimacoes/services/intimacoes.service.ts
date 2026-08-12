@@ -11,13 +11,15 @@ export interface ListIntimacoesParams {
   limit?: number;
   /** Cursor opaco: eco do next_cursor recebido para pedir a próxima página. */
   cursor?: string;
+  /** Busca server-side por cnj_number (ILIKE). Omitido quando vazio. */
+  search?: string;
 }
 
 export async function listIntimacoes(
   fetcher: ApiFetcher,
-  { limit = 20, cursor }: ListIntimacoesParams = {},
+  { limit = 20, cursor, search }: ListIntimacoesParams = {},
 ): Promise<PageEnvelope<IntimacaoView>> {
   return fetcher<PageEnvelope<IntimacaoView>>(ENDPOINT, {
-    query: { limit, cursor },
+    query: { limit, cursor, search },
   });
 }

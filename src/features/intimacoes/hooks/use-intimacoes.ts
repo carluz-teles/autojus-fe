@@ -1,37 +1,67 @@
 "use client";
 
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
+import { DEFAULT_PAGE_SIZE } from "@/components/ui/list-pagination";
 import { useApi } from "@/lib/api/use-api";
+import { useCursorPagination } from "@/lib/hooks/use-cursor-pagination";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 
 import { listIntimacoes } from "../services/intimacoes.service";
 
-const INTIMACOES_KEY = ["intimacoes", "list"] as const;
-const PAGE_LIMIT = 20;
-
 /**
- * Hook público da feature — inbox de intimações, leitura paginada por cursor via
- * React Query. next_cursor null = última página.
+ * Hook público da feature — inbox de intimações: leitura por cursor (prev/próxima),
+ * busca server-side (debounce por cnj_number) e totais "X de Y". Espelha useProcessos.
  */
 export function useIntimacoes() {
   const fetcher = useApi();
+  const [search, setSearch] = useState("");
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
+  const debouncedSearch = useDebounce(search, 400);
 
-  const query = useInfiniteQuery({
-    queryKey: INTIMACOES_KEY,
-    queryFn: ({ pageParam }) =>
-      listIntimacoes(fetcher, { limit: PAGE_LIMIT, cursor: pageParam }),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => last.page.next_cursor ?? undefined,
+  const pagination = useCursorPagination(`${debouncedSearch} ${pageSize}`);
+
+  const query = useQuery({
+    queryKey: [
+      "intimacoes",
+      "list",
+      {
+        search: debouncedSearch,
+        limit: pageSize,
+        cursor: pagination.activeCursor,
+      },
+    ],
+    queryFn: () =>
+      listIntimacoes(fetcher, {
+        limit: pageSize,
+        cursor: pagination.activeCursor,
+        search: debouncedSearch || undefined,
+      }),
+    placeholderData: keepPreviousData,
   });
 
-  const intimacoes = query.data?.pages.flatMap((p) => p.data) ?? [];
+  const nextCursor = query.data?.page.next_cursor ?? null;
 
   return {
-    intimacoes,
+    intimacoes: query.data?.data ?? [],
+    totalCount: query.data?.page.total_count ?? 0,
+    total: query.data?.page.total ?? 0,
     isPending: query.isPending,
+    isFetching: query.isFetching,
     error: query.error,
-    hasNextPage: query.hasNextPage,
-    fetchNextPage: query.fetchNextPage,
-    isFetchingNextPage: query.isFetchingNextPage,
+    // busca
+    search,
+    setSearch,
+    // paginação
+    pageSize,
+    setPageSize,
+    pageNumber: pagination.pageNumber,
+    canPrev: pagination.canPrev,
+    canNext: nextCursor !== null,
+    onPrev: pagination.prev,
+    onNext: () => {
+      if (nextCursor) pagination.next(nextCursor);
+    },
   };
 }

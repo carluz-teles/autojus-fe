@@ -4,15 +4,18 @@ import { ArrowUpDown, CheckCircle2, Filter, Printer } from "lucide-react";
 
 import { PageHeader } from "@/components/shell/page-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { ListPagination } from "@/components/ui/list-pagination";
+import { ListSearchToolbar } from "@/components/ui/list-search-toolbar";
 import { ImportBanner } from "@/features/import-status/components/import-banner";
 import { IntimacaoDetail } from "@/features/intimacoes/components/intimacao-detail";
 import { useIntimacoes } from "@/features/intimacoes/hooks/use-intimacoes";
 import type { IntimacaoStatus } from "@/features/intimacoes/types";
+import { formatCount } from "@/lib/format";
 import { useDetailDrawer } from "@/lib/hooks/use-detail-drawer";
 
 // Inbox das intimações capturadas do DJEN pelas OABs monitoradas. Dados reais via
-// GET /v1/intimacoes (intimation → read model do BE).
+// GET /v1/intimacoes (intimation → read model do BE), paginadas por cursor
+// (prev/próxima) com busca server-side por número do processo.
 
 function fmtDate(iso: string): string {
   const d = new Date(iso);
@@ -27,15 +30,30 @@ const STATUS_LABEL: Record<IntimacaoStatus, string> = {
 export default function IntimacoesPage() {
   const {
     intimacoes,
+    totalCount,
+    total,
     isPending,
+    isFetching,
     error,
-    hasNextPage,
-    fetchNextPage,
-    isFetchingNextPage,
+    search,
+    setSearch,
+    pageSize,
+    setPageSize,
+    pageNumber,
+    canPrev,
+    canNext,
+    onPrev,
+    onNext,
   } = useIntimacoes();
 
   const { selected, open, openItem, onOpenChange, onOpenChangeComplete } =
     useDetailDrawer(intimacoes);
+
+  const countLabel = isPending
+    ? "Sincronizando…"
+    : totalCount === total
+      ? `${formatCount(total)} ${total === 1 ? "intimação" : "intimações"}`
+      : `${formatCount(totalCount)} de ${formatCount(total)} intimações`;
 
   return (
     <>
@@ -48,22 +66,27 @@ export default function IntimacoesPage() {
 
       <div className="reveal mt-6 flex items-center gap-2 rounded-lg border border-emerald-200/70 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
         <CheckCircle2 className="size-4 shrink-0" />
-        <span className="font-medium">
-          {isPending
-            ? "Sincronizando…"
-            : `${intimacoes.length} intimações carregadas`}
-        </span>
+        <span className="font-medium tabular-nums">{countLabel}</span>
       </div>
 
-      <div className="reveal mt-4 flex flex-wrap items-center gap-2">
-        <FilterChip>Hoje</FilterChip>
-        <FilterChip>Responsável</FilterChip>
-        <FilterChip icon={Filter}>Filtrar</FilterChip>
-        <FilterChip icon={ArrowUpDown}>Ordenar</FilterChip>
-        <FilterChip icon={Printer}>Imprimir</FilterChip>
+      <div className="reveal mt-4">
+        <ListSearchToolbar
+          value={search}
+          onChange={setSearch}
+          placeholder="Buscar por número do processo…"
+        >
+          <FilterChip>Hoje</FilterChip>
+          <FilterChip>Responsável</FilterChip>
+          <FilterChip icon={Filter}>Filtrar</FilterChip>
+          <FilterChip icon={ArrowUpDown}>Ordenar</FilterChip>
+          <FilterChip icon={Printer}>Imprimir</FilterChip>
+        </ListSearchToolbar>
       </div>
 
-      <div className="reveal bg-card mt-4 overflow-hidden rounded-xl border shadow-sm">
+      <div
+        className="reveal bg-card mt-4 overflow-x-auto rounded-xl border shadow-sm"
+        aria-busy={isFetching}
+      >
         <table className="w-full text-sm">
           <thead className="text-muted-foreground border-b text-left text-xs tracking-wide uppercase">
             <tr>
@@ -97,7 +120,9 @@ export default function IntimacoesPage() {
                   colSpan={6}
                   className="text-muted-foreground px-5 py-10 text-center"
                 >
-                  Nenhuma intimação capturada ainda.
+                  {search
+                    ? `Nenhum resultado para “${search}”.`
+                    : "Nenhuma intimação capturada ainda."}
                 </td>
               </tr>
             ) : (
@@ -149,17 +174,17 @@ export default function IntimacoesPage() {
         </table>
       </div>
 
-      {hasNextPage ? (
-        <div className="mt-4 flex justify-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchNextPage()}
-            disabled={isFetchingNextPage}
-          >
-            {isFetchingNextPage ? "Carregando…" : "Carregar mais"}
-          </Button>
-        </div>
+      {!isPending && !error ? (
+        <ListPagination
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+          pageNumber={pageNumber}
+          canPrev={canPrev}
+          canNext={canNext}
+          onPrev={onPrev}
+          onNext={onNext}
+          totalCount={totalCount}
+        />
       ) : null}
 
       <IntimacaoDetail

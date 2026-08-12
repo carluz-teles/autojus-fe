@@ -20,11 +20,5 @@ export interface IntimacaoView {
   content_preview: string;
 }
 
-/** Envelope paginado por cursor do BE: { data, page: { next_cursor, limit } }. */
-export interface PageEnvelope<T> {
-  data: T[];
-  page: {
-    next_cursor: string | null;
-    limit: number;
-  };
-}
+// Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
+export type { PageEnvelope } from "@/lib/api/types";

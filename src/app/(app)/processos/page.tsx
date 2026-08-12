@@ -5,14 +5,18 @@ import { Archive, CheckCircle2, Scale } from "lucide-react";
 import { PageHeader } from "@/components/shell/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ListPagination } from "@/components/ui/list-pagination";
+import { ListSearchToolbar } from "@/components/ui/list-search-toolbar";
 import { ImportBanner } from "@/features/import-status/components/import-banner";
 import { ProcessoDetail } from "@/features/processos/components/processo-detail";
 import { useProcessos } from "@/features/processos/hooks/use-processos";
 import type { ProcessoView } from "@/features/processos/types";
+import { formatCount } from "@/lib/format";
 import { useDetailDrawer } from "@/lib/hooks/use-detail-drawer";
 
 // Lista de processos consolidados (court_case / court_record), capturados do DJEN e
-// enriquecidos pelo DATAJUD. Dados reais via GET /v1/processos (read model do BE).
+// enriquecidos pelo DATAJUD. Dados reais via GET /v1/processos (read model do BE),
+// paginados por cursor (prev/próxima) com busca server-side por número.
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
@@ -29,22 +33,34 @@ function lastMovement(p: ProcessoView): string {
 export default function ProcessosPage() {
   const {
     processos,
+    totalCount,
+    total,
     isPending,
+    isFetching,
     error,
-    hasNextPage,
-    fetchNextPage,
-    isFetchingNextPage,
+    search,
+    setSearch,
+    pageSize,
+    setPageSize,
+    pageNumber,
+    canPrev,
+    canNext,
+    onPrev,
+    onNext,
   } = useProcessos();
 
   const { selected, open, openItem, onOpenChange, onOpenChangeComplete } =
     useDetailDrawer(processos);
 
+  // "X de Y" quando há filtro (o total do filtro difere do global); só o total senão.
+  const countValue = isPending
+    ? "—"
+    : totalCount === total
+      ? formatCount(total)
+      : `${formatCount(totalCount)} de ${formatCount(total)}`;
+
   const stats = [
-    {
-      label: "Processos carregados",
-      value: isPending ? "—" : String(processos.length),
-      icon: Scale,
-    },
+    { label: "Processos", value: countValue, icon: Scale },
     { label: "Fechamentos no mês", value: "—", icon: CheckCircle2 },
     { label: "Arquivados no mês", value: "—", icon: Archive },
   ];
@@ -81,7 +97,18 @@ export default function ProcessosPage() {
         ))}
       </section>
 
-      <div className="reveal bg-card mt-4 overflow-hidden rounded-xl border shadow-sm">
+      <div className="reveal mt-6">
+        <ListSearchToolbar
+          value={search}
+          onChange={setSearch}
+          placeholder="Buscar por número do processo…"
+        />
+      </div>
+
+      <div
+        className="reveal bg-card mt-4 overflow-x-auto rounded-xl border shadow-sm"
+        aria-busy={isFetching}
+      >
         <table className="w-full text-sm">
           <thead className="text-muted-foreground border-b text-left text-xs tracking-wide uppercase">
             <tr>
@@ -114,7 +141,9 @@ export default function ProcessosPage() {
                   colSpan={5}
                   className="text-muted-foreground px-5 py-10 text-center"
                 >
-                  Nenhum processo capturado ainda.
+                  {search
+                    ? `Nenhum resultado para “${search}”.`
+                    : "Nenhum processo capturado ainda."}
                 </td>
               </tr>
             ) : (
@@ -159,17 +188,17 @@ export default function ProcessosPage() {
         </table>
       </div>
 
-      {hasNextPage ? (
-        <div className="mt-4 flex justify-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchNextPage()}
-            disabled={isFetchingNextPage}
-          >
-            {isFetchingNextPage ? "Carregando…" : "Carregar mais"}
-          </Button>
-        </div>
+      {!isPending && !error ? (
+        <ListPagination
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+          pageNumber={pageNumber}
+          canPrev={canPrev}
+          canNext={canNext}
+          onPrev={onPrev}
+          onNext={onNext}
+          totalCount={totalCount}
+        />
       ) : null}
 
       <ProcessoDetail
