@@ -244,7 +244,7 @@ function PrazoPorQue({ prazo }: { prazo: PrazoView | PrazoAgendaView }) {
         ) : null}
         {prazo.intimation_id ? (
           <Link
-            href={`/intimacoes?id=${prazo.intimation_id}`}
+            href={`/intimacoes/${prazo.intimation_id}`}
             className="text-gold inline-flex w-fit items-center gap-1 hover:underline"
           >
             <ExternalLink className="size-3.5" /> Ver intimação de origem

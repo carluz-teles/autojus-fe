@@ -1,13 +1,14 @@
-import { redirect } from "next/navigation";
+import { IntimacaoDetailPage } from "@/features/intimacoes/components/intimacao-detail-page";
 
-// O detalhe da intimação virou um drawer sobre a lista. Esta rota legada só
-// preserva links antigos: redireciona para a lista com ?id=, que reabre o
-// drawer quando o item está nas páginas carregadas.
-export default async function IntimacaoDetailRedirect({
+// Rota de detalhe da intimação (deep-link próprio). Shell = Server Component:
+// resolve o id da rota e delega para a feature (Client Component), que busca a
+// intimação por id (GET /v1/intimacoes/:id) e abre para QUALQUER intimação —
+// esteja ela nas páginas carregadas da lista ou não.
+export default async function IntimacaoDetailRoute({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  redirect(`/intimacoes?id=${encodeURIComponent(id)}`);
+  return <IntimacaoDetailPage id={id} />;
 }
