@@ -1,45 +1,113 @@
 "use client";
 
-import { Archive, CheckCircle2, Scale } from "lucide-react";
+import { Archive, PackageX, PauseCircle, Play, Scale } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { FilterToolbar } from "@/components/ui/filter-toolbar";
+import { KpiCard, KpiRow } from "@/components/ui/kpi-card";
 import { ListPagination } from "@/components/ui/list-pagination";
-import { ListSearchToolbar } from "@/components/ui/list-search-toolbar";
+import {
+  processoTone,
+  StatusBadge,
+  type StatusTone,
+} from "@/components/ui/status-badge";
 import { ImportBanner } from "@/features/import-status/components/import-banner";
-import { ProcessoDetail } from "@/features/processos/components/processo-detail";
 import { useProcessos } from "@/features/processos/hooks/use-processos";
+import { useProcessosSummary } from "@/features/processos/hooks/use-processos-summary";
+import { lifecycleLabel } from "@/features/processos/lib/labels";
 import type { ProcessoView } from "@/features/processos/types";
-import { formatCount } from "@/lib/format";
-import { useDetailDrawer } from "@/lib/hooks/use-detail-drawer";
+import { formatClaimValueBRL, formatDate } from "@/lib/format";
 
-// Lista de processos consolidados (court_case / court_record), capturados do DJEN e
-// enriquecidos pelo DATAJUD. Dados reais via GET /v1/processos (read model do BE),
-// paginados por cursor (prev/próxima) com busca server-side por número.
+// Lista de processos consolidados (court_case / court_record), capturados do DJEN
+// e enriquecidos pelo DATAJUD. KpiRow via GET /v1/processos/summary; DataTable via
+// GET /v1/processos (read model), paginada por cursor com busca server-side.
+// Cards de lifecycle são clicáveis: filtram a lista (?lifecycle) e marcam-se ativos.
 
-function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("pt-BR");
-}
+// Cada célula deriva de helpers (lib/format, lib/labels) — nada de cálculo no JSX.
+const COLUMNS: DataTableColumn<ProcessoView>[] = [
+  {
+    key: "processo",
+    header: "Processo",
+    cell: (p) => (
+      <div className="flex flex-col">
+        <span className="group-hover:text-gold font-medium tabular-nums transition-colors">
+          {p.cnj_number}
+        </span>
+        <span className="text-muted-foreground line-clamp-1 text-xs">
+          {[p.class, p.subject].filter(Boolean).join(" · ") || "—"}
+        </span>
+      </div>
+    ),
+  },
+  {
+    key: "cliente",
+    header: "Cliente",
+    cell: () => <span className="text-muted-foreground">—</span>,
+  },
+  {
+    key: "orgao",
+    header: "Órgão julgador",
+    cell: (p) => (
+      <span className="text-muted-foreground">{p.judging_body || "—"}</span>
+    ),
+  },
+  {
+    key: "distribuicao",
+    header: "Distribuição",
+    cell: (p) => (
+      <span className="text-muted-foreground tabular-nums">
+        {formatDate(p.filed_at)}
+      </span>
+    ),
+  },
+  {
+    key: "valor",
+    header: "Valor da causa",
+    align: "right",
+    cell: (p) => (
+      <span className="tabular-nums">{formatClaimValueBRL(p.claim_value)}</span>
+    ),
+  },
+  {
+    key: "responsavel",
+    header: "Responsável",
+    cell: (p) => (
+      <span className="text-muted-foreground">
+        {p.assigned_user_name || "—"}
+      </span>
+    ),
+  },
+  {
+    key: "status",
+    header: "Status",
+    cell: (p) => (
+      <StatusBadge
+        label={lifecycleLabel(p.lifecycle)}
+        tone={processoTone(lifecycleLabel(p.lifecycle))}
+      />
+    ),
+  },
+];
 
-function lastMovement(p: ProcessoView): string {
-  if (!p.last_movement_text) return "—";
-  const when = p.last_movement_at ? `${fmtDate(p.last_movement_at)} — ` : "";
-  return `${when}${p.last_movement_text}`;
-}
+const statusTone = (p: ProcessoView): StatusTone =>
+  processoTone(lifecycleLabel(p.lifecycle));
 
 export default function ProcessosPage() {
+  const router = useRouter();
+  const { summary } = useProcessosSummary();
   const {
     processos,
     totalCount,
-    total,
     isPending,
     isFetching,
     error,
     search,
     setSearch,
+    lifecycle,
+    setLifecycle,
     pageSize,
     setPageSize,
     pageNumber,
@@ -49,21 +117,14 @@ export default function ProcessosPage() {
     onNext,
   } = useProcessos();
 
-  const { selected, open, openItem, onOpenChange, onOpenChangeComplete } =
-    useDetailDrawer(processos);
+  // Alterna o filtro por lifecycle: clicar no card ativo limpa; senão aplica.
+  const toggleLifecycle = (value: string) =>
+    setLifecycle(lifecycle === value ? null : value);
 
-  // "X de Y" quando há filtro (o total do filtro difere do global); só o total senão.
-  const countValue = isPending
-    ? "—"
-    : totalCount === total
-      ? formatCount(total)
-      : `${formatCount(totalCount)} de ${formatCount(total)}`;
-
-  const stats = [
-    { label: "Processos", value: countValue, icon: Scale },
-    { label: "Fechamentos no mês", value: "—", icon: CheckCircle2 },
-    { label: "Arquivados no mês", value: "—", icon: Archive },
-  ];
+  const fmt = (n?: number) => (n == null ? "—" : n);
+  const rangeFrom =
+    processos.length === 0 ? 0 : (pageNumber - 1) * pageSize + 1;
+  const rangeTo = (pageNumber - 1) * pageSize + processos.length;
 
   return (
     <>
@@ -79,134 +140,95 @@ export default function ProcessosPage() {
 
       <ImportBanner />
 
-      <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {stats.map(({ label, value, icon: Icon }, i) => (
-          <div
-            key={label}
-            className="reveal bg-card rounded-xl border p-5 shadow-sm"
-            style={{ animationDelay: `${i * 60}ms` }}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-sm">{label}</span>
-              <Icon className="text-gold size-4" />
-            </div>
-            <p className="font-display mt-3 text-3xl leading-none tabular-nums">
-              {value}
-            </p>
-          </div>
-        ))}
+      <section className="reveal mt-8">
+        <KpiRow cols={5}>
+          <KpiCard
+            icon={Scale}
+            label="Total"
+            value={fmt(summary?.total)}
+            tone="neutral"
+            onClick={() => setLifecycle(null)}
+            active={lifecycle === null}
+          />
+          <KpiCard
+            icon={Play}
+            label="Em andamento"
+            value={fmt(summary?.em_andamento)}
+            tone="info"
+            onClick={() => toggleLifecycle("ACTIVE")}
+            active={lifecycle === "ACTIVE"}
+          />
+          <KpiCard
+            icon={PauseCircle}
+            label="Suspensos"
+            value={fmt(summary?.suspensos)}
+            tone="warning"
+            onClick={() => toggleLifecycle("SUSPENDED")}
+            active={lifecycle === "SUSPENDED"}
+          />
+          <KpiCard
+            icon={Archive}
+            label="Arquivados"
+            value={fmt(summary?.arquivados)}
+            tone="neutral"
+            onClick={() => toggleLifecycle("ARCHIVED")}
+            active={lifecycle === "ARCHIVED"}
+          />
+          <KpiCard
+            icon={PackageX}
+            label="Baixados"
+            value={fmt(summary?.baixados)}
+            tone="neutral"
+            onClick={() => toggleLifecycle("CLOSED")}
+            active={lifecycle === "CLOSED"}
+          />
+        </KpiRow>
       </section>
 
       <div className="reveal mt-6">
-        <ListSearchToolbar
-          value={search}
-          onChange={setSearch}
+        <FilterToolbar
+          search={search}
+          onSearchChange={setSearch}
           placeholder="Buscar por número do processo…"
         />
       </div>
 
-      <div
-        className="reveal bg-card mt-4 overflow-x-auto rounded-xl border shadow-sm"
-        aria-busy={isFetching}
-      >
-        <table className="w-full text-sm">
-          <thead className="text-muted-foreground border-b text-left text-xs tracking-wide uppercase">
-            <tr>
-              <th className="px-5 py-3 font-medium">Nº do processo</th>
-              <th className="px-5 py-3 font-medium">Tribunal / grau</th>
-              <th className="px-5 py-3 font-medium">Classe</th>
-              <th className="px-5 py-3 font-medium">Órgão julgador</th>
-              <th className="px-5 py-3 font-medium">Último andamento</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {isPending ? (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="text-muted-foreground px-5 py-10 text-center"
-                >
-                  Carregando processos…
-                </td>
-              </tr>
-            ) : error ? (
-              <tr>
-                <td colSpan={5} className="px-5 py-10 text-center text-red-600">
-                  Erro ao carregar processos.
-                </td>
-              </tr>
-            ) : processos.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="text-muted-foreground px-5 py-10 text-center"
-                >
-                  {search
-                    ? `Nenhum resultado para “${search}”.`
-                    : "Nenhum processo capturado ainda."}
-                </td>
-              </tr>
-            ) : (
-              processos.map((p) => (
-                <tr
-                  key={p.id}
-                  onClick={() => openItem(p)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      openItem(p);
-                    }
-                  }}
-                  tabIndex={0}
-                  role="button"
-                  aria-label={`Abrir processo ${p.cnj_number}`}
-                  aria-current={selected?.id === p.id ? "true" : undefined}
-                  className="hover:bg-muted/40 focus-visible:ring-ring/50 aria-[current=true]:bg-gold/5 cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset"
-                >
-                  <td className="hover:text-gold px-5 py-4 font-medium tabular-nums">
-                    {p.cnj_number}
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className="text-muted-foreground">{p.court}</span>
-                    <Badge variant="outline" className="ml-2">
-                      {p.degree}
-                    </Badge>
-                  </td>
-                  <td className="text-muted-foreground px-5 py-4">
-                    {p.class || "—"}
-                  </td>
-                  <td className="text-muted-foreground px-5 py-4">
-                    {p.judging_body || "—"}
-                  </td>
-                  <td className="text-muted-foreground px-5 py-4">
-                    {lastMovement(p)}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {!isPending && !error ? (
-        <ListPagination
-          pageSize={pageSize}
-          onPageSizeChange={setPageSize}
-          pageNumber={pageNumber}
-          canPrev={canPrev}
-          canNext={canNext}
-          onPrev={onPrev}
-          onNext={onNext}
-          totalCount={totalCount}
+      <div className="reveal mt-4">
+        <DataTable
+          columns={COLUMNS}
+          rows={processos}
+          rowKey={(p) => p.id}
+          statusTone={statusTone}
+          onRowClick={(p) => router.push(`/processos/${p.id}`)}
+          rowActions={(p) => [{ label: "Abrir", href: `/processos/${p.id}` }]}
+          isLoading={isPending || (isFetching && processos.length === 0)}
+          loadingLabel="Carregando processos…"
+          error={error ? "Erro ao carregar processos." : undefined}
+          empty={
+            <p className="text-muted-foreground px-5 py-10 text-center">
+              {search
+                ? `Nenhum resultado para “${search}”.`
+                : "Nenhum processo capturado ainda."}
+            </p>
+          }
+          rangeFrom={error ? undefined : rangeFrom}
+          rangeTo={error ? undefined : rangeTo}
+          total={error ? undefined : totalCount}
+          pagination={
+            !isPending && !error ? (
+              <ListPagination
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+                pageNumber={pageNumber}
+                canPrev={canPrev}
+                canNext={canNext}
+                onPrev={onPrev}
+                onNext={onNext}
+              />
+            ) : undefined
+          }
         />
-      ) : null}
-
-      <ProcessoDetail
-        processo={selected}
-        open={open}
-        onOpenChange={onOpenChange}
-        onOpenChangeComplete={onOpenChangeComplete}
-      />
+      </div>
     </>
   );
 }

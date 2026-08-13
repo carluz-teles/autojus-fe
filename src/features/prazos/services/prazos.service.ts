@@ -6,6 +6,7 @@ import type {
   PrazoConfirmInput,
   PrazoConfirmResult,
   PrazoDetalheView,
+  PrazosSummary,
   PrazoStatus,
   PrazoView,
 } from "../types";
@@ -74,6 +75,16 @@ export async function getPrazoPorIntimacao(
     query: { intimation_id: intimationId, limit: 1 },
   });
   return page.data[0] ?? null;
+}
+
+/**
+ * Contadores da agenda — GET /v1/prazos/summary → objeto único (sem envelope de
+ * cursor). Alimenta a KpiRow do topo da tela.
+ */
+export async function getPrazosSummary(
+  fetcher: ApiFetcher,
+): Promise<PrazosSummary> {
+  return fetcher<PrazosSummary>(`${ENDPOINT}/summary`);
 }
 
 /** F2 — "Aprovar tudo": abre o prazo (PENDING→OPEN) e cria as tarefas numa tacada. */

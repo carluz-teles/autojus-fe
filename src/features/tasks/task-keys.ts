@@ -8,4 +8,5 @@ export const taskKeys = {
     [...taskKeys.all, "agenda", params] as const,
   processo: (processoId: string) =>
     [...taskKeys.all, "processo", processoId] as const,
+  detail: (id: string) => [...taskKeys.all, "detail", id] as const,
 };

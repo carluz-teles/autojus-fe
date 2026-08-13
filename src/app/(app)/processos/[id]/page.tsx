@@ -1,14 +1,14 @@
-import { redirect } from "next/navigation";
+import { ProcessoCockpit } from "@/features/processos/components/cockpit/processo-cockpit";
 
-// O detalhe do processo virou um drawer sobre a lista. Esta rota legada só
-// preserva links antigos: redireciona para a lista com ?id=, que reabre o
-// drawer quando o item está nas páginas carregadas. A tela dedicada de
-// processo (linha do tempo, responsáveis, documentos) vem numa fatia futura.
-export default async function ProcessoDetailRedirect({
+// Página do processo (cockpit) — rota dedicada. Shell = Server Component: resolve
+// o id da rota e delega para a feature (Client Component), que busca o processo
+// por id (GET /v1/processos/:id) e monta o cockpit da Fase 1 (shell sobre o dado
+// que já existe, sem IA e sem protocolo). Espelha o deep-link de intimação.
+export default async function ProcessoDetailRoute({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  redirect(`/processos?id=${encodeURIComponent(id)}`);
+  return <ProcessoCockpit processoId={id} />;
 }

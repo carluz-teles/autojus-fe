@@ -23,3 +23,36 @@ const countFormatter = new Intl.NumberFormat("pt-BR");
 export function formatCount(n: number): string {
   return countFormatter.format(n);
 }
+
+const brlFormatter = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+});
+
+/**
+ * Formata o valor da causa (decimal em string, ex. "250000.00") em BRL pt-BR —
+ * ex. "R$ 250.000,00". Retorna `fallback` quando null/vazio ou não-numérico.
+ */
+export function formatClaimValueBRL(
+  value: string | null | undefined,
+  fallback = "—",
+): string {
+  if (value == null || value === "") return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? brlFormatter.format(n) : fallback;
+}
+
+/** Formata data+hora ISO em pt-BR; retorna `fallback` se null ou inválido. */
+export function formatDateTime(iso: string | null, fallback = "—"): string {
+  if (!iso) return fallback;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? fallback
+    : date.toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+}

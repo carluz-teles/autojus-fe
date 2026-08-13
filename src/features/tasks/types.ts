@@ -17,6 +17,12 @@ export interface TaskView {
   /** Vencimento (RFC3339) ou null quando a tarefa não tem prazo. */
   due_date: string | null;
   status: TaskStatus;
+  /**
+   * Status de apresentação DERIVADO pelo BE (Aberta|Em execução|Concluída|
+   * Atrasada; "" para DISMISSED). É a fonte da coluna STATUS e do StatusBadge de
+   * tarefa; o `status` cru segue para as ações. Aditivo — pode vir ausente.
+   */
+  display_status?: string;
   /** Origem (ex.: DEADLINE, INTIMATION, MANUAL) — de onde a tarefa nasceu. */
   source: string;
   /** Id INTERNO do responsável (não o org_id/tenant_id). Base do filtro "meus". */
@@ -26,6 +32,60 @@ export interface TaskView {
   court_record_id?: string;
   /** Preenchido quando status vira DONE (RFC3339). */
   completed_at: string | null;
+}
+
+/**
+ * Item do checklist de uma tarefa (subtarefa marcável) — item do array `items` do
+ * detalhe (GET /v1/tasks/:id). `done_at` só vem quando `done` é true. Espelha o
+ * TaskItemView do BE.
+ */
+export interface TaskItemView {
+  id: string;
+  title: string;
+  position: number;
+  done: boolean;
+  done_at: string | null;
+  created_at: string;
+}
+
+/** Progresso do checklist — {done, total}. Espelha o TaskProgress do BE. */
+export interface TaskProgress {
+  done: number;
+  total: number;
+}
+
+/**
+ * Detalhe da tarefa — GET /v1/tasks/:id. Os campos da tarefa + o checklist ordenado
+ * (`items`), o progresso (`progress`) e o `display_status` DERIVADO. `items` é sempre
+ * um array (nunca null). Espelha o TaskDetailView do BE.
+ */
+export interface TaskDetailView {
+  id: string;
+  title: string;
+  description?: string;
+  kind?: string;
+  due_date: string | null;
+  status: TaskStatus;
+  display_status?: string;
+  source: string;
+  assignee_user_id?: string;
+  deadline_id?: string;
+  intimation_id?: string;
+  court_record_id?: string;
+  completed_at: string | null;
+  items: TaskItemView[];
+  progress: TaskProgress;
+}
+
+/**
+ * Contadores agregados da agenda de tarefas — GET /v1/tasks/summary. Objeto único
+ * (sem envelope de cursor), nos buckets do display_status. Alimenta a KpiRow.
+ */
+export interface TasksSummary {
+  abertas: number;
+  em_execucao: number;
+  concluidas: number;
+  atrasadas: number;
 }
 
 // Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
