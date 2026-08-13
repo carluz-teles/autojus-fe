@@ -23,3 +23,15 @@ export async function listIntimacoes(
     query: { limit, cursor, search },
   });
 }
+
+/**
+ * Detalhe individual — GET /v1/intimacoes/:id → IntimacaoView (mesma forma do
+ * item da lista) ou 404 (ApiError kind=ENTITY_NOT_FOUND). Espelha getPrazo:
+ * o deep-link busca por id quando a intimação não está nas páginas carregadas.
+ */
+export async function getIntimacao(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<IntimacaoView> {
+  return fetcher<IntimacaoView>(`${ENDPOINT}/${id}`);
+}
