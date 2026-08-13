@@ -1,12 +1,13 @@
 "use client";
 
-import { Bot, FileText, Gavel, ScrollText } from "lucide-react";
+import { Bot, FileText, Gavel } from "lucide-react";
 import Link from "next/link";
 
 import { PageHeader } from "@/components/shell/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AndamentosTimeline } from "@/features/andamentos/components/andamentos-timeline";
+import { ProcessoDocumentos } from "@/features/documentos/components/processo-documentos";
 import { ProcessoIntimacoes } from "@/features/intimacoes/components/processo-intimacoes";
 import { ProcessoPrazos } from "@/features/prazos/components/processo-prazos";
 import { ProcessoTasks } from "@/features/tasks/components/processo-tasks";
@@ -137,12 +138,7 @@ export function ProcessoCockpit({ processoId }: { processoId: string }) {
         </TabsContent>
 
         <TabsContent value="documentos">
-          <EmptyState
-            icon={ScrollText}
-            title="Documentos do processo"
-            description="Os documentos anexados aos autos ficam aqui, com upload por link seguro e visualização. Chega na Fase 2."
-            phase="Chega na Fase 2"
-          />
+          <ProcessoDocumentos processoId={processoId} />
         </TabsContent>
 
         <TabsContent value="decisoes">
