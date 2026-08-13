@@ -7,11 +7,19 @@ import { ApiError } from "@/lib/api/errors";
 import { usePrazosDoProcesso } from "../hooks/use-prazos-do-processo";
 import { PrazoCard, PrazoCardSkeleton } from "./prazo-card";
 
-// Aba "Prazos" do processo: herói "próximo prazo" no topo + lista dos demais.
-// Só JSX + binding — a leitura e a escolha do herói vivem no hook.
+// Aba "Prazos" do processo: herói "próximo prazo" + demais VIVOS; os terminais
+// (MISSED/MET/CANCELLED) vão num "Histórico" recolhido (evita poluir com os prazos
+// já vencidos vindos do backfill histórico). Só JSX + binding — lógica no hook.
 export function ProcessoPrazos({ processoId }: { processoId: string }) {
-  const { prazos, proximoPrazo, isPending, isError, error } =
-    usePrazosDoProcesso(processoId);
+  const {
+    proximoPrazo,
+    liveRestantes,
+    historico,
+    isEmpty,
+    isPending,
+    isError,
+    error,
+  } = usePrazosDoProcesso(processoId);
 
   if (isPending) {
     return (
@@ -32,7 +40,7 @@ export function ProcessoPrazos({ processoId }: { processoId: string }) {
     );
   }
 
-  if (prazos.length === 0) {
+  if (isEmpty) {
     return (
       <div className="text-muted-foreground flex min-h-40 flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 text-center text-sm">
         <Timer className="size-5 opacity-60" />
@@ -43,16 +51,36 @@ export function ProcessoPrazos({ processoId }: { processoId: string }) {
     );
   }
 
-  const restantes = proximoPrazo
-    ? prazos.filter((p) => p.id !== proximoPrazo.id)
-    : prazos;
+  const semVivos = !proximoPrazo && liveRestantes.length === 0;
 
   return (
     <div className="flex flex-col gap-3">
       {proximoPrazo ? <PrazoCard prazo={proximoPrazo} featured /> : null}
-      {restantes.map((p) => (
+      {liveRestantes.map((p) => (
         <PrazoCard key={p.id} prazo={p} />
       ))}
+
+      {semVivos ? (
+        <p className="text-muted-foreground rounded-xl border border-dashed px-4 py-5 text-center text-sm">
+          Nenhum prazo em aberto — só encerrados no histórico abaixo.
+        </p>
+      ) : null}
+
+      {historico.length > 0 ? (
+        <details className="group rounded-xl border">
+          <summary className="text-muted-foreground hover:text-foreground flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm select-none">
+            <span>Histórico — {historico.length} prazo(s) encerrado(s)</span>
+            <span className="text-xs transition-transform group-open:rotate-180">
+              ▾
+            </span>
+          </summary>
+          <div className="flex flex-col gap-3 px-3 pt-1 pb-3">
+            {historico.map((p) => (
+              <PrazoCard key={p.id} prazo={p} />
+            ))}
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }
