@@ -5,14 +5,15 @@
 import type { TaskStatus } from "../types";
 
 // "kind" legível: mapa dos tipos conhecidos + humanização de fallback, para que
-// qualquer valor do BE apareça apresentável.
+// qualquer valor do BE apareça apresentável. Os valores são a taxonomia TaskKind do
+// BE (internal/deadline: ANALISE|PECA|PROTOCOLO|PROVIDENCIA|CIENCIA), a mesma que o
+// advisory sugere e que a borda de POST/PATCH /v1/tasks valida.
 const KIND_LABEL: Record<string, string> = {
-  REVIEW_DEADLINE: "Revisar prazo",
-  CONFIRM_DEADLINE: "Confirmar prazo",
-  REVIEW_INTIMATION: "Revisar intimação",
-  DRAFT_DOCUMENT: "Elaborar peça",
-  FILE_DOCUMENT: "Protocolar peça",
-  CONTACT_CLIENT: "Contatar cliente",
+  ANALISE: "Análise",
+  PECA: "Peça",
+  PROTOCOLO: "Protocolo",
+  PROVIDENCIA: "Providência",
+  CIENCIA: "Ciência",
 };
 
 function humanize(raw: string): string {

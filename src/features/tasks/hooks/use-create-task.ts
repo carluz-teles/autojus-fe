@@ -29,6 +29,7 @@ export function useCreateTask() {
 
   return {
     createTask: mutation.mutate,
+    createTaskAsync: mutation.mutateAsync,
     isPending: mutation.isPending,
     error: mutation.error,
     isSuccess: mutation.isSuccess,

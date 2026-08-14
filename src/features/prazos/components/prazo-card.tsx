@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
+import { kindLabel } from "../lib/labels";
 import type {
   PrazoAgendaView,
   PrazoCounting,
@@ -14,30 +15,6 @@ import type {
 } from "../types";
 
 // ── Rótulos e cálculos (fora do JSX: componente = binding; lógica em helpers) ──
-
-// "kind" legível: mapa dos tipos conhecidos + humanização de fallback, para que
-// qualquer valor do BE apareça de forma apresentável.
-const KIND_LABEL: Record<string, string> = {
-  APPEAL: "Recurso",
-  APPEAL_REPLY: "Contrarrazões",
-  ANSWER: "Contestação",
-  DEFENSE: "Defesa",
-  EMBARGOS: "Embargos",
-  MANIFESTATION: "Manifestação",
-  COMPLIANCE: "Cumprimento",
-  PAYMENT: "Pagamento",
-  APPEAL_INNER: "Agravo interno",
-};
-
-function humanize(raw: string): string {
-  if (!raw) return "Prazo";
-  const spaced = raw.replace(/_/g, " ").toLowerCase();
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
-
-function kindLabel(kind: string): string {
-  return KIND_LABEL[kind] ?? humanize(kind);
-}
 
 const STATUS_LABEL: Record<PrazoStatus, string> = {
   PENDING: "Aguardando",

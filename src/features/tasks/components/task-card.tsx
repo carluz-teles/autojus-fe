@@ -8,36 +8,10 @@ import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import { useTaskActions } from "../hooks/use-task-actions";
+import { taskKindLabel, taskStatusLabel } from "../lib/labels";
 import type { TaskStatus, TaskView } from "../types";
 
 // ── Rótulos e cálculos (fora do JSX: componente = binding; lógica em helpers) ──
-
-// "kind" legível: mapa dos tipos conhecidos + humanização de fallback, para que
-// qualquer valor do BE apareça apresentável.
-const KIND_LABEL: Record<string, string> = {
-  REVIEW_DEADLINE: "Revisar prazo",
-  CONFIRM_DEADLINE: "Confirmar prazo",
-  REVIEW_INTIMATION: "Revisar intimação",
-  DRAFT_DOCUMENT: "Elaborar peça",
-  FILE_DOCUMENT: "Protocolar peça",
-  CONTACT_CLIENT: "Contatar cliente",
-};
-
-function humanize(raw: string): string {
-  const spaced = raw.replace(/_/g, " ").toLowerCase();
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
-
-function kindLabel(kind: string | undefined): string | null {
-  if (!kind) return null;
-  return KIND_LABEL[kind] ?? humanize(kind);
-}
-
-const STATUS_LABEL: Record<TaskStatus, string> = {
-  OPEN: "Em aberto",
-  DONE: "Concluída",
-  DISMISSED: "Dispensada",
-};
 
 // Vencida = ainda em aberto e com vencimento no passado.
 function isOverdue(task: TaskView): boolean {
@@ -70,16 +44,18 @@ const CARD_TONE: Record<TaskTone, string> = {
 
 // ── Badge de status ──
 
-function StatusBadge({ status }: { status: TaskStatus }) {
+// Estilo decide pelo status CRU (DONE verde, DISMISSED atenuada); o texto vem do
+// taskStatusLabel (display_status derivado pelo BE, com fallback pt-BR).
+function StatusBadge({ status, label }: { status: TaskStatus; label: string }) {
   if (status === "DONE") {
     return (
       <Badge className="border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
-        {STATUS_LABEL.DONE}
+        {label}
       </Badge>
     );
   }
   const variant = status === "DISMISSED" ? "secondary" : "default";
-  return <Badge variant={variant}>{STATUS_LABEL[status]}</Badge>;
+  return <Badge variant={variant}>{label}</Badge>;
 }
 
 // ── Cartão de tarefa ──
@@ -99,7 +75,8 @@ export function TaskCard({
 }) {
   const { markDone, dismiss } = useTaskActions();
   const tone = taskTone(task);
-  const kind = kindLabel(task.kind);
+  const kind = taskKindLabel(task.kind);
+  const statusLabel = taskStatusLabel(task);
   const assignee = assigneeLabel(task, currentUserId);
   const overdue = tone === "overdue";
   const busy = markDone.isPending || dismiss.isPending;
@@ -126,7 +103,7 @@ export function TaskCard({
           ) : null}
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-          <StatusBadge status={task.status} />
+          <StatusBadge status={task.status} label={statusLabel} />
         </div>
       </div>
 

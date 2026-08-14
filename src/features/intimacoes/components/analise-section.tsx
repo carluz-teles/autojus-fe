@@ -1,28 +1,26 @@
 "use client";
 
 import { Info, ListTodo, Sparkles } from "lucide-react";
-import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SheetSection } from "@/components/ui/sheet";
-import { useTarefasSugeridas } from "@/features/prazos/hooks/use-tarefas-sugeridas";
 import type { PrazoAgendaView, PrazoCounting } from "@/features/prazos/types";
 import { cn } from "@/lib/utils";
 
-import { useAnaliseTarefas } from "../hooks/use-analise-tarefas";
+import { useAnalise } from "../hooks/use-analise";
 import {
   SuggestedTaskCard,
   SuggestedTaskCardSkeleton,
 } from "./suggested-task-card";
 
-// Regime de contagem: segmentado com 2 botões (mesmo padrão de confirmar-prazo.tsx —
-// replicado por não ser exportado de lá). Aqui é referência visual: sem endpoint de
-// recontagem, o vencimento default segue o end_date do prazo (limitação conhecida).
-const COUNTINGS: { value: PrazoCounting; label: string }[] = [
-  { value: "BUSINESS", label: "Dias úteis" },
-  { value: "CALENDAR", label: "Dias corridos" },
-];
+// Regime de contagem exibido como rótulo informativo. SEM toggle: sem endpoint de
+// recontagem, alternar BUSINESS/CALENDAR não teria efeito (o vencimento default das
+// tarefas segue o end_date do prazo, já calculado). Um botão que não muda nada seria
+// uma falsa promessa ao advogado — o regime vai no payload do F2 como veio do prazo.
+function countingLabel(counting: PrazoCounting): string {
+  return counting === "BUSINESS" ? "Dias úteis" : "Dias corridos";
+}
 
 // Linhas pulsando enquanto a IA analisa — evita o "loading infinito" quando o LLM está off
 // (a query tem retry:false, então sempre resolve).
@@ -46,9 +44,9 @@ function TextSkeleton({ lines }: { lines: number }) {
 /**
  * Seção "Análise da IA" do detalhe da intimação: compõe 3 SheetSection — "O que
  * aconteceu" (summary, com fallback pro teor bruto quando o LLM está off, pra nunca
- * perder informação), "Recomendação" e "Tarefas sugeridas" (toolbar com toggle de
- * regime + "Aprovar tudo" + lista de SuggestedTaskCard). Busca via useTarefasSugeridas;
- * o estado dos cards e as mutations ficam em useAnaliseTarefas (componente = JSX + binding).
+ * perder informação), "Recomendação" e "Tarefas sugeridas" (toolbar com regime + "Aprovar
+ * tudo" + lista de SuggestedTaskCard). Toda a lógica vem do hook público useAnalise
+ * (componente = JSX + binding). "Aprovar tudo" em lote: falha parcial vira Alert.
  */
 export function AnaliseSection({
   prazo,
@@ -57,27 +55,16 @@ export function AnaliseSection({
   prazo: PrazoAgendaView;
   fallbackContent?: string | null;
 }) {
-  const { data, isLoading, isError } = useTarefasSugeridas(prazo.id);
-  const [counting, setCounting] = useState<PrazoCounting>(prazo.counting);
+  const analise = useAnalise(prazo);
 
-  const tarefas = useAnaliseTarefas({
-    tasks: data?.suggested_tasks ?? [],
-    context: {
-      deadlineId: prazo.id,
-      intimationId: prazo.intimation_id,
-      courtRecordId: prazo.court_record_id,
-      defaultDueDate: prazo.end_date,
-    },
-  });
-
-  const summary = data?.summary?.trim();
-  const recommendation = data?.recommendation?.trim();
+  const summary = analise.summary;
+  const recommendation = analise.recommendation;
   const fallback = fallbackContent?.trim();
 
   return (
     <div className="flex flex-col gap-6">
       <SheetSection title="O que aconteceu">
-        {isLoading ? (
+        {analise.isLoading ? (
           <TextSkeleton lines={3} />
         ) : summary ? (
           <p className="whitespace-pre-line">{summary}</p>
@@ -91,7 +78,7 @@ export function AnaliseSection({
       </SheetSection>
 
       <SheetSection title="Recomendação" accent>
-        {isLoading ? (
+        {analise.isLoading ? (
           <TextSkeleton lines={2} />
         ) : recommendation ? (
           <div className="flex items-start gap-2">
@@ -106,53 +93,48 @@ export function AnaliseSection({
       </SheetSection>
 
       <SheetSection title="Tarefas sugeridas">
-        {isLoading ? (
+        {analise.isLoading ? (
           <div className="flex flex-col gap-3">
             <SuggestedTaskCardSkeleton />
             <SuggestedTaskCardSkeleton />
           </div>
-        ) : tarefas.hasCards ? (
+        ) : analise.hasCards ? (
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="bg-muted/50 inline-flex w-fit gap-1 rounded-lg border p-1">
-                {COUNTINGS.map((c) => (
-                  <Button
-                    key={c.value}
-                    type="button"
-                    size="sm"
-                    variant={counting === c.value ? "default" : "ghost"}
-                    aria-pressed={counting === c.value}
-                    onClick={() => setCounting(c.value)}
-                  >
-                    {c.label}
-                  </Button>
-                ))}
-              </div>
+              <span className="text-muted-foreground text-xs">
+                Regime: {countingLabel(prazo.counting)}
+              </span>
               <Button
                 size="sm"
-                onClick={tarefas.approveAll}
-                disabled={tarefas.pendingCount === 0 || tarefas.busy}
+                onClick={analise.approveAll}
+                disabled={analise.pendingCount === 0 || analise.busy}
               >
                 <Sparkles /> Aprovar tudo
               </Button>
             </div>
 
+            {analise.batchError ? (
+              <p className="text-destructive text-sm" role="alert">
+                {analise.batchError}
+              </p>
+            ) : null}
+
             <div className="flex flex-col gap-3">
-              {tarefas.cards.map((card) => (
+              {analise.cards.map((card) => (
                 <SuggestedTaskCard
                   key={card.key}
                   card={card}
-                  assigneeLabel={tarefas.assigneeLabel}
-                  busy={tarefas.busy}
+                  assigneeLabel={analise.assigneeLabel}
+                  busy={analise.busy}
                   onDraftChange={(draft) =>
-                    tarefas.updateDraft(card.key, draft)
+                    analise.updateDraft(card.key, draft)
                   }
                   onToggleEdit={(editing) =>
-                    tarefas.setEditing(card.key, editing)
+                    analise.setEditing(card.key, editing)
                   }
-                  onDismiss={() => tarefas.dismiss(card.key)}
-                  onCreate={() => tarefas.createOne(card.key)}
-                  onSave={() => tarefas.saveOne(card.key)}
+                  onDismiss={() => analise.dismiss(card.key)}
+                  onCreate={() => analise.createOne(card.key)}
+                  onSave={() => analise.saveOne(card.key)}
                 />
               ))}
             </div>
@@ -162,12 +144,12 @@ export function AnaliseSection({
             className="min-h-0 border-0 py-6"
             icon={ListTodo}
             title={
-              isError
+              analise.isError
                 ? "Não foi possível carregar a análise"
                 : "Sem tarefas sugeridas"
             }
             description={
-              isError
+              analise.isError
                 ? "Tente reabrir a intimação em instantes."
                 : "A IA não sugeriu ações para esta intimação — monte as tarefas manualmente no painel de prazo."
             }

@@ -56,3 +56,14 @@ export function formatDateTime(iso: string | null, fallback = "—"): string {
         minute: "2-digit",
       });
 }
+
+/**
+ * Converte uma data ISO/RFC3339 (ex. "2026-08-20T00:00:00Z") no valor do
+ * `<input type="date">` ("YYYY-MM-DD"). Retorna "" para null/vazio/formato
+ * inesperado — o input de data nunca recebe valor inválido.
+ */
+export function toDateInput(iso?: string | null): string {
+  if (!iso) return "";
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(iso);
+  return match ? match[1] : "";
+}

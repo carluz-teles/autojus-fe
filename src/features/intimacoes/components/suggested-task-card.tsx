@@ -5,6 +5,7 @@ import { CalendarClock, Check, Pencil, Plus, User, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { taskKindLabel } from "@/features/tasks/lib/labels";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -12,13 +13,6 @@ import type {
   AnaliseTaskCard,
   AnaliseTaskDraft,
 } from "../hooks/use-analise-tarefas";
-
-// "kind" da sugestão é uma categoria curta livre (ANALISE|PECA|PROTOCOLO|…) — humaniza
-// para caber no eyebrow sem depender de um mapa fechado.
-function humanizeKind(kind: string): string {
-  const spaced = kind.replace(/_/g, " ").toLowerCase();
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
 
 /**
  * Card de UMA tarefa sugerida pela IA — apresentacional (JSX + binding). O estado
@@ -61,7 +55,7 @@ export function SuggestedTaskCard({
         <div className="min-w-0 flex-1">
           {kind ? (
             <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-              {humanizeKind(kind)}
+              {taskKindLabel(kind)}
             </span>
           ) : null}
           {card.editing ? (

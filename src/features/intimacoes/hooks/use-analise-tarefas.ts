@@ -7,6 +7,7 @@ import type { SuggestedTask } from "@/features/prazos/types";
 import { useCreateTask } from "@/features/tasks/hooks/use-create-task";
 import { useUpdateTask } from "@/features/tasks/hooks/use-update-task";
 import type { CreateTaskInput } from "@/features/tasks/types";
+import { toDateInput } from "@/lib/format";
 
 // Contexto que liga cada tarefa sugerida ao prazo/intimação de origem — vira os FKs
 // do POST /v1/tasks. `defaultDueDate` é o end_date do prazo (RFC3339) que pré-preenche
@@ -40,13 +41,6 @@ export interface AnaliseTaskDraft {
   dueDate?: string;
 }
 
-// "2026-08-20T00:00:00Z" → "2026-08-20" (valor do <input type="date">).
-function toDateInput(iso?: string | null): string {
-  if (!iso) return "";
-  const match = /^(\d{4}-\d{2}-\d{2})/.exec(iso);
-  return match ? match[1] : "";
-}
-
 /**
  * Hook público da seção de análise: dono do estado dos cards de tarefas sugeridas
  * (semeado UMA vez quando o LLM responde) e das mutations de criar/editar. O card e a
@@ -65,13 +59,18 @@ export function useAnaliseTarefas({
   const update = useUpdateTask();
 
   const [cards, setCards] = useState<AnaliseTaskCard[]>([]);
+  // Erro de falha parcial do "Aprovar tudo" (mutation de lote): null quando o último
+  // lote fechou inteiro ou ainda não rodou; texto quando N cards falharam no meio.
+  const [batchError, setBatchError] = useState<string | null>(null);
 
-  // Semeia os cards a partir das sugestões do LLM UMA vez (a resposta é estável na
-  // sessão). Guard por ref para não reescrever depois que o advogado editou/descartou.
-  const seeded = useRef(false);
+  // Semeia os cards a partir das sugestões do LLM UMA vez por prazo (a resposta é
+  // estável na sessão). Guard por ref CHAVEADO no deadlineId: trocar de prazo/intimação
+  // reseta o seeding (o componente pode ser reutilizado com outro prazo no drawer);
+  // dentro do MESMO prazo, o ref impede reescrever depois que o advogado editou/descartou.
+  const seededFor = useRef<string | null>(null);
   useEffect(() => {
-    if (seeded.current || tasks.length === 0) return;
-    seeded.current = true;
+    if (seededFor.current === context.deadlineId || tasks.length === 0) return;
+    seededFor.current = context.deadlineId;
     setCards(
       tasks.map((task, index) => ({
         key: `sug-${index}`,
@@ -84,7 +83,7 @@ export function useAnaliseTarefas({
         editing: false,
       })),
     );
-  }, [tasks, context.defaultDueDate]);
+  }, [tasks, context.deadlineId, context.defaultDueDate]);
 
   const patchCard = (key: string, patch: Partial<AnaliseTaskCard>) =>
     setCards((cs) => cs.map((c) => (c.key === key ? { ...c, ...patch } : c)));
@@ -126,9 +125,37 @@ export function useAnaliseTarefas({
     );
   };
 
+  // "Aprovar tudo" cria EM LOTE os cards ainda pendentes. Processa em sequência com
+  // mutateAsync + Promise.allSettled: cada card vira created só quando o POST confirmou,
+  // e uma falha no meio do lote NÃO mascara o resto (nem o contrário) — o erro é
+  // reportado por card e, quando há falha parcial, exposto em `batchError` para o
+  // componente avisar que o lote não fechou inteiro.
   const approveAll = () => {
-    cards.forEach((card) => {
-      if (card.status === "pending" && card.title.trim()) createOne(card.key);
+    const pending = cards.filter(
+      (c) => c.status === "pending" && c.title.trim(),
+    );
+    if (pending.length === 0) return;
+    setBatchError(null);
+    // SNAPSHOT das chaves: cards é fechamento do render atual; o allSettled abaixo
+    // completa de forma assíncrona, então não confiamos em cards mutado no meio.
+    const keys = pending.map((c) => c.key);
+    void Promise.allSettled(
+      keys.map(async (key) => {
+        const card = cards.find((c) => c.key === key);
+        if (!card) return;
+        const task = await create.createTaskAsync(buildInput(card));
+        patchCard(key, { status: "created", taskId: task.id, editing: false });
+      }),
+    ).then((results) => {
+      const failed = results.filter(
+        (r): r is PromiseRejectedResult => r.status === "rejected",
+      ).length;
+      if (failed > 0) {
+        setBatchError(
+          `${failed} de ${keys.length} tarefa(s) não puderam ser criada(s). ` +
+            "Verifique os cards em aberto e tente novamente.",
+        );
+      }
     });
   };
 
@@ -137,6 +164,7 @@ export function useAnaliseTarefas({
     hasCards: cards.length > 0,
     pendingCount: cards.filter((c) => c.status === "pending").length,
     busy: create.isPending || update.isPending,
+    batchError,
     // "Você" quando há id interno; sem endpoint de membros, é o único assignee possível.
     assigneeLabel: me?.user_id ? "Você" : null,
     updateDraft: (key: string, draft: AnaliseTaskDraft) =>
