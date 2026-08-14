@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  CalendarCheck,
-  CircleAlert,
-  Plus,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
+import { CalendarCheck, CircleAlert } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -23,10 +17,10 @@ import type { PrazoDetalheView } from "../types";
 import { PrazoCard, PrazoCardSkeleton } from "./prazo-card";
 
 /**
- * Painel F2 — "Aprovar tudo". No detalhe da intimação, mostra o prazo derivado e,
- * quando PENDING, o form pra ajustar (dias, contagem, em dobro) + montar as tarefas
- * e aprovar de uma vez. Container só resolve o estado (via hook) e delega o JSX de
- * cada caso; toda a lógica vive nos hooks.
+ * Painel F2 — confirmar prazo. No detalhe da intimação, mostra o prazo derivado e,
+ * quando PENDING, o form pra ajustar (tipo, dias, em dobro) e confirmar. As tarefas
+ * sugeridas saíram daqui e viraram fluxo próprio na Análise. Container só resolve o
+ * estado (via hook) e delega o JSX de cada caso; toda a lógica vive nos hooks.
  */
 export function ConfirmarPrazo({ intimationId }: { intimationId: string }) {
   const { state, prazo, detalhe } = usePrazoDaIntimacao(intimationId);
@@ -80,12 +74,6 @@ export function ConfirmarPrazo({ intimationId }: { intimationId: string }) {
   );
 }
 
-// Regime de contagem: segmentado com 2 botões (sem dep nova; toggle acessível).
-const COUNTINGS: { value: "BUSINESS" | "CALENDAR"; label: string }[] = [
-  { value: "BUSINESS", label: "Dias úteis" },
-  { value: "CALENDAR", label: "Dias corridos" },
-];
-
 function ConfirmarPrazoForm({
   intimationId,
   detalhe,
@@ -97,17 +85,10 @@ function ConfirmarPrazoForm({
     register,
     errors,
     submit,
-    taskFields,
-    addTask,
-    removeTask,
-    sugerindo,
-    counting,
-    setCounting,
     doubled,
     setDoubled,
     kindOptions,
     doubledReasonOptions,
-    assigneeOptions,
     isPending,
     error,
   } = useConfirmarPrazoForm({ intimationId, detalhe });
@@ -146,24 +127,6 @@ function ConfirmarPrazoForm({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <Label>Contagem</Label>
-        <div className="bg-muted/50 inline-flex w-fit gap-1 rounded-lg border p-1">
-          {COUNTINGS.map((c) => (
-            <Button
-              key={c.value}
-              type="button"
-              size="sm"
-              variant={counting === c.value ? "default" : "ghost"}
-              aria-pressed={counting === c.value}
-              onClick={() => setCounting(c.value)}
-            >
-              {c.label}
-            </Button>
-          ))}
-        </div>
-      </div>
-
       <div className="flex flex-col gap-3 rounded-xl border p-4">
         <Label className="flex items-center gap-2.5">
           <Checkbox
@@ -188,89 +151,11 @@ function ConfirmarPrazoForm({
         ) : null}
       </div>
 
-      {/* ── Tarefas (useFieldArray) ── */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h4 className="text-sm font-medium">Tarefas</h4>
-            {sugerindo ? (
-              <span className="text-muted-foreground flex items-center gap-1 text-xs">
-                <Sparkles className="size-3 animate-pulse" /> sugerindo com IA…
-              </span>
-            ) : null}
-          </div>
-          <Button type="button" variant="outline" size="sm" onClick={addTask}>
-            <Plus /> Adicionar tarefa
-          </Button>
-        </div>
-
-        {taskFields.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            Sem tarefas — aprovar abre só o prazo.
-          </p>
-        ) : null}
-
-        {taskFields.map((field, index) => (
-          <div
-            key={field.id}
-            className="bg-card flex flex-col gap-3 rounded-xl border p-3"
-          >
-            <div className="flex items-start gap-2">
-              <div className="flex flex-1 flex-col gap-2">
-                <Input
-                  placeholder="Título da tarefa"
-                  aria-invalid={errors.tasks?.[index]?.title ? true : undefined}
-                  {...register(`tasks.${index}.title`)}
-                />
-                {errors.tasks?.[index]?.title ? (
-                  <p className="text-destructive text-sm">
-                    {errors.tasks[index]?.title?.message}
-                  </p>
-                ) : null}
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Remover tarefa"
-                onClick={() => removeTask(index)}
-              >
-                <Trash2 />
-              </Button>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Input
-                type="date"
-                aria-label="Vencimento da tarefa"
-                {...register(`tasks.${index}.due_date`)}
-              />
-              <Select
-                aria-label="Responsável"
-                {...register(`tasks.${index}.assignee_user_id`)}
-              >
-                <option value="">Sem responsável</option>
-                {assigneeOptions.map((a) => (
-                  <option key={a.value} value={a.value}>
-                    {a.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <Input
-              placeholder="Descrição (opcional)"
-              {...register(`tasks.${index}.description`)}
-            />
-          </div>
-        ))}
-      </div>
-
       {error ? (
         <p className="text-destructive text-sm" role="alert">
           {error instanceof ApiError
             ? error.message
-            : "Não foi possível aprovar. Tente novamente."}
+            : "Não foi possível confirmar. Tente novamente."}
         </p>
       ) : null}
 
@@ -280,7 +165,7 @@ function ConfirmarPrazoForm({
           disabled={isPending}
           className={cn(isPending && "opacity-70")}
         >
-          <Sparkles /> {isPending ? "Aprovando…" : "Aprovar tudo"}
+          <CalendarCheck /> {isPending ? "Confirmando…" : "Confirmar prazo"}
         </Button>
       </div>
     </form>

@@ -12,6 +12,9 @@ import type {
   IntimacaoView,
 } from "@/features/intimacoes/types";
 import { ConfirmarPrazo } from "@/features/prazos/components/confirmar-prazo";
+import { usePrazoDaIntimacao } from "@/features/prazos/hooks/use-prazo-da-intimacao";
+
+import { AnaliseSection } from "./analise-section";
 
 // Peças de apresentação do detalhe da intimação, compartilhadas pelo drawer
 // (IntimacaoDetail, sobre a lista) e pela página de deep-link (/intimacoes/[id]).
@@ -78,9 +81,10 @@ export function AbrirNoTribunalButton({
   );
 }
 
-// Corpo do detalhe: conteúdo da publicação + metadados da captura DJEN + painel
-// F2 (ConfirmarPrazo) + placeholder da análise da IA. Sem chrome (título/footer)
-// para servir tanto o SheetContent do drawer quanto a página de deep-link.
+// Corpo do detalhe: metadados da captura DJEN + painel F2 (ConfirmarPrazo) + a
+// Análise da IA (resumo/recomendação/tarefas sugeridas, que já cobre o teor bruto
+// via fallback). Sem chrome (título/footer) para servir tanto o SheetContent do
+// drawer quanto a página de deep-link.
 export function IntimacaoDetailBody({
   intimacao,
 }: {
@@ -88,16 +92,6 @@ export function IntimacaoDetailBody({
 }) {
   return (
     <div className="flex flex-col gap-6">
-      <SheetSection title="O que aconteceu">
-        {intimacao.content_preview ? (
-          <p className="whitespace-pre-line">{intimacao.content_preview}</p>
-        ) : (
-          <p className="text-muted-foreground">
-            Sem prévia de conteúdo nesta publicação.
-          </p>
-        )}
-      </SheetSection>
-
       <dl className="rounded-xl border p-4">
         <SheetField label="Disponibilização">
           {fmtDate(intimacao.made_available_at)}
@@ -115,24 +109,50 @@ export function IntimacaoDetailBody({
         <SheetField label="Fonte">{intimacao.source || "—"}</SheetField>
       </dl>
 
-      <SheetSection title="Prazo & Tarefas">
+      <SheetSection title="Prazo">
         <ConfirmarPrazo intimationId={intimacao.id} />
       </SheetSection>
 
-      {/* Placeholder da fase de IA — reserva o espaço da "tela-alma". */}
-      <div className="border-gold/25 from-gold/[0.06] rounded-xl border border-dashed bg-gradient-to-br to-transparent p-5">
-        <div className="flex items-center gap-2">
-          <span className="bg-gold/15 text-gold flex size-8 items-center justify-center rounded-full">
-            <Sparkles className="size-4" />
-          </span>
-          <p className="text-sm font-medium">Análise da IA · em breve</p>
-        </div>
-        <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-          A IA vai ler esta intimação, resumir o que aconteceu e o que fazer, e
-          sugerir ações com prazo (via calendário forense) prontas para virar
-          tarefas.
-        </p>
-      </div>
+      <IntimacaoAnalise intimacao={intimacao} />
     </div>
+  );
+}
+
+// Container da Análise (a "tela-alma"): resolve o prazo derivado da intimação — a
+// Análise é keyed pelo prazo — e delega ao AnaliseSection, que resume o teor,
+// recomenda e sugere tarefas (com fallback pro teor bruto quando o LLM está off).
+// Sem prazo derivado ainda, mostra só o teor bruto pra informação não sumir.
+// Lógica no hook (usePrazoDaIntimacao); aqui só binding.
+function IntimacaoAnalise({ intimacao }: { intimacao: IntimacaoView }) {
+  const { state, prazo } = usePrazoDaIntimacao(intimacao.id);
+
+  return (
+    <section>
+      <div className="mb-3 flex items-center gap-2">
+        <span className="bg-gold/15 text-gold flex size-8 items-center justify-center rounded-full">
+          <Sparkles className="size-4" />
+        </span>
+        <h3 className="text-sm font-medium">Análise</h3>
+      </div>
+
+      {state === "loading" ? (
+        <p className="text-muted-foreground text-sm">Carregando análise…</p>
+      ) : prazo ? (
+        <AnaliseSection
+          prazo={prazo}
+          fallbackContent={intimacao.content_preview}
+        />
+      ) : (
+        <SheetSection title="O que aconteceu">
+          {intimacao.content_preview ? (
+            <p className="whitespace-pre-line">{intimacao.content_preview}</p>
+          ) : (
+            <p className="text-muted-foreground">
+              Sem prévia de conteúdo nesta publicação.
+            </p>
+          )}
+        </SheetSection>
+      )}
+    </section>
   );
 }

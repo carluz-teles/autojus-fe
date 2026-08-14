@@ -1,29 +1,14 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useMemo } from "react";
-import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { useMemo } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
-import { useMe } from "@/features/onboarding/hooks/use-me";
-
-import type {
-  PrazoConfirmInput,
-  PrazoCounting,
-  PrazoDetalheView,
-} from "../types";
+import type { PrazoConfirmInput, PrazoDetalheView } from "../types";
 import { useConfirmarPrazo } from "./use-confirmar-prazo";
-import { useTarefasSugeridas } from "./use-tarefas-sugeridas";
 
-// ── Zod: fonte da validação client-side (days>0, título não-vazio) ──
-
-const taskSchema = z.object({
-  title: z.string().trim().min(1, "Dê um título à tarefa."),
-  kind: z.string().optional(),
-  due_date: z.string().optional(),
-  assignee_user_id: z.string().optional(),
-  description: z.string().optional(),
-});
+// ── Zod: fonte da validação client-side (days>0) ──
 
 const schema = z.object({
   kind: z.string().trim().min(1, "Informe o tipo do prazo."),
@@ -34,7 +19,6 @@ const schema = z.object({
   counting: z.enum(["BUSINESS", "CALENDAR"]),
   doubled: z.boolean(),
   doubled_reason: z.string().optional(),
-  tasks: z.array(taskSchema),
 });
 
 export type ConfirmarPrazoValues = z.infer<typeof schema>;
@@ -61,14 +45,6 @@ const DOUBLED_REASONS: string[] = [
   "Defensoria Pública (art. 186, CPC)",
 ];
 
-const emptyTask = (): ConfirmarPrazoValues["tasks"][number] => ({
-  title: "",
-  kind: "",
-  due_date: "",
-  assignee_user_id: "",
-  description: "",
-});
-
 // Monta o corpo do BE a partir dos valores do form: normaliza strings, omite os
 // opcionais vazios e só manda doubled_reason quando "em dobro". (Fora do JSX.)
 function toConfirmInput(
@@ -86,21 +62,18 @@ function toConfirmInput(
         ? values.doubled_reason?.trim() || undefined
         : undefined,
     },
-    tasks: values.tasks.map((t) => ({
-      title: t.title.trim(),
-      kind: t.kind?.trim() || undefined,
-      due_date: t.due_date || undefined,
-      description: t.description?.trim() || undefined,
-      assignee_user_id: t.assignee_user_id || undefined,
-    })),
+    // F2 só confirma/ajusta o prazo — as tarefas sugeridas viraram fluxo próprio na
+    // Análise (POST /v1/tasks, uma a uma). O confirm faz REPLACE-ALL de tasks no BE:
+    // mandar algo aqui apagaria as tasks já criadas na Análise. Por isso, sempre [].
+    tasks: [],
   };
 }
 
 /**
- * Hook público do form F2. Compõe RHF+Zod (pré-preenchido pelo detalhe), o
- * useFieldArray das tarefas e a mutation useConfirmarPrazo, e expõe só handlers +
- * estado para o componente (que fica em JSX+binding). `counting`/`doubled` são
- * controles não-nativos, geridos por setValue/watch e devolvidos prontos.
+ * Hook público do form F2. Compõe RHF+Zod (pré-preenchido pelo detalhe) e a mutation
+ * useConfirmarPrazo, e expõe só handlers + estado para o componente (que fica em
+ * JSX+binding). `doubled` é controle não-nativo, gerido por setValue/watch. As tarefas
+ * saíram do F2 (viraram fluxo próprio na Análise); aqui só confirma/ajusta o prazo.
  */
 export function useConfirmarPrazoForm({
   intimationId,
@@ -109,7 +82,6 @@ export function useConfirmarPrazoForm({
   intimationId: string;
   detalhe: PrazoDetalheView;
 }) {
-  const { data: me } = useMe();
   const { confirmar, isPending, error } = useConfirmarPrazo();
 
   const form = useForm<ConfirmarPrazoValues>({
@@ -117,27 +89,22 @@ export function useConfirmarPrazoForm({
     defaultValues: {
       kind: detalhe.kind,
       days: detalhe.days,
+      // Regime de contagem fica no valor derivado (sem toggle no F2): sem endpoint de
+      // recontagem, o vencimento segue o end_date do prazo. Vai no payload como veio.
       counting: detalhe.counting,
       doubled: detalhe.doubled,
       doubled_reason: detalhe.doubled_reason ?? "",
-      tasks: [emptyTask()],
     },
   });
 
-  const tasks = useFieldArray({ control: form.control, name: "tasks" });
-
   // useWatch (não form.watch) — assinatura por campo compatível com o React
   // Compiler; reage a cada mudança sem re-render do form inteiro.
-  const counting = useWatch({ control: form.control, name: "counting" });
   const doubled = useWatch({ control: form.control, name: "doubled" });
   const kind = useWatch({ control: form.control, name: "kind" });
   const doubledReason = useWatch({
     control: form.control,
     name: "doubled_reason",
   });
-
-  const setCounting = (value: PrazoCounting) =>
-    form.setValue("counting", value, { shouldDirty: true });
 
   const setDoubled = (value: boolean) => {
     form.setValue("doubled", value, { shouldDirty: true });
@@ -158,30 +125,6 @@ export function useConfirmarPrazoForm({
       : DOUBLED_REASONS;
   }, [doubledReason]);
 
-  // "Atribuir a mim" usa o id INTERNO do usuário atual (Me.user_id). Só listamos
-  // quem tem id interno conhecido no cliente — não inventamos assignees.
-  const assigneeOptions = me?.user_id
-    ? [{ value: me.user_id, label: "Atribuir a mim" }]
-    : [];
-
-  // Tarefas sugeridas por IA (on-demand): o form aparece na hora; as sugestões chegam em
-  // ~1-2s e pré-preenchem a lista UMA vez — só se o advogado ainda não mexeu (não clobbera
-  // edição manual). Se o LLM falhar, o form segue com a tarefa vazia. tasks.replace é método
-  // do RHF (não setState), seguro no effect.
-  const { data: sugeridas, isLoading: sugerindo } = useTarefasSugeridas(
-    detalhe.id,
-  );
-  useEffect(() => {
-    const items = sugeridas?.suggested_tasks;
-    if (items?.length && !form.formState.isDirty) {
-      tasks.replace(
-        items.map((s) => ({ ...emptyTask(), title: s.title, kind: s.kind })),
-      );
-    }
-    // Reage só à chegada das sugestões; form/tasks são refs estáveis do RHF.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sugeridas]);
-
   const submit = form.handleSubmit((values) =>
     confirmar(toConfirmInput(intimationId, values)),
   );
@@ -190,21 +133,12 @@ export function useConfirmarPrazoForm({
     register: form.register,
     errors: form.formState.errors,
     submit,
-    // tarefas (useFieldArray)
-    taskFields: tasks.fields,
-    addTask: () => tasks.append(emptyTask()),
-    removeTask: (index: number) => tasks.remove(index),
-    // IA sugerindo as tarefas (pré-preenchimento on-demand)
-    sugerindo,
-    // controles não-nativos
-    counting,
-    setCounting,
+    // controle não-nativo (em dobro)
     doubled,
     setDoubled,
     // options dos selects
     kindOptions,
     doubledReasonOptions,
-    assigneeOptions,
     // estado da mutation
     isPending,
     error,
