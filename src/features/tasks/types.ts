@@ -2,6 +2,8 @@
 // derivada dos prazos/intimações (source) e atribuída a um usuário.
 //   GET  /v1/tasks                 → PageEnvelope<TaskView>   (agenda global)
 //   GET  /v1/processos/:id/tasks   → PageEnvelope<TaskView>   (tarefas do processo)
+//   POST /v1/tasks                 → cria uma tarefa manual (avulsa ou com contexto)
+//   PATCH /v1/tasks/:id            → edita os campos da tarefa (ajuste parcial)
 //   POST /v1/tasks/:id/done        → conclui a tarefa
 //   POST /v1/tasks/:id/dismiss     → dispensa a tarefa
 
@@ -75,6 +77,38 @@ export interface TaskDetailView {
   completed_at: string | null;
   items: TaskItemView[];
   progress: TaskProgress;
+}
+
+/**
+ * Corpo do POST /v1/tasks — cria uma tarefa manual (source MANUAL, status OPEN, ambos
+ * server-set). Só `title` é obrigatório; os FKs de contexto (deadline/intimation/court_record)
+ * e o assignee são opcionais — a tarefa pode ser avulsa. `due_date` no formato "YYYY-MM-DD"
+ * (date input); campos vazios/omitidos = ausentes no BE. Sem tenant_id/org_id: o BE resolve
+ * pelo JWT (created_by = principal). Espelha o CreateTaskRequest do BE.
+ */
+export interface CreateTaskInput {
+  title: string;
+  description?: string;
+  kind?: string;
+  due_date?: string;
+  /** Id INTERNO do responsável (Me.user_id) — nunca org_id/tenant_id. */
+  assignee_user_id?: string;
+  deadline_id?: string;
+  intimation_id?: string;
+  court_record_id?: string;
+}
+
+/**
+ * Corpo do PATCH /v1/tasks/:id — ajuste PARCIAL. Só os campos presentes mudam; um ausente
+ * mantém o valor no BE. `due_date: ""` limpa o vencimento; `assignee_user_id: ""` desatribui.
+ * Status só muda por done/dismiss (não é editável aqui). Espelha o UpdateTaskRequest do BE.
+ */
+export interface UpdateTaskInput {
+  title?: string;
+  description?: string;
+  kind?: string;
+  due_date?: string;
+  assignee_user_id?: string;
 }
 
 /**

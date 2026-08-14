@@ -1,12 +1,14 @@
 import type { ApiFetcher } from "@/lib/api/use-api";
 
 import type {
+  CreateTaskInput,
   PageEnvelope,
   TaskDetailView,
   TaskItemView,
   TasksSummary,
   TaskStatus,
   TaskView,
+  UpdateTaskInput,
 } from "../types";
 
 const ENDPOINT = "/v1/tasks";
@@ -75,6 +77,37 @@ export async function getTask(
   id: string,
 ): Promise<TaskDetailView> {
   return fetcher<TaskDetailView>(`${ENDPOINT}/${id}`);
+}
+
+/**
+ * Cria uma tarefa manual — POST /v1/tasks → 201 com a tarefa criada (TaskView). Só `title`
+ * é obrigatório; o BE trata campos vazios/ausentes como não-informados (JSON.stringify
+ * já omite os undefined). tenant_id/created_by vêm do JWT — nunca do body.
+ */
+export async function createTask(
+  fetcher: ApiFetcher,
+  input: CreateTaskInput,
+): Promise<TaskView> {
+  return fetcher<TaskView>(ENDPOINT, {
+    method: "POST",
+    body: input,
+  });
+}
+
+/**
+ * Edita os campos de uma tarefa — PATCH /v1/tasks/:id → 200 com a tarefa salva (TaskView).
+ * Ajuste parcial: só os campos presentes mudam. `due_date: ""` limpa; `assignee_user_id: ""`
+ * desatribui. Status só muda por done/dismiss. 404 (ENTITY_NOT_FOUND) se a tarefa não existe.
+ */
+export async function updateTask(
+  fetcher: ApiFetcher,
+  id: string,
+  patch: UpdateTaskInput,
+): Promise<TaskView> {
+  return fetcher<TaskView>(`${ENDPOINT}/${id}`, {
+    method: "PATCH",
+    body: patch,
+  });
 }
 
 /**
