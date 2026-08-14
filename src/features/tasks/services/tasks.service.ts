@@ -1,12 +1,14 @@
 import type { ApiFetcher } from "@/lib/api/use-api";
 
 import type {
+  CreateTaskInput,
   PageEnvelope,
   TaskDetailView,
   TaskItemView,
   TasksSummary,
   TaskStatus,
   TaskView,
+  UpdateTaskInput,
 } from "../types";
 
 const ENDPOINT = "/v1/tasks";
@@ -61,6 +63,32 @@ export async function listTasksByProcesso(
 ): Promise<PageEnvelope<TaskView>> {
   return fetcher<PageEnvelope<TaskView>>(`/v1/processos/${processoId}/tasks`, {
     query: { limit, cursor },
+  });
+}
+
+/**
+ * Cria uma tarefa — POST /v1/tasks (201) → a task criada (mesmo shape do TaskView).
+ * `title` é obrigatório; os vínculos (court_record/deadline/intimation) vão no corpo.
+ */
+export async function createTask(
+  fetcher: ApiFetcher,
+  input: CreateTaskInput,
+): Promise<TaskView> {
+  return fetcher<TaskView>(ENDPOINT, { method: "POST", body: input });
+}
+
+/**
+ * Edita parcialmente uma tarefa — PATCH /v1/tasks/:id (200) → a task atualizada.
+ * Campos ausentes no patch mantêm o valor no BE.
+ */
+export async function updateTask(
+  fetcher: ApiFetcher,
+  id: string,
+  patch: UpdateTaskInput,
+): Promise<TaskView> {
+  return fetcher<TaskView>(`${ENDPOINT}/${id}`, {
+    method: "PATCH",
+    body: patch,
   });
 }
 

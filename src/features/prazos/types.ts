@@ -94,5 +94,25 @@ export interface PrazosSummary {
   cumpridos: number;
 }
 
+// ── Tarefas sugeridas pela IA (advisory) ──
+// GET /v1/prazos/:id/suggested-tasks → o resumo + a recomendação do modelo e a
+// lista de tarefas propostas para o advogado revisar antes de confirmar o prazo.
+
+/** Tarefa proposta pela IA. Só `title` é garantido; `kind`/`description` são dicas. */
+export interface SuggestedTask {
+  title: string;
+  kind?: string;
+  description?: string;
+}
+
+/** Resposta do GET /v1/prazos/:id/suggested-tasks. */
+export interface SuggestedTasksResult {
+  /** Síntese do que a intimação/prazo pede (linguagem natural). */
+  summary: string;
+  /** Recomendação de ação do modelo. */
+  recommendation: string;
+  suggested_tasks: SuggestedTask[];
+}
+
 // Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
 export type { PageEnvelope } from "@/lib/api/types";
