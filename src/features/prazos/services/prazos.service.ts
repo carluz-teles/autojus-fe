@@ -104,5 +104,7 @@ export async function getSuggestedTasks(
   fetcher: ApiFetcher,
   prazoId: string,
 ): Promise<SuggestedTasksResult> {
-  return fetcher<SuggestedTasksResult>(`${ENDPOINT}/${prazoId}/suggested-tasks`);
+  return fetcher<SuggestedTasksResult>(
+    `${ENDPOINT}/${prazoId}/suggested-tasks`,
+  );
 }
