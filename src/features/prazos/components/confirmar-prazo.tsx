@@ -100,6 +100,7 @@ function ConfirmarPrazoForm({
     taskFields,
     addTask,
     removeTask,
+    sugerindo,
     counting,
     setCounting,
     doubled,
@@ -190,7 +191,14 @@ function ConfirmarPrazoForm({
       {/* ── Tarefas (useFieldArray) ── */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium">Tarefas</h4>
+          <div className="flex items-center gap-2">
+            <h4 className="text-sm font-medium">Tarefas</h4>
+            {sugerindo ? (
+              <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                <Sparkles className="size-3 animate-pulse" /> sugerindo com IA…
+              </span>
+            ) : null}
+          </div>
           <Button type="button" variant="outline" size="sm" onClick={addTask}>
             <Plus /> Adicionar tarefa
           </Button>

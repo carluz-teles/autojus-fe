@@ -9,6 +9,7 @@ import type {
   PrazosSummary,
   PrazoStatus,
   PrazoView,
+  SuggestedTasksResult,
 } from "../types";
 
 const ENDPOINT = "/v1/prazos";
@@ -96,4 +97,12 @@ export async function confirmarPrazo(
     method: "POST",
     body,
   });
+}
+
+/** Tarefas sugeridas por LLM para pré-preencher o F2 (on-demand; só custa ao abrir). */
+export async function getSuggestedTasks(
+  fetcher: ApiFetcher,
+  prazoId: string,
+): Promise<SuggestedTasksResult> {
+  return fetcher<SuggestedTasksResult>(`${ENDPOINT}/${prazoId}/suggested-tasks`);
 }

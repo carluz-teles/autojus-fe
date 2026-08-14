@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
@@ -13,6 +13,7 @@ import type {
   PrazoDetalheView,
 } from "../types";
 import { useConfirmarPrazo } from "./use-confirmar-prazo";
+import { useTarefasSugeridas } from "./use-tarefas-sugeridas";
 
 // ── Zod: fonte da validação client-side (days>0, título não-vazio) ──
 
@@ -163,6 +164,24 @@ export function useConfirmarPrazoForm({
     ? [{ value: me.user_id, label: "Atribuir a mim" }]
     : [];
 
+  // Tarefas sugeridas por IA (on-demand): o form aparece na hora; as sugestões chegam em
+  // ~1-2s e pré-preenchem a lista UMA vez — só se o advogado ainda não mexeu (não clobbera
+  // edição manual). Se o LLM falhar, o form segue com a tarefa vazia. tasks.replace é método
+  // do RHF (não setState), seguro no effect.
+  const { data: sugeridas, isLoading: sugerindo } = useTarefasSugeridas(
+    detalhe.id,
+  );
+  useEffect(() => {
+    const items = sugeridas?.suggested_tasks;
+    if (items?.length && !form.formState.isDirty) {
+      tasks.replace(
+        items.map((s) => ({ ...emptyTask(), title: s.title, kind: s.kind })),
+      );
+    }
+    // Reage só à chegada das sugestões; form/tasks são refs estáveis do RHF.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sugeridas]);
+
   const submit = form.handleSubmit((values) =>
     confirmar(toConfirmInput(intimationId, values)),
   );
@@ -175,6 +194,8 @@ export function useConfirmarPrazoForm({
     taskFields: tasks.fields,
     addTask: () => tasks.append(emptyTask()),
     removeTask: (index: number) => tasks.remove(index),
+    // IA sugerindo as tarefas (pré-preenchimento on-demand)
+    sugerindo,
     // controles não-nativos
     counting,
     setCounting,
