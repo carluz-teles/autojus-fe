@@ -15,6 +15,7 @@ import { RowActions } from "@/components/ui/row-actions";
 import { SheetField, SheetSection } from "@/components/ui/sheet";
 import { intimacaoTone, StatusBadge } from "@/components/ui/status-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ConfirmarPrazo } from "@/features/prazos/components/confirmar-prazo";
 import { formatDate } from "@/lib/format";
 
 import { useIntimacaoActions } from "../hooks/use-intimacao-actions";
@@ -177,6 +178,13 @@ export function IntimacaoDetalhe({
                     Nenhum destinatário informado.
                   </p>
                 )}
+              </SheetSection>
+
+              {/* F2 — o coração do produto: confirma o prazo derivado e monta as
+                  tarefas (pré-preenchidas pela IA quando o prazo é PENDING). Auto-contido:
+                  busca o prazo da intimação sozinho e degrada gracioso quando não há um. */}
+              <SheetSection title="Prazo & Tarefas">
+                <ConfirmarPrazo intimationId={intimacao.id} />
               </SheetSection>
             </div>
           </DetailBody>
