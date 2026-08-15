@@ -2,6 +2,7 @@ import { TrialBanner } from "@/features/billing/components/trial-banner";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
 import { NotificationStream } from "@/features/notifications/notification-stream";
 
+import { BreadcrumbProvider, BreadcrumbSlot } from "./breadcrumb-context";
 import { EnsureActiveOrg } from "./ensure-active-org";
 import { SidebarFooter } from "./sidebar-footer";
 import { SidebarNav } from "./sidebar-nav";
@@ -30,15 +31,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <SidebarFooter />
         </aside>
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
-          <header className="bg-background/80 sticky top-0 z-20 flex h-16 items-center justify-end gap-2 border-b px-6 backdrop-blur-sm">
-            <NotificationBell />
-            <UserMenu />
-          </header>
-          <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
-            {children}
-          </main>
-        </div>
+        <BreadcrumbProvider>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+            <header className="bg-background/80 sticky top-0 z-20 flex h-16 items-center justify-between gap-2 overflow-x-hidden border-b px-6 backdrop-blur-sm">
+              <div className="min-w-0 flex-1">
+                <BreadcrumbSlot />
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <NotificationBell />
+                <UserMenu />
+              </div>
+            </header>
+            <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
+              {children}
+            </main>
+          </div>
+        </BreadcrumbProvider>
       </div>
     </div>
   );

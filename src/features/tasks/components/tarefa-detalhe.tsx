@@ -1,8 +1,9 @@
 "use client";
 
 import { CheckCircle2, History, Paperclip, Plus } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
+import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
 import { Button } from "@/components/ui/button";
 import {
   type ChecklistItem,
@@ -61,14 +62,16 @@ export function TarefaDetalhe({ tarefa }: { tarefa: TaskDetailView }) {
     add.mutate(title, { onSuccess: () => setNewTitle("") });
   };
 
+  const breadcrumb = useMemo(
+    () => [{ label: "Tarefas", href: "/tarefas" }, { label: tarefa.title }],
+    [tarefa.title],
+  );
+  useSetBreadcrumb(breadcrumb);
+
   return (
     <DetailLayout
       header={
         <DetailHeader
-          breadcrumb={[
-            { label: "Tarefas", href: "/tarefas" },
-            { label: tarefa.title },
-          ]}
           title={tarefa.title}
           status={
             <StatusBadge label={statusLabel} tone={tarefaTone(statusLabel)} />

@@ -2,7 +2,9 @@
 
 import { CheckCircle2, ExternalLink, History, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { useMemo } from "react";
 
+import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
 import { Button } from "@/components/ui/button";
 import {
   DetailBody,
@@ -44,14 +46,19 @@ export function IntimacaoDetalhe({
   const isResolved = intimacao.user_status === "RESOLVED";
   const deadlineDays = daysLeftLabel(intimacao.deadline_start_at);
 
+  const breadcrumb = useMemo(
+    () => [
+      { label: "Intimações", href: "/intimacoes" },
+      { label: intimacao.cnj_number },
+    ],
+    [intimacao.cnj_number],
+  );
+  useSetBreadcrumb(breadcrumb);
+
   return (
     <DetailLayout
       header={
         <DetailHeader
-          breadcrumb={[
-            { label: "Intimações", href: "/intimacoes" },
-            { label: intimacao.cnj_number },
-          ]}
           title={intimacao.cnj_number}
           status={
             <StatusBadge

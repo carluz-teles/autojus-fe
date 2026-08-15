@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 // multi-coluna responsiva. Só JSX + binding.
 
 export interface Crumb {
-  label: string;
+  label: React.ReactNode;
   href?: string;
 }
 
@@ -26,7 +26,7 @@ export function DetailBreadcrumb({
     <nav
       aria-label="Trilha"
       className={cn(
-        "text-muted-foreground flex flex-wrap items-center gap-1.5 text-sm",
+        "text-muted-foreground flex min-w-0 flex-nowrap items-center gap-1.5 text-sm",
         className,
       )}
     >
@@ -37,20 +37,28 @@ export function DetailBreadcrumb({
             {c.href && !isLast ? (
               <Link
                 href={c.href}
-                className="hover:text-foreground rounded transition-colors"
+                className="hover:text-foreground shrink-0 rounded transition-colors"
               >
                 {c.label}
               </Link>
             ) : (
               <span
-                className={cn(isLast && "text-foreground font-medium")}
+                className={cn(
+                  isLast && "text-foreground min-w-0 truncate font-medium",
+                )}
                 aria-current={isLast ? "page" : undefined}
+                title={
+                  isLast && typeof c.label === "string" ? c.label : undefined
+                }
               >
                 {c.label}
               </span>
             )}
             {!isLast ? (
-              <ChevronRight className="size-3.5 opacity-60" aria-hidden />
+              <ChevronRight
+                className="size-3.5 shrink-0 opacity-60"
+                aria-hidden
+              />
             ) : null}
           </Fragment>
         );

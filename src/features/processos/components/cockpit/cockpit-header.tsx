@@ -1,13 +1,9 @@
 "use client";
 
-import {
-  ChevronRight,
-  FilePlus2,
-  MoreHorizontal,
-  Sparkles,
-} from "lucide-react";
-import Link from "next/link";
+import { FilePlus2, MoreHorizontal, Sparkles } from "lucide-react";
+import { useMemo } from "react";
 
+import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RiskBadge, type RiskLevel } from "@/components/ui/risk-badge";
@@ -35,21 +31,17 @@ export function CockpitHeader({
 }) {
   const pct = completenessPct(processo.completeness);
 
+  const breadcrumb = useMemo(
+    () => [
+      { label: "Processos", href: "/processos" },
+      { label: processo.cnj_number },
+    ],
+    [processo.cnj_number],
+  );
+  useSetBreadcrumb(breadcrumb);
+
   return (
     <header className="reveal flex flex-col gap-5 border-b pb-6">
-      <nav
-        aria-label="Trilha"
-        className="text-muted-foreground flex items-center gap-1 text-sm"
-      >
-        <Link href="/processos" className="hover:text-foreground">
-          Processos
-        </Link>
-        <ChevronRight className="size-3.5" />
-        <span className="text-foreground/80 tabular-nums">
-          {processo.cnj_number}
-        </span>
-      </nav>
-
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-3">

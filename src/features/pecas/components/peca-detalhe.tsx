@@ -15,7 +15,9 @@ import {
   Trash2,
   Wand2,
 } from "lucide-react";
+import { useMemo } from "react";
 
+import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,11 +51,16 @@ export function PecaDetalhe({ id }: { id: string }) {
   // breadcrumb/título. Nenhum dado de peça é buscado ou fabricado.
   const code = codeFromId(id);
 
+  const breadcrumb = useMemo(
+    () => [{ label: "Peças", href: "/pecas" }, { label: code }],
+    [code],
+  );
+  useSetBreadcrumb(breadcrumb);
+
   return (
     <DetailLayout
       header={
         <DetailHeader
-          breadcrumb={[{ label: "Peças", href: "/pecas" }, { label: code }]}
           title={code}
           status={<StatusBadge label="Rascunho" tone="neutral" />}
           subtitle={
