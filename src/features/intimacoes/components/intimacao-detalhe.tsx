@@ -28,6 +28,7 @@ import {
 } from "../lib/labels";
 import type { IntimacaoDetalheView } from "../types";
 import { AnaliseSection } from "./analise-section";
+import { DescriptionContent } from "./description-content";
 
 // TELA 1 — Detalhe da Intimação (deep-link /intimacoes/[id]) no design LEXIA.
 // Monta o DetailLayout da Wave 0: breadcrumb + título + StatusBadge(user_status) +
@@ -126,7 +127,7 @@ export function IntimacaoDetalhe({
             <div className="flex flex-col gap-6">
               <SheetSection title="Teor da publicação">
                 {intimacao.content ? (
-                  <p className="whitespace-pre-line">{intimacao.content}</p>
+                  <DescriptionContent content={intimacao.content} />
                 ) : (
                   <p className="text-muted-foreground">
                     Sem teor disponível nesta publicação.
@@ -228,7 +229,7 @@ function IntimacaoAnalise({ intimacao }: { intimacao: IntimacaoDetalheView }) {
   return (
     <SheetSection title="O que aconteceu">
       {intimacao.content ? (
-        <p className="whitespace-pre-line">{intimacao.content}</p>
+        <DescriptionContent content={intimacao.content} />
       ) : (
         <p className="text-muted-foreground">
           Sem teor disponível nesta publicação.

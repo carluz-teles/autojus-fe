@@ -9,6 +9,7 @@ import type { PrazoAgendaView, PrazoCounting } from "@/features/prazos/types";
 import { cn } from "@/lib/utils";
 
 import { useAnalise } from "../hooks/use-analise";
+import { DescriptionContent } from "./description-content";
 import {
   SuggestedTaskCard,
   SuggestedTaskCardSkeleton,
@@ -69,7 +70,7 @@ export function AnaliseSection({
         ) : summary ? (
           <p className="whitespace-pre-line">{summary}</p>
         ) : fallback ? (
-          <p className="whitespace-pre-line">{fallback}</p>
+          <DescriptionContent content={fallback} />
         ) : (
           <p className="text-muted-foreground">
             Sem prévia de conteúdo nesta publicação.
