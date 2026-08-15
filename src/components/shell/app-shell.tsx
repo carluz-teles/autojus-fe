@@ -1,3 +1,4 @@
+import { TrialBanner } from "@/features/billing/components/trial-banner";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
 import { NotificationStream } from "@/features/notifications/notification-stream";
 
@@ -13,26 +14,31 @@ import { UserMenu } from "./user-menu";
 // versão (SidebarFooter). O header fica enxuto: só a conta (UserMenu).
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-full flex-1">
+    <div className="flex min-h-full flex-1 flex-col">
       <EnsureActiveOrg />
       {/* Conexão SSE de notificações: sem UI, empurra toast + invalida as queries. */}
       <NotificationStream />
-      <aside className="border-sidebar-border bg-sidebar sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r md:flex">
-        <div className="px-3 py-4">
-          <SidebarOrg />
-        </div>
-        <SidebarNav />
-        <SidebarFooter />
-      </aside>
+      {/* Aviso de trial acabando/expirado — full-width, acima de sidebar+conteúdo. */}
+      <TrialBanner />
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="bg-background/80 sticky top-0 z-20 flex h-16 items-center justify-end gap-2 border-b px-6 backdrop-blur-sm">
-          <NotificationBell />
-          <UserMenu />
-        </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
-          {children}
-        </main>
+      <div className="flex min-h-0 flex-1">
+        <aside className="border-sidebar-border bg-sidebar sticky top-0 hidden h-full w-64 shrink-0 flex-col overflow-y-auto border-r md:flex">
+          <div className="px-3 py-4">
+            <SidebarOrg />
+          </div>
+          <SidebarNav />
+          <SidebarFooter />
+        </aside>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="bg-background/80 sticky top-0 z-20 flex h-16 items-center justify-end gap-2 border-b px-6 backdrop-blur-sm">
+            <NotificationBell />
+            <UserMenu />
+          </header>
+          <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   );
