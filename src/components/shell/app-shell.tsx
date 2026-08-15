@@ -14,7 +14,7 @@ import { UserMenu } from "./user-menu";
 // versão (SidebarFooter). O header fica enxuto: só a conta (UserMenu).
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-full flex-1 flex-col">
+    <div className="flex h-full flex-1 flex-col">
       <EnsureActiveOrg />
       {/* Conexão SSE de notificações: sem UI, empurra toast + invalida as queries. */}
       <NotificationStream />
@@ -30,7 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <SidebarFooter />
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
           <header className="bg-background/80 sticky top-0 z-20 flex h-16 items-center justify-end gap-2 border-b px-6 backdrop-blur-sm">
             <NotificationBell />
             <UserMenu />
