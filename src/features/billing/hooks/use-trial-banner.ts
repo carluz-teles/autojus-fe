@@ -28,9 +28,11 @@ const RELEVANT_STATUSES: ReadonlySet<TrialStatus> = new Set([
 /**
  * Resolve o status "efetivo" do trial a partir do read model do BE.
  *
- * Defesa contra corrida (`days_until_trial_end` negativo, mas `trial_status`
- * ainda não recalculado pelo BE pra `trial_expired`): dias negativos sempre
- * viram `trial_expired`, sobrescrevendo o que o BE mandou.
+ * `days_until_trial_end` negativo sempre vira `trial_expired`, mesmo que
+ * `trial_status` diga outra coisa — defesa barata contra qualquer contrato
+ * futuro que desacople os dois campos (hoje o BE deriva ambos do mesmo `now`
+ * na mesma chamada, então nunca deveriam divergir; este branch é rede de
+ * segurança, não uma corrida real observada).
  */
 function resolveTrialStatus(
   subscription: Subscription,
