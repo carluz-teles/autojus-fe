@@ -29,17 +29,11 @@ import {
   userStatusLabel,
 } from "@/features/intimacoes/lib/labels";
 import type { IntimacaoView } from "@/features/intimacoes/types";
-import { formatDate } from "@/lib/format";
+import { formatDate, shortId } from "@/lib/format";
 
 // Inbox das intimações capturadas do DJEN pelas OABs monitoradas. KpiRow via GET
 // /v1/intimacoes/summary; DataTable via GET /v1/intimacoes (read model), paginada
 // por cursor com busca server-side. AÇÃO por linha: ver / resolver / ignorar.
-
-// Chip curto do id (não há código humano do ato) — trecho estável do uuid.
-function shortId(id: string): string {
-  const head = id.replace(/-/g, "").slice(0, 6).toUpperCase();
-  return head || "—";
-}
 
 const statusTone = (it: IntimacaoView): StatusTone =>
   intimacaoTone(userStatusLabel(it.user_status));

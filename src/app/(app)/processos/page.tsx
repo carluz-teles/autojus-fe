@@ -2,101 +2,103 @@
 
 import { Archive, PackageX, PauseCircle, Play, Scale } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/shell/page-header";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { FilterToolbar } from "@/components/ui/filter-toolbar";
-import { KpiCard, KpiRow } from "@/components/ui/kpi-card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ListPagination } from "@/components/ui/list-pagination";
+import { Select } from "@/components/ui/select";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
+  prazoTone,
   processoTone,
   StatusBadge,
   type StatusTone,
 } from "@/components/ui/status-badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip } from "@/components/ui/tooltip";
 import { ImportBanner } from "@/features/import-status/components/import-banner";
+import { daysLeftLabel, prazoStatusLabel } from "@/features/prazos/lib/labels";
 import { useProcessos } from "@/features/processos/hooks/use-processos";
 import { useProcessosSummary } from "@/features/processos/hooks/use-processos-summary";
 import { lifecycleLabel } from "@/features/processos/lib/labels";
 import type { ProcessoView } from "@/features/processos/types";
-import { formatClaimValueBRL, formatDate } from "@/lib/format";
+import { formatClaimValueBRL, formatDate, shortId } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 // Lista de processos consolidados (court_case / court_record), capturados do DJEN
-// e enriquecidos pelo DATAJUD. KpiRow via GET /v1/processos/summary; DataTable via
-// GET /v1/processos (read model), paginada por cursor com busca server-side.
-// Cards de lifecycle são clicáveis: filtram a lista (?lifecycle) e marcam-se ativos.
+// e enriquecidos pelo DATAJUD. DataTable via GET /v1/processos (read model),
+// paginada por cursor com busca server-side. As abas Tabs filtram por lifecycle
+// (?lifecycle) em modo controlado; os chips da toolbar por órgão julgador e valor.
 
 // Cada célula deriva de helpers (lib/format, lib/labels) — nada de cálculo no JSX.
-const COLUMNS: DataTableColumn<ProcessoView>[] = [
-  {
-    key: "processo",
-    header: "Processo",
-    cell: (p) => (
-      <div className="flex flex-col">
-        <span className="group-hover:text-gold font-medium tabular-nums transition-colors">
-          {p.cnj_number}
-        </span>
-        <span className="text-muted-foreground line-clamp-1 text-xs">
-          {[p.class, p.subject].filter(Boolean).join(" · ") || "—"}
-        </span>
-      </div>
-    ),
-  },
-  {
-    key: "cliente",
-    header: "Cliente",
-    cell: () => <span className="text-muted-foreground">—</span>,
-  },
-  {
-    key: "orgao",
-    header: "Órgão julgador",
-    cell: (p) => (
-      <span className="text-muted-foreground">{p.judging_body || "—"}</span>
-    ),
-  },
-  {
-    key: "distribuicao",
-    header: "Distribuição",
-    cell: (p) => (
-      <span className="text-muted-foreground tabular-nums">
-        {formatDate(p.filed_at)}
-      </span>
-    ),
-  },
-  {
-    key: "valor",
-    header: "Valor da causa",
-    align: "right",
-    cell: (p) => (
-      <span className="tabular-nums">{formatClaimValueBRL(p.claim_value)}</span>
-    ),
-  },
-  {
-    key: "responsavel",
-    header: "Responsável",
-    cell: (p) => (
-      <span className="text-muted-foreground">
-        {p.assigned_user_name || "—"}
-      </span>
-    ),
-  },
-  {
-    key: "status",
-    header: "Status",
-    cell: (p) => (
-      <StatusBadge
-        label={lifecycleLabel(p.lifecycle)}
-        tone={processoTone(lifecycleLabel(p.lifecycle))}
-      />
-    ),
-  },
-];
+// As colunas vivem DENTRO do componente por dependerem do map de prazos paralelo.
 
 const statusTone = (p: ProcessoView): StatusTone =>
   processoTone(lifecycleLabel(p.lifecycle));
 
+// Cor do texto da coluna "Prazo a vencer", resolvida do tom do status do prazo.
+const PRAZO_TONE_TEXT: Record<StatusTone, string> = {
+  neutral: "text-muted-foreground",
+  info: "text-sky-600 dark:text-sky-400",
+  warning: "text-gold",
+  danger: "text-destructive",
+  success: "text-emerald-700 dark:text-emerald-400",
+};
+
+// Célula de texto com truncamento por ellipsis + tooltip no hover com o valor
+// completo (textos longos tipo órgão julgador / número do processo não devem
+// estourar a coluna nem ficar ilegíveis).
+function TruncatedCell({
+  value,
+  className,
+  as: As = "span",
+}: {
+  value: string;
+  className?: string;
+  as?: "span" | "div";
+}) {
+    return (
+      <Tooltip label={value}>
+        <As className={cn("block w-full min-w-0 truncate", className)}>
+          {value}
+        </As>
+      </Tooltip>
+    );
+}
+
+// Badge de contagem das abas — sumiu só quando o summary ainda não chegou.
+function TabCount({ value }: { value?: number }) {
+  if (value == null) return null;
+  return (
+    <Badge variant="secondary" className="tabular-nums">
+      {value}
+    </Badge>
+  );
+}
+
 export default function ProcessosPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="text-muted-foreground px-5 py-24 text-center">
+          Carregando processos…
+        </div>
+      }
+    >
+      <ProcessosList />
+    </Suspense>
+  );
+}
+
+function ProcessosList() {
   const router = useRouter();
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const { summary } = useProcessosSummary();
   const {
     processos,
@@ -108,6 +110,13 @@ export default function ProcessosPage() {
     setSearch,
     lifecycle,
     setLifecycle,
+    filters,
+    setFilters,
+    resetFilters,
+    activeFilterCount,
+    uniqueJudgingBodies,
+    uniqueClasses,
+    proximoPrazoPorProcesso,
     pageSize,
     setPageSize,
     pageNumber,
@@ -117,14 +126,145 @@ export default function ProcessosPage() {
     onNext,
   } = useProcessos();
 
-  // Alterna o filtro por lifecycle: clicar no card ativo limpa; senão aplica.
-  const toggleLifecycle = (value: string) =>
-    setLifecycle(lifecycle === value ? null : value);
+  const COLUMNS: DataTableColumn<ProcessoView>[] = [
+    {
+      key: "numero",
+      header: "Nº",
+      width: 64,
+      cell: (p) => (
+        <span className="bg-muted/60 text-muted-foreground inline-flex rounded-md px-2 py-0.5 font-mono text-xs tracking-wide">
+          {shortId(p.case_id || p.id)}
+        </span>
+      ),
+    },
+    {
+      key: "processo",
+      header: "Processo",
+      width: "13rem",
+      cell: (p) => (
+        <TruncatedCell
+          value={p.cnj_number}
+          className="group-hover:text-gold font-medium tabular-nums transition-colors"
+        />
+      ),
+    },
+    {
+      key: "tipo",
+      header: "Tipo",
+      width: "15rem",
+      cell: (p) => {
+        const tipo = [p.class, p.subject].filter(Boolean).join(" · ") || "—";
+        return (
+          <Tooltip label={tipo}>
+            <Badge
+              variant="secondary"
+              className="block w-full truncate font-medium"
+            >
+              {tipo}
+            </Badge>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      key: "orgao",
+      header: "Órgão julgador",
+      width: "15rem",
+      cell: (p) => (
+        <TruncatedCell
+          value={p.judging_body || "—"}
+          className="text-muted-foreground"
+        />
+      ),
+    },
+    {
+      key: "distribuicao",
+      header: "Distribuição",
+      width: "7rem",
+      cell: (p) => (
+        <span className="text-muted-foreground tabular-nums">
+          {formatDate(p.filed_at)}
+        </span>
+      ),
+    },
+    {
+      key: "valor",
+      header: "Valor da causa",
+      align: "right",
+      width: "8rem",
+      cell: (p) => (
+        <span className="tabular-nums">
+          {formatClaimValueBRL(p.claim_value)}
+        </span>
+      ),
+    },
+    {
+      key: "prazo",
+      header: "Prazo a vencer",
+      width: "7rem",
+      cell: (p) => {
+        const prazo = proximoPrazoPorProcesso.get(p.id);
+        if (!prazo) return <Badge variant="outline">Sem prazo</Badge>;
+        const tone = prazoTone(prazoStatusLabel(prazo.status, prazo.days_left));
+        return (
+          <div className="flex flex-col">
+            <span
+              className={cn("font-medium tabular-nums", PRAZO_TONE_TEXT[tone])}
+            >
+              {daysLeftLabel(prazo.days_left)}
+            </span>
+            <span className="text-muted-foreground text-xs tabular-nums">
+              {formatDate(prazo.end_date)}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      key: "responsavel",
+      header: "Responsável",
+      width: "7rem",
+      cell: (p) => (
+        <TruncatedCell
+          value={p.assigned_user_name || "—"}
+          className="text-muted-foreground"
+        />
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      width: "8rem",
+      cell: (p) => (
+        <StatusBadge
+          label={lifecycleLabel(p.lifecycle)}
+          tone={processoTone(lifecycleLabel(p.lifecycle))}
+        />
+      ),
+    },
+  ];
 
-  const fmt = (n?: number) => (n == null ? "—" : n);
   const rangeFrom =
     processos.length === 0 ? 0 : (pageNumber - 1) * pageSize + 1;
   const rangeTo = (pageNumber - 1) * pageSize + processos.length;
+
+  const hasAdvancedFilters = Boolean(
+    filters.class ||
+      filters.judging_body ||
+      filters.claim_value_min ||
+      filters.claim_value_max,
+  );
+
+  const emptyLabel = useMemo(() => {
+    if (search) return `Nenhum resultado para “${search}”.`;
+    if (lifecycle)
+      return `Nenhum processo ${lifecycleLabel(lifecycle).toLowerCase()}${
+        hasAdvancedFilters ? " com os filtros aplicados" : ""
+      }.`;
+    if (hasAdvancedFilters)
+      return "Nenhum processo encontrado com os filtros aplicados.";
+    return "Nenhum processo capturado ainda.";
+  }, [search, lifecycle, hasAdvancedFilters]);
 
   return (
     <>
@@ -141,48 +281,39 @@ export default function ProcessosPage() {
       <ImportBanner />
 
       <section className="reveal mt-8">
-        <KpiRow cols={5}>
-          <KpiCard
-            icon={Scale}
-            label="Total"
-            value={fmt(summary?.total)}
-            tone="neutral"
-            onClick={() => setLifecycle(null)}
-            active={lifecycle === null}
-          />
-          <KpiCard
-            icon={Play}
-            label="Em andamento"
-            value={fmt(summary?.em_andamento)}
-            tone="info"
-            onClick={() => toggleLifecycle("ACTIVE")}
-            active={lifecycle === "ACTIVE"}
-          />
-          <KpiCard
-            icon={PauseCircle}
-            label="Suspensos"
-            value={fmt(summary?.suspensos)}
-            tone="warning"
-            onClick={() => toggleLifecycle("SUSPENDED")}
-            active={lifecycle === "SUSPENDED"}
-          />
-          <KpiCard
-            icon={Archive}
-            label="Arquivados"
-            value={fmt(summary?.arquivados)}
-            tone="neutral"
-            onClick={() => toggleLifecycle("ARCHIVED")}
-            active={lifecycle === "ARCHIVED"}
-          />
-          <KpiCard
-            icon={PackageX}
-            label="Baixados"
-            value={fmt(summary?.baixados)}
-            tone="neutral"
-            onClick={() => toggleLifecycle("CLOSED")}
-            active={lifecycle === "CLOSED"}
-          />
-        </KpiRow>
+        <Tabs
+          defaultValue="TOTAL"
+          value={lifecycle ?? "TOTAL"}
+          onValueChange={(v) => setLifecycle(v === "TOTAL" ? null : v)}
+        >
+          <TabsList aria-label="Filtrar processos por situação">
+            <TabsTrigger value="TOTAL">
+              <Scale className="size-4" />
+              Total
+              <TabCount value={summary?.total} />
+            </TabsTrigger>
+            <TabsTrigger value="ACTIVE">
+              <Play className="size-4" />
+              Em andamento
+              <TabCount value={summary?.em_andamento} />
+            </TabsTrigger>
+            <TabsTrigger value="SUSPENDED">
+              <PauseCircle className="size-4" />
+              Suspensos
+              <TabCount value={summary?.suspensos} />
+            </TabsTrigger>
+            <TabsTrigger value="ARCHIVED">
+              <Archive className="size-4" />
+              Arquivados
+              <TabCount value={summary?.arquivados} />
+            </TabsTrigger>
+            <TabsTrigger value="CLOSED">
+              <PackageX className="size-4" />
+              Baixados
+              <TabCount value={summary?.baixados} />
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </section>
 
       <div className="reveal mt-6">
@@ -190,8 +321,102 @@ export default function ProcessosPage() {
           search={search}
           onSearchChange={setSearch}
           placeholder="Buscar por número do processo…"
+          onFilters={() => setFiltersOpen(true)}
+          activeFilters={activeFilterCount}
         />
       </div>
+
+      <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <SheetContent
+          title="Filtros"
+          description="Refine a listagem por tipo, órgão julgador e valor da causa."
+          footer={
+            <Button variant="outline" size="sm" onClick={resetFilters}>
+              Limpar tudo
+            </Button>
+          }
+        >
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="filtro-tipo">Tipo</Label>
+              <Select
+                id="filtro-tipo"
+                aria-label="Filtrar por tipo"
+                value={filters.class ?? ""}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    class: e.target.value || undefined,
+                  }))
+                }
+                className="w-full"
+              >
+                <option value="">Todos os tipos</option>
+                {uniqueClasses.map((classe) => (
+                  <option key={classe} value={classe}>
+                    {classe}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="filtro-orgao">Órgão julgador</Label>
+              <Select
+                id="filtro-orgao"
+                aria-label="Filtrar por órgão julgador"
+                value={filters.judging_body ?? ""}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    judging_body: e.target.value || undefined,
+                  }))
+                }
+                className="w-full"
+              >
+                <option value="">Todos os órgãos</option>
+                {uniqueJudgingBodies.map((body) => (
+                  <option key={body} value={body}>
+                    {body}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Valor da causa</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Valor mín."
+                  aria-label="Valor mínimo da causa"
+                  value={filters.claim_value_min ?? ""}
+                  onChange={(e) =>
+                    setFilters((f) => ({
+                      ...f,
+                      claim_value_min: e.target.value || undefined,
+                    }))
+                  }
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Valor máx."
+                  aria-label="Valor máximo da causa"
+                  value={filters.claim_value_max ?? ""}
+                  onChange={(e) =>
+                    setFilters((f) => ({
+                      ...f,
+                      claim_value_max: e.target.value || undefined,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <div className="reveal mt-4">
         <DataTable
@@ -206,9 +431,7 @@ export default function ProcessosPage() {
           error={error ? "Erro ao carregar processos." : undefined}
           empty={
             <p className="text-muted-foreground px-5 py-10 text-center">
-              {search
-                ? `Nenhum resultado para “${search}”.`
-                : "Nenhum processo capturado ainda."}
+              {emptyLabel}
             </p>
           }
           rangeFrom={error ? undefined : rangeFrom}

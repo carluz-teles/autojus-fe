@@ -25,15 +25,25 @@ function useTabsCtx(component: string): TabsCtx {
 
 export function Tabs({
   defaultValue,
+  value: controlledValue,
+  onValueChange,
   children,
   className,
 }: {
   defaultValue: string;
+  /** Controlled value — quando ausente, usa state interno (backward-compatible). */
+  value?: string;
+  onValueChange?: (v: string) => void;
   children: React.ReactNode;
   className?: string;
 }) {
-  const [value, setValue] = useState(defaultValue);
+  const [internalValue, setInternalValue] = useState(defaultValue);
   const baseId = useId();
+
+  // Controlled quando `value` é fornecido; senão, fallback para o state interno.
+  const value = controlledValue ?? internalValue;
+  const setValue = onValueChange ?? setInternalValue;
+
   return (
     <Ctx.Provider value={{ value, setValue, baseId }}>
       <div className={className}>{children}</div>

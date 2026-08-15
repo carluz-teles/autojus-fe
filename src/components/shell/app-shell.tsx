@@ -4,9 +4,7 @@ import { NotificationStream } from "@/features/notifications/notification-stream
 
 import { BreadcrumbProvider, BreadcrumbSlot } from "./breadcrumb-context";
 import { EnsureActiveOrg } from "./ensure-active-org";
-import { SidebarFooter } from "./sidebar-footer";
-import { SidebarNav } from "./sidebar-nav";
-import { SidebarOrg } from "./sidebar-org";
+import { Sidebar } from "./sidebar";
 import { UserMenu } from "./user-menu";
 
 // Chrome do app autenticado (Server Component). A auth já é garantida no proxy.
@@ -23,13 +21,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <TrialBanner />
 
       <div className="flex min-h-0 flex-1">
-        <aside className="border-sidebar-border bg-sidebar sticky top-0 hidden h-full w-64 shrink-0 flex-col overflow-y-auto border-r md:flex">
-          <div className="px-3 py-4">
-            <SidebarOrg />
-          </div>
-          <SidebarNav />
-          <SidebarFooter />
-        </aside>
+        <Sidebar />
 
         <BreadcrumbProvider>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
@@ -42,7 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <UserMenu />
               </div>
             </header>
-            <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
+            <main className="w-full flex-1 px-6 py-10">
               {children}
             </main>
           </div>

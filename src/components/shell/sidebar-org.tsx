@@ -4,10 +4,16 @@ import { useOrganization } from "@clerk/nextjs";
 import { Building2 } from "lucide-react";
 import Link from "next/link";
 
+import { Tooltip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+
+import { useSidebar } from "./sidebar";
+
 // Identidade do tenant no TOPO da sidebar: logo + nome da org, atalho pra
 // /organization. Ocupa o lugar que era da marca (jus·assessoria, agora no rodapé).
 export function SidebarOrg() {
   const { isLoaded, organization } = useOrganization();
+  const { collapsed } = useSidebar();
 
   if (!isLoaded) {
     return (
@@ -19,10 +25,13 @@ export function SidebarOrg() {
   }
   if (!organization) return null;
 
-  return (
+  const org = (
     <Link
       href="/settings/organization"
-      className="hover:bg-sidebar-accent flex items-center gap-3 rounded-lg px-2 py-1.5 transition"
+      className={cn(
+        "hover:bg-sidebar-accent flex min-w-0 items-center gap-3 rounded-lg px-2 py-1.5 transition",
+        collapsed && "justify-center px-0",
+      )}
     >
       <span className="bg-sidebar-accent ring-sidebar-border flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md ring-1">
         {organization.hasImage ? (
@@ -36,12 +45,21 @@ export function SidebarOrg() {
           <Building2 className="text-muted-foreground size-4.5" />
         )}
       </span>
-      <span className="min-w-0">
-        <span className="block truncate text-sm font-medium">
-          {organization.name}
+      {collapsed ? null : (
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium">
+            {organization.name}
+          </span>
+          <span className="text-muted-foreground block text-xs">Escritório</span>
         </span>
-        <span className="text-muted-foreground block text-xs">Escritório</span>
-      </span>
+      )}
     </Link>
+  );
+
+  if (!collapsed) return org;
+  return (
+    <Tooltip label={organization.name} className="max-w-64">
+      {org}
+    </Tooltip>
   );
 }

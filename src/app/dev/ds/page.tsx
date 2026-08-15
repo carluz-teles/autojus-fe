@@ -3,11 +3,9 @@
 import {
   Archive,
   Clock,
-  Download,
   FileText,
   Gavel,
   ListChecks,
-  Pencil,
   Scale,
   ScrollText,
   ShieldAlert,
@@ -328,7 +326,7 @@ export default function DesignSystemPage() {
 
       <Section
         title="5 · FilterToolbar"
-        hint="Busca + botão Filtros (com contagem) + dropdown Ações à direita."
+        hint="Busca + botão Filtros (ícone com contagem) — os filtros avançados moram no drawer da tela."
       >
         <FilterToolbar
           search=""
@@ -336,10 +334,6 @@ export default function DesignSystemPage() {
           placeholder="Buscar por número do processo…"
           onFilters={() => {}}
           activeFilters={2}
-          actions={[
-            { label: "Exportar CSV", icon: Download },
-            { label: "Nova intimação", icon: Pencil },
-          ]}
         />
       </Section>
 

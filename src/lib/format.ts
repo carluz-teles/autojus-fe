@@ -67,3 +67,12 @@ export function toDateInput(iso?: string | null): string {
   const match = /^(\d{4}-\d{2}-\d{2})/.exec(iso);
   return match ? match[1] : "";
 }
+
+/**
+ * ID curto e estável para exibição — trecho fixo do início do uuid (6 chars
+ * hex upper), sem depender de contador. Usado para identificar rapidamente um
+ * registro numa lista sem expor o uuid inteiro. Ex.: "550e8d4a…" → "550E8D".
+ */
+export function shortId(id: string): string {
+  return id.replace(/-/g, "").slice(0, 6).toUpperCase() || "—";
+}

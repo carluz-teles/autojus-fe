@@ -15,6 +15,8 @@ export interface DataTableColumn<T> {
   cell: (row: T) => React.ReactNode;
   /** Alinhamento do conteúdo. */
   align?: "left" | "right" | "center";
+  /** Largura da coluna (CSS). Com qualquer largura definida a tabela vira fixed. */
+  width?: string | number;
   className?: string;
 }
 
@@ -70,6 +72,9 @@ export function DataTable<T>({
   const hasActions = Boolean(rowActions);
   // total de colunas visíveis (status + dados + ação) pro colspan dos estados.
   const span = columns.length + (hasStatus ? 1 : 0) + (hasActions ? 1 : 0);
+  // Com qualquer largura definida a tabela passa a layout fixo — permite que
+  // colunas com truncate respeitem o limite em vez de estourar o container.
+  const fixedLayout = columns.some((c) => c.width != null);
 
   const showRange =
     typeof rangeFrom === "number" &&
@@ -82,13 +87,14 @@ export function DataTable<T>({
         className="bg-card overflow-x-auto rounded-xl border shadow-sm"
         aria-busy={isLoading}
       >
-        <table className="w-full text-sm">
+        <table className={cn("w-full text-sm", fixedLayout && "table-fixed")}>
           <thead className="text-muted-foreground border-b text-left text-xs tracking-wide uppercase">
             <tr>
               {hasStatus ? <th className="w-6 px-2 py-3" aria-hidden /> : null}
               {columns.map((col) => (
                 <th
                   key={col.key}
+                  style={col.width != null ? { width: col.width } : undefined}
                   className={cn(
                     "px-5 py-3 font-medium",
                     col.align && ALIGN[col.align],

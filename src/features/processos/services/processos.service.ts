@@ -3,6 +3,7 @@ import type { ApiFetcher } from "@/lib/api/use-api";
 import type {
   PageEnvelope,
   PartesView,
+  ProcessoFilters,
   ProcessosSummary,
   ProcessoView,
 } from "../types";
@@ -12,7 +13,7 @@ const ENDPOINT = "/v1/processos";
 // Camada de rede da feature: recebe o fetcher (ligado ao Clerk pelo useApi).
 // Não conhece React nem cache — isso é responsabilidade do hook.
 
-export interface ListProcessosParams {
+export interface ListProcessosParams extends ProcessoFilters {
   limit?: number;
   /** Cursor opaco: eco do next_cursor recebido para pedir a próxima página. */
   cursor?: string;
@@ -24,10 +25,28 @@ export interface ListProcessosParams {
 
 export async function listProcessos(
   fetcher: ApiFetcher,
-  { limit = 20, cursor, search, lifecycle }: ListProcessosParams = {},
+  {
+    limit = 20,
+    cursor,
+    search,
+    lifecycle,
+    class: processoClass,
+    judging_body,
+    claim_value_min,
+    claim_value_max,
+  }: ListProcessosParams = {},
 ): Promise<PageEnvelope<ProcessoView>> {
   return fetcher<PageEnvelope<ProcessoView>>(ENDPOINT, {
-    query: { limit, cursor, search, lifecycle },
+    query: {
+      limit,
+      cursor,
+      search,
+      lifecycle,
+      class: processoClass,
+      judging_body,
+      claim_value_min,
+      claim_value_max,
+    },
   });
 }
 

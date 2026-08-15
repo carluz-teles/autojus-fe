@@ -25,6 +25,35 @@ export interface ProcessoView {
   assigned_user_id: string | null;
   /** Nome do responsável pelo processo (assigned user) ou null. */
   assigned_user_name: string | null;
+  /**
+   * Próximo prazo a vencer, projeção derivada do BE (quando entregue). Pode vir
+   * null (sem prazo) ou undefined (BE ainda não expõe). O MVP Bridge preenche
+   * cliente-side via useProcessosPrazos.
+   */
+  next_deadline?: NextDeadlineView | null;
+}
+
+/** Projeção do prazo mais próximo — shape minimal, suficiente para a coluna. */
+export interface NextDeadlineView {
+  /** Vencimento do prazo (RFC3339). */
+  end_date: string;
+  /** Dias restantes (negativo = vencido). */
+  days_left: number;
+  /** Tipo legible do prazo (ex.: "Recurso", "Contestação"). */
+  kind: string;
+}
+
+/**
+ * Filtros avançados da lista de processos — aplicados server-side via query
+ * string. `class` filtra pela classe processual (cr.class); `judging_body` filtra
+ * pelo órgão julgador; `claim_value_min/max` pelas casas de valor da causa
+ * (decimais em string, ex. "250000.00").
+ */
+export interface ProcessoFilters {
+  class?: string;
+  judging_body?: string;
+  claim_value_min?: string;
+  claim_value_max?: string;
 }
 
 // GET /v1/processos/:id/partes — as partes do processo agrupadas por polo, para
