@@ -1,7 +1,6 @@
 "use client";
 
 import { CalendarCheck, CircleAlert } from "lucide-react";
-import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -55,12 +54,6 @@ export function ConfirmarPrazo({ intimationId }: { intimationId: string }) {
           <span className="font-medium">Prazo confirmado e em aberto.</span>
         </div>
         <PrazoCard prazo={prazo} />
-        <Link
-          href="/prazos"
-          className="text-gold w-fit text-sm hover:underline"
-        >
-          Ver na agenda de prazos
-        </Link>
       </div>
     );
   }
