@@ -20,12 +20,12 @@ import {
   type StatusTone,
 } from "@/components/ui/status-badge";
 import { ImportBanner } from "@/features/import-status/components/import-banner";
-import { TYPE_LABEL } from "@/features/intimacoes/components/intimacao-detail-body";
 import { useIntimacaoActions } from "@/features/intimacoes/hooks/use-intimacao-actions";
 import { useIntimacoes } from "@/features/intimacoes/hooks/use-intimacoes";
 import { useIntimacoesSummary } from "@/features/intimacoes/hooks/use-intimacoes-summary";
 import {
   daysLeftLabel,
+  TYPE_LABEL,
   userStatusLabel,
 } from "@/features/intimacoes/lib/labels";
 import type { IntimacaoView } from "@/features/intimacoes/types";

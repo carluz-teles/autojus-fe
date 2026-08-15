@@ -1,7 +1,33 @@
 // Humanizações da triagem da intimação (user_status) e derivação do prazo, num
 // só lugar — a lista consome daqui; nada de cálculo no JSX (Regra nº1).
 
-import type { IntimacaoUserStatus } from "../types";
+import type {
+  IntimacaoDegree,
+  IntimacaoStatus,
+  IntimacaoType,
+  IntimacaoUserStatus,
+} from "../types";
+
+// Rótulos pt-BR de grau/tipo/situação (DJEN) — fonte única consumida pela lista
+// e pelo detalhe (deep-link), evitando duas cópias divergentes (Regra nº1).
+export const DEGREE_LABEL: Record<IntimacaoDegree, string> = {
+  UNKNOWN: "Grau não informado",
+  G1: "1º grau",
+  G2: "2º grau",
+  JE: "Juizado Especial",
+  SUPERIOR: "Instância superior",
+};
+
+export const TYPE_LABEL: Record<IntimacaoType, string> = {
+  INTIMACAO: "Intimação",
+  CITACAO: "Citação",
+  COMUNICACAO: "Comunicação",
+};
+
+export const STATUS_LABEL: Record<IntimacaoStatus, string> = {
+  ACTIVE: "Ativa",
+  CANCELLED: "Cancelada",
+};
 
 // Situação de triagem (inbox) → rótulo pt-BR. Casa com os helpers de tom do DS
 // (intimacaoTone) que resolvem a cor a partir do rótulo.

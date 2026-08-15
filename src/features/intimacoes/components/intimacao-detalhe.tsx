@@ -10,27 +10,29 @@ import {
   DetailLayout,
 } from "@/components/ui/detail-layout";
 import { EmptyState } from "@/components/ui/empty-state";
-import { IAField, IAPanel } from "@/components/ui/ia-panel";
 import { RowActions } from "@/components/ui/row-actions";
 import { SheetField, SheetSection } from "@/components/ui/sheet";
 import { intimacaoTone, StatusBadge } from "@/components/ui/status-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmarPrazo } from "@/features/prazos/components/confirmar-prazo";
+import { usePrazoDaIntimacao } from "@/features/prazos/hooks/use-prazo-da-intimacao";
 import { formatDate } from "@/lib/format";
 
 import { useIntimacaoActions } from "../hooks/use-intimacao-actions";
-import { daysLeftLabel, userStatusLabel } from "../lib/labels";
-import type { IntimacaoDetalheView } from "../types";
 import {
+  daysLeftLabel,
   DEGREE_LABEL,
   STATUS_LABEL,
   TYPE_LABEL,
-} from "./intimacao-detail-body";
+  userStatusLabel,
+} from "../lib/labels";
+import type { IntimacaoDetalheView } from "../types";
+import { AnaliseSection } from "./analise-section";
 
 // TELA 1 — Detalhe da Intimação (deep-link /intimacoes/[id]) no design LEXIA.
 // Monta o DetailLayout da Wave 0: breadcrumb + título + StatusBadge(user_status) +
-// ações; três abas (Detalhes reais, Análise da IA placeholder Fase 3, Histórico
-// placeholder). Componente = binding: os estados/ações vêm dos hooks.
+// ações; três abas (Detalhes reais, Análise — resumo/recomendação/tarefas sugeridas
+// da IA, Histórico placeholder). Componente = binding: os estados/ações vêm dos hooks.
 export function IntimacaoDetalhe({
   intimacao,
 }: {
@@ -91,7 +93,7 @@ export function IntimacaoDetalhe({
       <Tabs defaultValue="detalhes">
         <TabsList aria-label="Abas da intimação">
           <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
-          <TabsTrigger value="ia">Análise da IA</TabsTrigger>
+          <TabsTrigger value="ia">Análise</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
         </TabsList>
 
@@ -191,16 +193,7 @@ export function IntimacaoDetalhe({
         </TabsContent>
 
         <TabsContent value="ia" className="mt-4">
-          <div className="max-w-xl">
-            <IAPanel placeholder="A análise da IA chega na Fase 3.">
-              <IAField label="Classificação" />
-              <IAField label="Confiança" />
-              <IAField label="Providência" />
-              <IAField label="Fundamento" />
-              <IAField label="Prazo legal" />
-              <IAField label="Risco" />
-            </IAPanel>
-          </div>
+          <IntimacaoAnalise intimacao={intimacao} />
         </TabsContent>
 
         <TabsContent value="historico" className="mt-4">
@@ -213,5 +206,34 @@ export function IntimacaoDetalhe({
         </TabsContent>
       </Tabs>
     </DetailLayout>
+  );
+}
+
+// Aba "Análise": resolve o prazo derivado da intimação (usePrazoDaIntimacao) e
+// delega ao AnaliseSection — mesma fonte usada no drawer da lista (Regra nº1),
+// que resume o teor, recomenda e sugere tarefas (com fallback pro teor bruto
+// quando o LLM está off). Sem prazo derivado ainda, mostra só o teor completo
+// pra a informação não sumir.
+function IntimacaoAnalise({ intimacao }: { intimacao: IntimacaoDetalheView }) {
+  const { state, prazo } = usePrazoDaIntimacao(intimacao.id);
+
+  if (state === "loading") {
+    return <p className="text-muted-foreground text-sm">Carregando análise…</p>;
+  }
+
+  if (prazo) {
+    return <AnaliseSection prazo={prazo} fallbackContent={intimacao.content} />;
+  }
+
+  return (
+    <SheetSection title="O que aconteceu">
+      {intimacao.content ? (
+        <p className="whitespace-pre-line">{intimacao.content}</p>
+      ) : (
+        <p className="text-muted-foreground">
+          Sem teor disponível nesta publicação.
+        </p>
+      )}
+    </SheetSection>
   );
 }
