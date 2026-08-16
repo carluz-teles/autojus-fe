@@ -41,7 +41,10 @@ export const SOURCE_LABELS: Record<IntegrationSource, string> = {
 // Inclui as NÃO-ativáveis de propósito: DATAJUD comunica o pipeline (enriquece
 // sozinho, disparado pela descoberta) e UPLOAD comunica o roadmap. Só as
 // entradas kind="discovery" passam pela ativação (ACTIVATABLE_SOURCES acima).
-export type SourceKind = "discovery" | "enrichment" | "upcoming";
+// kind="credential" é a fonte por login/senha pessoal (TJSP eproc): não passa
+// pela ativação por OAB — tem fluxo próprio (Sheet de credencial, ver
+// use-portal-credential.ts).
+export type SourceKind = "discovery" | "enrichment" | "upcoming" | "credential";
 
 export interface SourceCatalogEntry {
   id: string;
@@ -76,7 +79,36 @@ export const SOURCE_CATALOG: SourceCatalogEntry[] = [
     description:
       "Envie listas de processos ou documentos para incorporar ao acervo mesmo sem publicação em diário.",
   },
+  {
+    id: "TJSP_EPROC",
+    name: "TJSP eproc",
+    fullName: "Portal eproc — Tribunal de Justiça de São Paulo",
+    kind: "credential",
+    description:
+      "Consulta seus processos direto no portal com seu login pessoal — habilita dados e documentos das partes que o diário não publica.",
+  },
 ];
+
+// ——— Credencial de portal (TJSP eproc) ———
+// Espelha o read model do BE (GET/PUT/DELETE /v1/scraping/portal-credential).
+// Diferente de Integration (ativação por OAB): aqui a credencial é pessoal
+// (login/senha do próprio usuário) e o BE valida sincronamente antes de salvar.
+// Só existe uma credencial por usuário (TJSP eproc é o único portal do v0), daí
+// a rota sem :id — o BE resolve tenant/usuário pelo token.
+export type PortalCredentialStatus =
+  "ACTIVE" | "AUTH_FAILED" | "CAPTCHA_BLOCKED" | "DISABLED";
+
+export interface PortalCredential {
+  login: string;
+  status: PortalCredentialStatus;
+  last_error: string | null;
+  last_verified_at: string | null;
+}
+
+export interface SavePortalCredentialInput {
+  login: string;
+  password: string;
+}
 
 // ——— Reconciliações ———
 // Contrato do read model de reconciliações (GET /v1/acquisition/reconciliations e

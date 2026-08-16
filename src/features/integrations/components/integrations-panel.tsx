@@ -1,11 +1,21 @@
 "use client";
 
+import { useState } from "react";
+
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogContent,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiError } from "@/lib/api/errors";
 
 import { useIntegrations } from "../hooks/use-integrations";
+import { usePortalCredential } from "../hooks/use-portal-credential";
 import { useReconciliations } from "../hooks/use-reconciliations";
 import { SOURCE_CATALOG } from "../types";
+import { PortalCredentialSheet } from "./portal-credential-sheet";
 import { ReconciliationsTab } from "./reconciliations-tab";
 import { SourceCard } from "./source-card";
 
@@ -19,6 +29,14 @@ const fmtInt = new Intl.NumberFormat("pt-BR");
 export function IntegrationsPanel() {
   const { integrations, isLoading, error } = useIntegrations();
   const recon = useReconciliations();
+  const {
+    credential,
+    isLoading: isCredentialLoading,
+    remove,
+    isRemoving,
+  } = usePortalCredential();
+  const [credentialSheetOpen, setCredentialSheetOpen] = useState(false);
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
 
   const bySource = new Map(integrations.map((i) => [i.source, i]));
   const importing = recon.data?.import.importing ?? false;
@@ -62,7 +80,7 @@ export function IntegrationsPanel() {
 
         <TabsContent value="fontes" className="mt-5 flex flex-col gap-5">
           <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            {isLoading
+            {isLoading || isCredentialLoading
               ? SOURCE_CATALOG.map((s) => (
                   <div
                     key={s.id}
@@ -78,6 +96,36 @@ export function IntegrationsPanel() {
                     footer={entry.id === "DJEN" ? djenFooter : undefined}
                     termsHref={
                       entry.id === "DJEN" ? "/settings/termos" : undefined
+                    }
+                    credential={
+                      entry.id === "TJSP_EPROC" ? credential : undefined
+                    }
+                    action={
+                      entry.id === "TJSP_EPROC" ? (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCredentialSheetOpen(true)}
+                          >
+                            {credential
+                              ? "Reconfigurar"
+                              : "Configurar credencial"}
+                          </Button>
+                          {credential ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => setConfirmRemoveOpen(true)}
+                            >
+                              Remover
+                            </Button>
+                          ) : null}
+                        </div>
+                      ) : undefined
                     }
                   />
                 ))}
@@ -100,6 +148,41 @@ export function IntegrationsPanel() {
           />
         </TabsContent>
       </Tabs>
+
+      <PortalCredentialSheet
+        open={credentialSheetOpen}
+        onOpenChange={setCredentialSheetOpen}
+        credential={credential}
+      />
+
+      <AlertDialog open={confirmRemoveOpen} onOpenChange={setConfirmRemoveOpen}>
+        <AlertDialogContent
+          title="Remover credencial do TJSP eproc?"
+          description="Deixaremos de consultar seus processos por login/senha neste portal. Você pode configurar novamente quando quiser."
+          footer={
+            <>
+              <AlertDialogClose
+                render={
+                  <Button type="button" variant="outline" disabled={isRemoving}>
+                    Cancelar
+                  </Button>
+                }
+              />
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={isRemoving}
+                onClick={async () => {
+                  await remove();
+                  setConfirmRemoveOpen(false);
+                }}
+              >
+                {isRemoving ? "Removendo…" : "Remover"}
+              </Button>
+            </>
+          }
+        />
+      </AlertDialog>
     </div>
   );
 }
