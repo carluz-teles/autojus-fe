@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, CircleAlert, User, X } from "lucide-react";
+import { Check, CircleAlert, ExternalLink, User, X } from "lucide-react";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -104,6 +105,12 @@ export function TaskCard({
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
           <StatusBadge status={task.status} label={statusLabel} />
+          <Link
+            href={`/tarefas/${task.id}`}
+            className="text-gold inline-flex items-center gap-1 text-xs hover:underline"
+          >
+            <ExternalLink className="size-3.5" /> Abrir tarefa
+          </Link>
         </div>
       </div>
 
