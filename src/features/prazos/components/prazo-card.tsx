@@ -1,6 +1,12 @@
 "use client";
 
-import { CircleAlert, ExternalLink, Info } from "lucide-react";
+import {
+  AlertCircle,
+  CircleAlert,
+  Clock,
+  ExternalLink,
+  Info,
+} from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
@@ -76,6 +82,14 @@ const CARD_TONE: Record<PrazoTone, string> = {
   cancelled: "opacity-70",
 };
 
+// Vocabulário de urgência (ícone + cor, nunca só cor) — mesmo padrão que
+// task-card.tsx usa pra tarefa atrasada (CircleAlert condicionado a overdue).
+// Vencido = AlertCircle, urgente = Clock, normal/futuro = sem ícone especial.
+const TONE_ICON: Partial<Record<PrazoTone, typeof AlertCircle>> = {
+  missed: AlertCircle,
+  urgent: Clock,
+};
+
 // ── Badge de status ──
 
 function StatusBadge({ status }: { status: PrazoStatus }) {
@@ -116,6 +130,7 @@ export function PrazoCard({
   const tone = prazoTone(prazo);
   const { value, unit } = countdown(prazo.days_left);
   const agenda = hasProcesso(prazo) ? prazo : null;
+  const ToneIcon = TONE_ICON[tone];
 
   return (
     <article
@@ -166,7 +181,15 @@ export function PrazoCard({
           >
             {value}
           </div>
-          <div className="text-muted-foreground mt-1 text-xs">{unit}</div>
+          <div
+            className={cn(
+              "mt-1 flex items-center gap-1 text-xs",
+              ToneIcon ? COUNTDOWN_TONE[tone] : "text-muted-foreground",
+            )}
+          >
+            {ToneIcon ? <ToneIcon className="size-3.5" /> : null}
+            {unit}
+          </div>
         </div>
         <div className="flex flex-col items-end gap-1.5">
           <span className="text-sm font-medium tabular-nums">

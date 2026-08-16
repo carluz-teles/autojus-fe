@@ -82,7 +82,7 @@ export function CockpitHeader({
         </div>
       </div>
 
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 lg:grid-cols-4">
+      <dl className="flex flex-wrap items-baseline gap-y-2">
         <MetaField label="Distribuição">
           {formatDate(processo.filed_at)}
         </MetaField>
@@ -104,7 +104,7 @@ function MetaField({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="not-first:before:text-muted-foreground/40 inline-flex flex-wrap items-baseline gap-x-1.5 not-first:before:mr-2.5 not-first:before:content-['·'] not-first:before:select-none">
       <dt className="text-muted-foreground text-xs tracking-wide uppercase">
         {label}
       </dt>
