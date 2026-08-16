@@ -49,17 +49,16 @@ export function ProximaProvidenciaCard({
   providencia: ProvidenciaResult | null;
 }) {
   if (!providencia) {
+    // Estado neutro: mesma altura/padding do card ativo (evita pulo de layout ao
+    // alternar), sem CTA e sem link — só a confirmação de que não há pendência.
     return (
-      <div className="bg-card ring-foreground/10 flex items-center gap-3 rounded-xl p-5 shadow-sm ring-1">
-        <span className="bg-muted/60 text-muted-foreground flex size-9 items-center justify-center rounded-full">
+      <div className="bg-muted/40 ring-foreground/10 flex min-h-[13.5rem] flex-col items-center justify-center gap-3 rounded-xl p-5 text-center ring-1">
+        <span className="bg-muted text-muted-foreground flex size-9 items-center justify-center rounded-full">
           <CircleCheck className="size-5" />
         </span>
-        <div>
-          <h3 className="text-sm font-medium">Nada urgente agora</h3>
-          <p className="text-muted-foreground text-sm">
-            Não há prazo em aberto exigindo providência.
-          </p>
-        </div>
+        <p className="text-muted-foreground text-sm font-medium">
+          Nenhuma providência pendente no momento
+        </p>
       </div>
     );
   }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { PageHeader } from "@/components/shell/page-header";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AndamentosTimeline } from "@/features/andamentos/components/andamentos-timeline";
 import { ProcessoDocumentos } from "@/features/documentos/components/processo-documentos";
@@ -12,10 +13,10 @@ import { ProcessoTasks } from "@/features/tasks/components/processo-tasks";
 import { ApiError } from "@/lib/api/errors";
 
 import { useProcessoCockpit } from "../../hooks/use-processo-cockpit";
-import { AlertBar } from "./alert-bar";
 import { CockpitHeader } from "./cockpit-header";
 import { OverviewCards } from "./overview-cards";
 import { PartesCards } from "./partes-cards";
+import { ProximaProvidenciaCard } from "./proxima-providencia-card";
 import { ResumoTab } from "./resumo-tab";
 
 // Página do processo (cockpit) — Fase 1: shell sobre o dado que já existe, sem
@@ -75,7 +76,7 @@ export function ProcessoCockpit({ processoId }: { processoId: string }) {
     <div className="flex flex-col gap-6">
       <CockpitHeader processo={processo} riskLevel={risco.level} />
 
-      <AlertBar proximoPrazo={proximoPrazo} />
+      <ProximaProvidenciaCard providencia={providencia} />
 
       <OverviewCards proximoPrazo={proximoPrazo} counts={counts} />
 
@@ -90,9 +91,26 @@ export function ProcessoCockpit({ processoId }: { processoId: string }) {
           <TabsList aria-label="Seções do processo">
             <TabsTrigger value="resumo">Resumo</TabsTrigger>
             <TabsTrigger value="andamentos">Andamentos</TabsTrigger>
-            <TabsTrigger value="intimacoes">Intimações</TabsTrigger>
-            <TabsTrigger value="prazos">Prazos</TabsTrigger>
-            <TabsTrigger value="tarefas">Tarefas</TabsTrigger>
+            <TabsTrigger value="intimacoes">
+              Intimações
+              {counts.intimacoesTriagemPendente > 0 ? (
+                <Badge variant="destructive">
+                  {counts.intimacoesTriagemPendente}
+                </Badge>
+              ) : null}
+            </TabsTrigger>
+            <TabsTrigger value="prazos">
+              Prazos
+              {counts.prazosVivos > 0 ? (
+                <Badge variant="destructive">{counts.prazosVivos}</Badge>
+              ) : null}
+            </TabsTrigger>
+            <TabsTrigger value="tarefas">
+              Tarefas
+              {counts.tasksAbertas > 0 ? (
+                <Badge variant="destructive">{counts.tasksAbertas}</Badge>
+              ) : null}
+            </TabsTrigger>
             <TabsTrigger value="documentos">Documentos</TabsTrigger>
           </TabsList>
         </div>
