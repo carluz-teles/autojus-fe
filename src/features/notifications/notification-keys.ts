@@ -6,4 +6,5 @@ export const notificationKeys = {
   list: (params: { unread?: boolean } = {}) =>
     [...notificationKeys.all, "list", params] as const,
   unreadCount: () => [...notificationKeys.all, "unread-count"] as const,
+  preferences: () => [...notificationKeys.all, "preferences"] as const,
 };

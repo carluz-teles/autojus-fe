@@ -19,3 +19,20 @@ export interface PageEnvelope<T> {
     limit: number;
   };
 }
+
+// GET/PUT /v1/notifications/preferences: o override salvo do usuário para UM tipo
+// de aviso. Ausência de override (o tipo não aparece na lista do GET) = todos os
+// canais habilitados (default do BE); ["EMAIL"] presente = canal habilitado,
+// ausente = desabilitado. channels: [] é um opt-out explícito e válido.
+export type NotificationChannel = "EMAIL" | "IN_APP";
+
+export interface NotificationPreference {
+  type: string;
+  channels: NotificationChannel[];
+}
+
+// Envelope simples {data:[...]} (sem paginação — o conjunto de preferências é
+// pequeno), igual ao de membros da organização.
+export interface DataEnvelope<T> {
+  data: T[];
+}

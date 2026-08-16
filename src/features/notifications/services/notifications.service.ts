@@ -1,6 +1,12 @@
 import type { ApiFetcher } from "@/lib/api/use-api";
 
-import type { NotificationView, PageEnvelope } from "../types";
+import type {
+  DataEnvelope,
+  NotificationChannel,
+  NotificationPreference,
+  NotificationView,
+  PageEnvelope,
+} from "../types";
 
 // Camada de rede da feature (recebe o fetcher ligado ao Clerk). Não conhece React/cache.
 const BASE = "/v1/notifications";
@@ -37,4 +43,21 @@ export function markNotificationRead(
 
 export function markAllNotificationsRead(fetcher: ApiFetcher): Promise<void> {
   return fetcher<void>(`${BASE}/read-all`, { method: "POST" });
+}
+
+export function getNotificationPreferences(
+  fetcher: ApiFetcher,
+): Promise<DataEnvelope<NotificationPreference>> {
+  return fetcher<DataEnvelope<NotificationPreference>>(`${BASE}/preferences`);
+}
+
+export function setNotificationPreference(
+  fetcher: ApiFetcher,
+  type: string,
+  channels: NotificationChannel[],
+): Promise<NotificationPreference> {
+  return fetcher<NotificationPreference>(`${BASE}/preferences`, {
+    method: "PUT",
+    body: { type, channels },
+  });
 }
