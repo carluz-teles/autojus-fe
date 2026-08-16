@@ -92,6 +92,20 @@ function TabCount({ value }: { value?: number }) {
   );
 }
 
+// Badge de classe/assunto: w-fit (tamanho do conteúdo) p/ valores curtos, mas
+// nunca ultrapassa a coluna (max-w-full truncate) e o tooltip preserva o valor
+// completo no hover.
+function BadgeCell({ value }: { value: string }) {
+  const display = value || "—";
+  return (
+    <Tooltip label={display}>
+      <Badge variant="secondary" className="max-w-full font-medium">
+        <span className="min-w-0 truncate">{display}</span>
+      </Badge>
+    </Tooltip>
+  );
+}
+
 export default function ProcessosPage() {
   return (
     <Suspense
@@ -158,22 +172,16 @@ function ProcessosList() {
       ),
     },
     {
-      key: "tipo",
-      header: "Tipo",
-      width: "15rem",
-      cell: (p) => {
-        const tipo = [p.class, p.subject].filter(Boolean).join(" · ") || "—";
-        return (
-          <Tooltip label={tipo}>
-            <Badge
-              variant="secondary"
-              className="block w-full truncate font-medium"
-            >
-              {tipo}
-            </Badge>
-          </Tooltip>
-        );
-      },
+      key: "classe",
+      header: "Classe",
+      width: "9rem",
+      cell: (p) => <BadgeCell value={p.class} />,
+    },
+    {
+      key: "assunto",
+      header: "Assunto",
+      width: "9rem",
+      cell: (p) => <BadgeCell value={p.subject} />,
     },
     {
       key: "orgao",
