@@ -44,7 +44,7 @@ export function CockpitHeader({
               {lifecycleLabel(processo.lifecycle)}
             </Badge>
             <RiskBadge level={riskLevel} />
-            {processo.secrecy && processo.secrecy !== "PUBLIC" ? (
+            {processo.secrecy !== "PUBLIC" ? (
               <Badge variant="outline">
                 <Lock />
                 {secrecyLabel(processo.secrecy)}
@@ -54,6 +54,7 @@ export function CockpitHeader({
           <p className="text-muted-foreground text-sm">
             {[
               processo.class,
+              processo.subject,
               processo.court,
               degreeLabel(processo.degree),
               processo.judging_body,
