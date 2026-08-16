@@ -4,11 +4,13 @@ import {
   CalendarClock,
   CheckCircle2,
   ListChecks,
+  RotateCcw,
   Sparkles,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { formatDate } from "@/lib/format";
+import { Button } from "@/components/ui/button";
+import { formatDate, formatDateTime } from "@/lib/format";
 
 import { useProcessoResumo } from "../../hooks/use-processo-resumo";
 import type { ResumoKeyDate } from "../../types";
@@ -63,13 +65,26 @@ export function ResumoIAPanel({ processoId }: { processoId: string }) {
     return (
       <section className="bg-card ring-foreground/10 flex flex-col gap-4 rounded-xl p-5 shadow-sm ring-1">
         <PanelHeader />
-        <div className="border-gold/30 bg-gold/[0.05] flex flex-col gap-2 rounded-lg border border-dashed px-4 py-6 text-center">
-          <p className="text-foreground/80 text-sm font-medium">
-            Resumo indisponível
-          </p>
-          <p className="text-muted-foreground text-sm">
-            Não foi possível gerar o resumo agora. Tente novamente em instantes.
-          </p>
+        <div
+          role="alert"
+          className="border-gold/30 bg-gold/[0.05] flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-6 text-center"
+        >
+          <div className="flex flex-col gap-1">
+            <p className="text-foreground/80 text-sm font-medium">
+              Resumo indisponível
+            </p>
+            <p className="text-muted-foreground text-sm">
+              Não foi possível gerar o resumo agora.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => query.refetch()}
+          >
+            <RotateCcw className="size-3.5" /> Tentar novamente
+          </Button>
         </div>
       </section>
     );
@@ -162,7 +177,7 @@ export function ResumoIAPanel({ processoId }: { processoId: string }) {
       ) : null}
 
       <p className="text-muted-foreground/70 mt-1 border-t pt-3 text-xs">
-        Gerado por IA em {formatDateTimePT(resumo.generated_at)}.
+        Gerado por IA em {formatDateTime(resumo.generated_at)}.
       </p>
     </section>
   );
@@ -179,18 +194,6 @@ function PanelHeader() {
       </h3>
     </header>
   );
-}
-
-function formatDateTimePT(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 function ResumoSkeleton() {
