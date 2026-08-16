@@ -153,13 +153,6 @@ export function IntimacaoDetalhe({
                     {intimacao.cnj_number}
                   </Link>
                 </SheetField>
-                <SheetField label="Tribunal / grau">
-                  {intimacao.court} ·{" "}
-                  {DEGREE_LABEL[intimacao.degree] ?? intimacao.degree}
-                </SheetField>
-                <SheetField label="Órgão julgador">
-                  {intimacao.judging_body || "—"}
-                </SheetField>
               </dl>
 
               <SheetSection title="Destinatários">

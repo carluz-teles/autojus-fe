@@ -1,9 +1,10 @@
 "use client";
 
-import { Bot, FileText, Gavel } from "lucide-react";
+import { Bot, FileText } from "lucide-react";
 import Link from "next/link";
 
 import { PageHeader } from "@/components/shell/page-header";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AndamentosTimeline } from "@/features/andamentos/components/andamentos-timeline";
@@ -98,13 +99,19 @@ export function ProcessoCockpit({ processoId }: { processoId: string }) {
           <TabsList aria-label="Seções do processo">
             <TabsTrigger value="resumo">Resumo</TabsTrigger>
             <TabsTrigger value="andamentos">Andamentos</TabsTrigger>
-            <TabsTrigger value="intimacoes">Intimações</TabsTrigger>
-            <TabsTrigger value="prazos">Prazos</TabsTrigger>
-            <TabsTrigger value="tarefas">Tarefas</TabsTrigger>
-            <TabsTrigger value="pecas">Peças</TabsTrigger>
+            <TabsTrigger value="intimacoes">
+              Intimações
+              <TabCountBadge count={counts.intimacoesPendentes} />
+            </TabsTrigger>
+            <TabsTrigger value="prazos">
+              Prazos
+              <TabCountBadge count={counts.prazosAbertos} />
+            </TabsTrigger>
+            <TabsTrigger value="tarefas">
+              Tarefas
+              <TabCountBadge count={counts.tasksAbertas} />
+            </TabsTrigger>
             <TabsTrigger value="documentos">Documentos</TabsTrigger>
-            <TabsTrigger value="decisoes">Decisões</TabsTrigger>
-            <TabsTrigger value="ia">IA</TabsTrigger>
           </TabsList>
         </div>
 
@@ -146,15 +153,6 @@ export function ProcessoCockpit({ processoId }: { processoId: string }) {
           <ProcessoDocumentos processoId={processoId} />
         </TabsContent>
 
-        <TabsContent value="decisoes">
-          <EmptyState
-            icon={Gavel}
-            title="Decisões e sentenças"
-            description="Despachos, decisões e sentenças destacados da linha do tempo, com análise de impacto por IA. Chega na Fase 4."
-            phase="Chega na Fase 4"
-          />
-        </TabsContent>
-
         <TabsContent value="ia">
           <EmptyState
             icon={Bot}
@@ -166,6 +164,13 @@ export function ProcessoCockpit({ processoId }: { processoId: string }) {
       </Tabs>
     </div>
   );
+}
+
+// Badge de contagem ao lado do label da aba — só aparece quando há algo
+// pendente/aberto (0 não polui a navegação).
+function TabCountBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return <Badge variant="secondary">{count}</Badge>;
 }
 
 function CockpitSkeleton() {

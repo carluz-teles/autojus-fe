@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import { useIntimacoesDoProcesso } from "@/features/intimacoes/hooks/use-intimacoes-do-processo";
 import { usePrazosDoProcesso } from "@/features/prazos/hooks/use-prazos-do-processo";
+import { isLivePrazo } from "@/features/prazos/lib/proximo-prazo";
 import { useTasksDoProcesso } from "@/features/tasks/hooks/use-tasks-do-processo";
 
 import { computeProximaProvidencia } from "../lib/proxima-providencia";
@@ -61,6 +62,14 @@ export function useProcessoCockpit(processoId: string) {
     ).length;
   }, [intimacoes, prazos]);
 
+  // Prazos vivos (OPEN/PENDING) — mesmo critério do "próximo prazo" (herói) e da
+  // separação vivos × histórico da aba, aqui sem excluir o herói (é a contagem
+  // total, não a lista renderizada).
+  const prazosAbertos = useMemo(
+    () => prazos.filter(isLivePrazo).length,
+    [prazos],
+  );
+
   return {
     processo: detalhe.processo,
     isPending: detalhe.isPending,
@@ -76,6 +85,7 @@ export function useProcessoCockpit(processoId: string) {
       intimacoesPendentes,
       tasksAbertas: tasksCount.abertas,
       tasksAtrasadas: tasksCount.atrasadas,
+      prazosAbertos,
     },
     // estados de carregamento dos blocos secundários (não bloqueiam o header)
     signalsPending:
