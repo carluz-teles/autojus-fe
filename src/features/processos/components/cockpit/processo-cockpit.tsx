@@ -34,6 +34,7 @@ export function ProcessoCockpit({ processoId }: { processoId: string }) {
     proximoPrazo,
     risco,
     providencia,
+    ultimaIntimacao,
     counts,
   } = useProcessoCockpit(processoId);
 
@@ -86,13 +87,7 @@ export function ProcessoCockpit({ processoId }: { processoId: string }) {
         assignedUserName={processo.assigned_user_name}
       />
 
-      <OverviewCards
-        processo={processo}
-        proximoPrazo={proximoPrazo}
-        risco={risco}
-        counts={counts}
-        processoId={processoId}
-      />
+      <OverviewCards risco={risco} processoId={processoId} />
 
       <Tabs defaultValue="resumo" className="reveal flex flex-col gap-5">
         <div className="overflow-x-auto">
@@ -121,6 +116,7 @@ export function ProcessoCockpit({ processoId }: { processoId: string }) {
             processo={processo}
             providencia={providencia}
             risco={risco}
+            ultimaIntimacao={ultimaIntimacao}
           />
         </TabsContent>
 
@@ -186,11 +182,7 @@ function CockpitSkeleton() {
           ))}
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="bg-muted h-28 animate-pulse rounded-xl" />
-        ))}
-      </div>
+      <div className="bg-muted h-28 max-w-xs animate-pulse rounded-xl" />
     </div>
   );
 }

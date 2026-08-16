@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 
 import { useIntimacoesDoProcesso } from "@/features/intimacoes/hooks/use-intimacoes-do-processo";
+import { selectUltimaIntimacao } from "@/features/intimacoes/lib/ultima-intimacao";
 import { usePrazosDoProcesso } from "@/features/prazos/hooks/use-prazos-do-processo";
 import { isLivePrazo } from "@/features/prazos/lib/proximo-prazo";
 import { useTasksDoProcesso } from "@/features/tasks/hooks/use-tasks-do-processo";
@@ -11,20 +12,9 @@ import { computeProximaProvidencia } from "../lib/proxima-providencia";
 import { computeRisco } from "../lib/risco";
 import { useProcessoDetalhe } from "./use-processo-detalhe";
 
-// Contagens de tarefas derivadas no cliente (o BE não entrega o recorte).
-function contaTasks(tasks: { status: string; due_date: string | null }[]) {
-  const now = Date.now();
-  let abertas = 0;
-  let atrasadas = 0;
-  for (const t of tasks) {
-    if (t.status !== "OPEN") continue;
-    abertas += 1;
-    if (t.due_date) {
-      const due = new Date(t.due_date).getTime();
-      if (!Number.isNaN(due) && due < now) atrasadas += 1;
-    }
-  }
-  return { abertas, atrasadas };
+// Contagem de tarefas abertas derivada no cliente (o BE não entrega o recorte).
+function contaTasksAbertas(tasks: { status: string }[]): number {
+  return tasks.filter((t) => t.status === "OPEN").length;
 }
 
 /**
@@ -53,7 +43,7 @@ export function useProcessoCockpit(processoId: string) {
     [prazos, tasks],
   );
 
-  const tasksCount = useMemo(() => contaTasks(tasks), [tasks]);
+  const tasksAbertas = useMemo(() => contaTasksAbertas(tasks), [tasks]);
 
   const intimacoesPendentes = useMemo(() => {
     const idsComPrazo = new Set(prazos.map((p) => p.intimation_id));
@@ -70,6 +60,11 @@ export function useProcessoCockpit(processoId: string) {
     [prazos],
   );
 
+  const ultimaIntimacao = useMemo(
+    () => selectUltimaIntimacao(intimacoes),
+    [intimacoes],
+  );
+
   return {
     processo: detalhe.processo,
     isPending: detalhe.isPending,
@@ -80,11 +75,10 @@ export function useProcessoCockpit(processoId: string) {
     proximoPrazo,
     risco,
     providencia,
+    ultimaIntimacao,
     counts: {
-      intimacoesTotal: intimacoesQ.totalCount,
       intimacoesPendentes,
-      tasksAbertas: tasksCount.abertas,
-      tasksAtrasadas: tasksCount.atrasadas,
+      tasksAbertas,
       prazosAbertos,
     },
     // estados de carregamento dos blocos secundários (não bloqueiam o header)

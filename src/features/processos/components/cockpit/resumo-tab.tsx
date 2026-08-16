@@ -1,10 +1,12 @@
 "use client";
 
 import { FileText } from "lucide-react";
+import Link from "next/link";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { IAPanel } from "@/components/ui/ia-panel";
 import { RiskBadge } from "@/components/ui/risk-badge";
+import type { IntimacaoView } from "@/features/intimacoes/types";
 import { formatClaimValueBRL, formatDate } from "@/lib/format";
 
 import { degreeLabel, lifecycleLabel, secrecyLabel } from "../../lib/labels";
@@ -25,11 +27,13 @@ export function ResumoTab({
   processo,
   providencia,
   risco,
+  ultimaIntimacao,
 }: {
   processoId: string;
   processo: ProcessoView;
   providencia: ProvidenciaResult | null;
   risco: RiscoResult;
+  ultimaIntimacao: IntimacaoView | null;
 }) {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -95,6 +99,34 @@ export function ResumoTab({
               {secrecyLabel(processo.secrecy)}
             </RecapField>
           </dl>
+        </div>
+
+        <div className="bg-card ring-foreground/10 flex flex-col gap-3 rounded-xl p-5 shadow-sm ring-1">
+          <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+            Último andamento
+          </h3>
+          {processo.last_movement_at ? (
+            <div className="flex flex-col gap-2 text-sm">
+              <p className="text-muted-foreground">
+                {formatDate(processo.last_movement_at)}
+              </p>
+              <p className="text-foreground/80">
+                {processo.last_movement_text || "—"}
+              </p>
+              {ultimaIntimacao ? (
+                <Link
+                  href={`/intimacoes/${ultimaIntimacao.id}`}
+                  className="text-gold w-fit text-xs hover:underline"
+                >
+                  Ver última intimação
+                </Link>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              Nenhum andamento registrado.
+            </p>
+          )}
         </div>
 
         <IAPanel
