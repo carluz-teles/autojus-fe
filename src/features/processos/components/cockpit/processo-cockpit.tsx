@@ -1,8 +1,10 @@
 "use client";
 
+import { Bot, FileText, Gavel } from "lucide-react";
 import Link from "next/link";
 
 import { PageHeader } from "@/components/shell/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AndamentosTimeline } from "@/features/andamentos/components/andamentos-timeline";
 import { ProcessoDocumentos } from "@/features/documentos/components/processo-documentos";
@@ -77,12 +79,18 @@ export function ProcessoCockpit({ processoId }: { processoId: string }) {
 
       <AlertBar proximoPrazo={proximoPrazo} />
 
-      <OverviewCards proximoPrazo={proximoPrazo} counts={counts} />
-
       <PartesCards
         processoId={processoId}
         assignedUserId={processo.assigned_user_id}
         assignedUserName={processo.assigned_user_name}
+      />
+
+      <OverviewCards
+        processo={processo}
+        proximoPrazo={proximoPrazo}
+        risco={risco}
+        counts={counts}
+        processoId={processoId}
       />
 
       <Tabs defaultValue="resumo" className="reveal flex flex-col gap-5">
@@ -93,13 +101,17 @@ export function ProcessoCockpit({ processoId }: { processoId: string }) {
             <TabsTrigger value="intimacoes">Intimações</TabsTrigger>
             <TabsTrigger value="prazos">Prazos</TabsTrigger>
             <TabsTrigger value="tarefas">Tarefas</TabsTrigger>
+            <TabsTrigger value="pecas">Peças</TabsTrigger>
             <TabsTrigger value="documentos">Documentos</TabsTrigger>
+            <TabsTrigger value="decisoes">Decisões</TabsTrigger>
+            <TabsTrigger value="ia">IA</TabsTrigger>
           </TabsList>
         </div>
 
         <TabsContent value="resumo">
           <ResumoTab
             processoId={processoId}
+            processo={processo}
             providencia={providencia}
             risco={risco}
           />
@@ -121,8 +133,35 @@ export function ProcessoCockpit({ processoId }: { processoId: string }) {
           <ProcessoTasks processoId={processoId} />
         </TabsContent>
 
+        <TabsContent value="pecas">
+          <EmptyState
+            icon={FileText}
+            title="Peças e minutas"
+            description="A geração de peças com IA (petições, manifestações, recursos) e o histórico de minutas do processo chegam na Fase 2."
+            phase="Chega na Fase 2"
+          />
+        </TabsContent>
+
         <TabsContent value="documentos">
           <ProcessoDocumentos processoId={processoId} />
+        </TabsContent>
+
+        <TabsContent value="decisoes">
+          <EmptyState
+            icon={Gavel}
+            title="Decisões e sentenças"
+            description="Despachos, decisões e sentenças destacados da linha do tempo, com análise de impacto por IA. Chega na Fase 4."
+            phase="Chega na Fase 4"
+          />
+        </TabsContent>
+
+        <TabsContent value="ia">
+          <EmptyState
+            icon={Bot}
+            title="Assistente do processo"
+            description="Converse sobre o caso, peça um resumo ou gere uma peça em contexto — tudo com o processo carregado. Chega na Fase 3."
+            phase="Chega na Fase 3"
+          />
         </TabsContent>
       </Tabs>
     </div>
