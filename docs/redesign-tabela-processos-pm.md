@@ -8,7 +8,7 @@
 
 ## 1. OBJECTIVE
 
-Substituir a abordagem baseada em *cards* (KpiRow de 5 lifecycle) da tela `/processos` por
+Substituir a abordagem baseada em _cards_ (KpiRow de 5 lifecycle) da tela `/processos` por
 **navegação por abas** (uma por status de lifecycle), e ampliar a DataTable com **split da coluna
 "Processo"** (short-id + CNJ + tipo) e uma nova coluna **"Prazo a vencer"**. Acoplar **filtros
 por coluna** (Órgão Julgador, Valor da causa, outros) e manter a arquitetura service → hook →
@@ -16,12 +16,12 @@ component sem regressões.
 
 ### Escopo
 
-| Incluído | Excluído |
-|---|---|
-| Abas de lifecycle (substituem os cards) | Redesign do cockpit de detalhe (`/processos/[id]`) |
-| Colunas: short-id, CNJ, tipo, prazo a vencer | Backend — apenas levantamento de gaps |
-| Filtros por Órgão Julgador e Valor da causa na toolbar | Integração com exportação CSV |
-| Badge de contagem nas abas | Nova feature de atribuição em massa |
+| Incluído                                               | Excluído                                           |
+| ------------------------------------------------------ | -------------------------------------------------- |
+| Abas de lifecycle (substituem os cards)                | Redesign do cockpit de detalhe (`/processos/[id]`) |
+| Colunas: short-id, CNJ, tipo, prazo a vencer           | Backend — apenas levantamento de gaps              |
+| Filtros por Órgão Julgador e Valor da causa na toolbar | Integração com exportação CSV                      |
+| Badge de contagem nas abas                             | Nova feature de atribuição em massa                |
 
 ---
 
@@ -43,13 +43,13 @@ processo → clica na linha → abre processo → vê aba "Prazos".
 
 ### 3.1 Abas de lifecycle (substitui KpiRow)
 
-| Aba | Lifecycle value | Label | Tone | Badge |
-|---|---|---|---|---|
-| Todos | `null` | Total | neutral | — |
-| Em andamento | `ACTIVE` | Em andamento | info | contagem |
-| Suspensos | `SUSPENDED` | Suspensos | warning | contagem |
-| Arquivados | `ARCHIVED` | Arquivados | neutral | contagem |
-| Baixados | `CLOSED` | Baixados | neutral | contagem |
+| Aba          | Lifecycle value | Label        | Tone    | Badge    |
+| ------------ | --------------- | ------------ | ------- | -------- |
+| Todos        | `null`          | Total        | neutral | —        |
+| Em andamento | `ACTIVE`        | Em andamento | info    | contagem |
+| Suspensos    | `SUSPENDED`     | Suspensos    | warning | contagem |
+| Arquivados   | `ARCHIVED`      | Arquivados   | neutral | contagem |
+| Baixados     | `CLOSED`        | Baixados     | neutral | contagem |
 
 - A aba ativa filtra a lista via `?lifecycle=` (server-side, mesmo mecanismo atual).
 - Badge mostra a contagem daquele lifecycle (do `useProcessosSummary`).
@@ -59,17 +59,17 @@ processo → clica na linha → abre processo → vê aba "Prazos".
 
 ### 3.2 Colunas da DataTable
 
-| # | Header | Key (ProcessoView) | Derivação |
-|---|---|---|---|
-| 1 | **Nº** (short-id) | `case_id` ou `id` | helper `shortId()` (ver 4.2) |
-| 2 | **Processo** (CNJ) | `cnj_number` | exibição direta, `tabular-nums` |
-| 3 | **Tipo** | `class` + `subject` | `[class, subject].filter(Boolean).join(" · ")` |
-| 4 | **Órgão julgador** | `judging_body` | exibição direta |
-| 5 | **Distribuição** | `filed_at` | `formatDate()` |
-| 6 | **Valor da causa** | `claim_value` | `formatClaimValueBRL()` |
-| 7 | **Prazo a vencer** | _derivado_ | próximo prazo vivo (ver 3.3) |
-| 8 | **Responsável** | `assigned_user_name` | exibição direta |
-| 9 | **Status** | `lifecycle` | `StatusBadge` via `lifecycleLabel` + `processoTone` |
+| #   | Header             | Key (ProcessoView)   | Derivação                                           |
+| --- | ------------------ | -------------------- | --------------------------------------------------- |
+| 1   | **Nº** (short-id)  | `case_id` ou `id`    | helper `shortId()` (ver 4.2)                        |
+| 2   | **Processo** (CNJ) | `cnj_number`         | exibição direta, `tabular-nums`                     |
+| 3   | **Tipo**           | `class` + `subject`  | `[class, subject].filter(Boolean).join(" · ")`      |
+| 4   | **Órgão julgador** | `judging_body`       | exibição direta                                     |
+| 5   | **Distribuição**   | `filed_at`           | `formatDate()`                                      |
+| 6   | **Valor da causa** | `claim_value`        | `formatClaimValueBRL()`                             |
+| 7   | **Prazo a vencer** | _derivado_           | próximo prazo vivo (ver 3.3)                        |
+| 8   | **Responsável**    | `assigned_user_name` | exibição direta                                     |
+| 9   | **Status**         | `lifecycle`          | `StatusBadge` via `lifecycleLabel` + `processoTone` |
 
 - **Remover** coluna "Cliente" (placeholder `—` — não existe no backend).
 - A coluna **Status** mantém-se como 1ª coluna da nova configuração ou como última? **Decisão:**
@@ -140,13 +140,13 @@ function shortId(id: string): string {
 
 ### 5.1 Tokens do design system "Ledger"
 
-| Elemento | Token atual | Uso previsto |
-|---|---|---|
-| Gold accent | `text-gold` / `bg-gold/[0.04]` | aba ativa, prazo urgente |
-| Fonte de dados | `tabular-nums` | CNJ, prazos, valores |
-| Fonte de display | `font-display` (Fraunces) | counts de KPI |
-| Surface | `bg-card` + `ring-1 shadow-sm` | tabela (já no DataTable) |
-| Radius | `rounded-xl` | tabela; `rounded-lg` tabs |
+| Elemento         | Token atual                    | Uso previsto              |
+| ---------------- | ------------------------------ | ------------------------- |
+| Gold accent      | `text-gold` / `bg-gold/[0.04]` | aba ativa, prazo urgente  |
+| Fonte de dados   | `tabular-nums`                 | CNJ, prazos, valores      |
+| Fonte de display | `font-display` (Fraunces)      | counts de KPI             |
+| Surface          | `bg-card` + `ring-1 shadow-sm` | tabela (já no DataTable)  |
+| Radius           | `rounded-xl`                   | tabela; `rounded-lg` tabs |
 
 ### 5.2 Estrutura visual esperada
 
@@ -198,43 +198,43 @@ function shortId(id: string): string {
 
 ## 7. EDGE_CASES
 
-| # | Cenário | Comportamento esperado |
-|---|---|---|
-| E1 | Processo sem prazo derivado | Coluna "Prazo a vencer" mostra `—` |
-| E2 | Prazo vencido (days_left < 0) | `text-destructive` + "N dias em atraso" |
-| E3 | Prazo vence hoje (days_left = 0) | `"Hoje"` em `text-gold` (urgent) |
-| E4 | `claim_value` null | `—` |
-| E5 | `case_id` vazio | `shortId` deriva de `id` |
-| E6 | `judging_body` vazio | `—` |
-| E7 | Busca + aba ativa simultaneamente | Ambos filtros combinam (query key inclui os dois) |
-| E8 | Mudança de página enquanto busca digita | Debounce de 400ms já no hook (`useDebounce`) |
-| E9 | Backend retorna lifecycle não mapeado | `lifecycleLabel` faz fallback `humanize()` |
-| E10 | Tela de carregamento no mobile | `KpiCard` skeleton já existe (`CockpitSkeleton`) — adaptar para tabs |
-| E11 | Lista vazia em aba específica | Mensagem contextual: "Nenhum processo arquivado." |
-| E12 | `assigned_user_name` null | `—` |
+| #   | Cenário                                 | Comportamento esperado                                               |
+| --- | --------------------------------------- | -------------------------------------------------------------------- |
+| E1  | Processo sem prazo derivado             | Coluna "Prazo a vencer" mostra `—`                                   |
+| E2  | Prazo vencido (days_left < 0)           | `text-destructive` + "N dias em atraso"                              |
+| E3  | Prazo vence hoje (days_left = 0)        | `"Hoje"` em `text-gold` (urgent)                                     |
+| E4  | `claim_value` null                      | `—`                                                                  |
+| E5  | `case_id` vazio                         | `shortId` deriva de `id`                                             |
+| E6  | `judging_body` vazio                    | `—`                                                                  |
+| E7  | Busca + aba ativa simultaneamente       | Ambos filtros combinam (query key inclui os dois)                    |
+| E8  | Mudança de página enquanto busca digita | Debounce de 400ms já no hook (`useDebounce`)                         |
+| E9  | Backend retorna lifecycle não mapeado   | `lifecycleLabel` faz fallback `humanize()`                           |
+| E10 | Tela de carregamento no mobile          | `KpiCard` skeleton já existe (`CockpitSkeleton`) — adaptar para tabs |
+| E11 | Lista vazia em aba específica           | Mensagem contextual: "Nenhum processo arquivado."                    |
+| E12 | `assigned_user_name` null               | `—`                                                                  |
 
 ---
 
 ## 8. ACCEPTANCE_CRITERIA
 
-| ID | Critério | Como validar |
-|---|---|---|
-| AC-1 | Abas de lifecycle substituem os KpiCards clicáveis | Visual: não há mais cards; há pills de aba acima da tabela |
-| AC-2 | Badge de contagem nas abas reflete `useProcessosSummary` | Aba "Em andamento" mostra `(42)` sincronizado |
-| AC-3 | Click na aba "Total" limpa o filtro lifecycle | Query key `?lifecycle=` desaparece, lista mostra tudo |
-| AC-4 | URL reflete a aba ativa (`?lifecycle=ACTIVE`) | Refresh mantém aba selecionada |
-| AC-5 | Coluna "Processo" split em 3: short-id, CNJ, tipo | Tabela tem 9 colunas; short-id é chip monoespaçado |
-| AC-6 | short-id deriva de `case_id` (fallback `id`), 6 chars upper | Consistência com `intimacoes/page.tsx:39` |
-| AC-7 | Nova coluna "Prazo a vencer" mostra contagem regressiva | Exibe "Hoje" / "5 dias" / "2 dias em atraso" |
-| AC-8 | Prazo vencido tem cor `destructive` | Teste via mock de `days_left = -3` |
-| AC-9 | Prazo ≤ 3 dias tem cor `gold` (urgent) | Teste via mock de `days_left = 2` |
-| AC-10 | Filtro "Órgão julgador" funciona | Select filtra a lista |
-| AC-11 | Filtro "Valor da causa" (range) funciona | Inputs min/max filtram |
-| AC-12 | Badge "Filtros" conta filtros ativos | 2 selects preenchidos → badge(2) |
-| AC-13 | "Limpar tudo" zera todos os filtros e volta para aba "Total" | |
-| AC-14 | Tabela responsiva: scroll horizontal em mobile | `overflow-x-auto` wrap (já no DataTable) |
-| AC-15 | Acessibilidade: teclas de seta navegam entre abas | Tabs component já testado |
-| AC-16 | Build + lint + typecheck passam | `npm run lint && npm run build` |
+| ID    | Critério                                                     | Como validar                                               |
+| ----- | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| AC-1  | Abas de lifecycle substituem os KpiCards clicáveis           | Visual: não há mais cards; há pills de aba acima da tabela |
+| AC-2  | Badge de contagem nas abas reflete `useProcessosSummary`     | Aba "Em andamento" mostra `(42)` sincronizado              |
+| AC-3  | Click na aba "Total" limpa o filtro lifecycle                | Query key `?lifecycle=` desaparece, lista mostra tudo      |
+| AC-4  | URL reflete a aba ativa (`?lifecycle=ACTIVE`)                | Refresh mantém aba selecionada                             |
+| AC-5  | Coluna "Processo" split em 3: short-id, CNJ, tipo            | Tabela tem 9 colunas; short-id é chip monoespaçado         |
+| AC-6  | short-id deriva de `case_id` (fallback `id`), 6 chars upper  | Consistência com `intimacoes/page.tsx:39`                  |
+| AC-7  | Nova coluna "Prazo a vencer" mostra contagem regressiva      | Exibe "Hoje" / "5 dias" / "2 dias em atraso"               |
+| AC-8  | Prazo vencido tem cor `destructive`                          | Teste via mock de `days_left = -3`                         |
+| AC-9  | Prazo ≤ 3 dias tem cor `gold` (urgent)                       | Teste via mock de `days_left = 2`                          |
+| AC-10 | Filtro "Órgão julgador" funciona                             | Select filtra a lista                                      |
+| AC-11 | Filtro "Valor da causa" (range) funciona                     | Inputs min/max filtram                                     |
+| AC-12 | Badge "Filtros" conta filtros ativos                         | 2 selects preenchidos → badge(2)                           |
+| AC-13 | "Limpar tudo" zera todos os filtros e volta para aba "Total" |                                                            |
+| AC-14 | Tabela responsiva: scroll horizontal em mobile               | `overflow-x-auto` wrap (já no DataTable)                   |
+| AC-15 | Acessibilidade: teclas de seta navegam entre abas            | Tabs component já testado                                  |
+| AC-16 | Build + lint + typecheck passam                              | `npm run lint && npm run build`                            |
 
 ---
 
@@ -245,11 +245,11 @@ function shortId(id: string): string {
 **Fato atual:** `GET /v1/processos` retorna `ProcessoView` — **não inclui prazos**. O endpoint
 `GET /v1/processos/:id/prazos` existe, mas é por-processo (detalhe).
 
-**Pergunta A1:** *Devemos fazer N+1 client-side (fetch prazos para cada linha visível) ou pedir
-ao backend um campo agregado na lista?*
+**Pergunta A1:** _Devemos fazer N+1 client-side (fetch prazos para cada linha visível) ou pedir
+ao backend um campo agregado na lista?_
 
 - **Opção A (recomendado):** Pedir ao BE um campo `next_deadline: { end_date, days_left, kind }
-  | null` embarcado no `ProcessoView` da lista. Evita N+1 e mantém paginação server-side.
+| null` embarcado no `ProcessoView` da lista. Evita N+1 e mantém paginação server-side.
 - **Opção B:** Fetch client-side de prazos para as linhas visíveis (até 100). Rápido de
   implementar (hook paralelo), mas N requests por página — não escala e invalida cache de
   prazos ao navegar entre abas.
@@ -262,7 +262,7 @@ ao backend um campo agregado na lista?*
 **Fato atual:** `ProcessoView` tem `id: string` e `case_id: string`. O `case_id` não é
 referenciado em nenhuma tela atual — a UI navega por `id`.
 
-**Pergunta B1:** *`short-id` deve partir de `case_id` ou de `id`?*
+**Pergunta B1:** _`short-id` deve partir de `case_id` ou de `id`?_
 
 - `case_id` é o identificador interno do sistema (provavelmente UUID). Pode estar vazio.
 - `id` é o mesmo UUID. Já existe o helper `shortId()` em `intimacoes/page.tsx` derivando de
@@ -276,8 +276,8 @@ referenciado em nenhuma tela atual — a UI navega por `id`.
 **Fato atual:** `useProcessos` faz busca + lifecycle **server-side** (query key inclui ambos;
 `useCursorPagination` reseta ao mudar). Nenhum outro filtro existe no BE.
 
-**Pergunta C1:** *Devemos os novos filtros (Orgão julgador, Valor da causa) ser server-side ou
-client-side?*
+**Pergunta C1:** _Devemos os novos filtros (Orgão julgador, Valor da causa) ser server-side ou
+client-side?_
 
 - **Server-side:** requer novos query params (`?judging_body=`, `?claim_value_min=`,
   `?claim_value_max=`) no BE. Ideal para grandes volumes, mantém consistência com busca+cursor.
@@ -285,26 +285,26 @@ client-side?*
   que filtrar localmente perde linhas das outras páginas. Falso negativo silencioso.
 
 > **Recomendação PM:** Propor ao backend os novos query params (server-side). Enquanto isso,
-> implementar o filtro apenas client-side como *MVP* com aviso toast:
+> implementar o filtro apenas client-side como _MVP_ com aviso toast:
 > "Filtro local: apenas esta página" — evita surpresa quando a aba mudar.
 
 ---
 
 ## 10. DESIGN_DECISONS
 
-| # | Decisão | Justificativa |
-|---|---|---|
-| D1 | Tabs substituem KpiRow, não coexistem | Evita dupla UI de lifecycle; reduce clutter; requisito explícito |
-| D2 | Reusar `Tabs` de `@/components/ui/tabs.tsx` | Headless, acessível, estilo "pills" já definido |
-| D3 | Aba "Total" = `lifecycle=null` (limpa filtro) | Semântica "sem restrição" — usuário vê tudo |
-| D4 | short-id derivado de `case_id` || `id` | Fallback robusto; extrai helper reusável |
-| D5 | short-id: 6 chars hex upper (drop hyphens) | Consistência com `intimacoes/page.tsx:39`; visível mas sem revelar UUID completo |
-| D6 | `statusTone` na linha continua (ponto à esquerda) | DataTable já suporta; não quebra padrão visual |
-| D7 | Prazo a vencer: derivado de `PrazoView` filtrado por status vivo | Mesma lógica de `usePrazosDoProcesso`; consistente com cockpit |
-| D8 | Badge de contagem nas abas vem de `useProcessosSummary` | Não refaz request por aba; summary já entrega totais por status |
-| D9 | Filtros server-side como target; cliente como fallback | Arquitetura cursor-pagination exige server-side para não perder pages |
-| D10 | URL `?lifecycle=ACTIVE` persiste aba | Deep link / compartilhamento; refresh não perde estado |
-| D11 | Coluna "Cliente" removida | Não existe no `ProcessoView`; placeholder que ocupa espaço |
+| #   | Decisão                                                          | Justificativa                                                                    |
+| --- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| D1  | Tabs substituem KpiRow, não coexistem                            | Evita dupla UI de lifecycle; reduce clutter; requisito explícito                 |
+| D2  | Reusar `Tabs` de `@/components/ui/tabs.tsx`                      | Headless, acessível, estilo "pills" já definido                                  |
+| D3  | Aba "Total" = `lifecycle=null` (limpa filtro)                    | Semântica "sem restrição" — usuário vê tudo                                      |
+| D4  | short-id derivado de `case_id`                                   |                                                                                  | `id` | Fallback robusto; extrai helper reusável |
+| D5  | short-id: 6 chars hex upper (drop hyphens)                       | Consistência com `intimacoes/page.tsx:39`; visível mas sem revelar UUID completo |
+| D6  | `statusTone` na linha continua (ponto à esquerda)                | DataTable já suporta; não quebra padrão visual                                   |
+| D7  | Prazo a vencer: derivado de `PrazoView` filtrado por status vivo | Mesma lógica de `usePrazosDoProcesso`; consistente com cockpit                   |
+| D8  | Badge de contagem nas abas vem de `useProcessosSummary`          | Não refaz request por aba; summary já entrega totais por status                  |
+| D9  | Filtros server-side como target; cliente como fallback           | Arquitetura cursor-pagination exige server-side para não perder pages            |
+| D10 | URL `?lifecycle=ACTIVE` persiste aba                             | Deep link / compartilhamento; refresh não perde estado                           |
+| D11 | Coluna "Cliente" removida                                        | Não existe no `ProcessoView`; placeholder que ocupa espaço                       |
 
 ---
 
@@ -335,4 +335,4 @@ client-side?*
 
 ---
 
-*Documento gerado pela triagem PM — AGENTS.md e ERD Frontend são a fonte de verdade.*
+_Documento gerado pela triagem PM — AGENTS.md e ERD Frontend são a fonte de verdade._

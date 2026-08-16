@@ -44,8 +44,12 @@ export function Sidebar() {
             variant="ghost"
             size="icon"
             onClick={() => setCollapsed((c) => !c)}
-            aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"}
-            title={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"}
+            aria-label={
+              collapsed ? "Expandir barra lateral" : "Recolher barra lateral"
+            }
+            title={
+              collapsed ? "Expandir barra lateral" : "Recolher barra lateral"
+            }
             className="text-sidebar-foreground/50 hover:text-sidebar-foreground size-7 shrink-0"
           >
             {collapsed ? (

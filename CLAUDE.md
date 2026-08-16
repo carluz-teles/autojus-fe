@@ -40,10 +40,12 @@ Regras (inegociáveis):
 - **Forms**: React Hook Form + Zod resolver; o schema Zod é a fonte da validação client-side.
 
 ## Fluxo de git e tags (obrigatório — vários devs em repos separados, front e back)
+
 Nunca commitar direto na `main` (é prod). Sempre: `git checkout main && git pull` → branch nova a partir dela →
 commits na branch → merge de volta na `main`, resolvendo conflito quando aparecer.
 
 Tags SemVer (`vMAJOR.MINOR.PATCH`) criadas **após** o merge na `main`, nunca antes:
+
 - Primeiro merge do v0 em produção → `v1.0.0`.
 - Feature nova (tela, fluxo) → bump de MINOR (`v1.1.0`, `v1.2.0`, ...).
 - Bugfix/hotfix → bump de PATCH (`v1.0.1`, `v1.0.2`, ...).

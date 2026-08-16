@@ -14,7 +14,9 @@ export function SidebarFooter() {
     <div className="mt-auto flex flex-col gap-2 border-t px-3 py-3">
       <NavLink href="/settings" label="Configurações" icon={Settings} />
       {collapsed ? null : (
-        <span className="text-muted-foreground/70 px-3 text-xs">v0 · AtJud</span>
+        <span className="text-muted-foreground/70 px-3 text-xs">
+          v0 · AtJud
+        </span>
       )}
     </div>
   );

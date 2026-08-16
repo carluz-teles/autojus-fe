@@ -50,7 +50,9 @@ export function SidebarOrg() {
           <span className="block truncate text-sm font-medium">
             {organization.name}
           </span>
-          <span className="text-muted-foreground block text-xs">Escritório</span>
+          <span className="text-muted-foreground block text-xs">
+            Escritório
+          </span>
         </span>
       )}
     </Link>

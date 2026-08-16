@@ -34,9 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <UserMenu />
               </div>
             </header>
-            <main className="w-full flex-1 px-6 py-10">
-              {children}
-            </main>
+            <main className="w-full flex-1 px-6 py-10">{children}</main>
           </div>
         </BreadcrumbProvider>
       </div>
