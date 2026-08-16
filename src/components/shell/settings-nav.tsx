@@ -13,6 +13,7 @@ export const SETTINGS_TABS = [
   { href: "/settings/integrations", label: "Integrações" },
   { href: "/settings/termos", label: "Termos" },
   { href: "/settings/billing", label: "Cobrança" },
+  { href: "/settings/notifications", label: "Notificações" },
   { href: "/settings/profile", label: "Perfil" },
 ] as const;
 
