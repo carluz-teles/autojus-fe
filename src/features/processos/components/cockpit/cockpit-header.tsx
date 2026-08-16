@@ -1,6 +1,6 @@
 "use client";
 
-import { FilePlus2, MoreHorizontal, Sparkles } from "lucide-react";
+import { FilePlus2, Lock, MoreHorizontal, Sparkles } from "lucide-react";
 import { useMemo } from "react";
 
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
@@ -9,12 +9,7 @@ import { Button } from "@/components/ui/button";
 import { RiskBadge, type RiskLevel } from "@/components/ui/risk-badge";
 import { formatClaimValueBRL, formatDate } from "@/lib/format";
 
-import {
-  completenessPct,
-  degreeLabel,
-  lifecycleLabel,
-  secrecyLabel,
-} from "../../lib/labels";
+import { degreeLabel, lifecycleLabel, secrecyLabel } from "../../lib/labels";
 import type { ProcessoView } from "../../types";
 
 // Cabeçalho do cockpit (§6): breadcrumb, CNJ herói + badge de situação, linha de
@@ -28,8 +23,6 @@ export function CockpitHeader({
   processo: ProcessoView;
   riskLevel: RiskLevel;
 }) {
-  const pct = completenessPct(processo.completeness);
-
   const breadcrumb = useMemo(
     () => [
       { label: "Processos", href: "/processos" },
@@ -51,6 +44,12 @@ export function CockpitHeader({
               {lifecycleLabel(processo.lifecycle)}
             </Badge>
             <RiskBadge level={riskLevel} />
+            {processo.secrecy && processo.secrecy !== "PUBLIC" ? (
+              <Badge variant="outline">
+                <Lock />
+                {secrecyLabel(processo.secrecy)}
+              </Badge>
+            ) : null}
           </div>
           <p className="text-muted-foreground text-sm">
             {[
@@ -92,24 +91,6 @@ export function CockpitHeader({
         <MetaField label="Grau">{degreeLabel(processo.degree)}</MetaField>
         <MetaField label="Sistema">{processo.court || "—"}</MetaField>
       </dl>
-
-      <div className="flex flex-col gap-1.5">
-        <div className="text-muted-foreground flex items-center justify-between text-xs">
-          <span>Completude do processo</span>
-          <span className="tabular-nums">{pct}%</span>
-        </div>
-        <div className="bg-muted h-1.5 overflow-hidden rounded-full">
-          <div
-            className="bg-gold h-full rounded-full transition-[width] duration-500"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-        {processo.secrecy !== "PUBLIC" ? (
-          <p className="text-muted-foreground mt-1 text-xs">
-            Sigilo: {secrecyLabel(processo.secrecy)}
-          </p>
-        ) : null}
-      </div>
     </header>
   );
 }
