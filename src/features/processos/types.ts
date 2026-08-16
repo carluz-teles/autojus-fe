@@ -97,3 +97,50 @@ export interface ProcessosSummary {
 
 // Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
 export type { PageEnvelope } from "@/lib/api/types";
+
+// GET /v1/processos/:id/resume — o resumo do processo por IA (write-once
+// sync-on-first-GET: o BE gera na primeira abertura, persiste na court_record e
+// serve do cache nas seguintes). Slices SEMPRE vêm inicializados pelo BE (nunca
+// null); em modo degradado (sem LLM configurado) summary="" e risks/ações são [].
+export interface ProcessoResumoView {
+  summary: string;
+  current_status: string;
+  key_dates_and_deadlines: ResumoKeyDate[];
+  recent_movements: ResumoMovement[];
+  risks: ResumoRisk[];
+  recommended_actions: ResumoAction[];
+  /** Momento em que o resumo foi gerado (RFC3339) — informa a idade do cache. */
+  generated_at: string;
+}
+
+/** Prazo aberto com sinalização de urgência do resumo por IA. */
+export interface ResumoKeyDate {
+  kind: string;
+  /** Vencimento (YYYY-MM-DD). */
+  end_date: string;
+  /** Dias restantes (negativo = vencido). */
+  days_remaining: number;
+  /** OVERDUE | DUE_SOON | OK — determinístico no BE, espelha o prompt. */
+  urgency: "OVERDUE" | "DUE_SOON" | "OK";
+  /** deadline_id ou intimação de referência. */
+  source: string;
+}
+
+/** Andamento significativo citado no resumo. */
+export interface ResumoMovement {
+  occurred_at: string;
+  text: string;
+  source: string;
+}
+
+/** Sinal vermelho detectado no processo. */
+export interface ResumoRisk {
+  description: string;
+  source: string;
+}
+
+/** Próximo passo sugerido. */
+export interface ResumoAction {
+  action: string;
+  source: string;
+}
