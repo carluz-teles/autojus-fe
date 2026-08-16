@@ -8,7 +8,7 @@ import {
   useNotificationPreferences,
   useSetNotificationPreference,
 } from "../hooks/use-notification-preferences";
-import { NOTIFICATION_TYPES } from "../notification-types";
+import { NOTIFICATION_TYPES } from "../lib/labels";
 import type { NotificationPreference } from "../types";
 
 // Só o canal EMAIL é exposto aqui: hoje é o único canal que o BE realmente
