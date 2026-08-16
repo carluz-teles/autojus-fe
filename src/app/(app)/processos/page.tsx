@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { FilterToolbar } from "@/components/ui/filter-toolbar";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ListPagination } from "@/components/ui/list-pagination";
 import { Select } from "@/components/ui/select";
@@ -34,7 +33,8 @@ import { cn } from "@/lib/utils";
 // Lista de processos consolidados (court_case / court_record), capturados do DJEN
 // e enriquecidos pelo DATAJUD. DataTable via GET /v1/processos (read model),
 // paginada por cursor com busca server-side. As abas Tabs filtram por lifecycle
-// (?lifecycle) em modo controlado; os chips da toolbar por órgão julgador e valor.
+// (?lifecycle) em modo controlado; os filtros do drawer (Tribunal, Grau,
+// Responsável) vêm das opções do envelope do BE e são sincronizados com a URL.
 
 // Cada célula deriva de helpers (lib/format, lib/labels) — nada de cálculo no JSX.
 // As colunas vivem DENTRO do componente por dependerem do map de prazos paralelo.
@@ -51,6 +51,16 @@ const PRAZO_TONE_TEXT: Record<StatusTone, string> = {
   success: "text-emerald-700 dark:text-emerald-400",
 };
 
+// Filtros avançados do drawer, na ordem exibida. As opções vêm do envelope do
+// BE (filterOptions); aqui só o rótulo da seção de cada um. lifecycle fica de
+// fora — as abas Tabs são o controle dele.
+const FILTER_KEYS = ["court", "degree", "assignee"] as const;
+const FILTER_LABELS: Record<(typeof FILTER_KEYS)[number], string> = {
+  court: "Tribunal",
+  degree: "Grau",
+  assignee: "Responsável",
+};
+
 // Célula de texto com truncamento por ellipsis + tooltip no hover com o valor
 // completo (textos longos tipo órgão julgador / número do processo não devem
 // estourar a coluna nem ficar ilegíveis).
@@ -63,13 +73,13 @@ function TruncatedCell({
   className?: string;
   as?: "span" | "div";
 }) {
-    return (
-      <Tooltip label={value}>
-        <As className={cn("block w-full min-w-0 truncate", className)}>
-          {value}
-        </As>
-      </Tooltip>
-    );
+  return (
+    <Tooltip label={value}>
+      <As className={cn("block w-full min-w-0 truncate", className)}>
+        {value}
+      </As>
+    </Tooltip>
+  );
 }
 
 // Badge de contagem das abas — sumiu só quando o summary ainda não chegou.
@@ -111,11 +121,10 @@ function ProcessosList() {
     lifecycle,
     setLifecycle,
     filters,
-    setFilters,
+    setFilter,
     resetFilters,
     activeFilterCount,
-    uniqueJudgingBodies,
-    uniqueClasses,
+    filterOptions,
     proximoPrazoPorProcesso,
     pageSize,
     setPageSize,
@@ -249,10 +258,13 @@ function ProcessosList() {
   const rangeTo = (pageNumber - 1) * pageSize + processos.length;
 
   const hasAdvancedFilters = Boolean(
-    filters.class ||
-      filters.judging_body ||
-      filters.claim_value_min ||
-      filters.claim_value_max,
+    filters.court || filters.degree || filters.assignee,
+  );
+
+  // Chaves com opções emitidas pelo BE no envelope (a ordem de FILTER_KEYS é a
+  // exibida no drawer); lifecycle fica de fora por ser controlado pelas abas.
+  const filterKeys = FILTER_KEYS.filter((key) =>
+    Boolean(filterOptions?.[key]?.length),
   );
 
   const emptyLabel = useMemo(() => {
@@ -329,7 +341,7 @@ function ProcessosList() {
       <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
         <SheetContent
           title="Filtros"
-          description="Refine a listagem por tipo, órgão julgador e valor da causa."
+          description="Refine a listagem pelos filtros disponíveis."
           footer={
             <Button variant="outline" size="sm" onClick={resetFilters}>
               Limpar tudo
@@ -337,83 +349,31 @@ function ProcessosList() {
           }
         >
           <div className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="filtro-tipo">Tipo</Label>
-              <Select
-                id="filtro-tipo"
-                aria-label="Filtrar por tipo"
-                value={filters.class ?? ""}
-                onChange={(e) =>
-                  setFilters((f) => ({
-                    ...f,
-                    class: e.target.value || undefined,
-                  }))
-                }
-                className="w-full"
-              >
-                <option value="">Todos os tipos</option>
-                {uniqueClasses.map((classe) => (
-                  <option key={classe} value={classe}>
-                    {classe}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="filtro-orgao">Órgão julgador</Label>
-              <Select
-                id="filtro-orgao"
-                aria-label="Filtrar por órgão julgador"
-                value={filters.judging_body ?? ""}
-                onChange={(e) =>
-                  setFilters((f) => ({
-                    ...f,
-                    judging_body: e.target.value || undefined,
-                  }))
-                }
-                className="w-full"
-              >
-                <option value="">Todos os órgãos</option>
-                {uniqueJudgingBodies.map((body) => (
-                  <option key={body} value={body}>
-                    {body}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Valor da causa</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="Valor mín."
-                  aria-label="Valor mínimo da causa"
-                  value={filters.claim_value_min ?? ""}
-                  onChange={(e) =>
-                    setFilters((f) => ({
-                      ...f,
-                      claim_value_min: e.target.value || undefined,
-                    }))
-                  }
-                />
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="Valor máx."
-                  aria-label="Valor máximo da causa"
-                  value={filters.claim_value_max ?? ""}
-                  onChange={(e) =>
-                    setFilters((f) => ({
-                      ...f,
-                      claim_value_max: e.target.value || undefined,
-                    }))
-                  }
-                />
-              </div>
-            </div>
+            {filterKeys.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                Nenhum filtro disponível.
+              </p>
+            ) : (
+              filterKeys.map((key) => (
+                <div className="space-y-2" key={key}>
+                  <Label htmlFor={`filtro-${key}`}>{FILTER_LABELS[key]}</Label>
+                  <Select
+                    id={`filtro-${key}`}
+                    aria-label={`Filtrar por ${FILTER_LABELS[key].toLowerCase()}`}
+                    value={filters[key] ?? ""}
+                    onChange={(e) => setFilter(key, e.target.value)}
+                    className="w-full"
+                  >
+                    <option value="">Todos</option>
+                    {(filterOptions?.[key] ?? []).map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              ))
+            )}
           </div>
         </SheetContent>
       </Sheet>
