@@ -16,11 +16,10 @@ import {
   secrecyLabel,
 } from "../../lib/labels";
 import type { ProcessoView } from "../../types";
-import { ResponsavelPicker } from "./responsavel-picker";
 
 // Cabeçalho do cockpit (§6): breadcrumb, CNJ herói + badge de situação, linha de
-// classificação, grade de metadata (distribuição, valor da causa, grau, sistema)
-// e o slot "Responsável" — agora real (picker de membros → PUT /responsavel).
+// classificação e a grade de metadata (distribuição, valor da causa, grau,
+// sistema). O slot "Responsável" mora no card dedicado em partes-cards.tsx.
 // Ações de IA/tarefa como placeholders no-op. Só JSX + binding.
 export function CockpitHeader({
   processo,
@@ -83,7 +82,7 @@ export function CockpitHeader({
         </div>
       </div>
 
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 lg:grid-cols-4">
         <MetaField label="Distribuição">
           {formatDate(processo.filed_at)}
         </MetaField>
@@ -92,13 +91,6 @@ export function CockpitHeader({
         </MetaField>
         <MetaField label="Grau">{degreeLabel(processo.degree)}</MetaField>
         <MetaField label="Sistema">{processo.court || "—"}</MetaField>
-        <MetaField label="Responsável">
-          <ResponsavelPicker
-            processoId={processo.id}
-            assignedUserId={processo.assigned_user_id}
-            assignedUserName={processo.assigned_user_name}
-          />
-        </MetaField>
       </dl>
 
       <div className="flex flex-col gap-1.5">

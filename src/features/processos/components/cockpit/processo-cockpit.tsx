@@ -79,7 +79,11 @@ export function ProcessoCockpit({ processoId }: { processoId: string }) {
 
       <AlertBar proximoPrazo={proximoPrazo} />
 
-      <PartesCards processoId={processoId} />
+      <PartesCards
+        processoId={processoId}
+        assignedUserId={processo.assigned_user_id}
+        assignedUserName={processo.assigned_user_name}
+      />
 
       <OverviewCards
         processo={processo}
