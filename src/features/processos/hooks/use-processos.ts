@@ -20,8 +20,9 @@ import { useProcessosPrazos } from "./use-processos-prazos";
  *
  * Lifecycle: sincronizado com a query string (`?lifecycle=`) — lê no mount,
  * escreve via router em cada mudança (as abas Tabs são o controle).
- * Filtros avançados (judging_body, claim_value) vivem em `filters` e integram o
- * query key + resetKey da paginação.
+ * Filtros avançados (court/degree/assignee) também são sincronizados com a URL
+ * (`?court=`, `?degree=`, `?assignee=`) e integram o query key + resetKey da
+ * paginação via o mesmo objeto `filters`.
  */
 export function useProcessos() {
   const fetcher = useApi();
@@ -29,7 +30,20 @@ export function useProcessos() {
   const searchParams = useSearchParams();
 
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<ProcessoFilters>({});
+
+  // Filtros avançados: lê ?court=, ?degree= e ?assignee= no mount (SSR-safe:
+  // ausentes quando não estão na URL). Cada mudança passa pelo setFilter, que
+  // mantém state + URL em sincronia.
+  const [filters, setFilters] = useState<ProcessoFilters>(() => {
+    const initial: ProcessoFilters = {};
+    const court = searchParams?.get("court");
+    if (court) initial.court = court;
+    const degree = searchParams?.get("degree");
+    if (degree) initial.degree = degree;
+    const assignee = searchParams?.get("assignee");
+    if (assignee) initial.assignee = assignee;
+    return initial;
+  });
 
   // Lifecycle: lê ?lifecycle= no mount (SSR-safe: null quando ausente).
   const [lifecycle, setLifecycleState] = useState<string | null>(
@@ -48,10 +62,39 @@ export function useProcessos() {
     router.replace(`?${params.toString()}`, { scroll: false });
   };
 
-  // Reseta filtros avançados + lifecycle (volta para a aba Total).
+  // Wrapper de um filtro avançado: atualiza o objeto `filters` (fonte do query
+  // key) + o param correspondente na URL, removendo-o quando o valor fica vazio.
+  // Mesmo padrão do setLifecycle.
+  const setFilter = (key: keyof ProcessoFilters, value: string) => {
+    setFilters((f) => {
+      const next = { ...f };
+      if (value) {
+        next[key] = value;
+      } else {
+        delete next[key];
+      }
+      return next;
+    });
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
+    if (value) {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+    router.replace(`?${params.toString()}`, { scroll: false });
+  };
+
+  // Reseta filtros avançados + lifecycle (volta para a aba Total) e limpa os
+  // params correspondentes da URL.
   const resetFilters = () => {
     setFilters({});
-    setLifecycle(null);
+    setLifecycleState(null);
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
+    params.delete("lifecycle");
+    params.delete("court");
+    params.delete("degree");
+    params.delete("assignee");
+    router.replace(`?${params.toString()}`, { scroll: false });
   };
 
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
@@ -94,26 +137,18 @@ export function useProcessos() {
     processos.map((p) => p.id),
   );
 
-  // Opções de filtro derivadas dos dados carregados (para os selects do drawer):
-  // órgãos julgadores e classes processuais únicas presentes nas linhas atuais.
-  const uniqueJudgingBodies = useMemo(
-    () =>
-      Array.from(new Set(processos.map((p) => p.judging_body).filter(Boolean))),
-    [processos],
-  );
-  const uniqueClasses = useMemo(
-    () => Array.from(new Set(processos.map((p) => p.class).filter(Boolean))),
-    [processos],
-  );
+  // Opções de filtro emitidas pelo BE no envelope (court/degree/assignee — cada
+  // chave é omitida quando sem opções; `{}` quando nada se aplica). Alimentam os
+  // selects do drawer de filtros. lifecycle fica de fora (as abas são o controle).
+  const filterOptions = query.data?.filters;
 
   // Contagem de filtros ativos (badge do botão "Filtros" na toolbar).
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (lifecycle) count++;
-    if (filters.class) count++;
-    if (filters.judging_body) count++;
-    if (filters.claim_value_min) count++;
-    if (filters.claim_value_max) count++;
+    if (filters.court) count++;
+    if (filters.degree) count++;
+    if (filters.assignee) count++;
     return count;
   }, [lifecycle, filters]);
 
@@ -132,12 +167,11 @@ export function useProcessos() {
     setLifecycle,
     // filtros avançados
     filters,
-    setFilters,
+    setFilter,
     resetFilters,
     activeFilterCount,
-    // opções de filtro derivadas
-    uniqueJudgingBodies,
-    uniqueClasses,
+    // opções de filtro do BE (para os selects do drawer)
+    filterOptions,
     // prazos paralelos (MVP Bridge)
     proximoPrazoPorProcesso,
     // paginação

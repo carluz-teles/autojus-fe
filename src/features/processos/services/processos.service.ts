@@ -30,10 +30,7 @@ export async function listProcessos(
     cursor,
     search,
     lifecycle,
-    class: processoClass,
-    judging_body,
-    claim_value_min,
-    claim_value_max,
+    ...filters
   }: ListProcessosParams = {},
 ): Promise<PageEnvelope<ProcessoView>> {
   return fetcher<PageEnvelope<ProcessoView>>(ENDPOINT, {
@@ -42,10 +39,7 @@ export async function listProcessos(
       cursor,
       search,
       lifecycle,
-      class: processoClass,
-      judging_body,
-      claim_value_min,
-      claim_value_max,
+      ...filters,
     },
   });
 }

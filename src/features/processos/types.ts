@@ -44,16 +44,18 @@ export interface NextDeadlineView {
 }
 
 /**
- * Filtros avançados da lista de processos — aplicados server-side via query
- * string. `class` filtra pela classe processual (cr.class); `judging_body` filtra
- * pelo órgão julgador; `claim_value_min/max` pelas casas de valor da causa
- * (decimais em string, ex. "250000.00").
+ * Filtros da lista de processos — aplicados server-side via query string e
+ * sincronizados com a URL (?court=, ?degree=, ?assignee=). Os valores vêm das
+ * opções emitidas pelo BE no envelope (`filters`), nunca digitados livremente;
+ * `assignee` é o uuid interno do responsável (o label legível vem do envelope).
  */
 export interface ProcessoFilters {
-  class?: string;
-  judging_body?: string;
-  claim_value_min?: string;
-  claim_value_max?: string;
+  /** Tribunal do processo (ex.: "TJSP"). */
+  court?: string;
+  /** Grau do processo (ex.: "G1", "G2", "JE", "SUPERIOR"). */
+  degree?: string;
+  /** Id interno do responsável (assigned user) — uuid, nunca org_id/tenant_id. */
+  assignee?: string;
 }
 
 // GET /v1/processos/:id/partes — as partes do processo agrupadas por polo, para
