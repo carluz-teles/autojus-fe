@@ -44,10 +44,3 @@ export function degreeLabel(degree: ProcessoDegree): string {
 export function secrecyLabel(secrecy: ProcessoSecrecy): string {
   return SECRECY_LABEL[secrecy] ?? secrecy;
 }
-
-/** Completude 0..1 (ou 0..100) → inteiro 0..100 para a barra de progresso. */
-export function completenessPct(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) return 0;
-  const pct = value <= 1 ? value * 100 : value;
-  return Math.min(100, Math.round(pct));
-}
