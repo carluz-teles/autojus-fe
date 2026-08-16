@@ -7,17 +7,10 @@ import type { IntimacaoView } from "@/features/intimacoes/types";
 import type { PrazoView } from "@/features/prazos/types";
 import type { TaskView } from "@/features/tasks/types";
 
-// Prazo "vivo" (ainda demanda ação: OPEN/PENDING) — fonte única, reusada aqui,
-// em proxima-providencia.ts e no badge de contagem da aba Prazos do cockpit
-// (use-processo-cockpit.ts). Não duplicar este filtro (Regra nº1).
-export const LIVE_PRAZO_STATUSES: ReadonlySet<PrazoView["status"]> = new Set([
+const LIVE_PRAZO: ReadonlySet<PrazoView["status"]> = new Set([
   "OPEN",
   "PENDING",
 ]);
-
-export function isPrazoVivo(p: PrazoView): boolean {
-  return LIVE_PRAZO_STATUSES.has(p.status);
-}
 
 export interface RiscoInput {
   prazos: PrazoView[];
@@ -33,7 +26,9 @@ export interface RiscoResult {
 
 /** Prazos vivos (OPEN/PENDING) do menor days_left ao maior. */
 function livePrazosOrdered(prazos: PrazoView[]): PrazoView[] {
-  return prazos.filter(isPrazoVivo).sort((a, b) => a.days_left - b.days_left);
+  return prazos
+    .filter((p) => LIVE_PRAZO.has(p.status))
+    .sort((a, b) => a.days_left - b.days_left);
 }
 
 // Uma tarefa "cobre" um prazo quando está em aberto e aponta pro mesmo deadline.

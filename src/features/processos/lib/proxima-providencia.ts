@@ -6,7 +6,10 @@
 import type { PrazoView } from "@/features/prazos/types";
 import type { TaskView } from "@/features/tasks/types";
 
-import { isPrazoVivo } from "./risco";
+const LIVE_PRAZO: ReadonlySet<PrazoView["status"]> = new Set([
+  "OPEN",
+  "PENDING",
+]);
 
 export type ProvidenciaUrgencia = "vencido" | "urgente" | "proximo" | "normal";
 
@@ -34,7 +37,7 @@ export function computeProximaProvidencia(
   prazos: PrazoView[],
   tasks: TaskView[],
 ): ProvidenciaResult | null {
-  const live = prazos.filter(isPrazoVivo);
+  const live = prazos.filter((p) => LIVE_PRAZO.has(p.status));
   if (live.length === 0) return null;
 
   const prazo = live.reduce((menor, p) =>

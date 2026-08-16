@@ -7,7 +7,7 @@ import { usePrazosDoProcesso } from "@/features/prazos/hooks/use-prazos-do-proce
 import { useTasksDoProcesso } from "@/features/tasks/hooks/use-tasks-do-processo";
 
 import { computeProximaProvidencia } from "../lib/proxima-providencia";
-import { computeRisco, isPrazoVivo } from "../lib/risco";
+import { computeRisco } from "../lib/risco";
 import { useProcessoDetalhe } from "./use-processo-detalhe";
 
 // Contagens de tarefas derivadas no cliente (o BE não entrega o recorte).
@@ -61,20 +61,6 @@ export function useProcessoCockpit(processoId: string) {
     ).length;
   }, [intimacoes, prazos]);
 
-  // Badge da aba Intimações: contagem pela situação de triagem (user_status),
-  // o mesmo "Pendente" já usado na inbox global (lib/labels.ts USER_STATUS_LABEL).
-  const intimacoesTriagemPendente = useMemo(
-    () => intimacoes.filter((i) => i.user_status === "PENDING").length,
-    [intimacoes],
-  );
-
-  // Badge da aba Prazos: prazos "vivos" (mesmo filtro de lib/risco.ts, reusado
-  // também em lib/proxima-providencia.ts — não reinventar).
-  const prazosVivos = useMemo(
-    () => prazos.filter(isPrazoVivo).length,
-    [prazos],
-  );
-
   return {
     processo: detalhe.processo,
     isPending: detalhe.isPending,
@@ -88,10 +74,8 @@ export function useProcessoCockpit(processoId: string) {
     counts: {
       intimacoesTotal: intimacoesQ.totalCount,
       intimacoesPendentes,
-      intimacoesTriagemPendente,
       tasksAbertas: tasksCount.abertas,
       tasksAtrasadas: tasksCount.atrasadas,
-      prazosVivos,
     },
     // estados de carregamento dos blocos secundários (não bloqueiam o header)
     signalsPending:
