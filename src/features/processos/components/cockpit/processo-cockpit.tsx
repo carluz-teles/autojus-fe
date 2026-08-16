@@ -106,6 +106,7 @@ export function ProcessoCockpit({ processoId }: { processoId: string }) {
 
         <TabsContent value="resumo">
           <ResumoTab
+            processoId={processoId}
             processo={processo}
             providencia={providencia}
             risco={risco}

@@ -12,17 +12,21 @@ import type { ProvidenciaResult } from "../../lib/proxima-providencia";
 import type { RiscoResult } from "../../lib/risco";
 import type { ProcessoView } from "../../types";
 import { ProximaProvidenciaCard } from "./proxima-providencia-card";
+import { ResumoIAPanel } from "./resumo-ia-panel";
 
 // Aba "Resumo" (fiel ao design LEXIA): coluna esquerda com o "Resumo por IA"
-// (casca IAPanel, Fase 3), a "Próxima providência" DETERMINÍSTICA (real), o bloco
-// de risco (real) e "Documentos relevantes" (placeholder Fase 2); coluna direita
-// com os dados do processo (real) e o "Assistente IA" (casca IAPanel, Fase 3).
-// Nenhuma chamada de IA — os painéis IAPanel ficam em estado placeholder.
+// (REAL, consome GET /v1/processos/:id/resume), a "Próxima providência"
+// DETERMINÍSTICA (real), o bloco de risco (real) e "Documentos relevantes"
+// (placeholder Fase 2); coluna direita com os dados do processo (real) e o
+// "Assistente IA" (casca IAPanel, Fase 3). O resumo por IA é best-effort — o
+// componente trata loading/erro/degrade, o resto da aba segue renderizando.
 export function ResumoTab({
+  processoId,
   processo,
   providencia,
   risco,
 }: {
+  processoId: string;
   processo: ProcessoView;
   providencia: ProvidenciaResult | null;
   risco: RiscoResult;
@@ -30,10 +34,7 @@ export function ResumoTab({
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div className="flex flex-col gap-6 lg:col-span-2">
-        <IAPanel
-          title="Resumo do processo por IA"
-          placeholder="Um panorama do processo em linguagem natural — o que já aconteceu, onde está e o que vem a seguir. Chega na Fase 3."
-        />
+        <ResumoIAPanel processoId={processoId} />
 
         <ProximaProvidenciaCard providencia={providencia} />
 

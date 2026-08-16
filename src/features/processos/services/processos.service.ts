@@ -4,6 +4,7 @@ import type {
   PageEnvelope,
   PartesView,
   ProcessoFilters,
+  ProcessoResumoView,
   ProcessosSummary,
   ProcessoView,
 } from "../types";
@@ -64,6 +65,19 @@ export async function getProcessosSummary(
   fetcher: ApiFetcher,
 ): Promise<ProcessosSummary> {
   return fetcher<ProcessosSummary>(`${ENDPOINT}/summary`);
+}
+
+/**
+ * Resumo do processo por IA — GET /v1/processos/:id/resume. Write-once
+ * sync-on-first-GET no BE: a primeira abertura gera (chama o LLM) e persiste;
+ * as seguintes servem do cache. O :id é o court_record id (o mesmo de
+ * /processos). Slices sempre inicializados; em degrade summary="" + risks [].
+ */
+export async function getProcessoResumo(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<ProcessoResumoView> {
+  return fetcher<ProcessoResumoView>(`${ENDPOINT}/${id}/resume`);
 }
 
 /**
