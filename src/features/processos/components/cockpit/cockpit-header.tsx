@@ -82,30 +82,17 @@ export function CockpitHeader({
         </div>
       </div>
 
-      <dl className="flex flex-wrap items-baseline gap-x-2.5 gap-y-2">
+      <dl className="flex flex-wrap items-baseline gap-y-2">
         <MetaField label="Distribuição">
           {formatDate(processo.filed_at)}
         </MetaField>
-        <MetaSeparator />
         <MetaField label="Valor da causa">
           {formatClaimValueBRL(processo.claim_value)}
         </MetaField>
-        <MetaSeparator />
         <MetaField label="Grau">{degreeLabel(processo.degree)}</MetaField>
-        <MetaSeparator />
         <MetaField label="Sistema">{processo.court || "—"}</MetaField>
       </dl>
     </header>
-  );
-}
-
-// Separador visual entre os campos da metadata — linha horizontal com wrap
-// gracioso (o par label:valor nunca quebra no meio, só entre pares).
-function MetaSeparator() {
-  return (
-    <span aria-hidden="true" className="text-muted-foreground/40 select-none">
-      ·
-    </span>
   );
 }
 
@@ -117,7 +104,7 @@ function MetaField({
   children: React.ReactNode;
 }) {
   return (
-    <div className="inline-flex flex-wrap items-baseline gap-x-1.5">
+    <div className="not-first:before:text-muted-foreground/40 inline-flex flex-wrap items-baseline gap-x-1.5 not-first:before:mr-2.5 not-first:before:content-['·'] not-first:before:select-none">
       <dt className="text-muted-foreground text-xs tracking-wide uppercase">
         {label}
       </dt>

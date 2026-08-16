@@ -1,38 +1,21 @@
 "use client";
 
-import { AlertCircle, Clock, Gavel } from "lucide-react";
+import { Gavel } from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ApiError } from "@/lib/api/errors";
 import { formatDate } from "@/lib/format";
-import { cn } from "@/lib/utils";
 
 import { useIntimacoesDoProcesso } from "../hooks/use-intimacoes-do-processo";
-import { daysUntil } from "../lib/labels";
-import type { IntimacaoType, IntimacaoView } from "../types";
+import type { IntimacaoType } from "../types";
 
 const TYPE_LABEL: Record<IntimacaoType, string> = {
   INTIMACAO: "Intimação",
   CITACAO: "Citação",
   COMUNICACAO: "Comunicação",
 };
-
-// Vocabulário de urgência (ícone + cor, nunca só cor) — mesmos limiares e o
-// mesmo par ícone/tom de prazo-card.tsx (vencido = AlertCircle/destructive,
-// urgente = Clock/gold), aplicado à janela do prazo derivado da intimação
-// (deadline_start_at). Normal/sem prazo = sem ícone especial.
-type Urgencia = "vencido" | "urgente" | null;
-
-function intimacaoUrgencia(i: IntimacaoView): Urgencia {
-  if (i.status !== "ACTIVE") return null;
-  const days = daysUntil(i.deadline_start_at);
-  if (days === null) return null;
-  if (days < 0) return "vencido";
-  if (days <= 3) return "urgente";
-  return null;
-}
 
 // Aba "Intimações" do processo: tabela por processo (tipo / situação / datas /
 // teor). As colunas de IA (classificação, confiança, "crítica", providência)
@@ -94,51 +77,39 @@ export function ProcessoIntimacoes({ processoId }: { processoId: string }) {
           </tr>
         </thead>
         <tbody className="divide-y">
-          {intimacoes.map((i) => {
-            const urgencia = intimacaoUrgencia(i);
-            return (
-              <tr key={i.id} className="hover:bg-muted/40 transition-colors">
-                <td className="px-4 py-3">
-                  <Badge variant="secondary">
-                    {TYPE_LABEL[i.type] ?? i.type}
-                  </Badge>
-                </td>
-                <td className="px-4 py-3">
-                  <Badge
-                    variant={i.status === "CANCELLED" ? "outline" : "default"}
-                    className={cn(
-                      urgencia === "vencido" && "text-destructive",
-                      urgencia === "urgente" && "text-gold",
-                    )}
-                  >
-                    {urgencia === "vencido" ? (
-                      <AlertCircle />
-                    ) : urgencia === "urgente" ? (
-                      <Clock />
-                    ) : null}
-                    {i.status === "CANCELLED" ? "Cancelada" : "Ativa"}
-                  </Badge>
-                </td>
-                <td className="text-muted-foreground px-4 py-3 tabular-nums">
-                  {formatDate(i.made_available_at)}
-                </td>
-                <td className="text-muted-foreground px-4 py-3 tabular-nums">
-                  {formatDate(i.published_at)}
-                </td>
-                <td className="text-muted-foreground max-w-md px-4 py-3">
-                  <Link
-                    href={`/intimacoes/${i.id}`}
-                    className="hover:text-gold line-clamp-2 hover:underline"
-                  >
-                    {i.content_preview || "Ver intimação"}
-                  </Link>
-                </td>
-                <td className="text-muted-foreground/50 px-4 py-3 text-xs italic">
-                  Em breve
-                </td>
-              </tr>
-            );
-          })}
+          {intimacoes.map((i) => (
+            <tr key={i.id} className="hover:bg-muted/40 transition-colors">
+              <td className="px-4 py-3">
+                <Badge variant="secondary">
+                  {TYPE_LABEL[i.type] ?? i.type}
+                </Badge>
+              </td>
+              <td className="px-4 py-3">
+                <Badge
+                  variant={i.status === "CANCELLED" ? "outline" : "default"}
+                >
+                  {i.status === "CANCELLED" ? "Cancelada" : "Ativa"}
+                </Badge>
+              </td>
+              <td className="text-muted-foreground px-4 py-3 tabular-nums">
+                {formatDate(i.made_available_at)}
+              </td>
+              <td className="text-muted-foreground px-4 py-3 tabular-nums">
+                {formatDate(i.published_at)}
+              </td>
+              <td className="text-muted-foreground max-w-md px-4 py-3">
+                <Link
+                  href={`/intimacoes/${i.id}`}
+                  className="hover:text-gold line-clamp-2 hover:underline"
+                >
+                  {i.content_preview || "Ver intimação"}
+                </Link>
+              </td>
+              <td className="text-muted-foreground/50 px-4 py-3 text-xs italic">
+                Em breve
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

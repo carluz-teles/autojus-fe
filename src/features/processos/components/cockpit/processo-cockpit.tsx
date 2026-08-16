@@ -94,7 +94,10 @@ export function ProcessoCockpit({ processoId }: { processoId: string }) {
             <TabsTrigger value="intimacoes">
               Intimações
               {counts.intimacoesTriagemPendente > 0 ? (
-                <Badge variant="destructive">
+                <Badge
+                  variant="destructive"
+                  title="Intimações aguardando triagem"
+                >
                   {counts.intimacoesTriagemPendente}
                 </Badge>
               ) : null}
