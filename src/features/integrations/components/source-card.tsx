@@ -2,29 +2,24 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import {
   type Integration,
-  type PortalCredential,
   type SourceCatalogEntry,
   type SourceKind,
   STATUS_ACTIVE,
 } from "../types";
 
 // Apresentacional: um card por fonte do catálogo. Sem hooks — o panel resolve os
-// dados (integração ativa, importação em andamento, última reconciliação, ou
-// credencial de portal) e passa tudo por prop. As fontes não-ativáveis também
-// viram card: DATAJUD explica o enriquecimento automático e UPLOAD comunica o
-// roadmap. kind="credential" (TJSP eproc) usa `credential` + `action` em vez
-// de `integration` — é login/senha pessoal, não ativação por OAB.
+// dados (integração ativa, importação em andamento, última reconciliação) e passa
+// tudo por prop. As fontes não-ativáveis também viram card: DATAJUD explica o
+// enriquecimento automático e UPLOAD comunica o roadmap.
 
 const KIND_LABELS: Record<SourceKind, string> = {
   discovery: "Descoberta",
   enrichment: "Enriquecimento",
   upcoming: "Em breve",
-  credential: "Credencial",
 };
 
 function KindChip({ kind }: { kind: SourceKind }) {
@@ -35,8 +30,6 @@ function KindChip({ kind }: { kind: SourceKind }) {
         kind === "discovery" && "bg-primary/10 text-primary",
         kind === "enrichment" && "bg-sky-500/10 text-sky-700 dark:text-sky-400",
         kind === "upcoming" && "bg-muted text-muted-foreground",
-        kind === "credential" &&
-          "bg-violet-500/10 text-violet-700 dark:text-violet-400",
       )}
     >
       {KIND_LABELS[kind]}
@@ -51,7 +44,7 @@ function StatusDot({
   pulse,
   label,
 }: {
-  tone: "emerald" | "amber" | "destructive" | "muted";
+  tone: "emerald" | "amber" | "muted";
   pulse?: boolean;
   label: string;
 }) {
@@ -72,7 +65,6 @@ function StatusDot({
             "relative inline-flex size-2 rounded-full",
             tone === "emerald" && "bg-emerald-500",
             tone === "amber" && "bg-amber-500",
-            tone === "destructive" && "bg-destructive",
             tone === "muted" && "bg-muted-foreground/40",
           )}
         />
@@ -81,7 +73,6 @@ function StatusDot({
         className={cn(
           tone === "emerald" && "text-emerald-700 dark:text-emerald-400",
           tone === "amber" && "text-amber-700 dark:text-amber-500",
-          tone === "destructive" && "text-destructive",
           tone === "muted" && "text-muted-foreground",
         )}
       >
@@ -91,40 +82,12 @@ function StatusDot({
   );
 }
 
-// Deriva o dot de status da credencial de portal a partir do read model do BE.
-// null = nunca configurada. AUTH_FAILED/CAPTCHA_BLOCKED usam texto acionável —
-// a cor sozinha nunca carrega o significado.
-function credentialStatus(credential?: PortalCredential | null) {
-  if (!credential) {
-    return <StatusDot tone="muted" label="Não configurada" />;
-  }
-  switch (credential.status) {
-    case "ACTIVE":
-      return (
-        <StatusDot
-          tone="emerald"
-          label={`Conectado como ${credential.login}`}
-        />
-      );
-    case "AUTH_FAILED":
-      return <StatusDot tone="destructive" label="Login ou senha inválidos" />;
-    case "CAPTCHA_BLOCKED":
-      return (
-        <StatusDot tone="amber" label="Bloqueio do portal — tente novamente" />
-      );
-    case "DISABLED":
-      return <StatusDot tone="muted" label="Desativada" />;
-  }
-}
-
 export function SourceCard({
   entry,
   integration,
   importing,
   footer,
   termsHref,
-  credential,
-  action,
 }: {
   entry: SourceCatalogEntry;
   integration?: Integration;
@@ -134,19 +97,13 @@ export function SourceCard({
   footer?: string;
   /** Link "Gerenciar termos" (fontes de descoberta — o scope mora em /settings/termos). */
   termsHref?: string;
-  /** kind="credential": a credencial de portal atual (null = não configurada). */
-  credential?: PortalCredential | null;
-  /** kind="credential": CTA da credencial ("Configurar"/"Reconfigurar" + "Remover"). */
-  action?: React.ReactNode;
 }) {
   const active = integration?.status === STATUS_ACTIVE;
   const oab = integration?.scope.oab ?? [];
 
   const status =
     // upcoming: o chip "Em breve" já diz tudo — sem dot redundante.
-    entry.kind === "upcoming" ? null : entry.kind === "credential" ? (
-      credentialStatus(credential)
-    ) : entry.kind === "enrichment" ? (
+    entry.kind === "upcoming" ? null : entry.kind === "enrichment" ? (
       <StatusDot tone="emerald" label="Automática" />
     ) : importing ? (
       <StatusDot tone="amber" pulse label="Importando…" />
@@ -209,22 +166,6 @@ export function SourceCard({
                 <ArrowRight className="size-3" />
               </Link>
             ) : null}
-          </div>
-        ) : null}
-
-        {entry.kind === "credential" ? (
-          <div className="mt-auto flex flex-col gap-3 border-t pt-3">
-            {credential?.status === "ACTIVE" && credential.last_verified_at ? (
-              <p className="text-muted-foreground text-xs">
-                Última verificação:{" "}
-                {formatDateTime(credential.last_verified_at)}
-              </p>
-            ) : credential?.last_error ? (
-              <p className="text-destructive text-xs">
-                {credential.last_error}
-              </p>
-            ) : null}
-            {action}
           </div>
         ) : null}
 
