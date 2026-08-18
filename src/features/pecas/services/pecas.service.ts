@@ -60,6 +60,23 @@ export async function patchPeca(
   });
 }
 
+// ── Geração IA (Fatia 3) ─────────────────────────────────────────────────────
+
+/**
+ * Dispara a geração assíncrona da minuta via IA.
+ * POST /v1/pecas/:id/generate → 202 { data: { id, saga_state: "EXTRACTING" } }
+ * 409 GENERATION_IN_PROGRESS se já em andamento.
+ */
+export async function generatePeca(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<{ data: { id: string; saga_state: string } }> {
+  return fetcher<{ data: { id: string; saga_state: string } }>(
+    `${ENDPOINT}/${id}/generate`,
+    { method: "POST", body: {} },
+  );
+}
+
 // ── Anexos (Fatia 2) ─────────────────────────────────────────────────────────
 
 /**
