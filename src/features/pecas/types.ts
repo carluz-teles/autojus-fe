@@ -14,7 +14,48 @@ export type PecaStatus = "DRAFT" | "REVIEWED" | "SIGNED";
 
 /** Estado da saga de produção (espelha o CHECK da tabela draft no BE). */
 export type PecaSagaState =
-  "CREATED" | "EXTRACTING" | "REVIEWED" | "SIGNED" | "FILED" | "LABELED";
+  | "CREATED"
+  | "EXTRACTING"
+  | "REVIEWED"
+  | "SIGNED"
+  | "FILED"
+  | "LABELED"
+  | "FAILED";
+
+// ── Revisão da IA ────────────────────────────────────────────────────────────
+
+/** Categorias de sugestão da IA (cor mapeada no componente). */
+export type SuggestionCategory =
+  "Clareza" | "Argumento" | "Coerência" | "Estilo";
+
+/** Citação documental de uma sugestão. */
+export interface PecaCitation {
+  document_id: string;
+  page: number | null;
+  quote: string;
+}
+
+/** Uma sugestão da revisão da IA. */
+export interface PecaSuggestion {
+  n: number;
+  category: SuggestionCategory;
+  /** Trecho original no content da peça — usado para localizar e destacar. */
+  original: string;
+  /** Texto substituto que o advogado pode aplicar. */
+  replacement: string;
+  problem: string;
+  description: string;
+  citation?: PecaCitation;
+}
+
+/** Revisão completa retornada pela IA. */
+export interface PecaReview {
+  status: "COMPLETED" | "FAILED";
+  generated_at: string;
+  /** false = geração sem lastro documental (anexos não processados ou ausentes). */
+  grounded: boolean;
+  suggestions: PecaSuggestion[];
+}
 
 // ── Tipos de resposta do BE ─────────────────────────────────────────────────
 
@@ -80,6 +121,11 @@ export interface PecaDetalheView {
   deadline: PecaPrazoCtx | null;
   /** Fatia 2: lista de anexos — [] quando vazio, nunca null (serializado pelo BE). */
   attachments: PecaAnexo[];
+  /**
+   * Fatia 3: revisão da IA. null até a 1ª geração completa; preenchido após
+   * saga_state=REVIEWED ou FAILED.
+   */
+  review: PecaReview | null;
 }
 
 /** Resposta do PATCH /v1/pecas/:id. */

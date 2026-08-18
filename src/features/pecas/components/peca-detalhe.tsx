@@ -21,7 +21,6 @@ import {
   Paperclip,
   Plus,
   RefreshCw,
-  Sparkles,
   Strikethrough,
   Trash2,
   Underline,
@@ -51,12 +50,15 @@ import {
   ANEXO_CATEGORIAS,
   type AnexoCategoria,
   type PecaAnexo,
+  type PecaSuggestion,
 } from "@/features/pecas/types";
 import { daysLeftLabel, prazoStatusLabel } from "@/features/prazos/lib/labels";
 import type { PrazoStatus } from "@/features/prazos/types";
 import { ApiError } from "@/lib/api/errors";
 import { formatBytes, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+
+import { AssistenteIA, suggestionColor } from "./assistente-ia";
 
 // TELA REAL — Construção de Peça (/pecas/[id]).
 // Layout 3 colunas: Contexto (colapsável) | Editor (Peça/Anexos) | Assistente IA (casca).
@@ -137,6 +139,30 @@ function PecaDetalheReal({
   const [step, setStep] = useState<Step>("Construção");
   const [ctxOpen, setCtxOpen] = useState(true);
 
+  // Content levantado ao pai para que AssistenteIA possa aplicar sugestões
+  // e o EditorCol possa re-renderizar com o novo content.
+  const [content, setContent] = useState(peca.content ?? "");
+
+  // Autosave compartilhado — chamado tanto pelo editor (onChange) quanto ao
+  // aplicar sugestão.
+  const { status, savedAt, scheduleAutosave } = useAutosavePeca(
+    id,
+    peca.content ?? "",
+  );
+
+  // Hover sync editor↔painel (pelo n da sugestão).
+  const [activeSuggestionN, setActiveSuggestionN] = useState<number | null>(
+    null,
+  );
+
+  const handleApplySuggestion = useCallback(
+    (newContent: string) => {
+      setContent(newContent);
+      scheduleAutosave(newContent);
+    },
+    [scheduleAutosave],
+  );
+
   return (
     <div className="reveal flex h-[calc(100vh-4rem)] flex-col overflow-hidden">
       {/* TopBar: breadcrumb + stepper + ações */}
@@ -153,8 +179,22 @@ function PecaDetalheReal({
             peca={peca}
             ctxOpen={ctxOpen}
             onExpandCtx={() => setCtxOpen(true)}
+            content={content}
+            setContent={setContent}
+            autosaveStatus={status}
+            savedAt={savedAt}
+            scheduleAutosave={scheduleAutosave}
+            activeSuggestionN={activeSuggestionN}
+            onActivateSuggestion={setActiveSuggestionN}
           />
-          <AssistenteCol />
+          <AssistenteIA
+            pecaId={id}
+            peca={peca}
+            content={content}
+            onApplySuggestion={handleApplySuggestion}
+            activeSuggestionN={activeSuggestionN}
+            onActivateSuggestion={setActiveSuggestionN}
+          />
         </div>
       ) : (
         <PlaceholderStep step={step} onBack={() => setStep("Construção")} />
@@ -421,18 +461,27 @@ function EditorCol({
   peca,
   ctxOpen,
   onExpandCtx,
+  content,
+  setContent,
+  autosaveStatus: status,
+  savedAt,
+  scheduleAutosave,
+  activeSuggestionN,
+  onActivateSuggestion,
 }: {
   id: string;
   peca: NonNullable<ReturnType<typeof usePeca>["peca"]>;
   ctxOpen: boolean;
   onExpandCtx: () => void;
+  content: string;
+  setContent: (c: string) => void;
+  autosaveStatus: ReturnType<typeof useAutosavePeca>["status"];
+  savedAt: Date | null;
+  scheduleAutosave: (c: string) => void;
+  activeSuggestionN: number | null;
+  onActivateSuggestion: (n: number | null) => void;
 }) {
   const [tab, setTab] = useState<EditorTab>("peca");
-  const [content, setContent] = useState(peca.content ?? "");
-  const { status, savedAt, scheduleAutosave } = useAutosavePeca(
-    id,
-    peca.content ?? "",
-  );
   const anexoCount = peca.attachments?.length ?? 0;
 
   const handleChange = useCallback(
@@ -441,7 +490,7 @@ function EditorCol({
       setContent(next);
       scheduleAutosave(next);
     },
-    [scheduleAutosave],
+    [setContent, scheduleAutosave],
   );
 
   const savedAtLabel = savedAt
@@ -456,6 +505,10 @@ function EditorCol({
     .split(/\s+/)
     .filter((w) => w.length > 0).length;
   const charCount = content.length;
+
+  // Sugestões pendentes (não ignoradas — a lógica de ignoradas está no AssistenteIA).
+  // Aqui só precisamos de saber quais originais existem no content p/ SugBlock.
+  const suggestions: PecaSuggestion[] = peca.review?.suggestions ?? [];
 
   return (
     <section
@@ -533,6 +586,16 @@ function EditorCol({
               Falha ao salvar — tentando novamente na próxima alteração.
             </div>
           ) : null}
+
+          {/* Barra de sugestões no editor (quando há sugestões com match no content) */}
+          {suggestions.length > 0 && (
+            <SuggestionsEditorBar
+              suggestions={suggestions}
+              content={content}
+              activeSuggestionN={activeSuggestionN}
+              onActivate={onActivateSuggestion}
+            />
+          )}
 
           {/* Editor */}
           <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
@@ -929,35 +992,70 @@ function EditorTabBtn({
   );
 }
 
-// ── Coluna Assistente IA (casca) ─────────────────────────────────────────────
+// ── Barra de sugestões no editor ─────────────────────────────────────────────
+// O editor é um textarea plano (sem highlight inline). Esta barra conecta as
+// sugestões ao texto: cada chip (número + cor da categoria) sincroniza o hover
+// com o painel e, ao clicar, SELECIONA o trecho `original` no textarea (rola até
+// ele). Só mostra sugestões cujo original ainda casa no content.
 
-function AssistenteCol() {
+function SuggestionsEditorBar({
+  suggestions,
+  content,
+  activeSuggestionN,
+  onActivate,
+}: {
+  suggestions: PecaSuggestion[];
+  content: string;
+  activeSuggestionN: number | null;
+  onActivate: (n: number | null) => void;
+}) {
+  const pending = suggestions.filter((s) => content.includes(s.original));
+  if (pending.length === 0) return null;
+
+  const selectOriginal = (original: string) => {
+    const ta = document.getElementById("peca-content");
+    if (!(ta instanceof HTMLTextAreaElement)) return;
+    const idx = content.indexOf(original);
+    if (idx < 0) return;
+    ta.focus();
+    ta.setSelectionRange(idx, idx + original.length);
+  };
+
   return (
-    <section
-      aria-label="Assistente IA"
-      className="bg-card ring-foreground/10 flex w-80 shrink-0 flex-col rounded-xl shadow-sm ring-1"
-    >
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="bg-gold/15 text-gold flex size-6 items-center justify-center rounded-md">
-            <Sparkles className="size-3.5" aria-hidden />
-          </span>
-          <h2 className="font-display text-sm leading-none">Assistente IA</h2>
-        </div>
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6">
-        <span className="bg-gold/10 text-gold flex size-12 items-center justify-center rounded-full">
-          <Sparkles className="size-5" aria-hidden />
-        </span>
-        <p className="text-muted-foreground text-center text-sm leading-relaxed">
-          O Assistente IA chega na próxima fatia — aqui ele vai sugerir
-          melhorias, citar os autos e responder dúvidas sobre a peça.
-        </p>
-        <span className="border-gold/40 bg-gold/[0.06] text-gold rounded-full border px-2.5 py-0.5 text-xs font-medium">
-          Próxima fatia
-        </span>
-      </div>
-    </section>
+    <div className="bg-muted/20 flex flex-wrap items-center gap-1.5 border-b px-3 py-2">
+      <span className="text-muted-foreground mr-1 text-xs font-medium">
+        {pending.length} sugest{pending.length !== 1 ? "ões" : "ão"} da IA:
+      </span>
+      {pending.map((s) => {
+        const c = suggestionColor(s.category);
+        const active = activeSuggestionN === s.n;
+        return (
+          <button
+            key={s.n}
+            type="button"
+            onMouseEnter={() => onActivate(s.n)}
+            onMouseLeave={() => onActivate(null)}
+            onClick={() => selectOriginal(s.original)}
+            aria-label={`Sugestão ${s.n}: ${s.category} — ir ao trecho no texto`}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full border py-0.5 pr-2 pl-0.5 text-xs transition-shadow",
+              active ? c.ring : "border-transparent",
+            )}
+          >
+            <span
+              className={cn(
+                "flex size-4 items-center justify-center rounded-full text-[0.6rem] font-semibold",
+                c.num,
+              )}
+              aria-hidden
+            >
+              {s.n}
+            </span>
+            <span className="text-foreground">{s.category}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
