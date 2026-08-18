@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 
 import { useChatThread, useSendChat } from "../hooks/use-chat-peca";
 import { useGeneratePeca } from "../hooks/use-generate-peca";
+import { useReviewPeca } from "../hooks/use-review-peca";
 import type {
   PecaDetalheView,
   PecaReview,
@@ -177,28 +178,40 @@ export function AssistenteIA({
   onActivateSuggestion,
 }: AssistenteIAProps) {
   const { generate, isPending: isGenerating } = useGeneratePeca(pecaId);
+  const {
+    review: triggerReview,
+    isPending: isReviewing,
+    isConflict: reviewConflict,
+    isValidation: reviewValidation,
+    reset: resetReview,
+  } = useReviewPeca(pecaId);
   const [ignoredNs, setIgnoredNs] = useState<Set<number>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const sagaState = peca.saga_state;
   const review: PecaReview | null = peca.review ?? null;
 
-  // Botão "Gerar com IA" deve aparecer em CREATED / REVIEWED / FAILED / SIGNED /
-  // FILED / LABELED — qualquer estado terminal onde não está gerando.
-  const canGenerate = sagaState !== "EXTRACTING" && !isGenerating;
+  // Geração em andamento: saga EXTRACTING ou mutation pendente.
   const isExtracting = sagaState === "EXTRACTING" || isGenerating;
+  // Revisão em andamento: mutation pendente (POST /review é síncrono).
+  const isBusyReview = isReviewing;
+  // Pode gerar/regenerar: não está extraindo nem revisando.
+  const canGenerate = !isExtracting && !isBusyReview;
+  // Pode revisar: minuta existe (DRAFTED ou REVIEWED) e não está ocupado.
+  const canReview =
+    (sagaState === "DRAFTED" || sagaState === "REVIEWED") &&
+    !isExtracting &&
+    !isBusyReview;
+
   const hasContent = content.trim().length > 0;
 
   function handleGenerateClick() {
-    if (hasContent && review === null) {
-      // Content existe mas sem review anterior → só confirma se houver content
-      // e ainda não houve geração (pra não perder rascunho manual).
-      setConfirmOpen(true);
-    } else if (hasContent && review !== null) {
-      // Já teve geração → regenerar também exige confirmação.
+    // Limpa erro de revisão anterior ao regenerar.
+    resetReview();
+    if (hasContent) {
+      // Content existe → confirmar para não perder rascunho/review.
       setConfirmOpen(true);
     } else {
-      // Editor vazio → dispara direto.
       generate();
     }
   }
@@ -208,29 +221,47 @@ export function AssistenteIA({
     generate();
   }
 
+  function handleReviewClick() {
+    resetReview();
+    triggerReview();
+  }
+
   function handleIgnore(n: number) {
     setIgnoredNs((prev) => new Set(prev).add(n));
   }
 
   function handleApply(sug: PecaSuggestion) {
-    // Substitui o original pelo replacement no content atual.
     const newContent = content.replace(sug.original, sug.replacement);
     onApplySuggestion(newContent);
-    // A sugestão some naturalmente pois original não casa mais no novo content.
   }
+
+  // Rótulo do header quando ocupado.
+  const headerBusyLabel = isExtracting
+    ? "Gerando…"
+    : isBusyReview
+      ? "Revisando…"
+      : null;
+
+  // Mensagem de erro amigável da revisão.
+  const reviewErrorMsg = reviewConflict
+    ? "Aguarde a geração terminar antes de revisar."
+    : reviewValidation
+      ? "Gere a minuta antes de revisar."
+      : null;
 
   return (
     <>
-      {/* Dialog de confirmação (base-ui Dialog — mesma lib do Sheet) */}
+      {/* Dialog de confirmação para gerar/regenerar */}
       <Dialog.Root open={confirmOpen} onOpenChange={setConfirmOpen}>
         <Dialog.Portal>
           <Dialog.Backdrop className="bg-foreground/25 fixed inset-0 z-40 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
           <Dialog.Popup className="bg-card text-card-foreground fixed top-1/2 left-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl border p-6 shadow-2xl transition-all duration-200 outline-none data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
             <Dialog.Title className="font-display text-lg leading-tight">
-              Gerar com IA?
+              {sagaState === "CREATED" ? "Gerar com IA?" : "Regenerar com IA?"}
             </Dialog.Title>
             <Dialog.Description className="text-muted-foreground mt-2 text-sm leading-relaxed">
-              A IA vai ler os autos e {review ? "regenerar" : "gerar"} a minuta,
+              A IA vai ler os autos e{" "}
+              {sagaState === "CREATED" ? "gerar" : "regenerar"} a minuta,
               substituindo o conteúdo atual do editor. Esta ação não pode ser
               desfeita.
             </Dialog.Description>
@@ -240,7 +271,7 @@ export function AssistenteIA({
               </Dialog.Close>
               <Button size="sm" onClick={handleConfirmGenerate}>
                 <Sparkles data-icon="inline-start" />
-                {review ? "Regenerar" : "Gerar"}
+                {sagaState === "CREATED" ? "Gerar" : "Regenerar"}
               </Button>
             </div>
           </Dialog.Popup>
@@ -263,12 +294,12 @@ export function AssistenteIA({
             </span>
             <h2 className="font-display text-sm leading-none">Assistente IA</h2>
           </div>
-          {isExtracting && (
+          {headerBusyLabel && (
             <span
               aria-live="polite"
               className="text-muted-foreground animate-pulse text-xs"
             >
-              Gerando…
+              {headerBusyLabel}
             </span>
           )}
         </div>
@@ -293,7 +324,7 @@ export function AssistenteIA({
               </p>
             </div>
           ) : sagaState === "FAILED" && review === null ? (
-            /* Estado FAILED sem review anterior */
+            /* FAILED sem review anterior — falha na geração */
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
               <span
                 className="bg-destructive/10 text-destructive flex size-12 items-center justify-center rounded-full"
@@ -315,8 +346,16 @@ export function AssistenteIA({
                 Tentar de novo
               </Button>
             </div>
+          ) : sagaState === "DRAFTED" && review === null ? (
+            /* DRAFTED — minuta no editor, ainda não revisada */
+            <DraftedPanel
+              isBusyReview={isBusyReview}
+              reviewErrorMsg={reviewErrorMsg}
+              canReview={canReview}
+              onReview={handleReviewClick}
+            />
           ) : review !== null ? (
-            /* Estado REVIEWED (ou FAILED com review prévia — mostra última revisão) */
+            /* REVIEWED / FAILED com review prévia — mostra painel de sugestões */
             <ReviewPanel
               review={review}
               content={content}
@@ -327,9 +366,13 @@ export function AssistenteIA({
               onIgnore={handleIgnore}
               onRegenerate={() => setConfirmOpen(true)}
               canRegenerate={canGenerate}
+              isBusyReview={isBusyReview}
+              canReview={canReview}
+              reviewErrorMsg={reviewErrorMsg}
+              onReview={handleReviewClick}
             />
           ) : (
-            /* Estado inicial — CREATED / REVIEWED com editor vazio */
+            /* Estado inicial — CREATED */
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
               <span
                 className="bg-gold/10 text-gold flex size-12 items-center justify-center rounded-full"
@@ -345,7 +388,7 @@ export function AssistenteIA({
           )}
         </div>
 
-        {/* Footer: botão Gerar */}
+        {/* Footer: botão Gerar/Regenerar */}
         <div className="border-t p-3">
           <Button
             className="w-full"
@@ -357,9 +400,9 @@ export function AssistenteIA({
             <Sparkles data-icon="inline-start" />
             {isExtracting
               ? "Gerando…"
-              : review
-                ? "Regenerar com IA"
-                : "Gerar com IA"}
+              : sagaState === "CREATED"
+                ? "Gerar com IA"
+                : "Regenerar com IA"}
           </Button>
         </div>
 
@@ -367,6 +410,56 @@ export function AssistenteIA({
         <ChatPanel pecaId={pecaId} pecaHasProcess={!!peca.process} />
       </section>
     </>
+  );
+}
+
+// ── Painel DRAFTED (minuta gerada, ainda não revisada) ────────────────────────
+
+function DraftedPanel({
+  isBusyReview,
+  reviewErrorMsg,
+  canReview,
+  onReview,
+}: {
+  isBusyReview: boolean;
+  reviewErrorMsg: string | null;
+  canReview: boolean;
+  onReview: () => void;
+}) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
+      <span
+        className="bg-gold/10 text-gold flex size-12 items-center justify-center rounded-full"
+        aria-hidden
+      >
+        <Sparkles className="size-5" />
+      </span>
+      <p className="text-muted-foreground text-center text-sm leading-relaxed">
+        Minuta gerada. Revise o texto no editor e use &ldquo;Revisar com
+        IA&rdquo; para receber sugestões de melhoria.
+      </p>
+
+      {/* Erro amigável da revisão */}
+      {reviewErrorMsg && (
+        <p
+          role="alert"
+          className="border-destructive/30 bg-destructive/[0.06] text-destructive w-full rounded-lg border px-3 py-2 text-center text-xs"
+        >
+          {reviewErrorMsg}
+        </p>
+      )}
+
+      <Button
+        className="w-full"
+        size="sm"
+        onClick={onReview}
+        disabled={!canReview}
+        aria-busy={isBusyReview}
+      >
+        <Sparkles data-icon="inline-start" className="text-gold" />
+        {isBusyReview ? "Revisando…" : "Revisar com IA"}
+      </Button>
+    </div>
   );
 }
 
@@ -382,6 +475,10 @@ function ReviewPanel({
   onIgnore,
   onRegenerate,
   canRegenerate,
+  isBusyReview,
+  canReview,
+  reviewErrorMsg,
+  onReview,
 }: {
   review: PecaReview;
   content: string;
@@ -392,16 +489,37 @@ function ReviewPanel({
   onIgnore: (n: number) => void;
   onRegenerate: () => void;
   canRegenerate: boolean;
+  isBusyReview: boolean;
+  canReview: boolean;
+  reviewErrorMsg: string | null;
+  onReview: () => void;
 }) {
   const pending = review.suggestions.filter((s) => !ignoredNs.has(s.n));
   const pendingCount = pending.filter((s) =>
     content.includes(s.original),
   ).length;
+  const reviewFailed = review.status === "FAILED";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+      {/* Revisão FAILED — aviso + botão de tentar de novo */}
+      {reviewFailed && (
+        <div
+          role="alert"
+          className="border-destructive/30 bg-destructive/[0.06] flex items-start gap-2 rounded-lg border px-3 py-2 text-xs"
+        >
+          <TriangleAlert
+            className="text-destructive mt-0.5 size-3.5 shrink-0"
+            aria-hidden
+          />
+          <span className="text-destructive">
+            A revisão falhou. Tente novamente.
+          </span>
+        </div>
+      )}
+
       {/* Aviso grounded=false */}
-      {!review.grounded && (
+      {!reviewFailed && !review.grounded && (
         <div
           role="note"
           className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-3 py-2 text-xs"
@@ -416,40 +534,66 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* Resumo */}
-      <p className="text-muted-foreground text-sm leading-relaxed">
-        Encontrei{" "}
-        <span className="text-foreground font-medium">
-          {pendingCount} sugest{pendingCount !== 1 ? "ões" : "ão"}
-        </span>{" "}
-        para fortalecer a peça. Cada uma aponta para o trecho no editor:
-      </p>
+      {/* Resumo e cards — só quando a revisão completou */}
+      {!reviewFailed && (
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          Encontrei{" "}
+          <span className="text-foreground font-medium">
+            {pendingCount} sugest{pendingCount !== 1 ? "ões" : "ão"}
+          </span>{" "}
+          para fortalecer a peça. Cada uma aponta para o trecho no editor:
+        </p>
+      )}
 
       {/* Cards das sugestões */}
-      <div className="flex flex-col gap-2.5">
-        {review.suggestions.map((sug) => {
-          const ignored = ignoredNs.has(sug.n);
-          const stale = !content.includes(sug.original);
-          const applied = !ignored && stale;
-          return (
-            <SugCard
-              key={sug.n}
-              suggestion={sug}
-              ignored={ignored}
-              stale={stale && !ignored}
-              applied={applied}
-              active={activeSuggestionN === sug.n}
-              onEnter={() => onActivate(sug.n)}
-              onLeave={() => onActivate(null)}
-              onApply={() => onApply(sug)}
-              onIgnore={() => onIgnore(sug.n)}
-            />
-          );
-        })}
-      </div>
+      {!reviewFailed && (
+        <div className="flex flex-col gap-2.5">
+          {review.suggestions.map((sug) => {
+            const ignored = ignoredNs.has(sug.n);
+            const stale = !content.includes(sug.original);
+            const applied = !ignored && stale;
+            return (
+              <SugCard
+                key={sug.n}
+                suggestion={sug}
+                ignored={ignored}
+                stale={stale && !ignored}
+                applied={applied}
+                active={activeSuggestionN === sug.n}
+                onEnter={() => onActivate(sug.n)}
+                onLeave={() => onActivate(null)}
+                onApply={() => onApply(sug)}
+                onIgnore={() => onIgnore(sug.n)}
+              />
+            );
+          })}
+        </div>
+      )}
 
-      {/* Link regenerar */}
-      <div className="pt-1">
+      {/* Ações pós-revisão: re-revisar + regenerar */}
+      <div className="flex flex-col gap-2 pt-1">
+        {/* Erro amigável da revisão */}
+        {reviewErrorMsg && (
+          <p
+            role="alert"
+            className="border-destructive/30 bg-destructive/[0.06] text-destructive rounded-lg border px-3 py-2 text-center text-xs"
+          >
+            {reviewErrorMsg}
+          </p>
+        )}
+
+        <Button
+          className="w-full"
+          size="sm"
+          variant="outline"
+          onClick={onReview}
+          disabled={!canReview}
+          aria-busy={isBusyReview}
+        >
+          <Sparkles data-icon="inline-start" className="text-gold" />
+          {isBusyReview ? "Revisando…" : "Revisar com IA"}
+        </Button>
+
         <button
           type="button"
           onClick={onRegenerate}

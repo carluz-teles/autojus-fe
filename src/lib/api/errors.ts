@@ -53,7 +53,22 @@ const KNOWN_KINDS: ReadonlySet<string> = new Set<ApiErrorKind>([
   "UNKNOWN",
 ]);
 
+// O BE (lib/apperr) serializa seus Kind com nomes próprios que nem sempre batem
+// 1:1 com os nossos ApiErrorKind semânticos. Mapeia os divergentes. O caso crítico
+// é KindInvalid ("DOMAIN_ERROR_INVALID"), que vem em HTTP 400 — status sem fallback
+// abaixo, então sem este alias viraria "UNKNOWN" e as mensagens de validação
+// (ex.: "Gere a minuta antes de revisar") não apareceriam. Os demais também
+// recuperariam pelo status, mas mapear pelo kind é mais robusto.
+const BE_KIND_ALIASES: Record<string, ApiErrorKind> = {
+  DOMAIN_ERROR_INVALID: "VALIDATION",
+  AUTHENTICATION_ERROR: "UNAUTHENTICATED",
+  AUTHORIZATION_ERROR: "FORBIDDEN",
+  INFRA_ERROR: "INTERNAL",
+  SERVICE_UNAVAILABLE: "INTERNAL",
+};
+
 function normalizeKind(kind: string | undefined, status: number): ApiErrorKind {
+  if (kind && BE_KIND_ALIASES[kind]) return BE_KIND_ALIASES[kind];
   if (kind && KNOWN_KINDS.has(kind)) return kind as ApiErrorKind;
   if (status === 401) return "UNAUTHENTICATED";
   if (status === 403) return "FORBIDDEN";

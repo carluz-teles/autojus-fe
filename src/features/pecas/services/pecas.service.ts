@@ -9,6 +9,7 @@ import type {
   PecaChatThread,
   PecaCriadaView,
   PecaDetalheView,
+  PecaReviewResponse,
   PecaSalvaView,
   PecasSummary,
   PecaView,
@@ -78,6 +79,22 @@ export async function generatePeca(
     `${ENDPOINT}/${id}/generate`,
     { method: "POST", body: {} },
   );
+}
+
+/**
+ * Dispara revisão síncrona da minuta pela IA.
+ * POST /v1/pecas/:id/review (sem body) → 200 { data: PecaReviewResponse }
+ * 409 = saga EXTRACTING (gerar em andamento — aguardar).
+ * 422 = draft.content vazio ou IA não configurada.
+ */
+export async function reviewPeca(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<{ data: PecaReviewResponse }> {
+  return fetcher<{ data: PecaReviewResponse }>(`${ENDPOINT}/${id}/review`, {
+    method: "POST",
+    body: {},
+  });
 }
 
 // ── Chat IA (Fatia 3b) ───────────────────────────────────────────────────────
