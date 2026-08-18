@@ -2,6 +2,7 @@
 
 import { CheckCircle2, ExternalLink, History, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
@@ -16,6 +17,7 @@ import { RowActions } from "@/components/ui/row-actions";
 import { SheetField, SheetSection } from "@/components/ui/sheet";
 import { intimacaoTone, StatusBadge } from "@/components/ui/status-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCreatePeca } from "@/features/pecas/hooks/use-create-peca";
 import { ConfirmarPrazo } from "@/features/prazos/components/confirmar-prazo";
 import { usePrazoDaIntimacao } from "@/features/prazos/hooks/use-prazo-da-intimacao";
 import { formatDate } from "@/lib/format";
@@ -41,10 +43,23 @@ export function IntimacaoDetalhe({
 }: {
   intimacao: IntimacaoDetalheView;
 }) {
+  const router = useRouter();
   const { resolve } = useIntimacaoActions();
+  const { createPecaAsync, isPending: isPecaPending } = useCreatePeca();
   const statusLabel = userStatusLabel(intimacao.user_status);
   const isResolved = intimacao.user_status === "RESOLVED";
   const deadlineDays = daysLeftLabel(intimacao.deadline_start_at);
+
+  const handlePeticionar = () => {
+    void createPecaAsync(
+      { source: "intimation", intimation_id: intimacao.id },
+      {
+        onSuccess: (res) => {
+          router.push(`/pecas/${res.data.id}`);
+        },
+      },
+    );
+  };
 
   const breadcrumb = useMemo(
     () => [
@@ -79,8 +94,19 @@ export function IntimacaoDetalhe({
                 <CheckCircle2 />
                 {isResolved ? "Resolvida" : "Marcar como resolvida"}
               </Button>
-              <Button variant="outline" size="sm" disabled>
-                <Sparkles /> Gerar manifestação com IA
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isResolved || isPecaPending}
+                aria-label={
+                  isResolved
+                    ? "Intimação já resolvida — peticionamento indisponível"
+                    : "Peticionar — abrir editor de peça para esta intimação"
+                }
+                title={isResolved ? "Intimação já resolvida" : undefined}
+                onClick={handlePeticionar}
+              >
+                <Sparkles /> {isPecaPending ? "Criando peça…" : "Peticionar"}
               </Button>
               <RowActions
                 label="Mais ações"

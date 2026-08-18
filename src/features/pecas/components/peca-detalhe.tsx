@@ -1,224 +1,649 @@
 "use client";
 
 import {
-  ArrowRight,
-  Copy,
+  AlignLeft,
+  Bold,
+  Building2,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
   FileText,
-  GitCompare,
-  History,
-  ListChecks,
-  MoreVertical,
+  Gavel,
+  Italic,
+  Link2,
+  List,
+  ListOrdered,
+  PanelLeftClose,
+  PanelLeftOpen,
   Paperclip,
-  PenLine,
-  ScrollText,
   Sparkles,
-  Trash2,
-  Wand2,
+  Strikethrough,
+  Underline,
 } from "lucide-react";
-import { useMemo } from "react";
+import Link from "next/link";
+import { useCallback, useMemo, useState } from "react";
 
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DetailBody,
-  DetailHeader,
-  DetailLayout,
-} from "@/components/ui/detail-layout";
-import { EmptyState } from "@/components/ui/empty-state";
-import { RowActions } from "@/components/ui/row-actions";
-import { SheetField } from "@/components/ui/sheet";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { useAutosavePeca } from "@/features/pecas/hooks/use-autosave-peca";
+import { usePeca } from "@/features/pecas/hooks/use-peca";
+import { daysLeftLabel, prazoStatusLabel } from "@/features/prazos/lib/labels";
+import type { PrazoStatus } from "@/features/prazos/types";
+import { ApiError } from "@/lib/api/errors";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-// TELA 2 — Detalhe da Peça (deep-link /pecas/[id]) no design LEXIA. CASCA: o
-// backend de Peças é FASE 4 e ainda NÃO existe, então todos os campos são
-// placeholder "Fase 4" (sem dado real), o "Abrir editor" é desabilitado e o painel
-// lateral "Ações rápidas com IA" lista ações DESABILITADAS. Componente = binding.
+// TELA REAL — Construção de Peça (/pecas/[id]).
+// Layout 3 colunas: Contexto (colapsável) | Editor (Peça/Anexos) | Assistente IA (casca).
+// Dados vindos do GET /v1/pecas/:id; autosave via PATCH /v1/pecas/:id.
+// Stepper: Construção (ativa) · Assinatura · Protocolo (cascas navegáveis).
 
-// Ações rápidas com IA do design — todas DESABILITADAS (Fase 4).
-const IA_ACTIONS: { label: string; icon: typeof Wand2 }[] = [
-  { label: "Melhorar redação", icon: Wand2 },
-  { label: "Sugerir fundamentos", icon: ScrollText },
-  { label: "Verificar coerência", icon: ListChecks },
-  { label: "Comparar com peça anterior", icon: GitCompare },
-  { label: "Gerar pedidos", icon: FileText },
+const STEPS = ["Construção", "Assinatura", "Protocolo"] as const;
+type Step = (typeof STEPS)[number];
+
+const TOOLBAR_ICONS = [
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  AlignLeft,
+  List,
+  ListOrdered,
+  Link2,
 ];
 
+// ── Componente público ───────────────────────────────────────────────────────
+
 export function PecaDetalhe({ id }: { id: string }) {
-  // Sem BE (Fase 4): derivamos só um código legível do id da rota para o
-  // breadcrumb/título. Nenhum dado de peça é buscado ou fabricado.
-  const code = codeFromId(id);
+  const { peca, isPending, isError, error } = usePeca(id);
+
+  const notFound =
+    error instanceof ApiError && error.kind === "ENTITY_NOT_FOUND";
 
   const breadcrumb = useMemo(
-    () => [{ label: "Peças", href: "/pecas" }, { label: code }],
-    [code],
+    () => [
+      { label: "Peticionamento", href: "/pecas" },
+      {
+        label: peca
+          ? `Processo ${peca.process?.cnj_number ?? "—"}`
+          : isPending
+            ? "Carregando…"
+            : "Peça",
+      },
+    ],
+    [peca, isPending],
   );
   useSetBreadcrumb(breadcrumb);
 
+  if (isPending) return <PecaDetalheSkeleton />;
+
+  if (isError || !peca) {
+    return (
+      <div className="reveal flex flex-col gap-4">
+        <h1 className="font-display text-2xl leading-none tracking-tight">
+          {notFound ? "Peça não encontrada" : "Erro ao carregar"}
+        </h1>
+        <p className="text-muted-foreground text-sm">
+          {notFound
+            ? "Ela pode ter sido removida ou o link está incorreto."
+            : error instanceof ApiError
+              ? error.message
+              : "Tente novamente em instantes."}
+        </p>
+        <Link href="/pecas" className="text-gold text-sm hover:underline">
+          Voltar para as peças
+        </Link>
+      </div>
+    );
+  }
+
+  return <PecaDetalheReal id={id} peca={peca} />;
+}
+
+// ── Layout real da Construção ────────────────────────────────────────────────
+
+function PecaDetalheReal({
+  id,
+  peca,
+}: {
+  id: string;
+  peca: NonNullable<ReturnType<typeof usePeca>["peca"]>;
+}) {
+  const [step, setStep] = useState<Step>("Construção");
+  const [ctxOpen, setCtxOpen] = useState(true);
+
   return (
-    <DetailLayout
-      header={
-        <DetailHeader
-          title={code}
-          status={<StatusBadge label="Rascunho" tone="neutral" />}
-          subtitle={
-            <span className="inline-flex items-center gap-2">
-              Casca do design — o conteúdo desta peça chega na Fase 4.
-              <Badge variant="outline">Prévia · Fase 4</Badge>
-            </span>
-          }
-          actions={
-            <>
-              {/* Placeholder: o editor de minutas chega na Fase 4. */}
-              <Button size="sm" disabled title="Chega na Fase 4">
-                <PenLine /> Abrir editor
-              </Button>
-              <RowActions
-                label="Mais ações"
-                items={[
-                  { label: "Duplicar", icon: Copy, disabled: true },
-                  { label: "Anexar arquivo", icon: Paperclip, disabled: true },
-                  {
-                    label: "Arquivar",
-                    icon: Trash2,
-                    destructive: true,
-                    disabled: true,
-                  },
-                ]}
-              />
-            </>
-          }
-        />
-      }
-    >
-      <DetailBody
-        aside={
-          <>
-            <section className="bg-card ring-foreground/10 flex flex-col gap-4 rounded-xl p-5 shadow-sm ring-1">
-              <header className="flex items-center gap-2">
-                <span className="bg-primary/10 text-primary flex size-8 items-center justify-center rounded-lg">
-                  <Sparkles className="size-4" />
-                </span>
-                <h3 className="font-display text-base leading-none">
-                  Ações rápidas com IA
-                </h3>
-              </header>
-              <p className="text-muted-foreground text-xs leading-relaxed">
-                Refine a minuta com a IA a partir dos autos. Disponível quando a
-                produção de peças chegar na Fase 4.
-              </p>
-              <ul className="flex flex-col gap-1.5">
-                {IA_ACTIONS.map((a) => (
-                  <li key={a.label}>
-                    <button
-                      type="button"
-                      disabled
-                      title="Chega na Fase 4"
-                      className={cn(
-                        "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm",
-                        "text-muted-foreground cursor-not-allowed opacity-60",
-                      )}
-                    >
-                      <a.icon className="size-4 shrink-0" />
-                      {a.label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <span className="border-gold/40 bg-gold/[0.06] text-gold w-fit rounded-full border px-2.5 py-0.5 text-xs font-medium">
-                Chega na Fase 4
-              </span>
-            </section>
+    <div className="reveal flex h-[calc(100vh-4rem)] flex-col overflow-hidden">
+      {/* TopBar: breadcrumb + stepper + ações */}
+      <PecaTopBar peca={peca} step={step} onStep={setStep} />
 
-            <section className="bg-card ring-foreground/10 flex flex-col gap-3 rounded-xl p-5 text-sm shadow-sm ring-1">
-              <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                Próximo passo
-              </p>
-              <p className="text-foreground/85 leading-relaxed">
-                Continuar a edição no editor de minutas.
-              </p>
-              {/* Placeholder: editor chega na Fase 4. */}
-              <Button
-                variant="outline"
-                size="sm"
-                disabled
-                title="Chega na Fase 4"
-                className="w-full"
-              >
-                Abrir editor <ArrowRight />
-              </Button>
-            </section>
-          </>
-        }
-      >
-        <Tabs defaultValue="detalhes">
-          <TabsList aria-label="Abas da peça">
-            <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
-            <TabsTrigger value="versoes">Versões</TabsTrigger>
-            <TabsTrigger value="anexos">Anexos</TabsTrigger>
-            <TabsTrigger value="historico">Histórico</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="detalhes" className="mt-4">
-            <div className="flex flex-col gap-6">
-              <dl className="bg-card ring-foreground/10 rounded-xl p-5 shadow-sm ring-1">
-                <SheetField label="Origem">Fase 4</SheetField>
-                <SheetField label="Processo">Fase 4</SheetField>
-                <SheetField label="Prazo relacionado">Fase 4</SheetField>
-                <SheetField label="Status">Fase 4</SheetField>
-                <SheetField label="Versão">Fase 4</SheetField>
-                <SheetField label="Responsável">Fase 4</SheetField>
-              </dl>
-
-              <EmptyState
-                icon={FileText}
-                title="Conteúdo da peça chega na Fase 4"
-                description="As informações da minuta (origem, prazo relacionado, status e versão) aparecem aqui quando a produção de peças com IA estiver disponível."
-                phase="Chega na Fase 4"
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="versoes" className="mt-4">
-            <EmptyState
-              icon={History}
-              title="Histórico de versões chega na Fase 4"
-              description="Cada revisão da minuta — quem alterou, quando e o quê — será listada aqui."
-              phase="Chega na Fase 4"
-            />
-          </TabsContent>
-
-          <TabsContent value="anexos" className="mt-4">
-            <EmptyState
-              icon={Paperclip}
-              title="Anexos chegam na Fase 4"
-              description="Documentos e arquivos vinculados à peça aparecem aqui."
-              phase="Chega na Fase 4"
-            />
-          </TabsContent>
-
-          <TabsContent value="historico" className="mt-4">
-            <EmptyState
-              icon={MoreVertical}
-              title="Histórico chega na Fase 4"
-              description="As mudanças de status e os eventos desta peça serão registrados aqui."
-              phase="Chega na Fase 4"
-            />
-          </TabsContent>
-        </Tabs>
-      </DetailBody>
-    </DetailLayout>
+      {/* Corpo */}
+      {step === "Construção" ? (
+        <div className="flex min-h-0 flex-1 gap-3 pt-3">
+          {ctxOpen ? (
+            <ContextoCol peca={peca} onCollapse={() => setCtxOpen(false)} />
+          ) : null}
+          <EditorCol
+            id={id}
+            peca={peca}
+            ctxOpen={ctxOpen}
+            onExpandCtx={() => setCtxOpen(true)}
+          />
+          <AssistenteCol />
+        </div>
+      ) : (
+        <PlaceholderStep step={step} onBack={() => setStep("Construção")} />
+      )}
+    </div>
   );
 }
 
-// Deriva um código legível "PEC-XXXX" do id da rota — só para o título/breadcrumb
-// da casca. Não é dado de peça; é apenas o eco do parâmetro da URL.
-function codeFromId(id: string): string {
-  const head = id
-    .replace(/[^a-zA-Z0-9]/g, "")
-    .slice(0, 4)
-    .toUpperCase();
-  return `PEC-${head || "0000"}`;
+// ── TopBar ───────────────────────────────────────────────────────────────────
+
+function PecaTopBar({
+  peca,
+  step,
+  onStep,
+}: {
+  peca: NonNullable<ReturnType<typeof usePeca>["peca"]>;
+  step: Step;
+  onStep: (s: Step) => void;
+}) {
+  return (
+    <header className="bg-card/70 shrink-0 rounded-xl border px-5 py-3 backdrop-blur">
+      {/* Breadcrumb */}
+      <nav
+        aria-label="Peticionamento"
+        className="text-muted-foreground mb-2 flex items-center gap-1.5 text-sm"
+      >
+        <span>Peticionamento</span>
+        <ChevronRight className="size-3.5 opacity-60" aria-hidden />
+        <span className="text-foreground font-medium tabular-nums">
+          Processo {peca.process?.cnj_number ?? "—"}
+        </span>
+      </nav>
+
+      {/* Stepper */}
+      <ol className="flex items-center gap-1">
+        {STEPS.map((label, i) => {
+          const active = label === step;
+          const done = STEPS.indexOf(label) < STEPS.indexOf(step);
+          return (
+            <li key={label} className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => onStep(label)}
+                className={cn(
+                  "flex items-center gap-2 rounded-full px-3 py-1 text-sm transition-colors",
+                  active
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                aria-current={active ? "step" : undefined}
+              >
+                <span
+                  className={cn(
+                    "flex size-5 items-center justify-center rounded-full text-xs font-medium",
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : done
+                        ? "bg-primary/15 text-primary"
+                        : "border-muted-foreground/30 border",
+                  )}
+                  aria-hidden
+                >
+                  {i + 1}
+                </span>
+                {label}
+              </button>
+              {i < STEPS.length - 1 ? (
+                <span className="bg-border mx-1 h-px w-6" aria-hidden />
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+    </header>
+  );
+}
+
+// ── Coluna Contexto ──────────────────────────────────────────────────────────
+
+function ContextoCol({
+  peca,
+  onCollapse,
+}: {
+  peca: NonNullable<ReturnType<typeof usePeca>["peca"]>;
+  onCollapse: () => void;
+}) {
+  const { intimation, process, deadline } = peca;
+
+  const deadlineLabel = deadline
+    ? prazoStatusLabel(deadline.status as PrazoStatus, deadline.days_left)
+    : null;
+
+  // O BE clampa days_left em 0 — nunca negativo; urgente = vence hoje/amanhã.
+  const isUrgent = deadline && deadline.days_left <= 1;
+  const isWarning = deadline && !isUrgent && deadline.days_left <= 3;
+
+  return (
+    <section
+      aria-label="Contexto da peça"
+      className="bg-card ring-foreground/10 flex w-64 shrink-0 flex-col rounded-xl shadow-sm ring-1"
+    >
+      <div className="flex items-center justify-between border-b px-4 py-3">
+        <h2 className="font-display text-sm leading-none">Contexto da peça</h2>
+        <button
+          type="button"
+          onClick={onCollapse}
+          aria-label="Recolher contexto"
+          className="text-muted-foreground hover:bg-muted hover:text-foreground -mr-1 rounded-md p-1"
+        >
+          <PanelLeftClose className="size-4" aria-hidden />
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-4 overflow-y-auto p-4">
+        {/* Tipo de peça */}
+        <CtxField label="Tipo de peça">
+          <span className="flex items-center gap-1.5">
+            <FileText className="text-muted-foreground size-3.5" aria-hidden />
+            {peca.piece_type || "—"}
+          </span>
+        </CtxField>
+
+        {/* Intimação */}
+        <CtxField label="Intimação">
+          {intimation ? (
+            <>
+              <p className="text-primary text-sm font-medium">
+                {intimation.type}
+              </p>
+              {intimation.content ? (
+                <p className="text-muted-foreground mt-0.5 line-clamp-4 text-xs leading-relaxed">
+                  {intimation.content}
+                </p>
+              ) : (
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  Sem teor disponível.
+                </p>
+              )}
+            </>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </CtxField>
+
+        {/* Prazo */}
+        {deadline ? (
+          <div
+            className={cn(
+              "flex items-center gap-2 rounded-lg border px-3 py-2",
+              isUrgent
+                ? "border-destructive/40 bg-destructive/[0.06]"
+                : isWarning
+                  ? "border-amber-500/40 bg-amber-500/[0.06]"
+                  : "border-border bg-muted/30",
+            )}
+            role="status"
+            aria-label={`Prazo: ${formatDate(deadline.end_date)}, ${daysLeftLabel(deadline.days_left)}`}
+          >
+            <Clock
+              className={cn(
+                "size-3.5 shrink-0",
+                isUrgent
+                  ? "text-destructive"
+                  : isWarning
+                    ? "text-amber-600"
+                    : "text-muted-foreground",
+              )}
+              aria-hidden
+            />
+            <div className="text-xs">
+              <span className="text-muted-foreground">Prazo: </span>
+              <span
+                className={cn(
+                  "font-medium tabular-nums",
+                  isUrgent
+                    ? "text-destructive"
+                    : isWarning
+                      ? "text-amber-600 dark:text-amber-400"
+                      : "text-foreground",
+                )}
+              >
+                {formatDate(deadline.end_date)}
+              </span>
+              <span className="text-muted-foreground">
+                {" "}
+                ({daysLeftLabel(deadline.days_left)})
+              </span>
+              {deadlineLabel ? (
+                <span
+                  className={cn(
+                    "ml-1 font-medium",
+                    isUrgent
+                      ? "text-destructive"
+                      : isWarning
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-muted-foreground",
+                  )}
+                >
+                  · {deadlineLabel}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <CtxField label="Prazo">
+            <span className="text-muted-foreground">—</span>
+          </CtxField>
+        )}
+
+        {/* Processo */}
+        <CtxField label="Processo">
+          <span className="tabular-nums">{process?.cnj_number ?? "—"}</span>
+          {process?.class ? (
+            <p className="text-muted-foreground text-xs">{process.class}</p>
+          ) : null}
+          {process?.subject ? (
+            <p className="text-muted-foreground text-xs">{process.subject}</p>
+          ) : null}
+        </CtxField>
+
+        {/* Órgão julgador */}
+        <CtxField label="Órgão julgador">
+          <span className="flex items-center gap-1.5">
+            <Gavel className="text-muted-foreground size-3.5" aria-hidden />
+            {process?.judging_body || "—"}
+          </span>
+        </CtxField>
+
+        {/* Tribunal */}
+        <CtxField label="Tribunal">
+          <span className="flex items-center gap-1.5">
+            <Building2 className="text-muted-foreground size-3.5" aria-hidden />
+            {process?.court || "—"}
+          </span>
+        </CtxField>
+      </div>
+    </section>
+  );
+}
+
+function CtxField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-muted-foreground text-[0.7rem] font-medium tracking-wide uppercase">
+        {label}
+      </p>
+      <div className="text-foreground text-sm">{children}</div>
+    </div>
+  );
+}
+
+// ── Coluna Editor ────────────────────────────────────────────────────────────
+
+type EditorTab = "peca" | "anexos";
+
+function EditorCol({
+  id,
+  peca,
+  ctxOpen,
+  onExpandCtx,
+}: {
+  id: string;
+  peca: NonNullable<ReturnType<typeof usePeca>["peca"]>;
+  ctxOpen: boolean;
+  onExpandCtx: () => void;
+}) {
+  const [tab, setTab] = useState<EditorTab>("peca");
+  const [content, setContent] = useState(peca.content ?? "");
+  const { status, savedAt, scheduleAutosave } = useAutosavePeca(
+    id,
+    peca.content ?? "",
+  );
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const next = e.target.value;
+      setContent(next);
+      scheduleAutosave(next);
+    },
+    [scheduleAutosave],
+  );
+
+  const savedAtLabel = savedAt
+    ? savedAt.toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
+
+  const wordCount = content
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 0).length;
+  const charCount = content.length;
+
+  return (
+    <section
+      aria-label="Editor da peça"
+      className="bg-card ring-foreground/10 flex min-w-0 flex-1 flex-col rounded-xl shadow-sm ring-1"
+    >
+      {/* Aba header — botões custom (underline) sem depender do TabsList do DS */}
+      <div
+        role="tablist"
+        aria-label="Abas do editor"
+        className="flex items-center gap-1 border-b px-3"
+      >
+        {!ctxOpen ? (
+          <button
+            type="button"
+            onClick={onExpandCtx}
+            aria-label="Abrir contexto"
+            className="text-muted-foreground hover:bg-muted hover:text-foreground mr-1 flex size-7 items-center justify-center rounded-md"
+          >
+            <PanelLeftOpen className="size-4" aria-hidden />
+          </button>
+        ) : null}
+        <EditorTabBtn active={tab === "peca"} onClick={() => setTab("peca")}>
+          <FileText className="size-3.5" aria-hidden />
+          Peça
+        </EditorTabBtn>
+        <EditorTabBtn
+          active={tab === "anexos"}
+          onClick={() => setTab("anexos")}
+        >
+          <Paperclip className="size-3.5" aria-hidden />
+          Anexos
+        </EditorTabBtn>
+      </div>
+
+      {/* Aba Peça */}
+      {tab === "peca" ? (
+        <>
+          {/* Toolbar cosmética */}
+          <div
+            className="flex flex-wrap items-center gap-1 border-b px-3 py-2"
+            aria-hidden
+          >
+            {TOOLBAR_ICONS.map((Icon, i) => (
+              <button
+                key={i}
+                type="button"
+                tabIndex={-1}
+                aria-hidden
+                className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-7 items-center justify-center rounded-md"
+              >
+                <Icon className="size-3.5" />
+              </button>
+            ))}
+          </div>
+
+          {/* Autosave error banner */}
+          {status === "error" ? (
+            <div
+              role="alert"
+              aria-live="polite"
+              className="bg-destructive/[0.06] text-destructive border-b px-4 py-2 text-xs"
+            >
+              Falha ao salvar — tentando novamente na próxima alteração.
+            </div>
+          ) : null}
+
+          {/* Editor */}
+          <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
+            <label htmlFor="peca-content" className="sr-only">
+              Conteúdo da peça
+            </label>
+            <Textarea
+              id="peca-content"
+              value={content}
+              onChange={handleChange}
+              placeholder="Comece a redigir a peça…"
+              className="min-h-full resize-none border-none shadow-none outline-none focus-visible:border-none focus-visible:ring-0"
+              aria-label="Conteúdo da peça"
+            />
+          </div>
+
+          {/* Rodapé: contadores + autosave */}
+          <div
+            className="text-muted-foreground flex items-center justify-between border-t px-4 py-2 text-xs"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <span className="tabular-nums">
+              {wordCount} palavra{wordCount !== 1 ? "s" : ""} · {charCount}{" "}
+              caractere{charCount !== 1 ? "s" : ""}
+            </span>
+            <span>
+              {status === "saving"
+                ? "Salvando…"
+                : status === "saved" && savedAtLabel
+                  ? `Salvo às ${savedAtLabel}`
+                  : status === "error"
+                    ? "Falha ao salvar"
+                    : ""}
+            </span>
+          </div>
+        </>
+      ) : (
+        /* Aba Anexos — placeholder */
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-8">
+          <Paperclip
+            className="text-muted-foreground size-10 opacity-40"
+            aria-hidden
+          />
+          <p className="text-muted-foreground text-center text-sm">
+            Anexos chegam na próxima fatia.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function EditorTabBtn({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        "-mb-px flex items-center gap-1.5 border-b-2 px-2 py-3 text-sm font-medium transition-colors",
+        active
+          ? "border-primary text-foreground"
+          : "text-muted-foreground hover:text-foreground border-transparent",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ── Coluna Assistente IA (casca) ─────────────────────────────────────────────
+
+function AssistenteCol() {
+  return (
+    <section
+      aria-label="Assistente IA"
+      className="bg-card ring-foreground/10 flex w-80 shrink-0 flex-col rounded-xl shadow-sm ring-1"
+    >
+      <div className="flex items-center justify-between border-b px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="bg-gold/15 text-gold flex size-6 items-center justify-center rounded-md">
+            <Sparkles className="size-3.5" aria-hidden />
+          </span>
+          <h2 className="font-display text-sm leading-none">Assistente IA</h2>
+        </div>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6">
+        <span className="bg-gold/10 text-gold flex size-12 items-center justify-center rounded-full">
+          <Sparkles className="size-5" aria-hidden />
+        </span>
+        <p className="text-muted-foreground text-center text-sm leading-relaxed">
+          O Assistente IA chega na próxima fatia — aqui ele vai sugerir
+          melhorias, citar os autos e responder dúvidas sobre a peça.
+        </p>
+        <span className="border-gold/40 bg-gold/[0.06] text-gold rounded-full border px-2.5 py-0.5 text-xs font-medium">
+          Próxima fatia
+        </span>
+      </div>
+    </section>
+  );
+}
+
+// ── Placeholders das etapas casca ────────────────────────────────────────────
+
+function PlaceholderStep({ step, onBack }: { step: Step; onBack: () => void }) {
+  return (
+    <div className="reveal mt-6 flex flex-col items-center gap-4">
+      <div className="bg-card ring-foreground/10 flex max-w-md flex-col items-center gap-4 rounded-xl p-10 text-center shadow-sm ring-1">
+        <Calendar
+          className="text-muted-foreground size-10 opacity-40"
+          aria-hidden
+        />
+        <h2 className="font-display text-xl leading-tight">
+          Etapa {step} chega em breve
+        </h2>
+        <p className="text-muted-foreground text-sm">
+          A etapa de {step.toLowerCase()} será implementada na próxima fatia.
+        </p>
+        <Button variant="outline" size="sm" onClick={onBack}>
+          <ChevronLeft data-icon="inline-start" />
+          Voltar à Construção
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Skeleton ─────────────────────────────────────────────────────────────────
+
+function PecaDetalheSkeleton() {
+  return (
+    <div className="reveal flex flex-col gap-4">
+      <div className="bg-muted h-4 w-56 animate-pulse rounded" />
+      <div className="bg-muted h-8 w-72 animate-pulse rounded" />
+      <div className="bg-muted mt-2 h-9 w-80 animate-pulse rounded-lg" />
+      <div className="bg-muted mt-2 h-96 w-full animate-pulse rounded-xl" />
+    </div>
+  );
 }
