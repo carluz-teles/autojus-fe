@@ -92,17 +92,14 @@ export function prazoTone(status: string): StatusTone {
   }
 }
 
-/** Peça: Em produção=info, Em revisão=warning, Protocolada=success, Rascunho/Arquivada=neutral. */
+/** Peça: Assinada=success, Revisada=info, Rascunho=neutral. Mapeia os rótulos pt-BR de PecaStatus. */
 export function pecaTone(status: string): StatusTone {
   switch (norm(status)) {
-    case "em producao":
-      return "info";
-    case "em revisao":
-      return "warning";
-    case "protocolada":
+    case "assinada":
       return "success";
+    case "revisada":
+      return "info";
     case "rascunho":
-    case "arquivada":
       return "neutral";
     default:
       return "neutral";
