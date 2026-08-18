@@ -78,6 +78,8 @@ export interface PecaDetalheView {
   intimation?: PecaIntimacaoCtx;
   process?: PecaProcessoCtx;
   deadline: PecaPrazoCtx | null;
+  /** Fatia 2: lista de anexos — [] quando vazio, nunca null (serializado pelo BE). */
+  attachments: PecaAnexo[];
 }
 
 /** Resposta do PATCH /v1/pecas/:id. */
@@ -85,6 +87,53 @@ export interface PecaSalvaView {
   id: string;
   title: string;
   updated_at: string;
+}
+
+// ── Anexos da Peça ───────────────────────────────────────────────────────────
+
+/** Categorias válidas de anexo (6 opções + default "Outro"). */
+export type AnexoCategoria =
+  | "Procuração"
+  | "Comprovante de endereço"
+  | "Contrato"
+  | "Provas documentais"
+  | "Declaração de hipossuficiência"
+  | "Outro";
+
+export const ANEXO_CATEGORIAS: AnexoCategoria[] = [
+  "Procuração",
+  "Comprovante de endereço",
+  "Contrato",
+  "Provas documentais",
+  "Declaração de hipossuficiência",
+  "Outro",
+];
+
+/**
+ * Item de anexo — espelha o attachment_item do BE.
+ * GET /v1/pecas/:id retorna `data.attachments: PecaAnexo[]` ([] quando vazio, nunca null).
+ */
+export interface PecaAnexo {
+  id: string;
+  document_id: string;
+  name: string;
+  category: AnexoCategoria | null;
+  mime_type: string | null;
+  size_bytes: number | null;
+  status: string;
+  position: number;
+  created_at: string;
+}
+
+/** Body do POST /v1/pecas/:id/anexos. */
+export interface AttachDocumentoInput {
+  document_id: string;
+  category?: AnexoCategoria;
+}
+
+/** Body do PATCH /v1/pecas/:id/anexos/:attachmentId. */
+export interface UpdateAnexoCategoriaInput {
+  category: AnexoCategoria;
 }
 
 // ── Inputs ──────────────────────────────────────────────────────────────────

@@ -8,7 +8,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Eye,
   FileText,
+  FileUp,
   Gavel,
   Italic,
   Link2,
@@ -17,22 +19,43 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Paperclip,
+  Plus,
+  RefreshCw,
   Sparkles,
   Strikethrough,
+  Trash2,
   Underline,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  useCategorizarAnexo,
+  usePrevisualizarAnexo,
+  useRemoverAnexo,
+  useUploadAnexo,
+  validarTamanhoAnexo,
+} from "@/features/pecas/hooks/use-anexos-peca";
 import { useAutosavePeca } from "@/features/pecas/hooks/use-autosave-peca";
 import { usePeca } from "@/features/pecas/hooks/use-peca";
+import {
+  ANEXO_CATEGORIAS,
+  type AnexoCategoria,
+  type PecaAnexo,
+} from "@/features/pecas/types";
 import { daysLeftLabel, prazoStatusLabel } from "@/features/prazos/lib/labels";
 import type { PrazoStatus } from "@/features/prazos/types";
 import { ApiError } from "@/lib/api/errors";
-import { formatDate } from "@/lib/format";
+import { formatBytes, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 // TELA REAL — Construção de Peça (/pecas/[id]).
@@ -410,6 +433,7 @@ function EditorCol({
     id,
     peca.content ?? "",
   );
+  const anexoCount = peca.attachments?.length ?? 0;
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -464,6 +488,17 @@ function EditorCol({
         >
           <Paperclip className="size-3.5" aria-hidden />
           Anexos
+          <span
+            className={cn(
+              "rounded-full px-1.5 text-[0.65rem] font-semibold tabular-nums",
+              tab === "anexos"
+                ? "bg-primary/15 text-primary"
+                : "bg-muted text-muted-foreground",
+            )}
+            aria-label={`${anexoCount} anexo${anexoCount !== 1 ? "s" : ""}`}
+          >
+            {anexoCount}
+          </span>
         </EditorTabBtn>
       </div>
 
@@ -536,18 +571,334 @@ function EditorCol({
           </div>
         </>
       ) : (
-        /* Aba Anexos — placeholder */
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-8">
-          <Paperclip
-            className="text-muted-foreground size-10 opacity-40"
-            aria-hidden
-          />
-          <p className="text-muted-foreground text-center text-sm">
-            Anexos chegam na próxima fatia.
-          </p>
-        </div>
+        <AnexosTab pecaId={id} anexos={peca.attachments ?? []} />
       )}
     </section>
+  );
+}
+
+// ── Aba Anexos (real) ────────────────────────────────────────────────────────
+
+/**
+ * Mensagem de erro legível para falha de validação de tamanho.
+ */
+function erroTamanho(reason: "vazio" | "muito_grande", name: string): string {
+  if (reason === "vazio") return `"${name}" está vazio e não pode ser enviado.`;
+  return `"${name}" excede 50 MB e não pode ser enviado.`;
+}
+
+function AnexosTab({
+  pecaId,
+  anexos,
+}: {
+  pecaId: string;
+  anexos: PecaAnexo[];
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const {
+    enviarAnexo,
+    isUploading,
+    uploadError,
+    progress,
+    reset: resetUpload,
+  } = useUploadAnexo(pecaId);
+
+  const categorizarMutation = useCategorizarAnexo(pecaId);
+  const removerMutation = useRemoverAnexo(pecaId);
+  const previsualizarMutation = usePrevisualizarAnexo();
+
+  // Progresso diferido para não bloquear interações durante atualização de %
+  const deferredProgress = useDeferredValue(progress);
+
+  function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    const valid = validarTamanhoAnexo(file);
+    if (!valid.ok) {
+      setValidationError(erroTamanho(valid.reason, file.name));
+      return;
+    }
+    setValidationError(null);
+    resetUpload();
+    enviarAnexo(file);
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    handleFiles(e.dataTransfer.files);
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-auto px-6 py-6">
+        <div className="mx-auto flex max-w-[46rem] flex-col gap-4">
+          <div>
+            <h3 className="font-display text-lg leading-none">
+              Documentos anexos
+            </h3>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Serão protocolados junto com a peça, na ordem abaixo.
+            </p>
+          </div>
+
+          {/* Dropzone */}
+          <div
+            role="group"
+            aria-label="Área de upload de anexos"
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+          >
+            <button
+              type="button"
+              disabled={isUploading}
+              onClick={() => inputRef.current?.click()}
+              aria-label="Selecionar arquivo para anexar"
+              aria-describedby={
+                validationError
+                  ? "anexo-validation-error"
+                  : uploadError
+                    ? "anexo-upload-error"
+                    : undefined
+              }
+              className={cn(
+                "border-border hover:border-primary/40 hover:bg-primary/[0.02] flex w-full flex-col items-center gap-2 rounded-xl border border-dashed px-6 py-8 text-center transition-colors",
+                isUploading && "cursor-not-allowed opacity-60",
+              )}
+            >
+              <span
+                className="bg-primary/10 text-primary flex size-10 items-center justify-center rounded-full"
+                aria-hidden
+              >
+                <FileUp className="size-5" />
+              </span>
+              <p className="text-sm font-medium">
+                {isUploading
+                  ? "Enviando…"
+                  : "Arraste arquivos aqui ou clique para enviar"}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                PDF, imagens, DOCX — máximo 50 MB por arquivo
+              </p>
+            </button>
+            <input
+              ref={inputRef}
+              type="file"
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+          </div>
+
+          {/* Progresso de upload */}
+          {isUploading && deferredProgress !== null ? (
+            <div
+              role="progressbar"
+              aria-valuenow={deferredProgress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Enviando: ${deferredProgress}%`}
+              className="flex flex-col gap-1.5"
+            >
+              <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
+                <div
+                  className="bg-primary h-full rounded-full transition-all"
+                  style={{ width: `${deferredProgress}%` }}
+                />
+              </div>
+              <p className="text-muted-foreground text-right text-xs tabular-nums">
+                {deferredProgress}%
+              </p>
+            </div>
+          ) : null}
+
+          {/* Erro de validação */}
+          {validationError ? (
+            <p
+              id="anexo-validation-error"
+              role="alert"
+              className="text-destructive text-sm"
+            >
+              {validationError}
+            </p>
+          ) : null}
+
+          {/* Erro de upload */}
+          {uploadError ? (
+            <div
+              id="anexo-upload-error"
+              role="alert"
+              className="bg-destructive/[0.06] text-destructive border-destructive/30 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+            >
+              <span className="flex-1">
+                Falha ao enviar:{" "}
+                {uploadError instanceof Error
+                  ? uploadError.message
+                  : "Tente novamente."}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  resetUpload();
+                  setValidationError(null);
+                }}
+                aria-label="Dispensar erro de upload"
+                className="hover:bg-destructive/10 rounded-md p-1"
+              >
+                <RefreshCw className="size-3.5" />
+              </button>
+            </div>
+          ) : null}
+
+          {/* Lista de anexos */}
+          {anexos.length > 0 ? (
+            <ul className="flex flex-col gap-2" aria-label="Anexos adicionados">
+              {anexos.map((anexo, i) => (
+                <AnexoItem
+                  key={anexo.id}
+                  index={i}
+                  anexo={anexo}
+                  onCategorizar={(categoria) =>
+                    categorizarMutation.mutate({
+                      attachmentId: anexo.id,
+                      category: categoria,
+                    })
+                  }
+                  onPrevisualizar={() =>
+                    previsualizarMutation.mutate(anexo.document_id)
+                  }
+                  onRemover={() => removerMutation.mutate(anexo.id)}
+                  isRemoving={removerMutation.isPending}
+                  isPreviewing={previsualizarMutation.isPending}
+                />
+              ))}
+            </ul>
+          ) : !isUploading ? (
+            <p className="text-muted-foreground text-center text-sm">
+              Nenhum anexo adicionado ainda.
+            </p>
+          ) : null}
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            disabled={isUploading}
+            onClick={() => inputRef.current?.click()}
+          >
+            <Plus data-icon="inline-start" />
+            Adicionar documento
+          </Button>
+        </div>
+      </div>
+
+      {/* Rodapé */}
+      <div
+        className="text-muted-foreground flex items-center justify-between border-t px-4 py-2 text-xs"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <span className="tabular-nums">
+          {isUploading
+            ? "Enviando…"
+            : `${anexos.length} documento${anexos.length !== 1 ? "s" : ""} anexado${anexos.length !== 1 ? "s" : ""}`}
+        </span>
+        <span>A IA usa estes anexos como fonte ao redigir a peça.</span>
+      </div>
+    </div>
+  );
+}
+
+function AnexoItem({
+  index,
+  anexo,
+  onCategorizar,
+  onPrevisualizar,
+  onRemover,
+  isRemoving,
+  isPreviewing,
+}: {
+  index: number;
+  anexo: PecaAnexo;
+  onCategorizar: (cat: AnexoCategoria) => void;
+  onPrevisualizar: () => void;
+  onRemover: () => void;
+  isRemoving: boolean;
+  isPreviewing: boolean;
+}) {
+  return (
+    <li className="hover:bg-muted/30 flex items-center gap-3 rounded-xl border p-3 transition-colors">
+      {/* Número de ordem */}
+      <span
+        className="text-muted-foreground w-4 shrink-0 text-center text-xs tabular-nums"
+        aria-hidden
+      >
+        {index + 1}
+      </span>
+
+      {/* Ícone */}
+      <span
+        className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-rose-500/10 text-rose-500"
+        aria-hidden
+      >
+        <FileText className="size-4" />
+      </span>
+
+      {/* Nome + tamanho */}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium" title={anexo.name}>
+          {anexo.name}
+        </p>
+        <p className="text-muted-foreground text-xs tabular-nums">
+          {formatBytes(anexo.size_bytes)}
+        </p>
+      </div>
+
+      {/* Select de categoria */}
+      <label htmlFor={`categoria-${anexo.id}`} className="sr-only">
+        Categoria do anexo {anexo.name}
+      </label>
+      <select
+        id={`categoria-${anexo.id}`}
+        value={anexo.category ?? "Outro"}
+        onChange={(e) => onCategorizar(e.target.value as AnexoCategoria)}
+        className="border-input bg-card text-foreground focus:ring-ring rounded-md border px-2 py-1 text-xs outline-none focus:ring-1"
+      >
+        {ANEXO_CATEGORIAS.map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
+
+      {/* Pré-visualizar */}
+      <button
+        type="button"
+        onClick={onPrevisualizar}
+        disabled={isPreviewing}
+        aria-label={`Pré-visualizar ${anexo.name} em nova aba`}
+        className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-8 items-center justify-center rounded-md disabled:opacity-50"
+      >
+        <Eye className="size-4" aria-hidden />
+      </button>
+
+      {/* Remover */}
+      <button
+        type="button"
+        onClick={onRemover}
+        disabled={isRemoving}
+        aria-label={`Remover ${anexo.name}`}
+        className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex size-8 items-center justify-center rounded-md disabled:opacity-50"
+      >
+        <Trash2 className="size-4" aria-hidden />
+      </button>
+    </li>
   );
 }
 
