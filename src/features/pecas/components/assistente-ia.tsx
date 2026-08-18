@@ -1,19 +1,13 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import {
-  Check,
-  ExternalLink,
-  FileText,
-  RotateCcw,
-  Sparkles,
-  TriangleAlert,
-} from "lucide-react";
-import { useState } from "react";
+import { Check, RotateCcw, Sparkles, TriangleAlert } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { useChatThread, useSendChat } from "../hooks/use-chat-peca";
 import { useGeneratePeca } from "../hooks/use-generate-peca";
 import type {
   PecaDetalheView,
@@ -21,6 +15,9 @@ import type {
   PecaSuggestion,
   SuggestionCategory,
 } from "../types";
+import { ChatComposer } from "./chat-composer";
+import { ChatMessage } from "./chat-message";
+import { CitationLink } from "./citation-link";
 
 // ── Mapa de cores das categorias ──────────────────────────────────────────────
 
@@ -364,21 +361,10 @@ export function AssistenteIA({
                 ? "Regenerar com IA"
                 : "Gerar com IA"}
           </Button>
-
-          {/* Chat placeholder (F3b) */}
-          <div className="mt-2">
-            <button
-              type="button"
-              disabled
-              aria-disabled="true"
-              className="border-input text-muted-foreground flex w-full cursor-not-allowed items-center gap-2 rounded-lg border px-3 py-2 text-sm opacity-50"
-            >
-              <span className="flex-1 text-left">
-                Chat com a IA… (em breve)
-              </span>
-            </button>
-          </div>
         </div>
+
+        {/* Chat (F3b) */}
+        <ChatPanel pecaId={pecaId} pecaHasProcess={!!peca.process} />
       </section>
     </>
   );
@@ -549,23 +535,10 @@ function SugCard({
 
       {/* Citação documental */}
       {!ignored && suggestion.citation && (
-        <a
-          href={`/api/v1/documentos/${suggestion.citation.document_id}/download`}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Ver documento citado (${suggestion.citation.quote.slice(0, 40)}…)`}
-          className={cn(
-            "mt-2 flex items-center gap-1.5 text-xs hover:underline",
-            c.text,
-          )}
-        >
-          <FileText className="size-3 shrink-0" aria-hidden />
-          <span className="line-clamp-1">{suggestion.citation.quote}</span>
-          <ExternalLink
-            className="ml-auto size-3 shrink-0 opacity-60"
-            aria-hidden
-          />
-        </a>
+        <CitationLink
+          citation={suggestion.citation}
+          className={cn("mt-2", c.text)}
+        />
       )}
 
       {/* Ações */}
@@ -610,5 +583,151 @@ function SugCard({
         )}
       </div>
     </article>
+  );
+}
+
+// ── ChatPanel (Fatia 3b) ──────────────────────────────────────────────────────
+
+function ChatPanel({
+  pecaId,
+  pecaHasProcess,
+}: {
+  pecaId: string;
+  /** Fallback enquanto o thread ainda não carregou (thread === null). */
+  pecaHasProcess: boolean;
+}) {
+  const { thread, isPending: isLoadingThread } = useChatThread(pecaId);
+
+  // thread?.grounded_capable é a fonte autoritativa (GET /chat).
+  // pecaHasProcess é usado apenas enquanto o thread ainda não chegou,
+  // evitando que o banner apareça/desapareça erroneamente por race condition.
+  const grounded_capable =
+    thread !== null ? thread.grounded_capable : pecaHasProcess;
+  const {
+    sendMessage,
+    isPending: isSending,
+    isError: hasSendError,
+    reset: resetSend,
+    lastQuestion,
+  } = useSendChat(pecaId);
+
+  // Scroll automático para a última mensagem ao atualizar o thread.
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  const messages = thread?.messages ?? [];
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length]);
+
+  function handleSend(question: string) {
+    resetSend();
+    sendMessage(question);
+  }
+
+  function handleRetry() {
+    if (lastQuestion) {
+      resetSend();
+      sendMessage(lastQuestion);
+    }
+  }
+
+  return (
+    <div
+      role="region"
+      aria-label="Chat com Assistente IA"
+      className="flex flex-col border-t"
+    >
+      {/* Banner: peça sem processo → grounding indisponível */}
+      {!grounded_capable && (
+        <div
+          role="note"
+          className="flex items-start gap-2 border-b bg-amber-500/[0.04] px-3 py-2 text-xs"
+        >
+          <TriangleAlert
+            className="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+            aria-hidden
+          />
+          <span className="text-amber-700 dark:text-amber-300">
+            Sem processo vinculado — respostas sem citação dos autos.
+          </span>
+        </div>
+      )}
+
+      {/* Área de mensagens com scroll interno */}
+      <div
+        role="list"
+        className="flex max-h-72 min-h-0 flex-col gap-3 overflow-y-auto p-3"
+        aria-live="polite"
+        aria-label="Histórico do chat"
+      >
+        {/* Estado de carregamento do thread */}
+        {isLoadingThread && (
+          <p className="text-muted-foreground text-center text-xs">
+            Carregando histórico…
+          </p>
+        )}
+
+        {/* Estado vazio */}
+        {!isLoadingThread && messages.length === 0 && (
+          <p className="text-muted-foreground text-center text-xs leading-relaxed">
+            Faça uma pergunta sobre os autos ou a peça.
+          </p>
+        )}
+
+        {/* Mensagens */}
+        {messages.map((msg) => (
+          <ChatMessage key={msg.id} message={msg} />
+        ))}
+
+        {/* Indicador de envio (spinner visual) */}
+        {isSending && (
+          <div className="flex items-start gap-2.5">
+            <span
+              className="bg-gold/15 text-gold mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md"
+              aria-hidden
+            >
+              <Sparkles className="size-3.5 animate-pulse" />
+            </span>
+            <span className="text-muted-foreground bg-muted/50 rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm">
+              Analisando…
+            </span>
+          </div>
+        )}
+
+        {/* Banner de erro */}
+        {hasSendError && !isSending && (
+          <div
+            role="alert"
+            className="border-destructive/30 bg-destructive/[0.06] flex flex-col gap-2 rounded-lg border px-3 py-2 text-xs"
+          >
+            <span className="text-destructive">
+              Não foi possível obter uma resposta. Verifique a conexão.
+            </span>
+            {lastQuestion && (
+              <button
+                type="button"
+                onClick={handleRetry}
+                className="text-destructive w-fit font-medium underline underline-offset-2"
+              >
+                Tentar novamente
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Âncora de scroll */}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Composer fixo no rodapé */}
+      <div className="border-t p-3">
+        <ChatComposer
+          onSend={handleSend}
+          disabled={isSending}
+          refocusWhenEnabled
+        />
+      </div>
+    </div>
   );
 }

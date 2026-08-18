@@ -5,11 +5,14 @@ import type {
   CreatePecaInput,
   PatchPecaInput,
   PecaAnexo,
+  PecaChatMessage,
+  PecaChatThread,
   PecaCriadaView,
   PecaDetalheView,
   PecaSalvaView,
   PecasSummary,
   PecaView,
+  SendChatInput,
   UpdateAnexoCategoriaInput,
 } from "../types";
 
@@ -75,6 +78,36 @@ export async function generatePeca(
     `${ENDPOINT}/${id}/generate`,
     { method: "POST", body: {} },
   );
+}
+
+// ── Chat IA (Fatia 3b) ───────────────────────────────────────────────────────
+
+/**
+ * Carrega o histórico do chat grounded.
+ * GET /v1/pecas/:id/chat → { data: PecaChatThread }
+ * Mensagens em ordem ASC (até 50).
+ */
+export async function getChat(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<{ data: PecaChatThread }> {
+  return fetcher<{ data: PecaChatThread }>(`${ENDPOINT}/${id}/chat`);
+}
+
+/**
+ * Envia uma pergunta ao assistente IA.
+ * POST /v1/pecas/:id/chat → { data: PecaChatMessage }
+ * 422 = IA não configurada.
+ */
+export async function sendChat(
+  fetcher: ApiFetcher,
+  id: string,
+  input: SendChatInput,
+): Promise<{ data: PecaChatMessage }> {
+  return fetcher<{ data: PecaChatMessage }>(`${ENDPOINT}/${id}/chat`, {
+    method: "POST",
+    body: input,
+  });
 }
 
 // ── Anexos (Fatia 2) ─────────────────────────────────────────────────────────

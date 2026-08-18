@@ -182,6 +182,32 @@ export interface UpdateAnexoCategoriaInput {
   category: AnexoCategoria;
 }
 
+// ── Chat com IA (Fatia 3b) ───────────────────────────────────────────────────
+
+/** Uma mensagem do thread de chat com a IA. */
+export interface PecaChatMessage {
+  id: string;
+  draft_id: string;
+  role: "user" | "assistant";
+  content: string;
+  citations: PecaCitation[];
+  grounded: boolean;
+  model_version?: string;
+  created_at: string;
+}
+
+/** Thread completo — GET /v1/pecas/:id/chat. */
+export interface PecaChatThread {
+  messages: PecaChatMessage[];
+  /** false = peça sem processo vinculado → respostas sem citação documental. */
+  grounded_capable: boolean;
+}
+
+/** Body do POST /v1/pecas/:id/chat. */
+export interface SendChatInput {
+  question: string;
+}
+
 // ── Inputs ──────────────────────────────────────────────────────────────────
 
 /** Body do POST /v1/pecas. */
