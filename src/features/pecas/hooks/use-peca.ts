@@ -10,6 +10,7 @@ import type { PecaDetalheView, PecaSagaState } from "../types";
 /** Estados de saga que encerram o polling (terminais). */
 const TERMINAL_SAGA_STATES: PecaSagaState[] = [
   "CREATED",
+  "DRAFTED",
   "REVIEWED",
   "SIGNED",
   "FILED",

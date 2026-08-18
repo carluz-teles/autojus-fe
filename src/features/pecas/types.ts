@@ -16,6 +16,7 @@ export type PecaStatus = "DRAFT" | "REVIEWED" | "SIGNED";
 export type PecaSagaState =
   | "CREATED"
   | "EXTRACTING"
+  | "DRAFTED"
   | "REVIEWED"
   | "SIGNED"
   | "FILED"
@@ -55,6 +56,15 @@ export interface PecaReview {
   /** false = geração sem lastro documental (anexos não processados ou ausentes). */
   grounded: boolean;
   suggestions: PecaSuggestion[];
+}
+
+/**
+ * Retorno síncrono do POST /v1/pecas/:id/review.
+ * { data: { review: PecaReview, saga_state: "REVIEWED" } }
+ */
+export interface PecaReviewResponse {
+  review: PecaReview;
+  saga_state: PecaSagaState;
 }
 
 // ── Tipos de resposta do BE ─────────────────────────────────────────────────
