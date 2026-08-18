@@ -29,6 +29,7 @@ import Link from "next/link";
 import {
   useCallback,
   useDeferredValue,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -142,6 +143,24 @@ function PecaDetalheReal({
   // Content levantado ao pai para que AssistenteIA possa aplicar sugestões
   // e o EditorCol possa re-renderizar com o novo content.
   const [content, setContent] = useState(peca.content ?? "");
+
+  // Sincroniza o editor quando o servidor muda o texto por fora — ex.: a
+  // geração/regeneração com IA popula draft.content de forma assíncrona e o
+  // polling do usePeca traz o novo peca.content. useState só aplica o valor
+  // inicial no mount, então SEM isto o editor ficaria vazio após a IA gerar a
+  // minuta (bug: sugestões vinham mas o corpo não aparecia). Só adota o valor
+  // do servidor se não houver edição local não salva (content local ainda
+  // igual ao último valor conhecido do servidor, ou vazio) — nunca sobrescreve
+  // o que o usuário está digitando.
+  const lastServerContent = useRef(peca.content ?? "");
+  useEffect(() => {
+    const server = peca.content ?? "";
+    if (server === lastServerContent.current) return;
+    setContent((local) =>
+      local === lastServerContent.current || local === "" ? server : local,
+    );
+    lastServerContent.current = server;
+  }, [peca.content]);
 
   // Autosave compartilhado — chamado tanto pelo editor (onChange) quanto ao
   // aplicar sugestão.

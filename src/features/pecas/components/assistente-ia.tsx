@@ -420,7 +420,7 @@ function ReviewPanel({
       <p className="text-muted-foreground text-sm leading-relaxed">
         Encontrei{" "}
         <span className="text-foreground font-medium">
-          {pendingCount} sugestão{pendingCount !== 1 ? "ões" : ""}
+          {pendingCount} sugest{pendingCount !== 1 ? "ões" : "ão"}
         </span>{" "}
         para fortalecer a peça. Cada uma aponta para o trecho no editor:
       </p>
