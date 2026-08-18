@@ -1,13 +1,16 @@
 import type { ApiFetcher } from "@/lib/api/use-api";
 
 import type {
+  AttachDocumentoInput,
   CreatePecaInput,
   PatchPecaInput,
+  PecaAnexo,
   PecaCriadaView,
   PecaDetalheView,
   PecaSalvaView,
   PecasSummary,
   PecaView,
+  UpdateAnexoCategoriaInput,
 } from "../types";
 
 const ENDPOINT = "/v1/pecas";
@@ -54,6 +57,54 @@ export async function patchPeca(
   return fetcher<{ data: PecaSalvaView }>(`${ENDPOINT}/${id}`, {
     method: "PATCH",
     body: patch,
+  });
+}
+
+// ── Anexos (Fatia 2) ─────────────────────────────────────────────────────────
+
+/**
+ * Vincula um documento já UPLOADED à peça.
+ * POST /v1/pecas/:id/anexos → { data: PecaAnexo }
+ * 409 = já vinculado; 422 = PENDING/COURT/categoria inválida.
+ */
+export async function attachDocumento(
+  fetcher: ApiFetcher,
+  pecaId: string,
+  input: AttachDocumentoInput,
+): Promise<{ data: PecaAnexo }> {
+  return fetcher<{ data: PecaAnexo }>(`${ENDPOINT}/${pecaId}/anexos`, {
+    method: "POST",
+    body: input,
+  });
+}
+
+/**
+ * Categoriza um anexo em tempo real.
+ * PATCH /v1/pecas/:id/anexos/:attachmentId → { data: PecaAnexo }
+ */
+export async function updateAnexoCategoria(
+  fetcher: ApiFetcher,
+  pecaId: string,
+  attachmentId: string,
+  input: UpdateAnexoCategoriaInput,
+): Promise<{ data: PecaAnexo }> {
+  return fetcher<{ data: PecaAnexo }>(
+    `${ENDPOINT}/${pecaId}/anexos/${attachmentId}`,
+    { method: "PATCH", body: input },
+  );
+}
+
+/**
+ * Remove o vínculo do anexo.
+ * DELETE /v1/pecas/:id/anexos/:attachmentId → 204
+ */
+export async function removeAnexo(
+  fetcher: ApiFetcher,
+  pecaId: string,
+  attachmentId: string,
+): Promise<void> {
+  await fetcher<void>(`${ENDPOINT}/${pecaId}/anexos/${attachmentId}`, {
+    method: "DELETE",
   });
 }
 

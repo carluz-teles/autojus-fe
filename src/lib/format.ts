@@ -76,3 +76,14 @@ export function toDateInput(iso?: string | null): string {
 export function shortId(id: string): string {
   return id.replace(/-/g, "").slice(0, 6).toUpperCase() || "—";
 }
+
+/**
+ * Formata bytes em representação legível (KB/MB) — ex. `245760` → "240 KB".
+ * Retorna "—" para null/undefined.
+ */
+export function formatBytes(bytes: number | null | undefined): string {
+  if (bytes == null) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1_048_576) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1_048_576).toFixed(1)} MB`;
+}
