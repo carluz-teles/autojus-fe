@@ -118,8 +118,9 @@ export function IntimacaoDetail({ id }: { id: string }) {
           {/* Peças desta intimação — MOCK: peticionamento */}
           <PecasSection />
 
-          {/* Teor da publicação — REAL (HTML sanitizado) */}
-          <TeorPublicacao content={i.content} />
+          {/* Teor da publicação — REAL (HTML sanitizado). Guarda conteúdo vazio
+               para consistência com o painel lateral compacto. */}
+          {i.content ? <TeorPublicacao content={i.content} /> : null}
         </div>
 
         {/* Coluna lateral */}

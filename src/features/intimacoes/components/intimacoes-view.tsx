@@ -841,57 +841,6 @@ function PainelDetalhe({ id }: { id: string }) {
   );
 }
 
-/**
- * Wrapper local que envolve PrazoContagemGrande e acrescenta a linha "· dias úteis"
- * na data de vencimento — APENAS no painel compacto (não modifica PrazoContagemGrande
- * que é usado SEM esse sufixo na página full /intimacoes/[id]).
- */
-function PainelPrazoWrapper({ prazo }: { prazo: IntimacaoPrazoView | null }) {
-  const info = prazoUrgenciaInfo(prazo);
-
-  if (!info || !prazo) {
-    // Sem prazo: delega o estado vazio ao PrazoContagemGrande diretamente.
-    return <PrazoContagemGrande prazo={null} />;
-  }
-
-  // Com prazo: PrazoContagemGrande renderiza o número grande + legenda.
-  // Acrescentamos "· dias úteis" somente aqui via override de layout: substituímos
-  // o componente por uma versão inline que replica sua estrutura + o sufixo.
-  const { magnitude, atrasado, hoje, corClass } = info;
-  const legenda = atrasado
-    ? magnitude === 1
-      ? "dia em atraso"
-      : "dias em atraso"
-    : hoje
-      ? "vence hoje"
-      : magnitude === 1
-        ? "dia restante"
-        : "dias restantes";
-
-  return (
-    <div className="flex items-center gap-3">
-      <span
-        className={cn(
-          "font-display text-[40px] leading-none tabular-nums",
-          corClass,
-        )}
-      >
-        {hoje ? "0" : magnitude}
-      </span>
-      <div className="text-[12px] leading-snug">
-        <p className="text-foreground font-medium">{legenda}</p>
-        <p className="text-muted-foreground mt-0.5">
-          Fatal em{" "}
-          <span className="text-foreground font-medium tabular-nums">
-            {formatarData(prazo.end_date)}
-          </span>
-          {" · dias úteis"}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 // ─── esqueletos ─────────────────────────────────────────────────────────────
 
 function PainelEsqueleto() {
