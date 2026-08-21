@@ -5,7 +5,14 @@ import eslintConfigPrettier from "eslint-config-prettier";
 import simpleImportSort from "eslint-plugin-simple-import-sort";
 
 const eslintConfig = defineConfig([
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    // Artefatos de design handoff (JS/HTML vendored) — não é código-fonte do app.
+    "docs/**",
+  ]),
 
   ...nextVitals,
   ...nextTs,

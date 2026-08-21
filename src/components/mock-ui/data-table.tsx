@@ -40,20 +40,20 @@ export function DataTable({
 
   return (
     <>
-      <div className="mt-4 overflow-x-auto rounded-xl bg-card ring-hairline">
+      <div className="bg-card ring-hairline mt-4 overflow-x-auto rounded-xl">
         <table
           className="w-full table-fixed border-collapse text-[13.5px]"
           style={{ minWidth: larguraMinima }}
         >
           <thead>
-            <tr className="h-11 border-b border-border">
+            <tr className="border-border h-11 border-b">
               <th className="w-7 px-2" />
               {colunas.map((c) => (
                 <th
                   key={c.label}
                   style={{ width: c.largura }}
                   className={cn(
-                    "px-5 py-3 text-[11px] font-medium tracking-[0.06em] uppercase text-muted-foreground",
+                    "text-muted-foreground px-5 py-3 text-[11px] font-medium tracking-[0.06em] uppercase",
                     c.alinhamento === "right" ? "text-right" : "text-left",
                   )}
                 >
@@ -66,7 +66,7 @@ export function DataTable({
             {linhas.length === 0 ? (
               <tr>
                 <td colSpan={colunas.length + 1} className="p-0">
-                  <div className="px-6 py-12 text-center text-muted-foreground">
+                  <div className="text-muted-foreground px-6 py-12 text-center">
                     <p className="text-sm">{vazioTexto}</p>
                     {onLimpar && (
                       <Button
@@ -87,7 +87,7 @@ export function DataTable({
                   key={l.id}
                   onClick={l.href ? () => router.push(l.href!) : undefined}
                   className={cn(
-                    "h-16 border-b border-border last:border-0 hover:bg-muted",
+                    "border-border hover:bg-muted h-16 border-b last:border-0",
                     l.href && "cursor-pointer",
                   )}
                 >
@@ -119,14 +119,14 @@ export function DataTable({
 
       {linhas.length > 0 && rodape && (
         <div className="mt-4 flex items-center justify-between gap-3">
-          <span className="text-[13px] tabular-nums text-muted-foreground">
+          <span className="text-muted-foreground text-[13px] tabular-nums">
             {rodape}
           </span>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" disabled>
               Anterior
             </Button>
-            <span className="text-[12.5px] tabular-nums text-muted-foreground">
+            <span className="text-muted-foreground text-[12.5px] tabular-nums">
               Página 1
             </span>
             <Button variant="outline" size="sm">
@@ -160,7 +160,7 @@ export function CelulaDupla({
         {principal}
       </span>
       {apoio && (
-        <span className="mt-0.5 block truncate text-[11.5px] text-muted-foreground">
+        <span className="text-muted-foreground mt-0.5 block truncate text-[11.5px]">
           {apoio}
         </span>
       )}

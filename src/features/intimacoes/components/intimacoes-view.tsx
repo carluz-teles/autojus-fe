@@ -745,7 +745,6 @@ function PainelDetalhe({ id }: { id: string }) {
           <span
             role="status"
             aria-label="Prazo confirmado por humano"
-            tabIndex={-1}
             className="text-muted-foreground flex shrink-0 items-center gap-1 text-[12px]"
           >
             <Check className="size-3.5" strokeWidth={2.2} aria-hidden />

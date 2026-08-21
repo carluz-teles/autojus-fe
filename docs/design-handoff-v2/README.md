@@ -4,7 +4,7 @@
 
 Redesenho do fluxo de negócio central do produto: a **intimação** é a unidade de trabalho, dela derivam **providências** (que são tarefas), **prazos**, **peças**, **assinatura** e **protocolo**. O escopo cobre também as telas de suporte (dashboard, processos, tarefas, contatos, peças), o sistema de filtros, configurações, certificado A1, sign in/up e onboarding.
 
-Problema que motivou o trabalho, nas palavras do time: *"advogado muitas vezes perde prazos porque não fica claro o que precisa ser cumprido ou não"*. Toda decisão de UX abaixo serve a isso.
+Problema que motivou o trabalho, nas palavras do time: _"advogado muitas vezes perde prazos porque não fica claro o que precisa ser cumprido ou não"_. Toda decisão de UX abaixo serve a isso.
 
 Repositório de destino: `carluz-teles/autojus-fe` (Next 16 App Router, React 19, TanStack Query v5, RHF + Zod, Tailwind v4 + shadcn/ui, Clerk). Regras de arquitetura em `CLAUDE.md` (service → hook → component) valem integralmente.
 
@@ -29,7 +29,8 @@ Cabeçalho: `PageHeader` com título "Intimações" e descrição "O que chegou 
 Abaixo do cabeçalho, na ordem: barra de filtros → chips de filtros ativos → faixa de 4 KPIs (em atraso, vencem hoje, em 48h, abertas) usando `KpiCard`. **KPIs mostram sempre o total, nunca o resultado filtrado** — decisão deliberada para o usuário não perder a referência.
 
 **Visão Triagem** (padrão) — grade `minmax(420px, 1fr) minmax(340px, 430px)`:
-- Coluna esquerda: lista agrupada por urgência, na ordem *Em atraso · Vence hoje · Próximos dois dias · Esta semana · Sem providência*. Grupos vazios não são renderizados. Cabeçalho do grupo: nome + contagem + régua de 1px.
+
+- Coluna esquerda: lista agrupada por urgência, na ordem _Em atraso · Vence hoje · Próximos dois dias · Esta semana · Sem providência_. Grupos vazios não são renderizados. Cabeçalho do grupo: nome + contagem + régua de 1px.
 - Cada linha: grade `4px minmax(0,1fr) 128px 96px`, `border-left: 3px solid <cor da urgência>`, borda inferior de 1px, hover em `--muted`. Conteúdo: título da providência (14,5px), processo + classe (11,5px `--muted-fg`, tabular), duas pílulas de metadado (estágio, "3/4 providências"), coluna de prazo (rótulo colorido + data), coluna de responsável (avatar 22px + primeiro nome).
 - Coluna direita: painel da intimação selecionada — tipo/tribunal em maiúsculas, título em Fraunces 26px, número do processo, contagem de dias em Fraunces 40px entre duas réguas, "O que aconteceu" (resumo IA), "Peças: 1 peça · rascunho", lista de providências com checkbox e link `TAR-00X`, e dois botões (Abrir intimação / Redigir peça).
 
@@ -45,7 +46,7 @@ Rota: `/intimacoes/[id]`. Usa `DetailHeader` + `DetailBody`.
 - **Painel de prazo** (o bloco mais importante da tela — ver "Máquina de estados do prazo" abaixo).
 - Corpo em `minmax(0,1fr) 340px`:
   - "O que aconteceu" — resumo da IA, 15px/1.7.
-  - "Providências derivadas" com a legenda *"Cada providência é uma tarefa atribuída — nenhuma fica sem dono nem sem prazo."* Cada item: checkbox 18px, título, descrição, chip `TAR-00X` clicável (com ícone arrow-up-right), pílula de status da tarefa, "tarefa de <responsável>", e à direita responsável + vencimento.
+  - "Providências derivadas" com a legenda _"Cada providência é uma tarefa atribuída — nenhuma fica sem dono nem sem prazo."_ Cada item: checkbox 18px, título, descrição, chip `TAR-00X` clicável (com ícone arrow-up-right), pílula de status da tarefa, "tarefa de <responsável>", e à direita responsável + vencimento.
   - "Peças desta intimação" — linhas com tipo + versão, responsável/hora, pílula de status (Rascunho, Revisada, Assinada, Aguardando protocolo, Protocolada, Descartada), número de protocolo quando existe, seta de navegação. Vazio: "Nenhuma peça gerada para esta intimação ainda." + "+ Nova peça".
   - "Teor da publicação" — texto integral com filete à esquerda.
   - Aside: card de responsáveis (condutor do prazo, revisão e assinatura) e card de histórico.
@@ -54,16 +55,16 @@ Rota: `/intimacoes/[id]`. Usa `DetailHeader` + `DetailBody`.
 
 O sistema é determinístico: a regra **sugere**, o advogado **decide**. Nada se torna prazo fatal sem confirmação humana, e a decisão fica auditada. Quatro estados, todos no mesmo painel:
 
-| Estado | Aparência | Ações |
-| --- | --- | --- |
-| `sugerido` | fundo `--gold` 8%, borda `--gold` 35% | Confirmar prazo · Ajustar · Não há prazo |
-| `editando` | formulário inline (os botões de leitura desaparecem) | Salvar e confirmar · Cancelar |
-| `confirmado` / `ajustado` | fundo verde 7%, "Fatal em" + auditoria | Editar prazo · Remover prazo |
-| `ausente` | fundo `--destructive` 6% | Adicionar prazo · Marcar como mera ciência |
+| Estado                    | Aparência                                            | Ações                                      |
+| ------------------------- | ---------------------------------------------------- | ------------------------------------------ |
+| `sugerido`                | fundo `--gold` 8%, borda `--gold` 35%                | Confirmar prazo · Ajustar · Não há prazo   |
+| `editando`                | formulário inline (os botões de leitura desaparecem) | Salvar e confirmar · Cancelar              |
+| `confirmado` / `ajustado` | fundo verde 7%, "Fatal em" + auditoria               | Editar prazo · Remover prazo               |
+| `ausente`                 | fundo `--destructive` 6%                             | Adicionar prazo · Marcar como mera ciência |
 
 - No estado sugerido, mostrar a **derivação**: tipo, termo inicial, contagem e a regra aplicada ("art. 919, caput, CPC"). Quando a extração é duvidosa, exibir "confiança baixa — revise antes de confirmar" em `--destructive`.
 - Formulário de ajuste: tipo de prazo (select), termo inicial (select entre os eventos reais — disponibilização, publicação, juntada), dias (número), contagem (segmented dias úteis/corridos), toggle "Prazo em dobro (art. 186 / 229, CPC)", toggle "Feriado local / suspensão forense" (+3 dias no protótipo).
-- **Termo final recalcula ao vivo** (dias úteis pulando sábado/domingo) e o painel avisa o impacto: *"Ao confirmar, as providências vinculadas passam a vencer em DD/MM/AAAA."*
+- **Termo final recalcula ao vivo** (dias úteis pulando sábado/domingo) e o painel avisa o impacto: _"Ao confirmar, as providências vinculadas passam a vencer em DD/MM/AAAA."_
 - Auditoria: "Confirmado por <nome> · hoje, 10:48" / "Ajustado e confirmado por…" / "Declarado sem prazo por…".
 
 ### 4. Construção da peça (`/pecas/[id]` — passo 1 de 3)
@@ -77,13 +78,14 @@ Stepper no topo: `1 Construção · 2 Assinatura · 3 Protocolo`. Grade de 3 col
 **Marcadores de sugestão**: cada sugestão tem número e cor próprios (1 `--gold`, 2 `oklch(0.45 0.09 230)`, 3 `--primary`), repetidos no marcador circular de 20px na **margem do papel** (`left: -28px`, nunca dentro da coluna de texto) e no cartão da sugestão. Clicar no número em qualquer lado realça o parágrafo (fundo na cor a 14% + anel de 2px). O cartão mostra "Parágrafo 3" — derive o número da posição real do parágrafo de corpo (títulos de seção não contam), não de literal.
 
 **Coluna direita — assistente em duas abas**:
-- *Sugestões*: cartões com tipo, texto, Aplicar/Descartar; rodapé fixo com "Revisar com IA" (outline) e "Regenerar minuta" (primary).
-- *Chat*: thread com IA (avatar 26px, autor, hora, texto 12,5px/1.6), chips de atalho (Resumir os autos, Sugerir teses, Conferir o prazo, Encontrar precedentes) e campo de envio com botão quadrado.
+
+- _Sugestões_: cartões com tipo, texto, Aplicar/Descartar; rodapé fixo com "Revisar com IA" (outline) e "Regenerar minuta" (primary).
+- _Chat_: thread com IA (avatar 26px, autor, hora, texto 12,5px/1.6), chips de atalho (Resumir os autos, Sugerir teses, Conferir o prazo, Encontrar precedentes) e campo de envio com botão quadrado.
 
 ### 5. Assinatura e protocolo (passos 2 e 3)
 
 - **Assinatura**: miniatura do documento à esquerda, lista de signatários (avatar, nome, OAB · papel, estado) e botão "Assinar com certificado" → estado assinado mostra "Peça assinada com certificado A1 · data/hora".
-- **Protocolo**: verificações automáticas (peça assinada por todos, anexos em PDF/A, custas, prazo ainda aberto) com ✓/○ e detalhe; "Protocolar agora" → recibo com protocolo, data/hora, processo e peça, e a frase: *"A intimação foi marcada como cumprida, as providências vinculadas foram encerradas e o prazo saiu da agenda da equipe."*
+- **Protocolo**: verificações automáticas (peça assinada por todos, anexos em PDF/A, custas, prazo ainda aberto) com ✓/○ e detalhe; "Protocolar agora" → recibo com protocolo, data/hora, processo e peça, e a frase: _"A intimação foi marcada como cumprida, as providências vinculadas foram encerradas e o prazo saiu da agenda da equipe."_
 
 ### 6. Detalhe da tarefa (estilo Linear)
 
@@ -98,6 +100,7 @@ Rota: `/tarefas/[id]`. Grade `minmax(0,1fr) 320px`.
 ### 7. Cockpit do processo (`/processos/[id]`)
 
 Segue `src/features/processos/components/cockpit/*`:
+
 - Cabeçalho: CNJ em Fraunces 30px tabular, pílula de situação, **badge de risco** e linha de classificação; ações "Gerar peça com IA", "Nova tarefa", "···".
 - Grade de metadados: Distribuição · Valor da causa · Grau · Sistema.
 - Cards: Autor · Réu · Responsável interno.
@@ -120,6 +123,7 @@ Todas com o mesmo esqueleto: `PageHeader` → (KPIs) → (abas) → barra de fil
 O advogado não pensa em filtros, pensa em perguntas. Por isso:
 
 **Camada 1 — visões rápidas**: chips sempre visíveis, um clique, alternáveis.
+
 - Intimações: Em atraso · Vencem hoje · Minhas · **Sem providência**
 - Processos: Com prazo em atraso · Prazo em 48h · Meus processos · Sem prazo aberto
 - Tarefas: Atrasadas · Vencem hoje · Minhas · Próximas 48h
@@ -127,6 +131,7 @@ O advogado não pensa em filtros, pensa em perguntas. Por isso:
 - Contatos: Clientes · Partes contrárias
 
 **Camada 2 — drawer de filtros** (padrão `Sheet` + `Select`), botão com contador e chips removíveis do que está aplicado:
+
 - Universais: **Responsável**, **Prazo** (em atraso / vence hoje / próximas 48h / próximos 7 dias / sem prazo), **Status**, busca textual
 - Intimações: + Etapa do peticionamento, Órgão julgador, Classe
 - Processos: + Situação, Classe, Órgão
@@ -152,7 +157,7 @@ Racional: o A1 não é integração, é **identidade jurídica**. O `.pfx` + sen
 
 - **Seu certificado**: titular, CPF mascarado, OAB, tipo, emissor/cadeia, validade + dias restantes, impressão digital.
 - **Instalação em 4 passos**: Arquivo (.pfx/.p12, avisando que e-CNPJ não assina peças e que nem admin consegue baixar de volta) → Senha + política → **Validação explícita** (titular confere com a conta? OAB entre as monitoradas? cadeia confiável e não revogada? vence em quantos dias? tipo correto?) → Consentimento com escopo e termo de responsabilidade. "Voltar" não aparece no primeiro passo; "Continuar" não aparece no último.
-- **Política de senha**: pedir a cada assinatura / manter liberado 30 min / cofre gerenciado com 2FA — cada opção explicando o trade-off. *Decisão pendente: se a Fase 1 não terá cofre, remover a terceira opção para não prometer o que não entrega.*
+- **Política de senha**: pedir a cada assinatura / manter liberado 30 min / cofre gerenciado com 2FA — cada opção explicando o trade-off. _Decisão pendente: se a Fase 1 não terá cofre, remover a terceira opção para não prometer o que não entrega._
 - **Escopo**: assinar peças · protocolar em seu nome · assinar procurações (separados de propósito — protocolar é mais perigoso que assinar).
 - **Registro de uso**: data, ato, processo, IP.
 - **Certificados da equipe**: admin vê estado, nunca o arquivo; destaca "Vence em 44 dias" e quem está "Ausente" (não assina nem protocola).
@@ -185,6 +190,7 @@ Por tela: visão ativa (triagem/quadro/prazos, lista/quadro), item selecionado, 
 Servidor (TanStack Query, conforme `CLAUDE.md`): intimações + summary, processos + summary + prazos, tasks + summary, peças, documentos, membros da org, termos monitorados, importações/reconciliações, plano e faturas, preferências de notificação, certificado (metadados apenas).
 
 **Duas regras de dados que a revisão cobrou repetidamente:**
+
 1. **Providência = tarefa.** Uma providência nunca existe sem tarefa associada; código, dono, vencimento e status vêm da tarefa.
 2. **Fonte única.** Status/responsável/vencimento editados no detalhe da tarefa precisam aparecer iguais na lista de tarefas, no quadro, na aba Tarefas do processo e nas providências da intimação. Badges de contagem na sidebar derivam dos mesmos dados das listas — nada de literais.
 
@@ -192,21 +198,21 @@ Servidor (TanStack Query, conforme `CLAUDE.md`): intimações + summary, process
 
 Todos já existem em `src/app/globals.css` (tema "Ledger", modo claro). Valores usados no protótipo:
 
-| Token | Valor |
-| --- | --- |
-| `--background` | `oklch(0.985 0.006 95)` |
-| `--foreground` | `oklch(0.24 0.02 165)` |
-| `--card` | `oklch(0.995 0.004 95)` |
-| `--muted` | `oklch(0.955 0.008 95)` |
-| `--muted-foreground` | `oklch(0.49 0.02 165)` |
-| `--primary` | `oklch(0.42 0.068 168)` |
-| `--primary-foreground` | `oklch(0.98 0.012 95)` |
-| `--gold` | `oklch(0.72 0.11 76)` |
-| `--destructive` | `oklch(0.55 0.2 27)` |
-| `--border` / `--input` | `oklch(0.9 0.012 90)` |
-| `--sidebar` | `oklch(0.972 0.01 100)` |
-| `--sidebar-accent` | `oklch(0.93 0.022 100)` |
-| `--radius` | `0.625rem` (cards 14px, controles 10px, chips 8px) |
+| Token                  | Valor                                              |
+| ---------------------- | -------------------------------------------------- |
+| `--background`         | `oklch(0.985 0.006 95)`                            |
+| `--foreground`         | `oklch(0.24 0.02 165)`                             |
+| `--card`               | `oklch(0.995 0.004 95)`                            |
+| `--muted`              | `oklch(0.955 0.008 95)`                            |
+| `--muted-foreground`   | `oklch(0.49 0.02 165)`                             |
+| `--primary`            | `oklch(0.42 0.068 168)`                            |
+| `--primary-foreground` | `oklch(0.98 0.012 95)`                             |
+| `--gold`               | `oklch(0.72 0.11 76)`                              |
+| `--destructive`        | `oklch(0.55 0.2 27)`                               |
+| `--border` / `--input` | `oklch(0.9 0.012 90)`                              |
+| `--sidebar`            | `oklch(0.972 0.01 100)`                            |
+| `--sidebar-accent`     | `oklch(0.93 0.022 100)`                            |
+| `--radius`             | `0.625rem` (cards 14px, controles 10px, chips 8px) |
 
 Tons semânticos seguem `status-badge.tsx`: neutral `--muted`, info sky `oklch(0.45 0.09 230)`, warning `--gold`, danger `--destructive`, success `oklch(0.45 0.1 150)`. Sempre fundo a 10-12% + texto no tom escuro.
 
@@ -228,18 +234,18 @@ Nenhum asset binário. Todos os ícones são inline SVG de Lucide (já é a lib 
 
 ## Mapa de tela → arquivos do repositório
 
-| Tela | Arquivos a modificar/criar |
-| --- | --- |
-| Shell, sidebar, header | `src/components/shell/{app-shell,sidebar,nav-link,nav-config,sidebar-footer,user-menu,breadcrumb-context}.tsx` |
-| Intimações (3 visões) | `src/app/(app)/intimacoes/page.tsx`, `src/features/intimacoes/` |
-| Detalhe da intimação + prazo | `src/app/(app)/intimacoes/[id]/`, `src/features/intimacoes/`, `src/features/prazos/` |
-| Peça (construção/assinatura/protocolo) | `src/features/pecas/`, `src/components/ui/ia-panel.tsx` |
-| Detalhe da tarefa | `src/app/(app)/tarefas/[id]/`, `src/features/tasks/`, `src/components/ui/detail-layout.tsx` |
-| Cockpit do processo | `src/features/processos/components/cockpit/*`, `lib/risco.ts` |
-| Listas | `src/components/ui/{data-table,kpi-card,status-badge,filter-toolbar,list-pagination,sheet}.tsx` |
-| Configurações | `src/app/(app)/settings/*`, `src/components/shell/settings-nav.tsx`, `src/features/{integrations,organization,notifications}/` |
-| Certificado A1 | nova feature `src/features/certificado/` + aba em settings |
-| Auth e onboarding | `src/app/(auth)/`, `src/features/onboarding/` |
+| Tela                                   | Arquivos a modificar/criar                                                                                                     |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Shell, sidebar, header                 | `src/components/shell/{app-shell,sidebar,nav-link,nav-config,sidebar-footer,user-menu,breadcrumb-context}.tsx`                 |
+| Intimações (3 visões)                  | `src/app/(app)/intimacoes/page.tsx`, `src/features/intimacoes/`                                                                |
+| Detalhe da intimação + prazo           | `src/app/(app)/intimacoes/[id]/`, `src/features/intimacoes/`, `src/features/prazos/`                                           |
+| Peça (construção/assinatura/protocolo) | `src/features/pecas/`, `src/components/ui/ia-panel.tsx`                                                                        |
+| Detalhe da tarefa                      | `src/app/(app)/tarefas/[id]/`, `src/features/tasks/`, `src/components/ui/detail-layout.tsx`                                    |
+| Cockpit do processo                    | `src/features/processos/components/cockpit/*`, `lib/risco.ts`                                                                  |
+| Listas                                 | `src/components/ui/{data-table,kpi-card,status-badge,filter-toolbar,list-pagination,sheet}.tsx`                                |
+| Configurações                          | `src/app/(app)/settings/*`, `src/components/shell/settings-nav.tsx`, `src/features/{integrations,organization,notifications}/` |
+| Certificado A1                         | nova feature `src/features/certificado/` + aba em settings                                                                     |
+| Auth e onboarding                      | `src/app/(auth)/`, `src/features/onboarding/`                                                                                  |
 
 ## Decisões pendentes para o time
 

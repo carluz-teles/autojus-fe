@@ -37,7 +37,7 @@ export function ContatosView() {
         titulo="Contatos"
         descricao="Clientes e partes envolvidas nos processos."
         acoes={
-          <span className="rounded-full border border-border px-2.5 py-0.5 text-[11.5px] text-muted-foreground">
+          <span className="border-border text-muted-foreground rounded-full border px-2.5 py-0.5 text-[11.5px]">
             Prévia
           </span>
         }
@@ -67,16 +67,16 @@ export function ContatosView() {
           celulas: [
             <CelulaDupla key="n" principal={c.nome} />,
             <Badge key="p">{c.papel}</Badge>,
-            <span key="c" className="tabular-nums text-muted-foreground">
+            <span key="c" className="text-muted-foreground tabular-nums">
               {c.celular}
             </span>,
             <span key="ci" className="text-muted-foreground">
               {c.cidade}
             </span>,
-            <span key="pr" className="tabular-nums text-muted-foreground">
+            <span key="pr" className="text-muted-foreground tabular-nums">
               {c.processos}
             </span>,
-            <span key="ca" className="tabular-nums text-muted-foreground">
+            <span key="ca" className="text-muted-foreground tabular-nums">
               {formatarData(c.cadastro)}
             </span>,
           ],

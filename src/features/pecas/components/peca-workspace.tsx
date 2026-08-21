@@ -43,10 +43,10 @@ export function PecaWorkspace({ id }: { id: string }) {
 
   return (
     <div className="flex h-full min-h-0 min-w-[1230px] flex-col overflow-x-auto">
-      <div className="flex items-center gap-6 border-b border-border px-8 py-4">
+      <div className="border-border flex items-center gap-6 border-b px-8 py-4">
         <Link
           href={`/intimacoes/${i.id}`}
-          className="text-xs text-muted-foreground no-underline hover:no-underline"
+          className="text-muted-foreground text-xs no-underline hover:no-underline"
         >
           ← Intimação
         </Link>
@@ -61,14 +61,14 @@ export function PecaWorkspace({ id }: { id: string }) {
       {passo === 1 && (
         <div className="grid min-h-0 flex-1 grid-cols-[300px_minmax(560px,1fr)_330px]">
           {/* Contexto: intimação, teor, processo, partes, prazo, providências */}
-          <aside className="overflow-y-auto border-r border-border px-4 py-6">
-            <p className="text-[10.5px] tracking-[0.12em] uppercase text-muted-foreground">
+          <aside className="border-border overflow-y-auto border-r px-4 py-6">
+            <p className="text-muted-foreground text-[10.5px] tracking-[0.12em] uppercase">
               Contexto
             </p>
-            <h3 className="mt-2 font-display text-[19px] font-medium">
+            <h3 className="font-display mt-2 text-[19px] font-medium">
               {peca.tipo} {peca.versao}
             </h3>
-            <p className="text-[11.5px] tabular-nums text-muted-foreground">
+            <p className="text-muted-foreground text-[11.5px] tabular-nums">
               {p.numero}
             </p>
 
@@ -77,17 +77,17 @@ export function PecaWorkspace({ id }: { id: string }) {
               href={`/intimacoes/${i.id}`}
               className="block no-underline hover:no-underline"
             >
-              <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-primary">
+              <span className="text-primary inline-flex items-center gap-1.5 text-[13px] font-medium">
                 {i.titulo}
                 <ArrowUpRight className="size-2.5" strokeWidth={2.4} />
               </span>
-              <span className="mt-0.5 block text-[11.5px] text-muted-foreground">
+              <span className="text-muted-foreground mt-0.5 block text-[11.5px]">
                 {i.tipo} · publicada em {formatarData(i.publicacao)}
               </span>
             </Link>
 
             <Rotulo className="mt-3.5">Teor da publicação</Rotulo>
-            <p className="max-h-33 overflow-y-auto border-l-2 border-border pl-2.5 text-[11.5px] leading-relaxed text-muted-foreground">
+            <p className="border-border text-muted-foreground max-h-33 overflow-y-auto border-l-2 pl-2.5 text-[11.5px] leading-relaxed">
               {i.teor}
             </p>
 
@@ -102,14 +102,17 @@ export function PecaWorkspace({ id }: { id: string }) {
             <Campo rotulo="Classe" valor={p.classe} />
             <Campo rotulo="Assunto" valor={p.assunto} />
             <Campo rotulo="Órgão" valor={p.orgao} />
-            <Campo rotulo="Tribunal · grau" valor={`${p.tribunal} · ${p.grau}`} />
+            <Campo
+              rotulo="Tribunal · grau"
+              valor={`${p.tribunal} · ${p.grau}`}
+            />
             <Campo rotulo="Valor da causa" valor={p.valorCausa} />
 
             <Rotulo className="mt-6">Partes</Rotulo>
             <CampoEmpilhado rotulo="Autor" valor={p.autor} />
             <CampoEmpilhado rotulo="Réu" valor={p.reu} />
             <div className="py-1.5 text-xs">
-              <p className="text-[11px] text-muted-foreground">Procuradores</p>
+              <p className="text-muted-foreground text-[11px]">Procuradores</p>
               {p.procuradores.map((proc) => (
                 <p key={proc}>{proc}</p>
               ))}
@@ -122,7 +125,7 @@ export function PecaWorkspace({ id }: { id: string }) {
             >
               {termo ? formatarData(termo) : "—"}
             </p>
-            <p className="text-[11.5px] text-muted-foreground">
+            <p className="text-muted-foreground text-[11.5px]">
               {rotuloPrazo(dias)} · dias úteis
             </p>
 
@@ -149,16 +152,17 @@ export function PecaWorkspace({ id }: { id: string }) {
 
             <Rotulo className="mt-6">Anexos</Rotulo>
             <div className="flex flex-col gap-2">
-              {["Nota promissória.pdf · 412 KB", "Contrato 2024.pdf · 1,2 MB"].map(
-                (a) => (
-                  <div
-                    key={a}
-                    className="truncate rounded-lg border border-border px-2 py-1.5 text-xs"
-                  >
-                    {a}
-                  </div>
-                ),
-              )}
+              {[
+                "Nota promissória.pdf · 412 KB",
+                "Contrato 2024.pdf · 1,2 MB",
+              ].map((a) => (
+                <div
+                  key={a}
+                  className="border-border truncate rounded-lg border px-2 py-1.5 text-xs"
+                >
+                  {a}
+                </div>
+              ))}
               <Button variant="ghost" size="sm" className="justify-center">
                 + Anexar documento
               </Button>
@@ -169,7 +173,7 @@ export function PecaWorkspace({ id }: { id: string }) {
           <section className="overflow-y-auto">
             <EditorToolbar />
             <div className="px-8 pt-7 pb-8">
-              <div className="mx-auto max-w-180 rounded-lg border border-border bg-card px-[clamp(24px,5vw,56px)] py-8 shadow-sm">
+              <div className="border-border bg-card mx-auto max-w-180 rounded-lg border px-[clamp(24px,5vw,56px)] py-8 shadow-sm">
                 <div
                   contentEditable
                   suppressContentEditableWarning
@@ -183,7 +187,11 @@ export function PecaWorkspace({ id }: { id: string }) {
                     Processo nº {p.numero} — {p.classe} — {p.assunto}
                   </p>
 
-                  <ParagrafoMarcado sugestao={SUGESTOES[0]} foco={foco} onFocar={setFoco}>
+                  <ParagrafoMarcado
+                    sugestao={SUGESTOES[0]}
+                    foco={foco}
+                    onFocar={setFoco}
+                  >
                     PROLHETI &amp; MARCONDES FORMATURAS LTDA ME, já qualificada
                     nos autos em epígrafe, por seu advogado abaixo assinado, vem
                     respeitosamente à presença de Vossa Excelência, com
@@ -192,7 +200,7 @@ export function PecaWorkspace({ id }: { id: string }) {
                     expostos.
                   </ParagrafoMarcado>
 
-                  <p className="mb-2 font-display text-[17px]">I — Dos fatos</p>
+                  <p className="font-display mb-2 text-[17px]">I — Dos fatos</p>
                   <p className="mb-4">
                     1. O presente feito trata-se de execução de título
                     extrajudicial embasada em nota promissória, conforme se
@@ -204,25 +212,35 @@ export function PecaWorkspace({ id }: { id: string }) {
                     que legitime a pretensão executiva.
                   </p>
 
-                  <p className="mb-2 font-display text-[17px]">II — Do direito</p>
-                  <ParagrafoMarcado sugestao={SUGESTOES[1]} foco={foco} onFocar={setFoco}>
+                  <p className="font-display mb-2 text-[17px]">
+                    II — Do direito
+                  </p>
+                  <ParagrafoMarcado
+                    sugestao={SUGESTOES[1]}
+                    foco={foco}
+                    onFocar={setFoco}
+                  >
                     3. Nos termos dos arts. 917 e 919 do CPC, o executado pode
                     apresentar defesa especificamente contrária e impugnar a
                     existência da obrigação. No presente caso, é evidente que a
                     exequente não cumpriu com seu ônus probatório.
                   </ParagrafoMarcado>
 
-                  <p className="mb-2 font-display text-[17px]">
+                  <p className="font-display mb-2 text-[17px]">
                     III — Dos pedidos
                   </p>
-                  <ParagrafoMarcado sugestao={SUGESTOES[2]} foco={foco} onFocar={setFoco}>
+                  <ParagrafoMarcado
+                    sugestao={SUGESTOES[2]}
+                    foco={foco}
+                    onFocar={setFoco}
+                  >
                     4. Requer, ao final, o acolhimento da defesa com a extinção
                     da execução, bem como a condenação da exequente nas custas
                     processuais.
                   </ParagrafoMarcado>
                 </div>
               </div>
-              <div className="mx-auto mt-3 flex max-w-180 justify-between text-[11.5px] tabular-nums text-muted-foreground">
+              <div className="text-muted-foreground mx-auto mt-3 flex max-w-180 justify-between text-[11.5px] tabular-nums">
                 <span>402 palavras · 2.534 caracteres</span>
                 <span>Rascunho salvo há 1 min</span>
               </div>
@@ -236,31 +254,35 @@ export function PecaWorkspace({ id }: { id: string }) {
       {passo === 2 && (
         <div className="mx-auto w-full max-w-220 px-8 py-8">
           <h1 className="font-display text-[34px] font-normal">Assinatura</h1>
-          <p className="mt-2 mb-6 text-[13.5px] text-muted-foreground">
+          <p className="text-muted-foreground mt-2 mb-6 text-[13.5px]">
             Confira a peça e colha as assinaturas antes do protocolo.
           </p>
 
           <div className="grid grid-cols-[260px_minmax(0,1fr)] gap-8">
-            <div className="h-82 overflow-hidden border border-border bg-card p-4 text-[8px] leading-relaxed text-muted-foreground shadow-sm">
-              <p className="mb-2.5 uppercase text-foreground">
+            <div className="border-border bg-card text-muted-foreground h-82 overflow-hidden border p-4 text-[8px] leading-relaxed shadow-sm">
+              <p className="text-foreground mb-2.5 uppercase">
                 Excelentíssimo Senhor Doutor Juiz de Direito da Vara do Juizado
                 Especial Cível da Comarca de Franca/SP
               </p>
               {[100, 92, 97, 64, 100, 88, 95, 41, 90, 72].map((w, idx) => (
                 <div
                   key={idx}
-                  className="mb-1.5 h-1.5 bg-muted"
+                  className="bg-muted mb-1.5 h-1.5"
                   style={{ width: `${w}%` }}
                 />
               ))}
             </div>
 
             <div>
-              <p className="mb-2 text-[10.5px] tracking-[0.12em] uppercase text-muted-foreground">
+              <p className="text-muted-foreground mb-2 text-[10.5px] tracking-[0.12em] uppercase">
                 Signatários
               </p>
               {[
-                { nome: i.condutor, oab: "OAB 347019/SP", papel: "autor da peça" },
+                {
+                  nome: i.condutor,
+                  oab: "OAB 347019/SP",
+                  papel: "autor da peça",
+                },
                 {
                   nome: i.revisor,
                   oab: "OAB 198988/MG",
@@ -269,12 +291,12 @@ export function PecaWorkspace({ id }: { id: string }) {
               ].map((s) => (
                 <div
                   key={s.nome}
-                  className="flex items-center gap-3 border-t border-border py-3"
+                  className="border-border flex items-center gap-3 border-t py-3"
                 >
                   <Avatar nome={s.nome} size={30} />
                   <span className="flex-1">
                     <span className="block text-sm">{s.nome}</span>
-                    <span className="block text-[11.5px] text-muted-foreground">
+                    <span className="text-muted-foreground block text-[11.5px]">
                       {s.oab} · {s.papel}
                     </span>
                   </span>
@@ -286,9 +308,9 @@ export function PecaWorkspace({ id }: { id: string }) {
                 </div>
               ))}
 
-              <div className="mt-6 border-t border-foreground pt-4">
+              <div className="border-foreground mt-6 border-t pt-4">
                 {peca.status !== "Rascunho" && (
-                  <p className="mb-3 text-[13.5px] text-success">
+                  <p className="text-success mb-3 text-[13.5px]">
                     Peça assinada com certificado A1 · 19/08/2026 10:42
                   </p>
                 )}
@@ -315,32 +337,37 @@ export function PecaWorkspace({ id }: { id: string }) {
         <div className="mx-auto w-full max-w-190 px-8 py-8">
           {peca.status === "Protocolada" ? (
             <div>
-              <p className="text-[10.5px] tracking-[0.12em] uppercase text-success">
+              <p className="text-success text-[10.5px] tracking-[0.12em] uppercase">
                 Protocolado
               </p>
-              <h1 className="mt-2 mb-4 font-display text-[40px] font-normal">
+              <h1 className="font-display mt-2 mb-4 text-[40px] font-normal">
                 Peça protocolada no {p.tribunal}
               </h1>
-              <dl className="grid grid-cols-2 gap-4 gap-x-8 border-y border-border py-4">
+              <dl className="border-border grid grid-cols-2 gap-4 gap-x-8 border-y py-4">
                 <Recibo rotulo="Protocolo" valor={peca.protocolo ?? "—"} />
                 <Recibo rotulo="Data e hora" valor="19/08/2026 10:47" />
                 <Recibo rotulo="Processo" valor={p.numero} />
                 <Recibo rotulo="Peça" valor={`${peca.tipo} ${peca.versao}`} />
               </dl>
-              <p className="my-6 text-[13.5px] leading-relaxed text-muted-foreground">
-                A intimação foi marcada como cumprida, as providências vinculadas
-                foram encerradas e o prazo saiu da agenda da equipe.
+              <p className="text-muted-foreground my-6 text-[13.5px] leading-relaxed">
+                A intimação foi marcada como cumprida, as providências
+                vinculadas foram encerradas e o prazo saiu da agenda da equipe.
               </p>
               <Button asChild>
-                <Link href="/intimacoes" className="no-underline hover:no-underline">
+                <Link
+                  href="/intimacoes"
+                  className="no-underline hover:no-underline"
+                >
                   Voltar para intimações
                 </Link>
               </Button>
             </div>
           ) : (
             <div>
-              <h1 className="font-display text-[34px] font-normal">Protocolo</h1>
-              <p className="mt-2 mb-6 text-[13.5px] text-muted-foreground">
+              <h1 className="font-display text-[34px] font-normal">
+                Protocolo
+              </h1>
+              <p className="text-muted-foreground mt-2 mb-6 text-[13.5px]">
                 Verificações automáticas antes de enviar ao tribunal.
               </p>
               {[
@@ -367,7 +394,7 @@ export function PecaWorkspace({ id }: { id: string }) {
               ].map((c) => (
                 <div
                   key={c.label}
-                  className="flex items-center gap-3 border-t border-border py-3"
+                  className="border-border flex items-center gap-3 border-t py-3"
                 >
                   <span
                     className={cn(
@@ -378,12 +405,12 @@ export function PecaWorkspace({ id }: { id: string }) {
                     {c.ok ? "✓" : "○"}
                   </span>
                   <span className="flex-1 text-sm">{c.label}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-muted-foreground text-xs">
                     {c.detalhe}
                   </span>
                 </div>
               ))}
-              <div className="mt-6 flex gap-2 border-t border-foreground pt-4">
+              <div className="border-foreground mt-6 flex gap-2 border-t pt-4">
                 <Button
                   disabled={peca.status === "Rascunho"}
                   onClick={() =>
@@ -396,13 +423,16 @@ export function PecaWorkspace({ id }: { id: string }) {
                   Protocolar agora
                 </Button>
                 <Button variant="ghost" asChild>
-                  <Link href="/pecas" className="no-underline hover:no-underline">
+                  <Link
+                    href="/pecas"
+                    className="no-underline hover:no-underline"
+                  >
                     Salvar e sair
                   </Link>
                 </Button>
               </div>
               {peca.status === "Rascunho" && (
-                <p className="mt-3 text-xs text-muted-foreground">
+                <p className="text-muted-foreground mt-3 text-xs">
                   Protocolar exige a peça assinada — volte ao passo 2.
                 </p>
               )}
@@ -466,7 +496,7 @@ function Rotulo({
   return (
     <p
       className={cn(
-        "mb-1.5 text-[10.5px] tracking-[0.12em] uppercase text-muted-foreground",
+        "text-muted-foreground mb-1.5 text-[10.5px] tracking-[0.12em] uppercase",
         className,
       )}
     >
@@ -477,7 +507,7 @@ function Rotulo({
 
 function Campo({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
-    <div className="flex justify-between gap-2.5 border-b border-border py-1.5 text-xs">
+    <div className="border-border flex justify-between gap-2.5 border-b py-1.5 text-xs">
       <span className="text-muted-foreground">{rotulo}</span>
       <span className="text-right">{valor}</span>
     </div>
@@ -486,8 +516,8 @@ function Campo({ rotulo, valor }: { rotulo: string; valor: string }) {
 
 function CampoEmpilhado({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
-    <div className="border-b border-border py-1.5 text-xs">
-      <span className="block text-[11px] text-muted-foreground">{rotulo}</span>
+    <div className="border-border border-b py-1.5 text-xs">
+      <span className="text-muted-foreground block text-[11px]">{rotulo}</span>
       <span className="mt-0.5 block">{valor}</span>
     </div>
   );
@@ -496,7 +526,7 @@ function CampoEmpilhado({ rotulo, valor }: { rotulo: string; valor: string }) {
 function Recibo({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <div>
-      <dt className="text-[10.5px] tracking-[0.1em] uppercase text-muted-foreground">
+      <dt className="text-muted-foreground text-[10.5px] tracking-[0.1em] uppercase">
         {rotulo}
       </dt>
       <dd className="mt-0.5 text-[15px] tabular-nums">{valor}</dd>

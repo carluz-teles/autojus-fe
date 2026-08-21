@@ -1,10 +1,4 @@
-import type {
-  Contato,
-  Intimacao,
-  Peca,
-  Processo,
-  Tarefa,
-} from "./types";
+import type { Contato, Intimacao, Peca, Processo, Tarefa } from "./types";
 
 /**
  * Banco em memória do porte mockado (AtJud). Substituído por API, feature por
@@ -38,15 +32,31 @@ export const PROCESSOS: Processo[] = [
       "Protocolar antes do fim do prazo",
     ],
     andamentos: [
-      { data: "2026-08-13T02:27:00", evento: "Publicação", tpu: "TPU 92 · DATAJUD" },
-      { data: "2026-08-12T09:02:00", evento: "Remessa", tpu: "TPU 123 · DATAJUD" },
+      {
+        data: "2026-08-13T02:27:00",
+        evento: "Publicação",
+        tpu: "TPU 92 · DATAJUD",
+      },
+      {
+        data: "2026-08-12T09:02:00",
+        evento: "Remessa",
+        tpu: "TPU 123 · DATAJUD",
+      },
       {
         data: "2026-08-10T08:10:00",
         evento: "Mero expediente",
         tpu: "TPU 11010 · DATAJUD",
       },
-      { data: "2026-08-01T05:19:00", evento: "Conclusão", tpu: "TPU 51 · DATAJUD" },
-      { data: "2024-03-12T10:02:00", evento: "Distribuição", tpu: "TPU 26 · DATAJUD" },
+      {
+        data: "2026-08-01T05:19:00",
+        evento: "Conclusão",
+        tpu: "TPU 51 · DATAJUD",
+      },
+      {
+        data: "2024-03-12T10:02:00",
+        evento: "Distribuição",
+        tpu: "TPU 26 · DATAJUD",
+      },
     ],
     documentos: [
       {
@@ -54,7 +64,11 @@ export const PROCESSOS: Processo[] = [
         meta: "71 pág. · 1,7 MB",
         estado: "Pronto",
       },
-      { nome: "Nota promissória.pdf", meta: "2 pág. · 412 KB", estado: "Pronto" },
+      {
+        nome: "Nota promissória.pdf",
+        meta: "2 pág. · 412 KB",
+        estado: "Pronto",
+      },
       { nome: "Contrato 2024.pdf", meta: "9 pág. · 1,2 MB", estado: "Pronto" },
     ],
   },
@@ -79,11 +93,23 @@ export const PROCESSOS: Processo[] = [
       "Peticionar justificativa do atraso",
     ],
     andamentos: [
-      { data: "2026-08-07T07:40:00", evento: "Publicação", tpu: "TPU 92 · DATAJUD" },
-      { data: "2026-07-22T10:15:00", evento: "Decisão", tpu: "TPU 3 · DATAJUD" },
+      {
+        data: "2026-08-07T07:40:00",
+        evento: "Publicação",
+        tpu: "TPU 92 · DATAJUD",
+      },
+      {
+        data: "2026-07-22T10:15:00",
+        evento: "Decisão",
+        tpu: "TPU 3 · DATAJUD",
+      },
     ],
     documentos: [
-      { nome: "Memória de cálculo.pdf", meta: "4 pág. · 208 KB", estado: "Pronto" },
+      {
+        nome: "Memória de cálculo.pdf",
+        meta: "4 pág. · 208 KB",
+        estado: "Pronto",
+      },
     ],
   },
   {
@@ -107,7 +133,11 @@ export const PROCESSOS: Processo[] = [
       "Conferir dados cadastrais no sistema",
     ],
     andamentos: [
-      { data: "2026-08-13T03:11:00", evento: "Publicação", tpu: "TPU 92 · DATAJUD" },
+      {
+        data: "2026-08-13T03:11:00",
+        evento: "Publicação",
+        tpu: "TPU 92 · DATAJUD",
+      },
     ],
     documentos: [],
   },
@@ -128,7 +158,11 @@ export const PROCESSOS: Processo[] = [
     resumoIA: "Execução fiscal arquivada definitivamente. Nada a cumprir.",
     proximosPassos: [],
     andamentos: [
-      { data: "2026-08-15T06:00:00", evento: "Arquivamento", tpu: "TPU 246 · DATAJUD" },
+      {
+        data: "2026-08-15T06:00:00",
+        evento: "Arquivamento",
+        tpu: "TPU 246 · DATAJUD",
+      },
     ],
     documentos: [],
   },
@@ -144,8 +178,7 @@ export const INTIMACOES: Intimacao[] = [
     publicacao: "2026-08-07",
     resumo:
       "O juízo intimou o exequente a apresentar memória de cálculo atualizada do débito no prazo de cinco dias úteis. O prazo venceu sem manifestação nos autos.",
-    teor:
-      "Intime-se o exequente para que, no prazo de 5 (cinco) dias, apresente memória de cálculo atualizada do débito, sob pena de extinção. Int. — ADV: LUAN GOMES (OAB 347019/SP)",
+    teor: "Intime-se o exequente para que, no prazo de 5 (cinco) dias, apresente memória de cálculo atualizada do débito, sob pena de extinção. Int. — ADV: LUAN GOMES (OAB 347019/SP)",
     condutor: "Luan Gomes",
     revisor: "Renata Marcondes",
     prazo: {
@@ -183,8 +216,7 @@ export const INTIMACOES: Intimacao[] = [
     publicacao: "2026-08-13",
     resumo:
       "A parte executada foi intimada a apresentar defesa em execução fundada em nota promissória, no prazo de cinco dias úteis, sob pena de prosseguimento dos atos expropriatórios.",
-    teor:
-      "Processo 1012473-58.2024.8.26.0196 — Execução de Título Extrajudicial — Nota Promissória — Prolheti & Marcondes Formaturas Ltda Me — Ficam as partes intimadas para apresentar defesa no prazo legal. — ADV: LUAN GOMES (OAB 347019/SP), PAULO SERGIO DE OLIVEIRA SOUZA (OAB 321511/SP)",
+    teor: "Processo 1012473-58.2024.8.26.0196 — Execução de Título Extrajudicial — Nota Promissória — Prolheti & Marcondes Formaturas Ltda Me — Ficam as partes intimadas para apresentar defesa no prazo legal. — ADV: LUAN GOMES (OAB 347019/SP), PAULO SERGIO DE OLIVEIRA SOUZA (OAB 321511/SP)",
     condutor: "Luan Gomes",
     revisor: "Renata Marcondes",
     prazo: {
@@ -207,7 +239,10 @@ export const INTIMACOES: Intimacao[] = [
     historico: [
       { quando: "2026-08-15T06:10:00", descricao: "Capturada do DJEN" },
       { quando: "2026-08-15T06:12:00", descricao: "Prazo sugerido pela regra" },
-      { quando: "2026-08-16T09:55:00", descricao: "Providências geradas pela IA" },
+      {
+        quando: "2026-08-16T09:55:00",
+        descricao: "Providências geradas pela IA",
+      },
     ],
   },
   {
@@ -219,8 +254,7 @@ export const INTIMACOES: Intimacao[] = [
     publicacao: "2026-08-13",
     resumo:
       "O processo passará a tramitar no sistema Eproc. Os procuradores devem se credenciar e conferir os dados cadastrais em cinco dias úteis.",
-    teor:
-      "Ficam intimados os procuradores para que providenciem o credenciamento no eproc, bem como verifiquem os dados cadastrais constantes do referido sistema.",
+    teor: "Ficam intimados os procuradores para que providenciem o credenciamento no eproc, bem como verifiquem os dados cadastrais constantes do referido sistema.",
     condutor: "Paulo Souza",
     revisor: "Renata Marcondes",
     prazo: {

@@ -13,32 +13,20 @@ import {
   statusTom,
 } from "./capturas-formatters";
 
-function MiniCard({
-  rotulo,
-  valor,
-}: {
-  rotulo: string;
-  valor: number;
-}) {
+function MiniCard({ rotulo, valor }: { rotulo: string; valor: number }) {
   return (
-    <div className="flex flex-col gap-1 rounded-xl bg-muted/50 p-3.5">
+    <div className="bg-muted/50 flex flex-col gap-1 rounded-xl p-3.5">
       <span className="font-display text-[22px] leading-none tabular-nums">
         {fmtInt.format(valor)}
       </span>
-      <span className="text-[11.5px] text-muted-foreground">{rotulo}</span>
+      <span className="text-muted-foreground text-[11.5px]">{rotulo}</span>
     </div>
   );
 }
 
-function ExecucaoRow({
-  rotulo,
-  valor,
-}: {
-  rotulo: string;
-  valor: string;
-}) {
+function ExecucaoRow({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-t border-border py-2.5 text-[13.5px]">
+    <div className="border-border flex items-center justify-between gap-4 border-t py-2.5 text-[13.5px]">
       <span className="text-muted-foreground">{rotulo}</span>
       <span className="tabular-nums">{valor}</span>
     </div>
@@ -70,7 +58,7 @@ export function CapturaDrawer({
     >
       {/* Sub-header: quando + estado */}
       <div className="-mt-1 flex flex-wrap items-center gap-2">
-        <span className="tabular-nums text-[12.5px] text-muted-foreground">
+        <span className="text-muted-foreground text-[12.5px] tabular-nums">
           {quando}
         </span>
         <StatusBadge tone={tom}>{run.display_status}</StatusBadge>
@@ -78,7 +66,7 @@ export function CapturaDrawer({
 
       {/* Efeito no acervo */}
       <section>
-        <h3 className="mb-3 text-[10.5px] font-medium tracking-[0.10em] uppercase text-muted-foreground">
+        <h3 className="text-muted-foreground mb-3 text-[10.5px] font-medium tracking-[0.10em] uppercase">
           Efeito no acervo
         </h3>
         <div className="grid grid-cols-2 gap-2.5">
@@ -89,7 +77,7 @@ export function CapturaDrawer({
 
       {/* Execução */}
       <section>
-        <h3 className="mb-1 text-[10.5px] font-medium tracking-[0.10em] uppercase text-muted-foreground">
+        <h3 className="text-muted-foreground mb-1 text-[10.5px] font-medium tracking-[0.10em] uppercase">
           Execução
         </h3>
         <ExecucaoRow rotulo="Janela" valor={janela} />

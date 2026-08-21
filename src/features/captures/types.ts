@@ -1,10 +1,7 @@
 export type CaptureSource = "DJEN" | "DATAJUD";
 export type CaptureKind = "DAILY_CAPTURE" | "ENRICHMENT" | "INITIAL_LOAD";
 export type CaptureDisplayStatus =
-  | "Concluída"
-  | "Concluída com avisos"
-  | "Falha parcial"
-  | "Em andamento";
+  "Concluída" | "Concluída com avisos" | "Falha parcial" | "Em andamento";
 
 export interface CaptureRunView {
   id: string;

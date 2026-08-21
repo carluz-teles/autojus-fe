@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  AlarmClock,
-  CircleCheck,
-  CirclePlay,
-  ListChecks,
-} from "lucide-react";
+import { AlarmClock, CircleCheck, CirclePlay, ListChecks } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -76,8 +71,7 @@ export function TarefasView() {
     [todas, filtro],
   );
 
-  const conta = (s: TarefaStatus) =>
-    todas.filter((t) => t.status === s).length;
+  const conta = (s: TarefaStatus) => todas.filter((t) => t.status === s).length;
 
   if (isLoading) return <div className="p-8">Carregando…</div>;
 
@@ -151,10 +145,13 @@ export function TarefasView() {
                 principal={t.titulo}
                 apoio={`${t.codigo} · ${t.descricao}`}
               />,
-              <span key="p" className="tabular-nums text-muted-foreground">
+              <span key="p" className="text-muted-foreground tabular-nums">
                 {formatarData(t.vencimento)}
               </span>,
-              <span key="r" className="flex items-center gap-2 text-muted-foreground">
+              <span
+                key="r"
+                className="text-muted-foreground flex items-center gap-2"
+              >
                 <Avatar nome={t.responsavel} size={21} />
                 {t.responsavel.split(" ")[0]}
               </span>,
@@ -227,7 +224,7 @@ function Quadro({ tarefas }: { tarefas: Tarefa[] }) {
                 style={{ background: cor }}
               />
               <span className="text-[13px] font-medium">{status}</span>
-              <span className="ml-auto text-[11.5px] tabular-nums text-muted-foreground">
+              <span className="text-muted-foreground ml-auto text-[11.5px] tabular-nums">
                 {cards.length}
               </span>
             </div>
@@ -241,14 +238,14 @@ function Quadro({ tarefas }: { tarefas: Tarefa[] }) {
                   onDragStart={() => setArrastando(t.id)}
                   onDragEnd={() => setArrastando(null)}
                   className={cn(
-                    "block rounded-xl border-l-[3px] bg-card p-3.5 no-underline ring-hairline hover:no-underline",
+                    "bg-card ring-hairline block rounded-xl border-l-[3px] p-3.5 no-underline hover:no-underline",
                     arrastando === t.id && "opacity-45",
                   )}
                   style={{ borderLeftColor: cor }}
                 >
                   <span className="flex items-center gap-2">
                     <Chip>{t.codigo}</Chip>
-                    <span className="ml-auto flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span className="text-muted-foreground ml-auto flex items-center gap-1.5 text-[11px]">
                       <span
                         className="size-[7px] rounded-full"
                         style={{ background: COR_PRIORIDADE[t.prioridade] }}
@@ -256,19 +253,19 @@ function Quadro({ tarefas }: { tarefas: Tarefa[] }) {
                       {t.prioridade}
                     </span>
                   </span>
-                  <span className="mt-2 mb-2.5 block text-[13.5px] leading-snug text-foreground">
+                  <span className="text-foreground mt-2 mb-2.5 block text-[13.5px] leading-snug">
                     {t.titulo}
                   </span>
-                  <span className="flex items-center gap-2 border-t border-border pt-2.5">
+                  <span className="border-border flex items-center gap-2 border-t pt-2.5">
                     <Avatar nome={t.responsavel} size={21} />
-                    <span className="text-[11.5px] tabular-nums text-muted-foreground">
+                    <span className="text-muted-foreground text-[11.5px] tabular-nums">
                       vence {formatarData(t.vencimento)}
                     </span>
                   </span>
                 </Link>
               ))}
               {cards.length === 0 && (
-                <span className="px-1 py-2 text-xs text-muted-foreground/60">
+                <span className="text-muted-foreground/60 px-1 py-2 text-xs">
                   Nada aqui.
                 </span>
               )}

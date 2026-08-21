@@ -67,7 +67,8 @@ export function fmtJanela(
 
   // INITIAL_LOAD e ENRICHMENT herdam a janela da importação (intervalo). ENRICHMENT
   // sem janela cai no rótulo "incremental" (enriquecimento contínuo, sem import).
-  if (!windowFrom || !windowTo) return kind === "ENRICHMENT" ? "incremental" : "—";
+  if (!windowFrom || !windowTo)
+    return kind === "ENRICHMENT" ? "incremental" : "—";
   const f = new Date(`${windowFrom}T00:00:00`);
   const t = new Date(`${windowTo}T00:00:00`);
   if (Number.isNaN(f.getTime()) || Number.isNaN(t.getTime())) {
@@ -115,4 +116,3 @@ export function fmtDuracao(sec: number | null): string {
 
 /** Formatador de inteiros pt-BR (milhar com ponto). */
 export const fmtInt = new Intl.NumberFormat("pt-BR");
-

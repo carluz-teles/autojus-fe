@@ -40,7 +40,7 @@ export function StepperPeca({
             </span>
             {label}
             {i < PASSOS.length - 1 && (
-              <span className="ml-1 h-px w-6.5 bg-border" />
+              <span className="bg-border ml-1 h-px w-6.5" />
             )}
           </button>
         );

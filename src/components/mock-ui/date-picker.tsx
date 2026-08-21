@@ -66,20 +66,20 @@ export function DatePicker({
       <button
         type="button"
         onClick={() => setAberto((v) => !v)}
-        className="flex h-9 w-46 cursor-pointer items-center justify-between gap-2 rounded-lg border border-input bg-card px-3 text-[13px] tabular-nums"
+        className="border-input bg-card flex h-9 w-46 cursor-pointer items-center justify-between gap-2 rounded-lg border px-3 text-[13px] tabular-nums"
       >
         {valor ? formatarData(valor) : "Sem data"}
       </button>
 
       {aberto && (
-        <div className="absolute top-[calc(100%+4px)] right-0 z-30 w-67 rounded-xl border border-border bg-card p-3 shadow-[0_10px_28px_oklch(0.24_0.02_165/14%)]">
+        <div className="border-border bg-card absolute top-[calc(100%+4px)] right-0 z-30 w-67 rounded-xl border p-3 shadow-[0_10px_28px_oklch(0.24_0.02_165/14%)]">
           <div className="flex items-center justify-between">
             <button
               type="button"
               onClick={() =>
                 setMes(new Date(mes.getFullYear(), mes.getMonth() - 1))
               }
-              className="grid size-7 cursor-pointer place-items-center rounded-md hover:bg-muted"
+              className="hover:bg-muted grid size-7 cursor-pointer place-items-center rounded-md"
             >
               <ChevronLeft className="size-3.5" />
             </button>
@@ -91,7 +91,7 @@ export function DatePicker({
               onClick={() =>
                 setMes(new Date(mes.getFullYear(), mes.getMonth() + 1))
               }
-              className="grid size-7 cursor-pointer place-items-center rounded-md hover:bg-muted"
+              className="hover:bg-muted grid size-7 cursor-pointer place-items-center rounded-md"
             >
               <ChevronRight className="size-3.5" />
             </button>
@@ -101,7 +101,7 @@ export function DatePicker({
             {SEMANA.map((d, i) => (
               <span
                 key={i}
-                className="grid h-7 place-items-center text-[10.5px] text-muted-foreground"
+                className="text-muted-foreground grid h-7 place-items-center text-[10.5px]"
               >
                 {d}
               </span>
@@ -121,9 +121,9 @@ export function DatePicker({
                     setAberto(false);
                   }}
                   className={cn(
-                    "grid h-7.5 cursor-pointer place-items-center rounded-md text-[12.5px] tabular-nums hover:bg-muted",
+                    "hover:bg-muted grid h-7.5 cursor-pointer place-items-center rounded-md text-[12.5px] tabular-nums",
                     fds && "text-muted-foreground/60",
-                    ehHoje && "ring-1 ring-gold",
+                    ehHoje && "ring-gold ring-1",
                     selecionado &&
                       "bg-primary text-primary-foreground hover:bg-primary",
                   )}

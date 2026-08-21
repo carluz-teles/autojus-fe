@@ -35,7 +35,15 @@ export interface ListTasksParams {
 /** Agenda global — as tarefas do tenant, filtráveis por status/responsável/intimação. */
 export async function listTasks(
   fetcher: ApiFetcher,
-  { status, assignee, from, to, limit = 20, cursor, intimation_id }: ListTasksParams = {},
+  {
+    status,
+    assignee,
+    from,
+    to,
+    limit = 20,
+    cursor,
+    intimation_id,
+  }: ListTasksParams = {},
 ): Promise<PageEnvelope<TaskView>> {
   return fetcher<PageEnvelope<TaskView>>(ENDPOINT, {
     query: { status, assignee, from, to, limit, cursor, intimation_id },

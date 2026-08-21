@@ -25,23 +25,65 @@ const POLITICAS = [
 ];
 
 const VALIDACOES = [
-  { label: "Titular confere com a conta", detalhe: "LUAN GOMES · CPF ***.***.891-**", ok: true },
+  {
+    label: "Titular confere com a conta",
+    detalhe: "LUAN GOMES · CPF ***.***.891-**",
+    ok: true,
+  },
   { label: "OAB entre as monitoradas", detalhe: "347019/SP", ok: true },
-  { label: "Cadeia confiável e não revogada", detalhe: "AC Certisign RFB G5", ok: true },
+  {
+    label: "Cadeia confiável e não revogada",
+    detalhe: "AC Certisign RFB G5",
+    ok: true,
+  },
   { label: "Validade", detalhe: "vence em 44 dias — renove antes", ok: false },
-  { label: "Tipo do certificado", detalhe: "e-CPF A1 (assina peças)", ok: true },
+  {
+    label: "Tipo do certificado",
+    detalhe: "e-CPF A1 (assina peças)",
+    ok: true,
+  },
 ];
 
 const USOS = [
-  { data: "19/08/2026 10:42", ato: "Assinatura de peça", processo: "1017480-70.2020.8.26.0196", ip: "177.32.11.4" },
-  { data: "15/08/2026 16:20", ato: "Protocolo", processo: "1021596-17.2023.8.26.0196", ip: "177.32.11.4" },
+  {
+    data: "19/08/2026 10:42",
+    ato: "Assinatura de peça",
+    processo: "1017480-70.2020.8.26.0196",
+    ip: "177.32.11.4",
+  },
+  {
+    data: "15/08/2026 16:20",
+    ato: "Protocolo",
+    processo: "1021596-17.2023.8.26.0196",
+    ip: "177.32.11.4",
+  },
 ];
 
 const EQUIPE_CERT = [
-  { nome: "Luan Gomes", estado: "Ativo", detalhe: "vence em 44 dias", tom: "warning" as const },
-  { nome: "Renata Marcondes", estado: "Ativo", detalhe: "vence em 213 dias", tom: "success" as const },
-  { nome: "Ana Martins", estado: "Ausente", detalhe: "não assina nem protocola", tom: "danger" as const },
-  { nome: "Paulo Souza", estado: "Ativo", detalhe: "vence em 98 dias", tom: "success" as const },
+  {
+    nome: "Luan Gomes",
+    estado: "Ativo",
+    detalhe: "vence em 44 dias",
+    tom: "warning" as const,
+  },
+  {
+    nome: "Renata Marcondes",
+    estado: "Ativo",
+    detalhe: "vence em 213 dias",
+    tom: "success" as const,
+  },
+  {
+    nome: "Ana Martins",
+    estado: "Ausente",
+    detalhe: "não assina nem protocola",
+    tom: "danger" as const,
+  },
+  {
+    nome: "Paulo Souza",
+    estado: "Ativo",
+    detalhe: "vence em 98 dias",
+    tom: "success" as const,
+  },
 ];
 
 /**
@@ -65,12 +107,12 @@ export function CertificadoTab() {
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex gap-3">
-            <ShieldCheck className="mt-0.5 size-5 text-success" />
+            <ShieldCheck className="text-success mt-0.5 size-5" />
             <div>
               <h2 className="font-display text-lg font-medium">
                 Seu certificado
               </h2>
-              <p className="mt-1 text-[13px] text-muted-foreground">
+              <p className="text-muted-foreground mt-1 text-[13px]">
                 e-CPF A1 · ICP-Brasil · usado para assinar e protocolar no seu
                 nome.
               </p>
@@ -92,7 +134,7 @@ export function CertificadoTab() {
           ].map(([k, v]) => (
             <div
               key={k}
-              className="flex justify-between gap-3 border-b border-border py-2 text-[13px]"
+              className="border-border flex justify-between gap-3 border-b py-2 text-[13px]"
             >
               <dt className="text-muted-foreground">{k}</dt>
               <dd className="tabular-nums">{v}</dd>
@@ -124,14 +166,16 @@ export function CertificadoTab() {
                     i === passo
                       ? "border-primary bg-primary text-primary-foreground"
                       : i < passo
-                        ? "border-[color-mix(in_oklch,var(--primary)_40%,transparent)] text-primary"
+                        ? "text-primary border-[color-mix(in_oklch,var(--primary)_40%,transparent)]"
                         : "border-border",
                   )}
                 >
                   {i < passo ? "✓" : i + 1}
                 </span>
                 {label}
-                {i < PASSOS.length - 1 && <span className="h-px w-6 bg-border" />}
+                {i < PASSOS.length - 1 && (
+                  <span className="bg-border h-px w-6" />
+                )}
               </span>
             ))}
           </div>
@@ -140,17 +184,17 @@ export function CertificadoTab() {
             {passo === 0 && (
               <div>
                 <h3 className="text-sm font-medium">Arquivo do certificado</h3>
-                <p className="mt-1 text-[13px] text-muted-foreground">
+                <p className="text-muted-foreground mt-1 text-[13px]">
                   Aceita .pfx ou .p12. O e-CNPJ da sociedade não assina peças —
                   use o e-CPF do advogado.
                 </p>
-                <div className="mt-4 rounded-xl border border-dashed border-border p-8 text-center">
-                  <p className="text-[13px] text-muted-foreground">
+                <div className="border-border mt-4 rounded-xl border border-dashed p-8 text-center">
+                  <p className="text-muted-foreground text-[13px]">
                     Arraste o arquivo aqui ou clique para selecionar
                   </p>
                 </div>
-                <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
-                  <AlertTriangle className="mt-px size-3.5 shrink-0 text-gold" />
+                <p className="text-muted-foreground mt-3 flex items-start gap-2 text-xs">
+                  <AlertTriangle className="text-gold mt-px size-3.5 shrink-0" />
                   O arquivo é cifrado no envio. Nem administradores conseguem
                   baixá-lo de volta.
                 </p>
@@ -184,7 +228,7 @@ export function CertificadoTab() {
                       <span className="block text-[13.5px] font-medium">
                         {p.titulo}
                       </span>
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                      <span className="text-muted-foreground mt-0.5 block text-xs">
                         {p.trade}
                       </span>
                     </button>
@@ -198,14 +242,14 @@ export function CertificadoTab() {
                 <h3 className="text-sm font-medium">
                   Validação antes de ativar
                 </h3>
-                <p className="mt-1 text-[13px] text-muted-foreground">
+                <p className="text-muted-foreground mt-1 text-[13px]">
                   Cinco checagens explícitas — nada é ativado silenciosamente.
                 </p>
                 <div className="mt-3">
                   {VALIDACOES.map((v) => (
                     <div
                       key={v.label}
-                      className="flex items-center gap-3 border-t border-border py-2.5"
+                      className="border-border flex items-center gap-3 border-t py-2.5"
                     >
                       <span
                         className={cn(
@@ -216,7 +260,7 @@ export function CertificadoTab() {
                         {v.ok ? "✓" : "!"}
                       </span>
                       <span className="flex-1 text-[13.5px]">{v.label}</span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-muted-foreground text-xs">
                         {v.detalhe}
                       </span>
                     </div>
@@ -256,7 +300,7 @@ export function CertificadoTab() {
                     />
                   </div>
                 </div>
-                <p className="rounded-xl border border-border bg-muted/50 p-3.5 text-xs leading-relaxed text-muted-foreground">
+                <p className="border-border bg-muted/50 text-muted-foreground rounded-xl border p-3.5 text-xs leading-relaxed">
                   Declaro que sou o titular do certificado e autorizo seu uso
                   nos atos marcados acima. Todo uso é registrado com data, ato,
                   processo e IP.
@@ -265,7 +309,7 @@ export function CertificadoTab() {
             )}
           </div>
 
-          <div className="mt-5 flex items-center justify-between gap-2 border-t border-border pt-4">
+          <div className="border-border mt-5 flex items-center justify-between gap-2 border-t pt-4">
             {passo > 0 ? (
               <Button
                 variant="ghost"
@@ -298,21 +342,23 @@ export function CertificadoTab() {
 
       <Card>
         <h2 className="font-display text-lg font-medium">Registro de uso</h2>
-        <p className="mt-1 text-[13px] text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-[13px]">
           Todo ato assinado ou protocolado fica registrado.
         </p>
         <div className="mt-3">
           {USOS.map((u) => (
             <div
               key={u.data}
-              className="grid grid-cols-[150px_minmax(0,1fr)_210px_110px] items-center gap-3 border-t border-border py-2.5 text-[13px]"
+              className="border-border grid grid-cols-[150px_minmax(0,1fr)_210px_110px] items-center gap-3 border-t py-2.5 text-[13px]"
             >
-              <span className="tabular-nums text-muted-foreground">{u.data}</span>
+              <span className="text-muted-foreground tabular-nums">
+                {u.data}
+              </span>
               <span>{u.ato}</span>
-              <span className="truncate tabular-nums text-muted-foreground">
+              <span className="text-muted-foreground truncate tabular-nums">
                 {u.processo}
               </span>
-              <span className="tabular-nums text-muted-foreground">{u.ip}</span>
+              <span className="text-muted-foreground tabular-nums">{u.ip}</span>
             </div>
           ))}
         </div>
@@ -322,17 +368,17 @@ export function CertificadoTab() {
         <h2 className="font-display text-lg font-medium">
           Certificados da equipe
         </h2>
-        <p className="mt-1 text-[13px] text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-[13px]">
           Administradores veem o estado, nunca o arquivo.
         </p>
         <div className="mt-3">
           {EQUIPE_CERT.map((m) => (
             <div
               key={m.nome}
-              className="flex items-center gap-3 border-t border-border py-2.5 text-[13px]"
+              className="border-border flex items-center gap-3 border-t py-2.5 text-[13px]"
             >
               <span className="flex-1">{m.nome}</span>
-              <span className="text-xs text-muted-foreground">{m.detalhe}</span>
+              <span className="text-muted-foreground text-xs">{m.detalhe}</span>
               <StatusBadge tone={m.tom}>{m.estado}</StatusBadge>
             </div>
           ))}
@@ -340,13 +386,13 @@ export function CertificadoTab() {
       </Card>
 
       <Card className="border border-[color-mix(in_oklch,var(--destructive)_25%,transparent)]">
-        <h2 className="font-display text-lg font-medium text-destructive">
+        <h2 className="font-display text-destructive text-lg font-medium">
           Zona de risco
         </h2>
-        <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-          Remover o certificado interrompe assinaturas e protocolos em andamento.
-          Peças aguardando assinatura ficam bloqueadas até um novo certificado
-          ser instalado.
+        <p className="text-muted-foreground mt-1 text-[13px] leading-relaxed">
+          Remover o certificado interrompe assinaturas e protocolos em
+          andamento. Peças aguardando assinatura ficam bloqueadas até um novo
+          certificado ser instalado.
         </p>
         <div className="mt-3.5 flex items-center gap-2">
           <Input

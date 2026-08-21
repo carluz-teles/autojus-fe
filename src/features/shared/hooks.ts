@@ -34,7 +34,10 @@ export const useIntimacoes = () =>
   useQuery({ queryKey: keys.intimacoes, queryFn: api.listIntimacoes });
 
 export const useIntimacao = (id: string) =>
-  useQuery({ queryKey: keys.intimacao(id), queryFn: () => api.getIntimacao(id) });
+  useQuery({
+    queryKey: keys.intimacao(id),
+    queryFn: () => api.getIntimacao(id),
+  });
 
 export function useUpdatePrazo(intimacaoId: string) {
   const invalidar = useInvalidarTudo();

@@ -14,7 +14,10 @@ import { Field, Input, Switch } from "@/components/mock-ui/input";
 import { Card, SectionTitle } from "@/components/mock-ui/layout";
 import { Skeleton, SkeletonRows } from "@/components/mock-ui/skeleton";
 import { StatusBadge, type Tom } from "@/components/mock-ui/status-badge";
-import { useNotificationPreferences, useSetNotificationPreference } from "@/features/notifications/hooks/use-notification-preferences";
+import {
+  useNotificationPreferences,
+  useSetNotificationPreference,
+} from "@/features/notifications/hooks/use-notification-preferences";
 import { NOTIFICATION_TYPES } from "@/features/notifications/lib/labels";
 import type { NotificationChannel } from "@/features/notifications/types";
 import { useOrgLogo } from "@/features/organization/hooks/use-org-logo";
@@ -29,7 +32,10 @@ import { useOrgProfileEditForm } from "@/features/organization/hooks/use-org-pro
 import { useIsOrgAdmin } from "@/features/organization/hooks/use-org-role";
 import { useRemoveOrgMember } from "@/features/organization/hooks/use-remove-org-member";
 import { roleLabel as beRoleLabel } from "@/features/organization/lib/labels";
-import type { OrgMemberView, OrgProfileView } from "@/features/organization/types";
+import type {
+  OrgMemberView,
+  OrgProfileView,
+} from "@/features/organization/types";
 import { ApiError } from "@/lib/api/errors";
 import { maskCnpj, maskPhone } from "@/lib/masks";
 import { cn } from "@/lib/utils";
@@ -105,12 +111,14 @@ export function OrganizacaoTab() {
       <Card>
         <div className="flex items-center gap-3.5">
           <LogoEditor isAdmin={isAdmin} />
-          <h2 className="font-display text-lg font-medium">Dados do escritório</h2>
+          <h2 className="font-display text-lg font-medium">
+            Dados do escritório
+          </h2>
         </div>
         {isProfileLoading ? (
           <SkeletonRows rows={5} className="mt-3.5" />
         ) : profileLoadFailed || !profile ? (
-          <p className="mt-3.5 text-[13px] text-destructive">
+          <p className="text-destructive mt-3.5 text-[13px]">
             Não foi possível carregar os dados do escritório.
           </p>
         ) : (
@@ -118,7 +126,7 @@ export function OrganizacaoTab() {
             {profileRows(profile).map(([k, v]) => (
               <div
                 key={k}
-                className="flex items-center justify-between gap-4 border-t border-border py-2.5 text-[13.5px]"
+                className="border-border flex items-center justify-between gap-4 border-t py-2.5 text-[13.5px]"
               >
                 <span className="text-muted-foreground">{k}</span>
                 <span>{v}</span>
@@ -150,7 +158,9 @@ export function OrganizacaoTab() {
         <MembrosList isAdmin={isAdmin} />
       </Card>
 
-      {editing ? <EditarPerfilDialog onFechar={() => setEditing(false)} /> : null}
+      {editing ? (
+        <EditarPerfilDialog onFechar={() => setEditing(false)} />
+      ) : null}
       {inviting ? (
         <ConvidarMembroDialog onFechar={() => setInviting(false)} />
       ) : null}
@@ -178,7 +188,7 @@ function MembrosList({ isAdmin }: { isAdmin: boolean }) {
     return (
       <div className="mt-3.5">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="border-t border-border py-3 first:border-t-0">
+          <div key={i} className="border-border border-t py-3 first:border-t-0">
             <div className="grid grid-cols-[32px_minmax(0,1fr)_150px_110px_32px] items-center gap-3.5">
               <Skeleton className="size-8 rounded-full" />
               <div className="flex min-w-0 flex-col gap-1.5">
@@ -197,7 +207,7 @@ function MembrosList({ isAdmin }: { isAdmin: boolean }) {
 
   if (membersError) {
     return (
-      <p className="mt-3.5 text-[13px] text-destructive">
+      <p className="text-destructive mt-3.5 text-[13px]">
         Não foi possível carregar os membros. Tente novamente.
       </p>
     );
@@ -237,7 +247,7 @@ function MembrosList({ isAdmin }: { isAdmin: boolean }) {
 
   if (members.length === 0 && pendentes.length === 0) {
     return (
-      <p className="mt-3.5 border-t border-border py-3 text-[13px] text-muted-foreground">
+      <p className="border-border text-muted-foreground mt-3.5 border-t py-3 text-[13px]">
         Nenhum membro ainda.
       </p>
     );
@@ -249,35 +259,37 @@ function MembrosList({ isAdmin }: { isAdmin: boolean }) {
         const displayName = m.name || m.email;
         const isSelf = !!currentUserEmail && m.email === currentUserEmail;
         return (
-        <div key={m.id} className="border-t border-border py-3">
-          <div className="grid grid-cols-[32px_minmax(0,1fr)_150px_110px_32px] items-center gap-3.5">
-            <Avatar nome={displayName} size={32} />
-            <span className="min-w-0">
-              <span className="block text-[13.5px] font-medium">{displayName}</span>
-              <span className="block truncate text-[11.5px] text-muted-foreground">
-                {m.email}
+          <div key={m.id} className="border-border border-t py-3">
+            <div className="grid grid-cols-[32px_minmax(0,1fr)_150px_110px_32px] items-center gap-3.5">
+              <Avatar nome={displayName} size={32} />
+              <span className="min-w-0">
+                <span className="block text-[13.5px] font-medium">
+                  {displayName}
+                </span>
+                <span className="text-muted-foreground block truncate text-[11.5px]">
+                  {m.email}
+                </span>
               </span>
-            </span>
-            <span className="text-[12.5px] text-muted-foreground">
-              {beRoleLabel(m.role)}
-            </span>
-            <StatusBadge tone="success" className="justify-self-start">
-              Ativo
-            </StatusBadge>
-            {isAdmin && !isSelf ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`Remover ${displayName}`}
-                onClick={() => setConfirmId(m.id)}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            ) : (
-              <span />
-            )}
+              <span className="text-muted-foreground text-[12.5px]">
+                {beRoleLabel(m.role)}
+              </span>
+              <StatusBadge tone="success" className="justify-self-start">
+                Ativo
+              </StatusBadge>
+              {isAdmin && !isSelf ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Remover ${displayName}`}
+                  onClick={() => setConfirmId(m.id)}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              ) : (
+                <span />
+              )}
+            </div>
           </div>
-        </div>
         );
       })}
       <ConfirmDialog
@@ -298,18 +310,18 @@ function MembrosList({ isAdmin }: { isAdmin: boolean }) {
       />
 
       {pendentes.map((inv) => (
-        <div key={inv.id} className="border-t border-border py-3">
+        <div key={inv.id} className="border-border border-t py-3">
           <div className="grid grid-cols-[32px_minmax(0,1fr)_150px_110px_32px] items-center gap-3.5">
             <Avatar nome="—" size={32} />
             <span className="min-w-0">
               <span className="block text-[13.5px] font-medium">
                 Convite pendente
               </span>
-              <span className="block truncate text-[11.5px] text-muted-foreground">
+              <span className="text-muted-foreground block truncate text-[11.5px]">
                 {inv.emailAddress}
               </span>
             </span>
-            <span className="text-[12.5px] text-muted-foreground">
+            <span className="text-muted-foreground text-[12.5px]">
               {clerkRoleLabel(inv.role)}
             </span>
             <StatusBadge tone="warning" className="justify-self-start">
@@ -374,7 +386,7 @@ function EditarPerfilDialog({ onFechar }: { onFechar: () => void }) {
   return (
     <Dialog aberto titulo="Editar dados do escritório" onFechar={onFechar}>
       <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
-        <p className="-mt-2 text-[13px] leading-relaxed text-muted-foreground">
+        <p className="text-muted-foreground -mt-2 text-[13px] leading-relaxed">
           Estes dados aparecem nas peças e no cadastro junto aos tribunais.
         </p>
 
@@ -432,7 +444,7 @@ function EditarPerfilDialog({ onFechar }: { onFechar: () => void }) {
           </Field>
         </div>
 
-        <div className="mt-1 flex items-center justify-end gap-2 border-t border-border pt-4">
+        <div className="border-border mt-1 flex items-center justify-end gap-2 border-t pt-4">
           <Button type="button" variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
@@ -494,8 +506,9 @@ function ConvidarMembroDialog({ onFechar }: { onFechar: () => void }) {
         className="flex flex-col gap-5"
         noValidate
       >
-        <p className="text-[13px] leading-relaxed text-muted-foreground">
-          O convidado recebe um e-mail para criar a conta e entrar no escritório.
+        <p className="text-muted-foreground text-[13px] leading-relaxed">
+          O convidado recebe um e-mail para criar a conta e entrar no
+          escritório.
         </p>
 
         <Field label="E-mail profissional" error={emailError ?? undefined}>
@@ -513,8 +526,14 @@ function ConvidarMembroDialog({ onFechar }: { onFechar: () => void }) {
         </Field>
 
         <div className="flex flex-col gap-2">
-          <span className="text-[12.5px] font-medium text-foreground">Papel</span>
-          <div role="radiogroup" aria-label="Papel" className="flex flex-col gap-2">
+          <span className="text-foreground text-[12.5px] font-medium">
+            Papel
+          </span>
+          <div
+            role="radiogroup"
+            aria-label="Papel"
+            className="flex flex-col gap-2"
+          >
             {ORG_ROLES.map((r) => {
               const selected = role === r.value;
               return (
@@ -527,7 +546,7 @@ function ConvidarMembroDialog({ onFechar }: { onFechar: () => void }) {
                   className={cn(
                     "flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition-colors",
                     selected
-                      ? "border-primary bg-[color-mix(in_oklch,var(--primary)_4%,transparent)] ring-1 ring-primary/20"
+                      ? "border-primary ring-primary/20 bg-[color-mix(in_oklch,var(--primary)_4%,transparent)] ring-1"
                       : "border-border hover:border-primary/40",
                   )}
                 >
@@ -538,14 +557,14 @@ function ConvidarMembroDialog({ onFechar }: { onFechar: () => void }) {
                     )}
                   >
                     {selected ? (
-                      <span className="size-2 rounded-full bg-primary" />
+                      <span className="bg-primary size-2 rounded-full" />
                     ) : null}
                   </span>
                   <span className="min-w-0">
                     <span className="block text-[13.5px] font-medium">
                       {r.label}
                     </span>
-                    <span className="mt-0.5 block text-[12.5px] leading-relaxed text-muted-foreground">
+                    <span className="text-muted-foreground mt-0.5 block text-[12.5px] leading-relaxed">
                       {r.desc}
                     </span>
                   </span>
@@ -555,7 +574,7 @@ function ConvidarMembroDialog({ onFechar }: { onFechar: () => void }) {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+        <div className="border-border flex items-center justify-end gap-2 border-t pt-4">
           <Button type="button" variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
@@ -616,11 +635,11 @@ export function TribunaisTab() {
               <span className="text-[14.5px] font-medium">{a.nome}</span>
               <StatusBadge tone={a.tom}>{a.estado}</StatusBadge>
             </div>
-            <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+            <p className="text-muted-foreground mt-1.5 text-[13px] leading-relaxed">
               {a.desc}
             </p>
           </div>
-          <span className="text-xs text-muted-foreground">{a.quando}</span>
+          <span className="text-muted-foreground text-xs">{a.quando}</span>
           <Button variant="outline" size="sm" className="justify-self-end">
             {a.acao}
           </Button>
@@ -633,7 +652,12 @@ export function TribunaisTab() {
 /* ---------- Cobrança ---------- */
 
 const USO = [
-  { rotulo: "Processos monitorados", valor: "6.818", limite: "de 10.000", pct: 68 },
+  {
+    rotulo: "Processos monitorados",
+    valor: "6.818",
+    limite: "de 10.000",
+    pct: 68,
+  },
   { rotulo: "OABs monitoradas", valor: "3", limite: "de 10", pct: 30 },
   { rotulo: "Peças geradas no mês", valor: "48", limite: "de 200", pct: 24 },
   { rotulo: "Usuários", valor: "4", limite: "de 10", pct: 40 },
@@ -652,9 +676,9 @@ export function CobrancaTab() {
             <span className="font-display text-[22px] tabular-nums">
               R$ 890
             </span>
-            <span className="text-[13px] text-muted-foreground">/mês</span>
+            <span className="text-muted-foreground text-[13px]">/mês</span>
           </div>
-          <p className="mt-1.5 text-[12.5px] text-muted-foreground">
+          <p className="text-muted-foreground mt-1.5 text-[12.5px]">
             Próxima fatura em 01/09/2026 · Mastercard •••• 4471
           </p>
         </div>
@@ -670,7 +694,7 @@ export function CobrancaTab() {
           {USO.map((u) => (
             <div key={u.rotulo}>
               <div className="flex items-baseline justify-between gap-3">
-                <span className="text-[13px] text-muted-foreground">
+                <span className="text-muted-foreground text-[13px]">
                   {u.rotulo}
                 </span>
                 <span className="text-[13px] tabular-nums">
@@ -678,9 +702,9 @@ export function CobrancaTab() {
                   <span className="text-muted-foreground">{u.limite}</span>
                 </span>
               </div>
-              <div className="mt-2 h-[5px] overflow-hidden rounded-sm bg-muted">
+              <div className="bg-muted mt-2 h-[5px] overflow-hidden rounded-sm">
                 <div
-                  className="h-[5px] bg-primary"
+                  className="bg-primary h-[5px]"
                   style={{ width: `${u.pct}%` }}
                 />
               </div>
@@ -694,14 +718,14 @@ export function CobrancaTab() {
         {FATURAS.map((f) => (
           <div
             key={f}
-            className="grid grid-cols-[140px_minmax(0,1fr)_100px_90px] items-center gap-3.5 border-t border-border py-3 text-[13px]"
+            className="border-border grid grid-cols-[140px_minmax(0,1fr)_100px_90px] items-center gap-3.5 border-t py-3 text-[13px]"
           >
             <span className="tabular-nums">{f}</span>
             <span className="text-muted-foreground">Plano Escritório</span>
             <span className="tabular-nums">R$ 890,00</span>
             <button
               type="button"
-              className="cursor-pointer justify-self-end text-[12.5px] text-primary"
+              className="text-primary cursor-pointer justify-self-end text-[12.5px]"
             >
               Baixar
             </button>
@@ -755,14 +779,14 @@ export function NotificacoesTab() {
       <h2 className="font-display text-lg font-medium">
         Preferências de notificação
       </h2>
-      <p className="mt-2 text-[13px] text-muted-foreground">
+      <p className="text-muted-foreground mt-2 text-[13px]">
         Escolha por qual canal receber cada tipo de aviso. Sem configuração
         salva, todos os canais ficam ativos por padrão.
       </p>
 
       {isPending ? (
         <div className="mt-4.5">
-          <div className="grid grid-cols-[minmax(0,1fr)_repeat(2,100px)] gap-2.5 border-b border-border pb-2.5">
+          <div className="border-border grid grid-cols-[minmax(0,1fr)_repeat(2,100px)] gap-2.5 border-b pb-2.5">
             <span />
             {CANAIS.map((c) => (
               <Skeleton key={c.key} className="h-3 w-10 justify-self-center" />
@@ -771,7 +795,7 @@ export function NotificacoesTab() {
           {Array.from({ length: 7 }).map((_, i) => (
             <div
               key={i}
-              className="grid grid-cols-[minmax(0,1fr)_repeat(2,100px)] items-center gap-2.5 border-b border-border py-3 last:border-0"
+              className="border-border grid grid-cols-[minmax(0,1fr)_repeat(2,100px)] items-center gap-2.5 border-b py-3 last:border-0"
             >
               <Skeleton className="h-3.5 w-40" />
               {CANAIS.map((c) => (
@@ -784,17 +808,17 @@ export function NotificacoesTab() {
           ))}
         </div>
       ) : isError ? (
-        <p role="alert" className="mt-4 text-sm text-destructive">
+        <p role="alert" className="text-destructive mt-4 text-sm">
           Não foi possível carregar as preferências. Tente novamente.
         </p>
       ) : (
         <>
-          <div className="mt-4.5 grid grid-cols-[minmax(0,1fr)_repeat(2,100px)] gap-2.5 border-b border-border pb-2.5">
+          <div className="border-border mt-4.5 grid grid-cols-[minmax(0,1fr)_repeat(2,100px)] gap-2.5 border-b pb-2.5">
             <span />
             {CANAIS.map((c) => (
               <span
                 key={c.key}
-                className="text-center text-[11px] font-medium tracking-[0.06em] uppercase text-muted-foreground"
+                className="text-muted-foreground text-center text-[11px] font-medium tracking-[0.06em] uppercase"
               >
                 {c.label}
               </span>
@@ -804,7 +828,7 @@ export function NotificacoesTab() {
           {NOTIFICATION_TYPES.map(({ type, label }) => (
             <div
               key={type}
-              className="grid grid-cols-[minmax(0,1fr)_repeat(2,100px)] items-center gap-2.5 border-b border-border py-3 last:border-0"
+              className="border-border grid grid-cols-[minmax(0,1fr)_repeat(2,100px)] items-center gap-2.5 border-b py-3 last:border-0"
             >
               <span className="text-[13.5px]">{label}</span>
               {CANAIS.map((canal) => (
@@ -878,7 +902,9 @@ export function PerfilTab() {
           />
           <div>
             <p className="font-display text-xl">{user.fullName ?? "—"}</p>
-            <p className="text-[12.5px] text-muted-foreground">{papel || "Membro"}</p>
+            <p className="text-muted-foreground text-[12.5px]">
+              {papel || "Membro"}
+            </p>
           </div>
           <Button
             variant="outline"
@@ -893,7 +919,7 @@ export function PerfilTab() {
           {infoRows.map(([k, v]) => (
             <div
               key={k}
-              className="flex items-center justify-between gap-4 border-t border-border py-2.5 text-[13.5px]"
+              className="border-border flex items-center justify-between gap-4 border-t py-2.5 text-[13.5px]"
             >
               <span className="text-muted-foreground">{k}</span>
               <span>{v}</span>
@@ -904,13 +930,16 @@ export function PerfilTab() {
 
       <Card>
         <div className="flex items-center gap-2">
-          <Shield className="text-muted-foreground size-[15px]" strokeWidth={1.7} />
+          <Shield
+            className="text-muted-foreground size-[15px]"
+            strokeWidth={1.7}
+          />
           <h2 className="font-display text-lg font-medium">Segurança</h2>
         </div>
-        <div className="mt-3 flex items-center justify-between gap-4 border-t border-border py-3">
+        <div className="border-border mt-3 flex items-center justify-between gap-4 border-t py-3">
           <span className="text-[13.5px]">
             Alterar senha
-            <span className="block text-[11.5px] text-muted-foreground">
+            <span className="text-muted-foreground block text-[11.5px]">
               Gerenciado pelo Clerk
             </span>
           </span>
@@ -918,11 +947,11 @@ export function PerfilTab() {
             Alterar senha
           </Button>
         </div>
-        <div className="flex items-center justify-between gap-4 border-t border-border py-3">
+        <div className="border-border flex items-center justify-between gap-4 border-t py-3">
           <span className="text-[13.5px]">
             Verificação em duas etapas
             {user.twoFactorEnabled !== undefined && (
-              <span className="block text-[11.5px] text-muted-foreground">
+              <span className="text-muted-foreground block text-[11.5px]">
                 {user.twoFactorEnabled
                   ? "Habilitada na sua conta"
                   : "Não habilitada"}

@@ -45,10 +45,7 @@ export function StatusBadge({
       style={{ background: fundo, color: cor }}
     >
       {ponto && (
-        <span
-          className="size-1.5 rounded-full"
-          style={{ background: cor }}
-        />
+        <span className="size-1.5 rounded-full" style={{ background: cor }} />
       )}
       {children}
     </span>
@@ -65,7 +62,7 @@ export function Chip({
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center truncate rounded-lg bg-muted/70 px-2 py-0.5 font-mono text-[11px] text-muted-foreground",
+        "bg-muted/70 text-muted-foreground inline-flex max-w-full items-center truncate rounded-lg px-2 py-0.5 font-mono text-[11px]",
         className,
       )}
     >
@@ -76,7 +73,7 @@ export function Chip({
 
 export function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-block max-w-full truncate rounded-full bg-muted px-2.5 py-0.5 text-[11.5px] font-medium">
+    <span className="bg-muted inline-block max-w-full truncate rounded-full px-2.5 py-0.5 text-[11.5px] font-medium">
       {children}
     </span>
   );

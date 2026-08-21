@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleCheck, Clock,FileText, PenLine } from "lucide-react";
+import { CircleCheck, Clock, FileText, PenLine } from "lucide-react";
 import { useState } from "react";
 
 import { Kpi } from "@/components/mock-ui/data-display";
@@ -117,9 +117,14 @@ export function PecasView() {
             <CelulaDupla
               key="p"
               principal={`${l.peca.tipo} ${l.peca.versao}`}
-              apoio={l.peca.protocolo ? `Protocolo ${l.peca.protocolo}` : undefined}
+              apoio={
+                l.peca.protocolo ? `Protocolo ${l.peca.protocolo}` : undefined
+              }
             />,
-            <span key="pr" className="block truncate tabular-nums text-muted-foreground">
+            <span
+              key="pr"
+              className="text-muted-foreground block truncate tabular-nums"
+            >
               {l.processo}
             </span>,
             <span
@@ -129,7 +134,7 @@ export function PecasView() {
             >
               {l.prazo}
             </span>,
-            <span key="r" className="block truncate text-muted-foreground">
+            <span key="r" className="text-muted-foreground block truncate">
               {l.peca.responsavel}
             </span>,
             <StatusBadge key="s" tone={TOM_PECA[l.peca.status]} ponto>

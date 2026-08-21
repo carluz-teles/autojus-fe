@@ -8,3 +8,6 @@ package-lock.json
 # infra (Terraform + cache .terraform) e workflows de CI — não são código-fonte JS/TS
 infra/
 .github/
+
+# artefatos de design handoff (HTML/JS vendored) — não é código-fonte do app
+docs/

@@ -46,9 +46,18 @@ export function TeorPublicacao({
   const [transborda, setTransborda] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
+  // Reavalia o transbordo a cada reflow do conteúdo — não só na troca de content/altura.
+  // scrollHeight reflete a altura REAL mesmo com o maxHeight de colapso aplicado (overflow
+  // hidden não muda scrollHeight), então uma mudança de largura (resize da janela na tela
+  // full, ou do painel) recalcula corretamente se o botão "Ver mais" deve aparecer.
   useEffect(() => {
     const el = contentRef.current;
-    if (el) setTransborda(el.scrollHeight > collapsedHeight);
+    if (!el) return;
+    const medir = () => setTransborda(el.scrollHeight > collapsedHeight);
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [content, collapsedHeight]);
 
   return (

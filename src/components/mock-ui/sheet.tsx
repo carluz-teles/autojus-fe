@@ -39,14 +39,14 @@ export function Sheet({
     >
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-40 bg-[oklch(0.24_0.02_165/25%)] backdrop-blur-[2px] transition-opacity duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
-        <Dialog.Popup className="fixed inset-y-0 right-0 z-40 flex w-[420px] flex-col border-l border-border bg-card shadow-[-12px_0_40px_oklch(0.24_0.02_165/14%)] outline-none transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] data-[ending-style]:translate-x-full data-[starting-style]:translate-x-full">
-          <header className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
+        <Dialog.Popup className="border-border bg-card fixed inset-y-0 right-0 z-40 flex w-[420px] flex-col border-l shadow-[-12px_0_40px_oklch(0.24_0.02_165/14%)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] outline-none data-[ending-style]:translate-x-full data-[starting-style]:translate-x-full">
+          <header className="border-border flex items-start justify-between gap-4 border-b px-6 py-5">
             <div>
               <Dialog.Title className="font-display text-xl leading-snug">
                 {titulo}
               </Dialog.Title>
               {descricao && (
-                <Dialog.Description className="mt-1 text-[12.5px] text-muted-foreground">
+                <Dialog.Description className="text-muted-foreground mt-1 text-[12.5px]">
                   {descricao}
                 </Dialog.Description>
               )}
@@ -63,7 +63,7 @@ export function Sheet({
             {children}
           </div>
 
-          <footer className="flex items-center justify-between gap-2 border-t border-border px-6 py-4">
+          <footer className="border-border flex items-center justify-between gap-2 border-t px-6 py-4">
             {rodape ?? (
               <>
                 {onLimpar ? (

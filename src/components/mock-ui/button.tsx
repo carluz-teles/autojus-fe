@@ -22,8 +22,7 @@ const SIZES: Record<Size, string> = {
   icon: "size-8.5 justify-center",
 };
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
   asChild?: boolean;

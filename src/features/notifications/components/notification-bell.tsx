@@ -48,7 +48,7 @@ export function NotificationBell() {
 
       <Popover.Portal>
         <Popover.Positioner side="bottom" align="end" sideOffset={8}>
-          <Popover.Popup className="bg-popover w-80 overflow-hidden rounded-xl border shadow-lg outline-none transition-[transform,opacity] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+          <Popover.Popup className="bg-popover w-80 overflow-hidden rounded-xl border shadow-lg transition-[transform,opacity] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] outline-none data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
             <div className="flex items-center justify-between border-b px-4 py-2.5">
               <span className="text-sm font-medium">Notificações</span>
               {count > 0 ? (

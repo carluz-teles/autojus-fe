@@ -44,9 +44,7 @@ export async function lookupOabName(
 
 /** Extrai as OABs monitoradas da lista de integrações (source === "DJEN"). */
 export function extractDjenOabs(integrations: IntegrationView[]): string[] {
-  return (
-    integrations.find((i) => i.source === "DJEN")?.scope.oab ?? []
-  );
+  return integrations.find((i) => i.source === "DJEN")?.scope.oab ?? [];
 }
 
 /** OABs monitoradas com nome derivado de party_counsel. */

@@ -39,12 +39,12 @@ export function ConfirmDialog({
     >
       <AlertDialog.Portal>
         <AlertDialog.Backdrop className="fixed inset-0 z-50 bg-[oklch(0.24_0.02_165/25%)] backdrop-blur-[2px] transition-opacity duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
-        <AlertDialog.Popup className="fixed top-1/2 left-1/2 z-50 w-[380px] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-card p-5 shadow-[0_20px_60px_oklch(0.24_0.02_165/18%)] outline-none transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+        <AlertDialog.Popup className="border-border bg-card fixed top-1/2 left-1/2 z-50 w-[380px] -translate-x-1/2 -translate-y-1/2 rounded-xl border p-5 shadow-[0_20px_60px_oklch(0.24_0.02_165/18%)] transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] outline-none data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
           <AlertDialog.Title className="font-display text-lg leading-snug">
             {titulo}
           </AlertDialog.Title>
           {descricao ? (
-            <AlertDialog.Description className="mt-1.5 text-[13px] text-muted-foreground">
+            <AlertDialog.Description className="text-muted-foreground mt-1.5 text-[13px]">
               {descricao}
             </AlertDialog.Description>
           ) : null}

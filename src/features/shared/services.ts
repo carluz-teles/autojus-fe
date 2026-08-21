@@ -16,10 +16,10 @@ import type {
   Tarefa,
 } from "./types";
 
-const espera = <T,>(valor: T, ms = 90) =>
+const espera = <T>(valor: T, ms = 90) =>
   new Promise<T>((resolve) => setTimeout(() => resolve(valor), ms));
 
-const clone = <T,>(v: T): T => structuredClone(v);
+const clone = <T>(v: T): T => structuredClone(v);
 
 function montarIntimacao(i: Intimacao): IntimacaoCompleta {
   return {
@@ -105,7 +105,10 @@ export async function updateTarefa(
   return espera(clone(alvo));
 }
 
-export async function addComentario(id: string, texto: string): Promise<Tarefa> {
+export async function addComentario(
+  id: string,
+  texto: string,
+): Promise<Tarefa> {
   const alvo = TAREFAS.find((t) => t.id === id);
   if (!alvo) throw new Error("Tarefa nao encontrada: " + id);
   alvo.comentarios.push({

@@ -50,12 +50,22 @@ export function DashboardView() {
     .filter((i) => i.dias !== null && i.dias <= 2)
     .sort((a, b) => (a.dias ?? 0) - (b.dias ?? 0));
 
-  const naoConfirmados = decoradas.filter((i) => i.prazo?.estado === "sugerido");
+  const naoConfirmados = decoradas.filter(
+    (i) => i.prazo?.estado === "sugerido",
+  );
 
   const dias = [
-    { label: "Atrasado", data: "até 18/08", teste: (d: number | null) => d !== null && d < 0 },
+    {
+      label: "Atrasado",
+      data: "até 18/08",
+      teste: (d: number | null) => d !== null && d < 0,
+    },
     { label: "Hoje", data: "qua, 19/08", teste: (d: number | null) => d === 0 },
-    { label: "Amanhã", data: "qui, 20/08", teste: (d: number | null) => d === 1 },
+    {
+      label: "Amanhã",
+      data: "qui, 20/08",
+      teste: (d: number | null) => d === 1,
+    },
     { label: "Sexta", data: "21/08", teste: (d: number | null) => d === 2 },
   ].map((g) => ({ ...g, itens: decoradas.filter((i) => g.teste(i.dias)) }));
 
@@ -65,7 +75,7 @@ export function DashboardView() {
         titulo="Dashboard"
         descricao="O que exige providência hoje, e como o escritório está andando."
         acoes={
-          <span className="text-xs tabular-nums text-muted-foreground">
+          <span className="text-muted-foreground text-xs tabular-nums">
             Última captura DJEN: hoje, 06:10
           </span>
         }
@@ -116,14 +126,14 @@ export function DashboardView() {
               <Link
                 key={i.id}
                 href={`/intimacoes/${i.id}`}
-                className="grid grid-cols-[minmax(0,1fr)_132px_120px] items-center gap-4 border-t border-border border-l-[3px] px-3 py-3.5 no-underline hover:bg-muted hover:no-underline"
+                className="border-border hover:bg-muted grid grid-cols-[minmax(0,1fr)_132px_120px] items-center gap-4 border-t border-l-[3px] px-3 py-3.5 no-underline hover:no-underline"
                 style={{ borderLeftColor: corDaUrgencia(i.urgencia) }}
               >
                 <span className="min-w-0">
-                  <span className="block text-sm font-medium text-foreground">
+                  <span className="text-foreground block text-sm font-medium">
                     {i.titulo}
                   </span>
-                  <span className="mt-0.5 block text-[11.5px] tabular-nums text-muted-foreground">
+                  <span className="text-muted-foreground mt-0.5 block text-[11.5px] tabular-nums">
                     {i.processo} · {i.providencias.length} providência(s)
                   </span>
                 </span>
@@ -132,20 +142,20 @@ export function DashboardView() {
                   style={{ color: corDaUrgencia(i.urgencia) }}
                 >
                   {rotuloPrazo(i.dias)}
-                  <span className="block text-[11px] text-muted-foreground">
+                  <span className="text-muted-foreground block text-[11px]">
                     {i.prazo?.termoFinal
                       ? formatarData(i.prazo.termoFinal)
                       : "—"}
                   </span>
                 </span>
-                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
                   <Avatar nome={i.condutor} />
                   {i.condutor.split(" ")[0]}
                 </span>
               </Link>
             ))}
             {urgentes.length === 0 && (
-              <p className="border-t border-border py-4 text-sm text-muted-foreground">
+              <p className="border-border text-muted-foreground border-t py-4 text-sm">
                 Nada vence nas próximas 48 horas.
               </p>
             )}
@@ -153,22 +163,22 @@ export function DashboardView() {
         </Card>
 
         <Card className="h-fit">
-          <h2 className="mb-3 font-display text-[17px] font-medium">
+          <h2 className="font-display mb-3 text-[17px] font-medium">
             Próximos prazos
           </h2>
           {dias.map((d) => (
             <div
               key={d.label}
-              className="flex items-baseline justify-between gap-3 border-t border-border py-2.5"
+              className="border-border flex items-baseline justify-between gap-3 border-t py-2.5"
             >
               <span className="text-[13px]">
                 {d.label}
-                <span className="text-[11px] tabular-nums text-muted-foreground">
+                <span className="text-muted-foreground text-[11px] tabular-nums">
                   {" "}
                   · {d.data}
                 </span>
               </span>
-              <span className="text-[13px] tabular-nums text-muted-foreground">
+              <span className="text-muted-foreground text-[13px] tabular-nums">
                 {d.itens.length} prazo(s)
               </span>
             </div>
@@ -177,19 +187,19 @@ export function DashboardView() {
       </section>
 
       <Card className="mt-4 p-6">
-        <h2 className="mb-3 font-display text-[19px] font-medium">
+        <h2 className="font-display mb-3 text-[19px] font-medium">
           Atividade recente
         </h2>
         {ATIVIDADE.map((a) => (
           <div
             key={a.quando + a.o_que}
-            className="grid grid-cols-[120px_minmax(0,1fr)_240px] items-baseline gap-4 border-t border-border py-2.5"
+            className="border-border grid grid-cols-[120px_minmax(0,1fr)_240px] items-baseline gap-4 border-t py-2.5"
           >
-            <span className="text-xs tabular-nums text-muted-foreground">
+            <span className="text-muted-foreground text-xs tabular-nums">
               {a.quando}
             </span>
             <span className="text-[13.5px]">{a.o_que}</span>
-            <span className="text-right text-xs tabular-nums text-muted-foreground">
+            <span className="text-muted-foreground text-right text-xs tabular-nums">
               {a.proc}
             </span>
           </div>

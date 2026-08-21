@@ -29,7 +29,7 @@ export function TermoCard({
   onRemover: () => void;
 }) {
   return (
-    <article className="ring-hairline rounded-xl bg-card p-4.5">
+    <article className="ring-hairline bg-card rounded-xl p-4.5">
       <header className="flex flex-wrap items-center gap-3">
         <span className="text-[13.5px] font-medium">
           {titular ? (
@@ -49,7 +49,7 @@ export function TermoCard({
           type="button"
           title="Remover inscrição"
           onClick={onRemover}
-          className="ml-auto cursor-pointer text-muted-foreground hover:text-destructive"
+          className="text-muted-foreground hover:text-destructive ml-auto cursor-pointer"
         >
           <X className="size-3.5" />
         </button>
@@ -59,14 +59,14 @@ export function TermoCard({
         {diarios.map((d) => (
           <div
             key={d.nome}
-            className="flex items-center gap-3 border-t border-border py-2.5"
+            className="border-border flex items-center gap-3 border-t py-2.5"
           >
             <span className="flex-1 text-[13px]">{d.nome}</span>
             <span className="flex gap-1.5">
               {d.fontes.map((f) => (
                 <span
                   key={f}
-                  className="rounded-full border border-border px-2 py-px text-[10.5px] text-muted-foreground"
+                  className="border-border text-muted-foreground rounded-full border px-2 py-px text-[10.5px]"
                 >
                   {f}
                 </span>

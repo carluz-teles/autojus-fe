@@ -34,7 +34,7 @@ export function SearchInput({
   return (
     <div className={cn("relative", wrapperClassName)}>
       <Search
-        className="pointer-events-none absolute top-1/2 left-3 size-[15px] -translate-y-1/2 text-muted-foreground"
+        className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-[15px] -translate-y-1/2"
         strokeWidth={1.9}
       />
       <Input className={cn("pl-8.5", className)} {...props} />
@@ -48,7 +48,7 @@ export function Label({
 }: React.LabelHTMLAttributes<HTMLLabelElement>) {
   return (
     <label
-      className={cn("text-[12.5px] font-medium text-foreground", className)}
+      className={cn("text-foreground text-[12.5px] font-medium", className)}
       {...props}
     />
   );
@@ -72,9 +72,9 @@ export function Field({
       <Label>{label}</Label>
       {children}
       {error ? (
-        <p className="text-xs text-destructive">{error}</p>
+        <p className="text-destructive text-xs">{error}</p>
       ) : hint ? (
-        <p className="text-xs text-muted-foreground">{hint}</p>
+        <p className="text-muted-foreground text-xs">{hint}</p>
       ) : null}
     </div>
   );
@@ -105,15 +105,13 @@ export function Switch({
       onClick={() => !disabled && onCheckedChange(!checked)}
       className={cn(
         "relative h-5 w-8.5 shrink-0 rounded-full transition-colors",
-        disabled
-          ? "cursor-not-allowed opacity-50"
-          : "cursor-pointer",
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
         checked ? "bg-primary" : "bg-border",
       )}
     >
       <span
         className={cn(
-          "absolute top-0.5 size-4 rounded-full bg-card transition-all",
+          "bg-card absolute top-0.5 size-4 rounded-full transition-all",
           checked ? "left-4" : "left-0.5",
         )}
       />
@@ -127,7 +125,7 @@ export function Switch({
       <span className="text-sm">
         {label}
         {hint && (
-          <span className="block text-xs text-muted-foreground">{hint}</span>
+          <span className="text-muted-foreground block text-xs">{hint}</span>
         )}
       </span>
       {toggle}
@@ -154,7 +152,7 @@ export function Checkbox({
       className={cn(
         "grid size-[18px] shrink-0 cursor-pointer place-items-center rounded-sm border text-[11px] leading-none",
         checked
-          ? "border-primary bg-[color-mix(in_oklch,var(--primary)_18%,transparent)] text-primary"
+          ? "border-primary text-primary bg-[color-mix(in_oklch,var(--primary)_18%,transparent)]"
           : "border-border hover:border-primary",
         className,
       )}

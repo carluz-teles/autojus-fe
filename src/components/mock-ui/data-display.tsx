@@ -16,9 +16,9 @@ export function Avatar({
   return (
     <span
       className={cn(
-        "grid shrink-0 place-items-center overflow-hidden rounded-full border border-border text-muted-foreground",
+        "border-border text-muted-foreground grid shrink-0 place-items-center overflow-hidden rounded-full border",
         destaque &&
-          "border-border bg-[color-mix(in_oklch,var(--primary)_10%,transparent)] text-primary",
+          "border-border text-primary bg-[color-mix(in_oklch,var(--primary)_10%,transparent)]",
         className,
       )}
       style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}
@@ -65,9 +65,9 @@ export function Kpi({
   }[tom];
 
   return (
-    <div className="rounded-xl bg-card p-4.5 ring-hairline">
+    <div className="bg-card ring-hairline rounded-xl p-4.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-medium tracking-[0.06em] uppercase text-muted-foreground">
+        <span className="text-muted-foreground text-[11px] font-medium tracking-[0.06em] uppercase">
           {rotulo}
         </span>
         <span
@@ -78,13 +78,13 @@ export function Kpi({
         </span>
       </div>
       <p
-        className="mt-3 font-display text-[26px] leading-none tabular-nums"
+        className="font-display mt-3 text-[26px] leading-none tabular-nums"
         style={{ color: cores[1] }}
       >
         {valor}
       </p>
       {dica && (
-        <p className="mt-1.5 text-[11.5px] text-muted-foreground/70">{dica}</p>
+        <p className="text-muted-foreground/70 mt-1.5 text-[11.5px]">{dica}</p>
       )}
     </div>
   );

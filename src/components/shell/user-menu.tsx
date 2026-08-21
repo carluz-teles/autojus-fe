@@ -49,7 +49,7 @@ export function UserMenu() {
 
       <Menu.Portal>
         <Menu.Positioner side="bottom" align="end" sideOffset={8}>
-          <Menu.Popup className="bg-popover text-popover-foreground w-56 overflow-hidden rounded-lg border shadow-md outline-none transition-[transform,opacity] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+          <Menu.Popup className="bg-popover text-popover-foreground w-56 overflow-hidden rounded-lg border shadow-md transition-[transform,opacity] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] outline-none data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
             <div className="border-b px-3 py-3">
               <p className="truncate text-sm font-medium">
                 {user.fullName ?? "Sua conta"}

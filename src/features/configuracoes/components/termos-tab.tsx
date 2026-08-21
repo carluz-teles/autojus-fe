@@ -66,10 +66,7 @@ export function TermosTab() {
   const { mutateAsync: updateScope, isPending } = useUpdateIntegrationScope();
 
   // OABs actuais (chaves canônicas "UFNUMERO") para dedup e montagem do scope.
-  const oabsAtuais = useMemo(
-    () => data?.data.map((r) => r.oab) ?? [],
-    [data],
-  );
+  const oabsAtuais = useMemo(() => data?.data.map((r) => r.oab) ?? [], [data]);
 
   // ——— estado local de rascunho ———
   const [rascunho, setRascunho] = useState("");
@@ -126,7 +123,7 @@ export function TermosTab() {
   return (
     <section className="mt-7 max-w-4xl">
       <h2 className="font-display text-lg font-medium">Termos monitorados</h2>
-      <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+      <p className="text-muted-foreground mt-2 text-[13px] leading-relaxed">
         As inscrições abaixo guiam a captura no DJEN. CNPJs e nomes de parte
         entram em breve. Alterações valem para as próximas capturas — a diária
         continua sozinha.
@@ -153,7 +150,7 @@ export function TermosTab() {
               {isPending ? "Adicionando…" : "Adicionar"}
             </Button>
           </div>
-          <p className="mt-2 text-[11.5px] text-muted-foreground">
+          <p className="text-muted-foreground mt-2 text-[11.5px]">
             UF em maiúsculas + número de inscrição.
           </p>
         </>
@@ -163,14 +160,11 @@ export function TermosTab() {
       {isLoading ? (
         <TermosSkeleton />
       ) : isError ? (
-        <p
-          role="alert"
-          className="text-destructive mt-5 text-sm"
-        >
+        <p role="alert" className="text-destructive mt-5 text-sm">
           Não foi possível carregar os termos monitorados. Tente novamente.
         </p>
       ) : oabsAtuais.length === 0 ? (
-        <p className="border-border mt-5 rounded-xl border border-dashed p-6 text-center text-[13px] text-muted-foreground">
+        <p className="border-border text-muted-foreground mt-5 rounded-xl border border-dashed p-6 text-center text-[13px]">
           Nenhuma inscrição monitorada — sem OAB não há captura.
         </p>
       ) : (

@@ -10,7 +10,7 @@ export function Skeleton({ className }: { className?: string }) {
   return (
     <div
       aria-hidden
-      className={cn("animate-pulse rounded-md bg-muted", className)}
+      className={cn("bg-muted animate-pulse rounded-md", className)}
     />
   );
 }
@@ -32,7 +32,7 @@ export function SkeletonRows({
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
-          className="flex items-center justify-between gap-4 border-t border-border py-2.5 first:border-t-0"
+          className="border-border flex items-center justify-between gap-4 border-t py-2.5 first:border-t-0"
         >
           <Skeleton className="h-3.5 w-32" />
           <Skeleton className="h-3.5 w-24" />

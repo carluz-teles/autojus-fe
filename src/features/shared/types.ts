@@ -1,17 +1,10 @@
 export type TarefaStatus =
-  | "Aberta"
-  | "Em execução"
-  | "Concluída"
-  | "Atrasada"
-  | "Cancelada";
+  "Aberta" | "Em execução" | "Concluída" | "Atrasada" | "Cancelada";
 
 export type TarefaPrioridade = "Alta" | "Média" | "Baixa";
 
 export type TarefaTipo =
-  | "Providência"
-  | "Diligência"
-  | "Interna"
-  | "Prazo judicial";
+  "Providência" | "Diligência" | "Interna" | "Prazo judicial";
 
 export type PrazoEstado = "sugerido" | "confirmado" | "ajustado" | "ausente";
 export type Contagem = "uteis" | "corridos";
@@ -95,11 +88,7 @@ export interface Peca {
 }
 
 export type EstagioIntimacao =
-  | "triagem"
-  | "peca"
-  | "revisao"
-  | "assinatura"
-  | "protocolo";
+  "triagem" | "peca" | "revisao" | "assinatura" | "protocolo";
 
 export interface Intimacao {
   id: string;
@@ -117,10 +106,7 @@ export interface Intimacao {
 }
 
 export type SituacaoProcesso =
-  | "Em andamento"
-  | "Suspenso"
-  | "Arquivado"
-  | "Baixado";
+  "Em andamento" | "Suspenso" | "Arquivado" | "Baixado";
 
 export interface Processo {
   numero: string;

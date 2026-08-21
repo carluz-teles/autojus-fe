@@ -92,8 +92,8 @@ export function AssistentePanel({
   const [aplicadas, setAplicadas] = useState<Record<string, boolean>>({});
 
   return (
-    <aside className="flex min-h-0 flex-col border-l border-border">
-      <div className="border-b border-border p-4">
+    <aside className="border-border flex min-h-0 flex-col border-l">
+      <div className="border-border border-b p-4">
         <Segmented
           className="w-full"
           valor={aba}
@@ -108,13 +108,13 @@ export function AssistentePanel({
       {aba === "sugestoes" ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            <p className="mb-3.5 text-[12.5px] leading-relaxed text-muted-foreground">
+            <p className="text-muted-foreground mb-3.5 text-[12.5px] leading-relaxed">
               Três sugestões apontam para trechos do editor.
             </p>
             {SUGESTOES.map((s, i) => (
               <div
                 key={s.id}
-                className="mb-3 rounded-xl border-l-[3px] bg-card p-3 ring-hairline"
+                className="bg-card ring-hairline mb-3 rounded-xl border-l-[3px] p-3"
                 style={{ borderLeftColor: s.cor }}
               >
                 <div className="flex items-center gap-2">
@@ -137,11 +137,13 @@ export function AssistentePanel({
                   >
                     {s.tipo}
                   </span>
-                  <span className="ml-auto text-[11px] text-muted-foreground">
+                  <span className="text-muted-foreground ml-auto text-[11px]">
                     Parágrafo {s.paragrafo}
                   </span>
                 </div>
-                <p className="my-1.5 text-[12.5px] leading-relaxed">{s.texto}</p>
+                <p className="my-1.5 text-[12.5px] leading-relaxed">
+                  {s.texto}
+                </p>
                 <div className="mt-2 flex gap-2">
                   <Button
                     variant="outline"
@@ -153,14 +155,18 @@ export function AssistentePanel({
                   >
                     {aplicadas[s.id] ? "Aplicada" : "Aplicar"}
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-7 text-[11.5px]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-[11.5px]"
+                  >
                     Descartar
                   </Button>
                 </div>
               </div>
             ))}
           </div>
-          <div className="flex flex-col gap-2 border-t border-border p-4">
+          <div className="border-border flex flex-col gap-2 border-t p-4">
             <Button variant="outline" size="sm">
               Revisar com IA
             </Button>
@@ -183,22 +189,24 @@ export function AssistentePanel({
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-1.5">
                     <span className="text-xs font-medium">{m.autor}</span>
-                    <span className="text-[10.5px] tabular-nums text-muted-foreground">
+                    <span className="text-muted-foreground text-[10.5px] tabular-nums">
                       {formatarDataHora(m.quando)}
                     </span>
                   </div>
-                  <p className="mt-1 text-[12.5px] leading-relaxed">{m.texto}</p>
+                  <p className="mt-1 text-[12.5px] leading-relaxed">
+                    {m.texto}
+                  </p>
                 </div>
               </div>
             ))}
           </div>
-          <div className="border-t border-border p-4">
+          <div className="border-border border-t p-4">
             <div className="mb-2.5 flex flex-wrap gap-1.5">
               {ATALHOS.map((a) => (
                 <button
                   key={a}
                   type="button"
-                  className="cursor-pointer rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] text-muted-foreground hover:border-[color-mix(in_oklch,var(--primary)_40%,transparent)] hover:text-primary"
+                  className="border-border bg-card text-muted-foreground hover:text-primary cursor-pointer rounded-full border px-2.5 py-1 text-[11.5px] hover:border-[color-mix(in_oklch,var(--primary)_40%,transparent)]"
                 >
                   {a}
                 </button>
