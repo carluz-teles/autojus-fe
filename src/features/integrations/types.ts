@@ -1,82 +1,7 @@
-// Espelha o read model do BE (internal/acquisition handler.integrationView + Scope).
-// Fonte ativável no v0: só DJEN (descoberta nacional por OAB). DATAJUD virou
-// enrichment-only (enriquece por número, disparado internamente por evento) e
-// NÃO é mais ativável pelo usuário — o BE rejeita "DATAJUD" com HTTP 400.
-// UPLOAD também não passa pela ativação.
-
-export const ACTIVATABLE_SOURCES = ["DJEN"] as const;
-export type IntegrationSource = (typeof ACTIVATABLE_SOURCES)[number];
-
-export const STATUS_ACTIVE = "ACTIVE";
-
-export interface Scope {
-  oab: string[];
-  taxId?: string[];
-}
-
-export interface Integration {
-  id: string;
-  source: string;
-  scope: Scope;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ActivateIntegrationInput {
-  sources: IntegrationSource[];
-  scope: Scope;
-}
-
-/** Envelope de lista do BE: { data: [...] } (conjunto pequeno, sem cursor). */
-export interface ListEnvelope<T> {
-  data: T[];
-}
-
-export const SOURCE_LABELS: Record<IntegrationSource, string> = {
-  DJEN: "DJEN — Diário de Justiça Eletrônico Nacional",
-};
-
-// ——— Catálogo de fontes da tela de integrações ———
-// Inclui as NÃO-ativáveis de propósito: DATAJUD comunica o pipeline (enriquece
-// sozinho, disparado pela descoberta) e UPLOAD comunica o roadmap. Só as
-// entradas kind="discovery" passam pela ativação (ACTIVATABLE_SOURCES acima).
-export type SourceKind = "discovery" | "enrichment" | "upcoming";
-
-export interface SourceCatalogEntry {
-  id: string;
-  name: string;
-  fullName: string;
-  kind: SourceKind;
-  description: string;
-}
-
-export const SOURCE_CATALOG: SourceCatalogEntry[] = [
-  {
-    id: "DJEN",
-    name: "DJEN",
-    fullName: "Diário de Justiça Eletrônico Nacional",
-    kind: "discovery",
-    description:
-      "Descobre processos e intimações em todo o país pelas OABs monitoradas. Captura diária, com importação do histórico de 1 ano na ativação.",
-  },
-  {
-    id: "DATAJUD",
-    name: "DATAJUD",
-    fullName: "Base Nacional de Dados do Judiciário — CNJ",
-    kind: "enrichment",
-    description:
-      "Enriquece cada processo descoberto — classe, órgão julgador e movimentos — pelo número CNJ. Automático, sem configuração.",
-  },
-  {
-    id: "UPLOAD",
-    name: "Upload",
-    fullName: "Importação manual de processos e peças",
-    kind: "upcoming",
-    description:
-      "Envie listas de processos ou documentos para incorporar ao acervo mesmo sem publicação em diário.",
-  },
-];
+// Espelha o read model do BE (internal/acquisition) para o que a tela de
+// reconciliações consome. Ativação/OAB-lookup saíram da UI (2026-08-19) — os
+// tipos ficaram só com o que reconciliation-detail.tsx e use-reconciliations.ts
+// ainda leem.
 
 // ——— Reconciliações ———
 // Contrato do read model de reconciliações (GET /v1/acquisition/reconciliations e
@@ -156,4 +81,38 @@ export interface IntimacaoLine {
 export interface SyncRunItemsView {
   processos: ProcessoLine[];
   intimacoes: IntimacaoLine[];
+}
+
+// ——— OABs monitoradas com nome (GET /v1/acquisition/watched-oabs) ———
+/** Uma OAB monitorada com o nome do advogado derivado de party_counsel. */
+export interface WatchedOab {
+  /** Chave canônica "UFNUMERO" (ex.: "SP347019"). */
+  oab: string;
+  /** Nome mais frequente em party_counsel; null quando ainda não há captura. */
+  name: string | null;
+}
+
+export interface WatchedOabsResponse {
+  data: WatchedOab[];
+}
+
+// ——— Integrações (OAB monitoring scope) ———
+// Espelha integrationView do BE (internal/acquisition/handler.go). A fonte de
+// verdade do monitoramento de OABs é o scope.oab da integração source==="DJEN".
+export interface IntegrationScope {
+  oab: string[];
+  taxId?: string[];
+}
+
+export interface IntegrationView {
+  id: string;
+  source: "DJEN" | "DATAJUD" | string;
+  scope: IntegrationScope;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IntegrationsListResponse {
+  data: IntegrationView[];
 }

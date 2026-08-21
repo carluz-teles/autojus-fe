@@ -20,6 +20,8 @@
   --color-gold: var(--gold);
   --color-gold-foreground: var(--gold-foreground);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-info: var(--info);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -81,6 +83,8 @@
   --gold-foreground: oklch(0.26 0.04 70);
 
   --destructive: oklch(0.55 0.2 27);
+  --success: oklch(0.45 0.1 150);
+  --info: oklch(0.45 0.09 230);
 
   --border: oklch(0.9 0.012 90);
   --input: oklch(0.9 0.012 90);
@@ -133,6 +137,8 @@
   --gold-foreground: oklch(0.22 0.03 70);
 
   --destructive: oklch(0.7 0.19 22);
+  --success: oklch(0.72 0.13 150);
+  --info: oklch(0.72 0.12 230);
 
   --border: oklch(1 0 0 / 11%);
   --input: oklch(1 0 0 / 15%);
@@ -188,6 +194,26 @@
   table {
     font-variant-numeric: tabular-nums;
   }
+
+  :focus-visible {
+    outline: 2px solid color-mix(in oklch, var(--primary) 50%, transparent);
+    outline-offset: 2px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 6px;
+  }
+}
+
+@utility ring-hairline {
+  box-shadow:
+    0 0 0 1px oklch(0.24 0.02 165 / 10%),
+    0 1px 2px oklch(0.24 0.02 165 / 6%);
 }
 
 @layer components {

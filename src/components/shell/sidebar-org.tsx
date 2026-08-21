@@ -27,7 +27,7 @@ export function SidebarOrg() {
 
   const org = (
     <Link
-      href="/settings/organization"
+      href="/settings?tab=organizacao"
       className={cn(
         "hover:bg-sidebar-accent flex min-w-0 items-center gap-3 rounded-lg px-2 py-1.5 transition",
         collapsed && "justify-center px-0",

@@ -1,14 +1,21 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
-import type { PrazoConfirmInput, PrazoDetalheView } from "../types";
+import type {
+  PrazoAnchorEvent,
+  PrazoConfirmInput,
+  PrazoCounting,
+  PrazoDetalheView,
+  PrazoView,
+} from "../types";
 import { useConfirmarPrazo } from "./use-confirmar-prazo";
+import { usePreviewPrazo } from "./use-preview-prazo";
 
-// ── Zod: fonte da validação client-side (days>0) ──
+// ── Zod: fonte da validação client-side ──
 
 const schema = z.object({
   kind: z.string().trim().min(1, "Informe o tipo do prazo."),
@@ -19,22 +26,28 @@ const schema = z.object({
   counting: z.enum(["BUSINESS", "CALENDAR"]),
   doubled: z.boolean(),
   doubled_reason: z.string().optional(),
+  anchor_event: z.enum(["MADE_AVAILABLE", "PUBLISHED", "DEADLINE_START"]),
+  manual_extra_days: z.number().int().min(0),
+  has_holidays: z.boolean(),
 });
 
 export type ConfirmarPrazoValues = z.infer<typeof schema>;
 
 // Tipos de prazo conhecidos (rótulos pt-BR). O detalhe pode trazer um kind fora
 // desta lista — kindOptions() injeta o valor atual para não perdê-lo no select.
+// Vocabulário de kinds em pt-BR — ALINHADO ao BE (deadline_rule usa CONTESTACAO/
+// MANIFESTACAO/GENERICO; os demais são escolhas manuais usuais). O confirm envia o
+// value como está; por isso precisa casar com o que o BE deriva/espera.
 const PRAZO_KINDS: { value: string; label: string }[] = [
-  { value: "APPEAL", label: "Recurso" },
-  { value: "APPEAL_REPLY", label: "Contrarrazões" },
-  { value: "ANSWER", label: "Contestação" },
-  { value: "DEFENSE", label: "Defesa" },
+  { value: "CONTESTACAO", label: "Contestação" },
+  { value: "MANIFESTACAO", label: "Manifestação" },
+  { value: "RECURSO", label: "Recurso" },
+  { value: "CONTRARRAZOES", label: "Contrarrazões" },
   { value: "EMBARGOS", label: "Embargos" },
-  { value: "MANIFESTATION", label: "Manifestação" },
-  { value: "COMPLIANCE", label: "Cumprimento" },
-  { value: "PAYMENT", label: "Pagamento" },
-  { value: "APPEAL_INNER", label: "Agravo interno" },
+  { value: "AGRAVO", label: "Agravo" },
+  { value: "CUMPRIMENTO", label: "Cumprimento de sentença" },
+  { value: "PAGAMENTO", label: "Pagamento" },
+  { value: "GENERICO", label: "Genérico" },
 ];
 
 // Motivos usuais de prazo em dobro no CPC (o detalhe pode trazer outro).
@@ -45,8 +58,23 @@ const DOUBLED_REASONS: string[] = [
   "Defensoria Pública (art. 186, CPC)",
 ];
 
-// Monta o corpo do BE a partir dos valores do form: normaliza strings, omite os
-// opcionais vazios e só manda doubled_reason quando "em dobro". (Fora do JSX.)
+// Âncoras de prazo disponíveis.
+export const ANCHOR_OPTIONS: {
+  value: PrazoAnchorEvent;
+  label: string;
+}[] = [
+  { value: "MADE_AVAILABLE", label: "Disponibilização" },
+  { value: "PUBLISHED", label: "Publicação" },
+  { value: "DEADLINE_START", label: "Termo derivado" },
+];
+
+// Regimes de contagem.
+export const COUNTING_OPTIONS: { value: PrazoCounting; label: string }[] = [
+  { value: "BUSINESS", label: "Dias úteis" },
+  { value: "CALENDAR", label: "Corridos" },
+];
+
+// Monta o corpo do BE a partir dos valores do form.
 function toConfirmInput(
   intimationId: string,
   values: ConfirmarPrazoValues,
@@ -61,54 +89,127 @@ function toConfirmInput(
       doubled_reason: values.doubled
         ? values.doubled_reason?.trim() || undefined
         : undefined,
+      anchor_event: values.anchor_event,
+      manual_extra_days:
+        values.has_holidays && values.manual_extra_days > 0
+          ? values.manual_extra_days
+          : undefined,
     },
-    // F2 só confirma/ajusta o prazo — as tarefas sugeridas viraram fluxo próprio na
-    // Análise (POST /v1/tasks, uma a uma). O confirm faz REPLACE-ALL de tasks no BE:
-    // mandar algo aqui apagaria as tasks já criadas na Análise. Por isso, sempre [].
+    // F2 só confirma/ajusta o prazo — as tarefas sugeridas viraram fluxo próprio.
     tasks: [],
   };
 }
 
+/** Extrai o anchor_event do prazo — fallback para MADE_AVAILABLE. */
+function defaultAnchor(
+  prazo: PrazoView | PrazoDetalheView | null,
+): PrazoAnchorEvent {
+  if (prazo && "anchor_event" in prazo && prazo.anchor_event) {
+    return prazo.anchor_event;
+  }
+  return "MADE_AVAILABLE";
+}
+
 /**
- * Hook público do form F2. Compõe RHF+Zod (pré-preenchido pelo detalhe) e a mutation
- * useConfirmarPrazo, e expõe só handlers + estado para o componente (que fica em
- * JSX+binding). `doubled` é controle não-nativo, gerido por setValue/watch. As tarefas
- * saíram do F2 (viraram fluxo próprio na Análise); aqui só confirma/ajusta o prazo.
+ * Hook público do form de ajuste de prazo. Compõe RHF+Zod (pré-preenchido pelo
+ * detalhe), a mutation useConfirmarPrazo e o usePreviewPrazo (recalc ao vivo com
+ * debounce de ~300ms via React state separado).
+ *
+ * O debounce é implementado via useEffect+setTimeout nos valores assistidos —
+ * sem dependência nova. Os valores debounced são passados ao usePreviewPrazo
+ * que usa React Query para cache + dedup de chamadas idênticas.
  */
 export function useConfirmarPrazoForm({
   intimationId,
-  detalhe,
+  prazo,
 }: {
   intimationId: string;
-  detalhe: PrazoDetalheView;
+  prazo: PrazoView | PrazoDetalheView;
 }) {
   const { confirmar, isPending, error } = useConfirmarPrazo();
 
   const form = useForm<ConfirmarPrazoValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      kind: detalhe.kind,
-      days: detalhe.days,
-      // Regime de contagem fica no valor derivado (sem toggle no F2): sem endpoint de
-      // recontagem, o vencimento segue o end_date do prazo. Vai no payload como veio.
-      counting: detalhe.counting,
-      doubled: detalhe.doubled,
-      doubled_reason: detalhe.doubled_reason ?? "",
+      kind: prazo.kind,
+      days: (prazo as PrazoDetalheView).days ?? 15,
+      counting: prazo.counting ?? "BUSINESS",
+      doubled: prazo.doubled ?? false,
+      doubled_reason: prazo.doubled_reason ?? "",
+      anchor_event: defaultAnchor(prazo),
+      manual_extra_days: prazo.manual_extra_days ?? 0,
+      has_holidays: (prazo.manual_extra_days ?? 0) > 0,
     },
   });
 
-  // useWatch (não form.watch) — assinatura por campo compatível com o React
-  // Compiler; reage a cada mudança sem re-render do form inteiro.
+  // useWatch — assinatura por campo, compatível com React Compiler.
   const doubled = useWatch({ control: form.control, name: "doubled" });
   const kind = useWatch({ control: form.control, name: "kind" });
   const doubledReason = useWatch({
     control: form.control,
     name: "doubled_reason",
   });
+  const counting = useWatch({ control: form.control, name: "counting" });
+  const anchorEvent = useWatch({ control: form.control, name: "anchor_event" });
+  const days = useWatch({ control: form.control, name: "days" });
+  const hasHolidays = useWatch({ control: form.control, name: "has_holidays" });
+  const manualExtraDays = useWatch({
+    control: form.control,
+    name: "manual_extra_days",
+  });
+
+  // ── Debounce dos parâmetros de preview (~300ms) ──
+  const [debouncedPreview, setDebouncedPreview] = useState({
+    days,
+    anchorEvent,
+    counting,
+    doubled,
+    manualExtraDays: hasHolidays ? manualExtraDays : 0,
+  });
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedPreview({
+        days,
+        anchorEvent,
+        counting,
+        doubled,
+        manualExtraDays: hasHolidays ? manualExtraDays : 0,
+      });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [days, anchorEvent, counting, doubled, hasHolidays, manualExtraDays]);
+
+  const { preview, isPending: previewPending } = usePreviewPrazo({
+    intimationId,
+    anchorEvent: debouncedPreview.anchorEvent,
+    kind,
+    days: debouncedPreview.days,
+    counting: debouncedPreview.counting,
+    doubled: debouncedPreview.doubled,
+    manualExtraDays: debouncedPreview.manualExtraDays,
+    enabled: true,
+  });
 
   const setDoubled = (value: boolean) => {
     form.setValue("doubled", value, { shouldDirty: true });
     if (!value) form.clearErrors("doubled_reason");
+  };
+
+  const setHasHolidays = (value: boolean) => {
+    form.setValue("has_holidays", value, { shouldDirty: true });
+    if (!value) form.setValue("manual_extra_days", 0, { shouldDirty: true });
+  };
+
+  const setAnchorEvent = (value: PrazoAnchorEvent) => {
+    form.setValue("anchor_event", value, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
+
+  const setCounting = (value: PrazoCounting) => {
+    form.setValue("counting", value, { shouldDirty: true });
   };
 
   // Selects "completos": incluem o valor pré-preenchido mesmo se estiver fora das
@@ -131,15 +232,28 @@ export function useConfirmarPrazoForm({
 
   return {
     register: form.register,
+    setValue: form.setValue,
     errors: form.formState.errors,
     submit,
-    // controle não-nativo (em dobro)
+    // campos controlled
     doubled,
     setDoubled,
-    // options dos selects
+    kind,
+    counting,
+    setCounting,
+    anchorEvent,
+    setAnchorEvent,
+    hasHolidays,
+    setHasHolidays,
+    manualExtraDays,
+    doubledReason: doubledReason ?? "",
+    // options
     kindOptions,
     doubledReasonOptions,
-    // estado da mutation
+    // preview ao vivo
+    preview,
+    previewPending,
+    // mutation
     isPending,
     error,
   };

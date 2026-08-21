@@ -1,13 +1,10 @@
-import { TarefaDetalhePage } from "@/features/tasks/components/tarefa-detalhe-page";
+import { TarefaDetail } from "@/features/tasks/components/tarefa-detail";
 
-// Rota de detalhe da tarefa (deep-link). Shell = Server Component: resolve o id da
-// rota e delega para a feature (Client Component), que busca a tarefa por id
-// (GET /v1/tasks/:id) e abre para QUALQUER tarefa. Espelha as rotas de intimação/prazo.
-export default async function TarefaDetalheRoute({
+export default async function TarefaPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <TarefaDetalhePage id={id} />;
+  return <TarefaDetail id={id} />;
 }

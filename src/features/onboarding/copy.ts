@@ -1,25 +1,17 @@
-// Fonte ÚNICA da linguagem e dos passos do onboarding. Nenhum componente/hook da
-// feature declara string solta: mudar um texto = mudar aqui (tom consistente,
-// revisão num lugar só). Os passos são a config que o wizard renderiza.
+// Fonte ÚNICA da linguagem do onboarding. Nenhum componente/hook da feature
+// declara string solta: mudar um texto = mudar aqui (tom consistente, revisão
+// num lugar só).
 //
 // Desenho do fluxo (decisão de produto): o sign-up do Clerk já coleta o nome, e a
-// foto vive no /profile — então o wizard vai direto ao que gera valor: a empresa
-// (tenant), os processos (OAB/fontes — o "aha" do produto) e o time (cada advogado
-// convidado traz a própria OAB → mais processos monitorados).
-
-export const ONBOARDING_STEPS = [
-  { id: 1, label: "Sua empresa" },
-  { id: 2, label: "Seus processos" },
-  { id: 3, label: "Seu time" },
-] as const;
+// foto vive no /profile — então o onboarding vai direto ao que cria o tenant: a
+// empresa. OAB/fontes e convite de time saíram do wizard (2026-08-19, decisão do
+// produto) e ficam pra depois em Integrações/Configurações — ainda sem tela
+// cabeada (débito conhecido, não esquecido).
 
 export const onboardingCopy = {
   page: {
     title: "Vamos configurar sua conta",
-    subtitle: "Três passos rápidos para os seus processos chegarem sozinhos.",
-  },
-  stepper: {
-    aria: "Progresso do onboarding",
+    subtitle: "Só um passo rápido pra criar sua conta.",
   },
   common: {
     back: "Voltar",

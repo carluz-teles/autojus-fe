@@ -5,17 +5,25 @@
 import type { PrazoStatus } from "../types";
 
 // "kind" legível: mapa dos tipos conhecidos + humanização de fallback, para que
-// qualquer valor do BE apareça apresentável.
+// qualquer valor do BE apareça apresentável. As CHAVES são o vocabulário REAL do
+// BE (pt-BR — deadline_rule seed: CONTESTACAO/MANIFESTACAO/GENERICO), não códigos
+// em inglês. Aliases em inglês ficam por compat, mas o BE usa os pt-BR.
 const KIND_LABEL: Record<string, string> = {
-  APPEAL: "Recurso",
-  APPEAL_REPLY: "Contrarrazões",
-  ANSWER: "Contestação",
-  DEFENSE: "Defesa",
+  CONTESTACAO: "Contestação",
+  MANIFESTACAO: "Manifestação",
+  GENERICO: "Genérico",
+  RECURSO: "Recurso",
+  CONTRARRAZOES: "Contrarrazões",
   EMBARGOS: "Embargos",
+  AGRAVO: "Agravo",
+  AGRAVO_INTERNO: "Agravo interno",
+  CUMPRIMENTO: "Cumprimento de sentença",
+  PAGAMENTO: "Pagamento",
+  DEFESA: "Defesa",
+  // aliases legados (compat)
+  APPEAL: "Recurso",
+  ANSWER: "Contestação",
   MANIFESTATION: "Manifestação",
-  COMPLIANCE: "Cumprimento",
-  PAYMENT: "Pagamento",
-  APPEAL_INNER: "Agravo interno",
 };
 
 function humanize(raw: string): string {

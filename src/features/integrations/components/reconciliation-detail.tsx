@@ -278,7 +278,7 @@ export function ReconciliationDetail({ jobId }: { jobId: string }) {
   return (
     <>
       <Link
-        href="/settings/integrations"
+        href="/settings?tab=tribunais"
         className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1.5 text-sm"
       >
         <ArrowLeft className="size-4" /> Integrações

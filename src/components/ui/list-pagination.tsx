@@ -1,7 +1,13 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatCount } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -48,15 +54,23 @@ export function ListPagination({
       <div className="text-muted-foreground flex items-center gap-2 text-sm">
         <span>Itens por página</span>
         <Select
-          value={pageSize}
-          onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          aria-label="Itens por página"
+          value={String(pageSize)}
+          onValueChange={(v) => v != null && onPageSizeChange(Number(v))}
         >
-          {PAGE_SIZE_OPTIONS.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
+          <SelectTrigger
+            size="sm"
+            className="w-16"
+            aria-label="Itens por página"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <SelectItem key={n} value={String(n)}>
+                {n}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
         {typeof totalCount === "number" ? (
           <span className="tabular-nums">

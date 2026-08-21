@@ -28,15 +28,17 @@ export interface ListTasksParams {
   limit?: number;
   /** Cursor opaco: eco do next_cursor recebido para pedir a próxima página. */
   cursor?: string;
+  /** Filtra pelo id da intimação de origem (FK). */
+  intimation_id?: string;
 }
 
-/** Agenda global — as tarefas do tenant, filtráveis por status/responsável. */
+/** Agenda global — as tarefas do tenant, filtráveis por status/responsável/intimação. */
 export async function listTasks(
   fetcher: ApiFetcher,
-  { status, assignee, from, to, limit = 20, cursor }: ListTasksParams = {},
+  { status, assignee, from, to, limit = 20, cursor, intimation_id }: ListTasksParams = {},
 ): Promise<PageEnvelope<TaskView>> {
   return fetcher<PageEnvelope<TaskView>>(ENDPOINT, {
-    query: { status, assignee, from, to, limit, cursor },
+    query: { status, assignee, from, to, limit, cursor, intimation_id },
   });
 }
 

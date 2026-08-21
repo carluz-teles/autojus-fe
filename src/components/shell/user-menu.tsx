@@ -1,9 +1,9 @@
 "use client";
 
+import { Menu } from "@base-ui/react/menu";
 import { useClerk, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
 
 // Iniciais para o fallback do avatar (sem imagem).
 function initials(name: string | null | undefined, email: string | undefined) {
@@ -17,29 +17,13 @@ function initials(name: string | null | undefined, email: string | undefined) {
 }
 
 // Menu do usuário headless — substitui o <UserButton/> do Clerk. Avatar + dropdown
-// (Perfil, Sair) com nossa marcação. Fecha ao clicar fora ou apertar Esc. Sair usa
-// useClerk().signOut e volta ao /sign-in.
+// (Perfil, Sair) com nossa marcação, sobre o Menu do base-ui (foco-trap, escape,
+// clique-fora, portal e animação de entrada/saída de graça — mesmo motor do
+// Sheet). Sair usa useClerk().signOut e volta ao /sign-in.
 export function UserMenu() {
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
-        setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
 
   if (!isLoaded || !user) {
     return <div className="bg-muted size-9 animate-pulse rounded-full" />;
@@ -48,12 +32,8 @@ export function UserMenu() {
   const email = user.primaryEmailAddress?.emailAddress;
 
   return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={open}
+    <Menu.Root>
+      <Menu.Trigger
         aria-label="Menu do usuário"
         className="ring-offset-background hover:ring-ring focus-visible:ring-ring size-9 overflow-hidden rounded-full ring-1 ring-transparent transition hover:ring-2 focus-visible:ring-2 focus-visible:outline-none"
       >
@@ -65,39 +45,36 @@ export function UserMenu() {
             {initials(user.fullName, email)}
           </span>
         )}
-      </button>
+      </Menu.Trigger>
 
-      {open ? (
-        <div
-          role="menu"
-          className="bg-popover text-popover-foreground absolute right-0 z-30 mt-2 w-56 overflow-hidden rounded-lg border shadow-md"
-        >
-          <div className="border-b px-3 py-3">
-            <p className="truncate text-sm font-medium">
-              {user.fullName ?? "Sua conta"}
-            </p>
-            {email ? (
-              <p className="text-muted-foreground truncate text-xs">{email}</p>
-            ) : null}
-          </div>
-          <Link
-            role="menuitem"
-            href="/settings/profile"
-            onClick={() => setOpen(false)}
-            className="hover:bg-accent block px-3 py-2 text-sm"
-          >
-            Perfil
-          </Link>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => signOut(() => router.push("/sign-in"))}
-            className="hover:bg-accent block w-full px-3 py-2 text-left text-sm"
-          >
-            Sair
-          </button>
-        </div>
-      ) : null}
-    </div>
+      <Menu.Portal>
+        <Menu.Positioner side="bottom" align="end" sideOffset={8}>
+          <Menu.Popup className="bg-popover text-popover-foreground w-56 overflow-hidden rounded-lg border shadow-md outline-none transition-[transform,opacity] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+            <div className="border-b px-3 py-3">
+              <p className="truncate text-sm font-medium">
+                {user.fullName ?? "Sua conta"}
+              </p>
+              {email ? (
+                <p className="text-muted-foreground truncate text-xs">
+                  {email}
+                </p>
+              ) : null}
+            </div>
+            <Menu.Item
+              render={<Link href="/settings?tab=perfil" />}
+              className="hover:bg-accent block px-3 py-2 text-sm outline-none"
+            >
+              Perfil
+            </Menu.Item>
+            <Menu.Item
+              onClick={() => signOut(() => router.push("/sign-in"))}
+              className="hover:bg-accent block w-full px-3 py-2 text-left text-sm outline-none"
+            >
+              Sair
+            </Menu.Item>
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
   );
 }

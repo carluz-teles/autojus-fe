@@ -25,3 +25,15 @@ export async function listOrgMembers(
   );
   return res.data;
 }
+
+/**
+ * Remove um membro ATIVO do escritório — DELETE /v1/organization/members/:id
+ * (Auth ADMIN). Único caminho de remoção do produto: o BE recusa a auto-remoção
+ * (ErrCannotRemoveSelf), regra que uma chamada direta ao Clerk não conhece.
+ */
+export async function removeOrgMember(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<void> {
+  await fetcher<void>(`/v1/organization/members/${id}`, { method: "DELETE" });
+}

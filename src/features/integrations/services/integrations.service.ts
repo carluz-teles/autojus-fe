@@ -1,30 +1,57 @@
 import type { ApiFetcher } from "@/lib/api/use-api";
 
 import type {
-  ActivateIntegrationInput,
-  Integration,
-  ListEnvelope,
+  IntegrationScope,
+  IntegrationsListResponse,
+  IntegrationView,
+  WatchedOabsResponse,
 } from "../types";
 
-const ENDPOINT = "/v1/acquisition/integrations";
+// Camada de rede para integrações de aquisição — sem React, só HTTP.
+// POST /v1/acquisition/integrations = upsert TOTAL do scope (manda a lista
+// completa: existentes ± a mudança). Requer role ADMIN no token.
 
-// Camada de rede da feature: funções tipadas que recebem o fetcher (ligado ao
-// Clerk pelo useApi). Não conhecem React nem cache — isso é responsabilidade do hook.
-
-export async function listIntegrations(
+/** Lista as integrações do tenant autenticado. */
+export function getIntegrations(
   fetcher: ApiFetcher,
-): Promise<Integration[]> {
-  const res = await fetcher<ListEnvelope<Integration>>(ENDPOINT);
-  return res.data;
+): Promise<IntegrationsListResponse> {
+  return fetcher<IntegrationsListResponse>("/v1/acquisition/integrations");
 }
 
-export async function activateIntegrations(
+/** Upsert do scope de integração DJEN — manda a lista COMPLETA de OABs. */
+export function updateIntegrationScope(
   fetcher: ApiFetcher,
-  input: ActivateIntegrationInput,
-): Promise<Integration[]> {
-  const res = await fetcher<ListEnvelope<Integration>>(ENDPOINT, {
+  scope: IntegrationScope,
+): Promise<IntegrationsListResponse> {
+  return fetcher<IntegrationsListResponse>("/v1/acquisition/integrations", {
     method: "POST",
-    body: input,
+    body: { scope },
   });
-  return res.data;
+}
+
+/** Lookup de nome por OAB (ex.: "SP123456"). Pode dar 404/501/503 — o chamador
+ * deve fazer fallback para a própria OAB como nome. */
+export async function lookupOabName(
+  fetcher: ApiFetcher,
+  oab: string,
+): Promise<string> {
+  const res = await fetcher<{ oab: string; name: string }>(
+    "/v1/acquisition/oab-lookup",
+    { query: { oab } },
+  );
+  return res.name;
+}
+
+/** Extrai as OABs monitoradas da lista de integrações (source === "DJEN"). */
+export function extractDjenOabs(integrations: IntegrationView[]): string[] {
+  return (
+    integrations.find((i) => i.source === "DJEN")?.scope.oab ?? []
+  );
+}
+
+/** OABs monitoradas com nome derivado de party_counsel. */
+export function getWatchedOabs(
+  fetcher: ApiFetcher,
+): Promise<WatchedOabsResponse> {
+  return fetcher<WatchedOabsResponse>("/v1/acquisition/watched-oabs");
 }

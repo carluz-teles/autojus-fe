@@ -13,8 +13,10 @@ export type PrazoIntimacaoState =
   | "loading" // ainda buscando o prazo (ou seu detalhe)
   | "error" // falhou em rede
   | "empty" // intimação sem prazo derivado ainda
-  | "confirmed" // prazo já OPEN/terminal — read-only
-  | "pending"; // prazo PENDING com detalhe pronto — mostra o form
+  | "pending" // prazo PENDING com detalhe pronto — mostra o read-only sugerido
+  | "editing" // modo formulário de ajuste (estado local do componente)
+  | "confirmed" // prazo já OPEN — read-only com auditoria
+  | "no_deadline"; // mera ciência — NO_DEADLINE com auditoria
 
 // Sub-hook privado (não exportado): GET /v1/prazos?intimation_id → 0 ou 1 prazo.
 // Desligado enquanto não há intimação (enabled:!!id, como usePrazo).
@@ -41,11 +43,19 @@ function usePrazoPorIntimacaoQuery(intimationId: string | null) {
  * Compõe o sub-hook privado de listagem + o `usePrazo` existente e resolve o
  * `state` que o componente renderiza (só binding). Sem intimação, tudo fica
  * desligado (enabled:false).
+ *
+ * Estados:
+ *   - "loading"    → ainda buscando
+ *   - "error"      → falha de rede
+ *   - "empty"      → sem prazo derivado ainda
+ *   - "pending"    → PENDING: painel sugerido (read-only), aguarda decisão humana
+ *   - "confirmed"  → OPEN: confirmado, com auditoria (confirmed_by_name + confirmed_at)
+ *   - "no_deadline"→ NO_DEADLINE: mera ciência, com auditoria
  */
 export function usePrazoDaIntimacao(intimationId: string | null) {
   const summary = usePrazoPorIntimacaoQuery(intimationId);
-  // Só busca o detalhe quando o prazo existe E ainda está PENDING (o form precisa
-  // de `days`); confirmado é read-only e o resumo já basta.
+  // Busca detalhe quando o prazo existe E está em estado que exige form (PENDING).
+  // OPEN e NO_DEADLINE não precisam do detalhe — o summary já tem auditoria.
   const prazoId = summary.prazo?.status === "PENDING" ? summary.prazo.id : null;
   const detalhe = usePrazo(prazoId);
 
@@ -56,13 +66,15 @@ export function usePrazoDaIntimacao(intimationId: string | null) {
         ? "error"
         : !summary.prazo
           ? "empty"
-          : summary.prazo.status !== "PENDING"
-            ? "confirmed"
-            : detalhe.isError
-              ? "error"
-              : detalhe.isPending || !detalhe.prazo
-                ? "loading"
-                : "pending"
+          : summary.prazo.status === "NO_DEADLINE"
+            ? "no_deadline"
+            : summary.prazo.status !== "PENDING"
+              ? "confirmed"
+              : detalhe.isError
+                ? "error"
+                : detalhe.isPending || !detalhe.prazo
+                  ? "loading"
+                  : "pending"
     : "empty";
 
   return {

@@ -1,101 +1,76 @@
-// Risco do processo (§27) — DETERMINÍSTICO, sem LLM. Função pura e testável: a
-// partir dos sinais já carregados (prazos, intimações, tarefas) decide o nível e
-// os motivos. A UI (RiskBadge) só pinta o resultado; nada de cálculo no JSX.
+// Aceita tanto o Processo (mock) quanto o ProcessoView (real) — o cockpit passou
+// a usar ProcessoView; o campo usado é apenas `lifecycle`/`situacao`, que ambas
+// as interfaces expõem.
+export type ProcessoParaRisco = { lifecycle?: string; situacao?: string };
 
-import type { RiskLevel } from "@/components/ui/risk-badge";
-import type { IntimacaoView } from "@/features/intimacoes/types";
-import type { PrazoView } from "@/features/prazos/types";
-import type { TaskView } from "@/features/tasks/types";
+export type NivelRisco = "Crítico" | "Atenção" | "Baixo";
 
-const LIVE_PRAZO: ReadonlySet<PrazoView["status"]> = new Set([
-  "OPEN",
-  "PENDING",
-]);
-
-export interface RiscoInput {
-  prazos: PrazoView[];
-  intimacoes: IntimacaoView[];
-  tasks: TaskView[];
-}
-
-export interface RiscoResult {
-  level: RiskLevel;
-  /** Motivos legíveis que sustentam o nível — mostrados no cartão de risco. */
-  reasons: string[];
-}
-
-/** Prazos vivos (OPEN/PENDING) do menor days_left ao maior. */
-function livePrazosOrdered(prazos: PrazoView[]): PrazoView[] {
-  return prazos
-    .filter((p) => LIVE_PRAZO.has(p.status))
-    .sort((a, b) => a.days_left - b.days_left);
-}
-
-// Uma tarefa "cobre" um prazo quando está em aberto e aponta pro mesmo deadline.
-function prazoTemTarefa(prazo: PrazoView, tasks: TaskView[]): boolean {
-  return tasks.some((t) => t.status === "OPEN" && t.deadline_id === prazo.id);
+export interface Risco {
+  nivel: NivelRisco;
+  cor: string;
+  fundo: string;
+  motivos: string[];
 }
 
 /**
- * Regras (§27), da mais severa à mais branda:
- *  - CRÍTICO: existe prazo vivo vencido (days_left < 0); OU prazo vivo a ≤ 3 dias
- *    sem tarefa em aberto que o cubra (ninguém está tocando o que vence já).
- *  - ATENÇÃO: prazo vivo próximo (≤ 7 dias); OU prazo vivo sem tarefa; OU há
- *    intimação ainda não analisada (sem prazo derivado dela).
- *  - BAIXO: nenhum dos acima.
+ * Risco determinístico — mesma entrada, mesma saída, motivos explicáveis.
+ * Prazo vencido ou prazo curto sem providência em andamento = crítico.
  */
-export function computeRisco({
-  prazos,
-  intimacoes,
-  tasks,
-}: RiscoInput): RiscoResult {
-  const reasons: string[] = [];
-  const live = livePrazosOrdered(prazos);
+export function calcularRisco(
+  processo: ProcessoParaRisco,
+  dadosPrazo: { dias: number | null; providenciasAbertas: number },
+): Risco {
+  const { dias, providenciasAbertas } = dadosPrazo;
+  const motivos: string[] = [];
 
-  const vencido = live.find((p) => p.days_left < 0);
-  const proximoSemTarefa = live.find(
-    (p) => p.days_left <= 3 && !prazoTemTarefa(p, tasks),
-  );
+  let nivel: NivelRisco = "Baixo";
 
-  if (vencido) {
-    reasons.push(
-      `Prazo vencido há ${Math.abs(vencido.days_left)} dia(s) e ainda em aberto.`,
+  if (dias !== null && dias < 0) {
+    nivel = "Crítico";
+    motivos.push(
+      `Prazo vencido há ${Math.abs(dias)} dia(s) e ainda em aberto.`,
+    );
+  } else if (dias !== null && dias <= 3 && providenciasAbertas === 0) {
+    nivel = "Crítico";
+    motivos.push(
+      `Prazo vence em ${dias} dia(s) e nenhuma providência está em andamento.`,
+    );
+  } else if (dias !== null && dias <= 7) {
+    nivel = "Atenção";
+    motivos.push(`Prazo próximo: vence em ${dias} dia(s).`);
+  }
+
+  if (providenciasAbertas > 0) {
+    motivos.push(
+      `${providenciasAbertas} providência(s) em aberto vinculada(s) ao prazo.`,
     );
   }
-  if (proximoSemTarefa && proximoSemTarefa !== vencido) {
-    reasons.push(
-      proximoSemTarefa.days_left <= 0
-        ? "Prazo vence hoje e não há tarefa atribuída."
-        : `Prazo em ${proximoSemTarefa.days_left} dia(s) sem tarefa atribuída.`,
-    );
-  }
-  if (vencido || proximoSemTarefa) {
-    return { level: "critico", reasons };
+
+  // ProcessoView usa `lifecycle` (SUSPENDED); mock Processo usa `situacao` ("Suspenso").
+  const isSuspenso =
+    processo.lifecycle === "SUSPENDED" || processo.situacao === "Suspenso";
+  if (isSuspenso) {
+    motivos.push("Processo suspenso — confira a causa da suspensão.");
   }
 
-  const proximo = live.find((p) => p.days_left <= 7);
-  if (proximo) {
-    reasons.push(`Prazo próximo: vence em ${proximo.days_left} dia(s).`);
+  if (motivos.length === 0) {
+    motivos.push("Sem prazos vencidos ou intimações pendentes.");
   }
 
-  const prazoSemTarefa = live.find((p) => !prazoTemTarefa(p, tasks));
-  if (prazoSemTarefa && prazoSemTarefa !== proximo) {
-    reasons.push("Há prazo em aberto sem tarefa vinculada.");
-  }
+  const cores: Record<NivelRisco, [string, string]> = {
+    Crítico: [
+      "var(--destructive)",
+      "color-mix(in oklch, var(--destructive) 10%, transparent)",
+    ],
+    Atenção: [
+      "var(--gold)",
+      "color-mix(in oklch, var(--gold) 14%, transparent)",
+    ],
+    Baixo: [
+      "var(--success)",
+      "color-mix(in oklch, var(--success) 12%, transparent)",
+    ],
+  };
 
-  // Intimação "não analisada": ativa e sem prazo derivado apontando pra ela.
-  const idsComPrazo = new Set(prazos.map((p) => p.intimation_id));
-  const naoAnalisada = intimacoes.find(
-    (i) => i.status === "ACTIVE" && !idsComPrazo.has(i.id),
-  );
-  if (naoAnalisada) {
-    reasons.push("Há intimação recebida ainda não analisada.");
-  }
-
-  if (proximo || prazoSemTarefa || naoAnalisada) {
-    return { level: "atencao", reasons };
-  }
-
-  reasons.push("Sem prazos vencidos ou intimações pendentes.");
-  return { level: "baixo", reasons };
+  return { nivel, cor: cores[nivel][0], fundo: cores[nivel][1], motivos };
 }

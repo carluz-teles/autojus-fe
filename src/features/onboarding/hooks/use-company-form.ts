@@ -28,8 +28,6 @@ const schema = makeOrgProfileSchema({
   cnpjInvalid: t.fields.cnpj.invalid,
   phoneInvalid: t.fields.phone.invalid,
   emailInvalid: t.fields.email.invalid,
-  cepInvalid: t.fields.address.cep.invalid,
-  logradouroRequired: t.fields.address.logradouro.required,
   cidadeRequired: t.fields.address.cidade.required,
   ufInvalid: t.fields.address.uf.invalid,
 });
