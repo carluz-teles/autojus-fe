@@ -54,13 +54,13 @@ export function FilterToolbar({
       {onFilters ? (
         <Button
           variant="outline"
-          size="icon"
           onClick={onFilters}
           aria-label="Filtros"
           title="Filtros"
           className="relative"
         >
-          <ListFilter />
+          <ListFilter data-icon="inline-start" />
+          Filtros
           {activeFilters > 0 ? (
             <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full text-[0.625rem] tabular-nums">
               {activeFilters}

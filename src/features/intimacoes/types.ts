@@ -33,6 +33,8 @@ export interface IntimacaoView {
   cnj_number: string;
   /** Classe processual (court_record.class); "" quando não informada. */
   class: string;
+  /** Assunto (court_record.subject); "" quando não informado. */
+  subject: string;
   /** ID do court_record — deep-link ao processo (/processos/:court_record_id). */
   court_record_id: string;
   court: string;
@@ -49,6 +51,18 @@ export interface IntimacaoView {
   content_preview: string;
   /** Prazo derivado desta intimação; null quando ainda não calculado. */
   prazo: IntimacaoPrazoView | null;
+  /**
+   * Timestamp ISO da última análise; null = "não analisada" (badge da lista/painel).
+   * Espelha IntimacaoView.ai_analyzed_at do BE.
+   */
+  ai_analyzed_at: string | null;
+  /** Id interno do condutor do prazo; null = não atribuído. Espelha o BE. */
+  conductor_user_id: string | null;
+  /** Nome do condutor do prazo (joined no BE); null = não atribuído. */
+  conductor_user_name: string | null;
+  /** Id do revisor — exposto na linha só pra preservá-lo ao atribuir o condutor
+   *  (PUT /responsaveis substitui os dois papéis). null = não atribuído. */
+  reviewer_user_id: string | null;
 }
 
 /**
@@ -169,21 +183,28 @@ export interface IntimacoesSummary {
 
 /**
  * Contagens por bucket de urgência — incluídas no envelope da lista de intimações.
- * Respeitam os filtros ativos (type/user_status/court/search) mas ignoram `urgencia`,
- * permitindo que os headers de cada seção mostrem a contagem real mesmo quando um
- * filtro de urgência está ativo. Espelha o IntimacoesBuckets do BE.
+ * Respeitam os filtros ativos (type/user_status/court/search) mas ignoram `urgencia` E
+ * `assignee` (limitação conhecida do BE — ver IntimacaoBucketsView), permitindo que os
+ * headers de cada seção mostrem a contagem real mesmo quando um filtro de urgência está
+ * ativo. Atraso/Hoje/ProximosDoisDias/EstaSemana/SemProvidencia são as cinco tabs que o
+ * master-detail renderiza; MaisAdiante/NaoConfirmado ficam no objeto por compat mas não
+ * viram tab. Espelha o IntimacaoBucketsView do BE (internal/acquisition/read.go).
  */
 export interface IntimacoesBuckets {
   /** days_left < 0 + status PENDING|OPEN */
   atraso: number;
   /** days_left = 0 + status PENDING|OPEN */
   hoje: number;
-  /** days_left 1..7 + status PENDING|OPEN */
+  /** vence em 1-2 dias + status PENDING|OPEN */
+  proximos_dois_dias: number;
+  /** vence em 3-7 dias + status PENDING|OPEN (?urgencia=semana no BE) */
   esta_semana: number;
-  /** days_left > 7 + status PENDING|OPEN */
+  /** ai_analyzed_at IS NULL e não resolvida/ignorada */
+  sem_providencia: number;
+  /** days_left > 7 + status PENDING|OPEN — não exibido como tab */
   mais_adiante: number;
-  /** sem deadline e não RESOLVED/IGNORED */
-  sem_prazo: number;
+  /** sugerido, ainda não confirmado — não exibido como tab */
+  nao_confirmado: number;
 }
 
 /**

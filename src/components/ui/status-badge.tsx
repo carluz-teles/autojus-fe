@@ -33,14 +33,19 @@ export function StatusBadge({
   label,
   tone,
   className,
+  dot = true,
 }: {
   label: string;
   tone: StatusTone;
   className?: string;
+  /** Ponto colorido antes do rótulo — default true (comportamento existente). */
+  dot?: boolean;
 }) {
   return (
     <Badge variant="outline" className={cn(TONE_CLASS[tone], className)}>
-      <span className={cn("size-1.5 rounded-full", DOT_CLASS[tone])} />
+      {dot ? (
+        <span className={cn("size-1.5 rounded-full", DOT_CLASS[tone])} />
+      ) : null}
       {label}
     </Badge>
   );

@@ -26,8 +26,19 @@ export interface ListIntimacoesParams {
   user_status?: string;
   /** Filtro server-side de tribunal (exact match). */
   court?: string;
-  /** Filtro server-side de urgência (atraso|hoje|semana|nao_confirmado). */
+  /**
+   * Filtro server-side de urgência (atraso|hoje|proximos_dois_dias|semana|
+   * mais_adiante|nao_confirmado|sem_providencia). Nota: o valor de wire da tab
+   * "Esta semana" é "semana" (não "esta_semana" — esse é só o nome do campo no
+   * envelope `buckets`).
+   */
   urgencia?: string;
+  /**
+   * Filtro server-side de responsável — "me" (toggle "Minhas") ou um uuid.
+   * Casa contra conductor_user_id OU reviewer_user_id. NÃO afeta as contagens do
+   * envelope `buckets` (limitação conhecida do BE).
+   */
+  assignee?: string;
 }
 
 export async function listIntimacoes(
@@ -40,10 +51,20 @@ export async function listIntimacoes(
     user_status,
     court,
     urgencia,
+    assignee,
   }: ListIntimacoesParams = {},
 ): Promise<IntimacaoBucketsEnvelope> {
   return fetcher<IntimacaoBucketsEnvelope>(ENDPOINT, {
-    query: { limit, cursor, search, type, user_status, court, urgencia },
+    query: {
+      limit,
+      cursor,
+      search,
+      type,
+      user_status,
+      court,
+      urgencia,
+      assignee,
+    },
   });
 }
 
@@ -184,6 +205,41 @@ export async function assignIntimacaoResponsaveis(
     body: {
       conductor_user_id: conductorUserId,
       reviewer_user_id: reviewerUserId,
+    },
+  });
+}
+
+/** Atribuição em massa do condutor. `all=true` aplica a toda a faixa/filtro atual
+ *  (inclui não paginados) via os filtros; senão aplica aos `ids`. */
+export interface BulkAssignParams {
+  conductorUserId: string | null;
+  all: boolean;
+  ids: string[];
+  /** filtros ativos — usados só no modo all. */
+  urgencia?: string;
+  search?: string;
+  type?: string;
+  user_status?: string;
+  court?: string;
+  assignee?: string;
+}
+
+export async function bulkAssignResponsaveis(
+  fetcher: ApiFetcher,
+  params: BulkAssignParams,
+): Promise<{ affected: number }> {
+  return fetcher<{ affected: number }>(`${ENDPOINT}/bulk/responsaveis`, {
+    method: "POST",
+    body: {
+      conductor_user_id: params.conductorUserId,
+      all: params.all,
+      ids: params.ids,
+      urgencia: params.urgencia ?? "",
+      search: params.search ?? "",
+      type: params.type ?? "",
+      user_status: params.user_status ?? "",
+      court: params.court ?? "",
+      assignee: params.assignee ?? "",
     },
   });
 }

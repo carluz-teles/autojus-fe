@@ -11,6 +11,8 @@ interface ListSearchToolbarProps {
   /** Filtros ao lado da busca (chips, selects). Renderizados à direita. */
   children?: React.ReactNode;
   className?: string;
+  /** Largura máxima do campo de busca (default sm:max-w-xs). */
+  inputWidthClassName?: string;
 }
 
 /**
@@ -24,6 +26,7 @@ export function ListSearchToolbar({
   placeholder = "Buscar…",
   children,
   className,
+  inputWidthClassName = "sm:max-w-xs",
 }: ListSearchToolbarProps) {
   return (
     <div
@@ -32,7 +35,7 @@ export function ListSearchToolbar({
         className,
       )}
     >
-      <div className="relative w-full sm:max-w-xs">
+      <div className={cn("relative w-full", inputWidthClassName)}>
         <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
         <Input
           type="search"

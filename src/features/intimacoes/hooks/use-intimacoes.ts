@@ -2,16 +2,15 @@
 
 import {
   keepPreviousData,
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { DEFAULT_PAGE_SIZE } from "@/components/ui/list-pagination";
 import { createTask } from "@/features/tasks/services/tasks.service";
 import { useApi } from "@/lib/api/use-api";
-import { useCursorPagination } from "@/lib/hooks/use-cursor-pagination";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 
 import {
@@ -19,6 +18,8 @@ import {
   aprovarProvidencia,
   assignIntimacaoResponsaveis,
   type AssignResponsaveisParams,
+  type BulkAssignParams,
+  bulkAssignResponsaveis,
   descartarProvidencia,
   getIntimacao,
   getIntimacoesSummary,
@@ -36,10 +37,14 @@ import type {
 const EMPTY_BUCKETS: IntimacoesBuckets = {
   atraso: 0,
   hoje: 0,
+  proximos_dois_dias: 0,
   esta_semana: 0,
+  sem_providencia: 0,
   mais_adiante: 0,
-  sem_prazo: 0,
+  nao_confirmado: 0,
 };
+
+const PAGE_SIZE = 20;
 
 // Chaves de query centralizadas para invalidação consistente.
 export const intimacoesKeys = {
@@ -55,67 +60,69 @@ export interface IntimacoesFilters {
   type?: string;
   user_status?: string;
   court?: string;
+  /** atraso|hoje|proximos_dois_dias|semana|mais_adiante|nao_confirmado|sem_providencia */
   urgencia?: string;
+  /** "me" (toggle "Minhas") ou um uuid; casa contra condutor OU revisor. */
+  assignee?: string;
 }
 
 /**
- * Hook público da feature — inbox de intimações: leitura por cursor (prev/próxima),
- * busca server-side (debounce por cnj_number) e totais "X de Y". Espelha useProcessos.
+ * Hook público da feature — inbox de intimações do master-detail: leitura por cursor
+ * ACUMULADA via useInfiniteQuery (mesmo idioma de useAndamentosDoProcesso) — cada tab de
+ * urgência dispara um fetch real (?urgencia=...) e "Mostrar mais" só pede a próxima
+ * página, sem perder as já carregadas. Busca server-side (debounce por cnj_number/
+ * classe/órgão). `buckets` traz as contagens reais por urgência (independem de
+ * `urgencia`, mas NÃO de `assignee` — limitação conhecida do BE).
  */
 export function useIntimacoes(filters: IntimacoesFilters = {}) {
   const fetcher = useApi();
   const [search, setSearch] = useState("");
-  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const debouncedSearch = useDebounce(search, 400);
-
-  // Resetar paginação quando filtros/busca mudam.
-  const filterKey = JSON.stringify({
-    ...filters,
-    search: debouncedSearch,
-    pageSize,
-  });
-  const pagination = useCursorPagination(filterKey);
 
   const params = {
     search: debouncedSearch || undefined,
-    limit: pageSize,
-    cursor: pagination.activeCursor,
     type: filters.type || undefined,
     user_status: filters.user_status || undefined,
     court: filters.court || undefined,
     urgencia: filters.urgencia || undefined,
+    assignee: filters.assignee || undefined,
   };
 
-  const query = useQuery({
+  const query = useInfiniteQuery({
     queryKey: intimacoesKeys.list(params),
-    queryFn: () => listIntimacoes(fetcher, params),
+    queryFn: ({ pageParam }) =>
+      listIntimacoes(fetcher, {
+        ...params,
+        limit: PAGE_SIZE,
+        cursor: pageParam || undefined,
+      }),
+    initialPageParam: "",
+    getNextPageParam: (lastPage) => lastPage.page.next_cursor,
+    // Mantém os dados da faixa/filtro anterior enquanto a nova query carrega, pra
+    // trocar tab/filtro NÃO derrubar a página inteira no skeleton (isPending só é
+    // true no 1º load). O loading da troca fica scoped na lista via isFetching.
     placeholderData: keepPreviousData,
   });
 
-  const nextCursor = query.data?.page.next_cursor ?? null;
+  const pages = query.data?.pages ?? [];
+  const first = pages[0];
 
   return {
-    intimacoes: query.data?.data ?? [],
-    filters: query.data?.filters ?? {},
-    buckets: query.data?.buckets ?? EMPTY_BUCKETS,
-    totalCount: query.data?.page.total_count ?? 0,
-    total: query.data?.page.total ?? 0,
+    intimacoes: pages.flatMap((p) => p.data),
+    filters: first?.filters ?? {},
+    buckets: first?.buckets ?? EMPTY_BUCKETS,
+    totalCount: first?.page.total_count ?? 0,
+    total: first?.page.total ?? 0,
     isPending: query.isPending,
     isFetching: query.isFetching,
     error: query.error,
     // busca
     search,
     setSearch,
-    // paginação
-    pageSize,
-    setPageSize,
-    pageNumber: pagination.pageNumber,
-    canPrev: pagination.canPrev,
-    canNext: nextCursor !== null,
-    onPrev: pagination.prev,
-    onNext: () => {
-      if (nextCursor) pagination.next(nextCursor);
-    },
+    // paginação incremental ("Mostrar mais")
+    hasMore: query.hasNextPage,
+    isLoadingMore: query.isFetchingNextPage,
+    loadMore: query.fetchNextPage,
   };
 }
 
@@ -282,6 +289,23 @@ export function useAssignIntimacaoResponsaveis(intimacaoId: string) {
       assignIntimacaoResponsaveis(fetcher, intimacaoId, params),
     onSuccess: (detalhe) => {
       qc.setQueryData(intimacoesKeys.detail(intimacaoId), detalhe);
+    },
+  });
+}
+
+/**
+ * Atribuição em massa do condutor — POST /v1/intimacoes/bulk/responsaveis. Invalida
+ * a lista (e o detalhe, caso a intimação aberta tenha sido afetada) pra reidratar.
+ */
+export function useBulkAssignResponsaveis() {
+  const fetcher = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: BulkAssignParams) =>
+      bulkAssignResponsaveis(fetcher, params),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: intimacoesKeys.lists() });
+      qc.invalidateQueries({ queryKey: intimacoesKeys.all });
     },
   });
 }

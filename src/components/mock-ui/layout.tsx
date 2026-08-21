@@ -7,21 +7,23 @@ export function PageHeader({
   descricao,
   acoes,
   children,
+  className,
 }: {
   titulo: string;
   descricao?: string;
   acoes?: React.ReactNode;
   children?: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <header className="border-b border-border pb-5">
+    <header className={cn("border-border border-b pb-5", className)}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl leading-none font-normal tracking-tight">
             {titulo}
           </h1>
           {descricao && (
-            <p className="mt-1.5 max-w-[620px] text-[13.5px] text-muted-foreground">
+            <p className="text-muted-foreground mt-1.5 max-w-[620px] text-[13.5px]">
               {descricao}
             </p>
           )}
@@ -41,7 +43,7 @@ export function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section className={cn("rounded-xl bg-card p-5 ring-hairline", className)}>
+    <section className={cn("bg-card ring-hairline rounded-xl p-5", className)}>
       {children}
     </section>
   );
@@ -57,7 +59,7 @@ export function SectionTitle({
   return (
     <h2
       className={cn(
-        "text-[10.5px] tracking-[0.12em] uppercase text-muted-foreground",
+        "text-muted-foreground text-[10.5px] tracking-[0.12em] uppercase",
         className,
       )}
     >
@@ -80,7 +82,7 @@ export function Segmented<T extends string>({
   return (
     <div
       className={cn(
-        "inline-flex gap-0.5 rounded-xl bg-muted/60 p-0.5",
+        "bg-muted/60 inline-flex gap-0.5 rounded-xl p-0.5",
         className,
       )}
     >
@@ -98,7 +100,7 @@ export function Segmented<T extends string>({
         >
           {o.label}
           {o.contagem && (
-            <span className="rounded-full bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground">
+            <span className="bg-muted text-muted-foreground rounded-full px-1.5 text-[11px] tabular-nums">
               {o.contagem}
             </span>
           )}
@@ -119,7 +121,7 @@ export function UnderlineTabs<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <nav className="flex flex-wrap gap-1 border-b border-border">
+    <nav className="border-border flex flex-wrap gap-1 border-b">
       {opcoes.map((o) => (
         <button
           key={o.valor}
@@ -129,7 +131,7 @@ export function UnderlineTabs<T extends string>({
             "-mb-px cursor-pointer border-b-2 px-3.5 py-2.5 text-[13px] font-medium whitespace-nowrap",
             o.valor === valor
               ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground",
+              : "text-muted-foreground hover:text-foreground border-transparent",
           )}
         >
           {o.label}

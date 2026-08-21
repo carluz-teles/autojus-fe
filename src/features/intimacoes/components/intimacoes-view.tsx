@@ -1,110 +1,165 @@
 "use client";
 
-import { AlarmClock, Clock, Inbox, Scale } from "lucide-react";
+import { Menu } from "@base-ui/react/menu";
+import { Check, UserPlus, X } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
-import { Kpi } from "@/components/mock-ui/data-display";
 import { PageHeader } from "@/components/mock-ui/layout";
-import { StatusBadge } from "@/components/mock-ui/status-badge";
-import { ListPagination } from "@/components/ui/list-pagination";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { type Facet, FacetedFilter } from "@/components/ui/faceted-filter";
+import { ListSearchToolbar } from "@/components/ui/list-search-toolbar";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { cn, formatarData } from "@/lib/utils";
 
 import {
   type IntimacoesFilters,
+  useBulkAssignResponsaveis,
+  useIntimacaoDetalhe,
   useIntimacoes,
-  useIntimacoesSummary,
 } from "../hooks/use-intimacoes";
 import { TYPE_LABEL, USER_STATUS_LABEL } from "../lib/labels";
-import type { IntimacaoView, IntimacoesBuckets } from "../types";
+import { tituloIntimacao } from "../lib/titulo";
+import type {
+  IntimacaoPrazoView,
+  IntimacaoView,
+  IntimacoesBuckets,
+} from "../types";
+import { AnalisarCard } from "./shared/analisar-card";
+import {
+  AtribuirResponsavel,
+  nomeExibicao,
+} from "./shared/atribuir-responsavel";
+import { Avatar, initials } from "./shared/avatar";
+import { PrazoContagemGrande } from "./shared/prazo-contagem-grande";
+import { prazoUrgenciaInfo } from "./shared/prazo-urgencia";
+import { TeorPublicacao } from "./shared/teor-publicacao";
 
-// Urgência derivada de prazo.days_left (inteiro do BE): 5 buckets mutuamente
-// exclusivos alinhados com o contrato BE (IntimacoesBuckets).
-type Urgencia = "atraso" | "hoje" | "semana" | "mais" | "sem";
+// ─────────────────────────────────────────────────────────────────────────────
+// IntimacoesView — inbox de triagem em layout master-detail: lista (~60%) +
+// painel de detalhe compacto (~40%, sticky), seguindo os 2 prints do design.
+// As 5 tabs de urgência disparam fetch REAL via ?urgencia; o toggle Triagem/
+// Prazos só reordena o MESMO dataset já carregado (client-side, sem novo
+// fetch). O painel de detalhe busca a intimação selecionada por completo
+// (useIntimacaoDetalhe) e REUSA o <AnalisarCard/> da tela de detalhe — os 2
+// estados dos prints (com/sem análise) são o mesmo componente, sem duplicar.
+// ─────────────────────────────────────────────────────────────────────────────
 
-function urgenciaView(prazo: IntimacaoView["prazo"]): Urgencia {
-  if (!prazo) return "sem";
-  const d = prazo.days_left;
-  if (d < 0) return "atraso";
-  if (d === 0) return "hoje";
-  if (d <= 7) return "semana";
-  return "mais";
-}
-
-function corDaUrgenciaView(u: Urgencia): string {
-  return {
-    atraso: "var(--destructive)",
-    hoje: "var(--gold)",
-    semana: "var(--muted-foreground)",
-    mais: "var(--info)",
-    sem: "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
-  }[u];
-}
-
-function rotuloPrazoView(prazo: IntimacaoView["prazo"]): string {
-  if (!prazo) return "sem prazo";
-  const d = prazo.days_left;
-  if (d < 0) return `${Math.abs(d)} dias em atraso`;
-  if (d === 0) return "vence hoje";
-  if (d === 1) return "vence amanhã";
-  return `em ${d} dias`;
-}
-
-const GRUPOS: {
+/** Tabs de urgência: rótulo, valor de wire (?urgencia) e a chave do bucket que
+ * traz a contagem real. O valor de wire de "Esta semana" é "semana" — só o
+ * NOME do campo no envelope `buckets` é "esta_semana" (ver types.ts). */
+const URGENCIA_TABS: {
+  value: string;
   label: string;
-  urgencia: Urgencia;
   bucketKey: keyof IntimacoesBuckets;
 }[] = [
-  { label: "Em atraso", urgencia: "atraso", bucketKey: "atraso" },
-  { label: "Vence hoje", urgencia: "hoje", bucketKey: "hoje" },
-  { label: "Esta semana", urgencia: "semana", bucketKey: "esta_semana" },
-  { label: "Mais adiante", urgencia: "mais", bucketKey: "mais_adiante" },
-  { label: "Sem prazo", urgencia: "sem", bucketKey: "sem_prazo" },
+  { value: "atraso", label: "Em atraso", bucketKey: "atraso" },
+  { value: "hoje", label: "Vence hoje", bucketKey: "hoje" },
+  {
+    value: "proximos_dois_dias",
+    label: "Próximos dois dias",
+    bucketKey: "proximos_dois_dias",
+  },
+  { value: "semana", label: "Esta semana", bucketKey: "esta_semana" },
+  {
+    value: "sem_providencia",
+    label: "Sem providência",
+    bucketKey: "sem_providencia",
+  },
 ];
 
-// ─── filtros server-side ─────────────────────────────────────────────────────
+type ModoVisao = "triagem" | "prazos";
 
-interface FiltrosAtivos {
-  search: string;
+/** MOCK: peticionamento — ação ainda não implementada. */
+function emBreve() {
+  toast("Em breve.");
+}
+
+/** Rótulo curto do prazo pra coluna direita da linha da lista. */
+function rotuloPrazo(prazo: IntimacaoPrazoView | null): string {
+  const info = prazoUrgenciaInfo(prazo);
+  if (!info) return "sem prazo";
+  if (info.atrasado)
+    return `${info.magnitude} ${info.magnitude === 1 ? "dia em atraso" : "dias em atraso"}`;
+  if (info.hoje) return "vence hoje";
+  return `vence em ${info.magnitude} ${info.magnitude === 1 ? "dia" : "dias"}`;
+}
+
+/**
+ * Reordena o MESMO array carregado — Triagem prioriza o que ainda precisa de
+ * análise (ai_analyzed_at null primeiro), depois o prazo mais urgente; Prazos
+ * ordena estritamente pela proximidade do vencimento (days_left), prazo nulo
+ * por último. Puro client-side — nenhum novo fetch ao trocar o toggle.
+ */
+function ordenarPorModo(
+  itens: IntimacaoView[],
+  modo: ModoVisao,
+): IntimacaoView[] {
+  const copia = [...itens];
+  if (modo === "prazos") {
+    copia.sort((a, b) => {
+      if (!a.prazo && !b.prazo) return 0;
+      if (!a.prazo) return 1;
+      if (!b.prazo) return -1;
+      return a.prazo.days_left - b.prazo.days_left;
+    });
+    return copia;
+  }
+  copia.sort((a, b) => {
+    const aAnalisada = !!a.ai_analyzed_at;
+    const bAnalisada = !!b.ai_analyzed_at;
+    if (aAnalisada !== bAnalisada) return aAnalisada ? 1 : -1;
+    if (!a.prazo && !b.prazo) return 0;
+    if (!a.prazo) return 1;
+    if (!b.prazo) return -1;
+    return a.prazo.days_left - b.prazo.days_left;
+  });
+  return copia;
+}
+
+interface FiltrosExtra {
   type: string;
   user_status: string;
   court: string;
-  urgencia: string;
+  /** id do membro (assignee) — filtra por condutor OU revisor. */
+  responsavel: string;
 }
 
-const FILTROS_VAZIOS: FiltrosAtivos = {
-  search: "",
+const FILTROS_EXTRA_VAZIOS: FiltrosExtra = {
   type: "",
-  user_status: "PENDING", // padrão: mostra pendentes
+  user_status: "",
   court: "",
-  urgencia: "",
-};
-
-// Mapeamento das visões rápidas para o param `urgencia` do BE.
-const VISAO_URGENCIA: Record<string, string> = {
-  atraso: "atraso",
-  hoje: "hoje",
-  semana: "semana",
-  mais_adiante: "mais_adiante",
-  nao_confirmado: "nao_confirmado",
+  responsavel: "",
 };
 
 export function IntimacoesView() {
-  const [filtros, setFiltros] = useState<FiltrosAtivos>(FILTROS_VAZIOS);
-  const [selecionada, setSelecionada] = useState<string | null>(null);
+  const [urgencia, setUrgencia] = useState<string>("atraso");
+  const [filtrosExtra, setFiltrosExtra] =
+    useState<FiltrosExtra>(FILTROS_EXTRA_VAZIOS);
+  const [selecionadaId, setSelecionadaId] = useState<string | null>(null);
+  // Seleção em massa. Dois modos: `todosDaFaixa` (ALL — toda a faixa, inclusive os
+  // itens ainda NÃO carregados; a ação manda um flag, não ids) OU `marcadas` (ids
+  // individuais). Escopo por faixa: limpa ao trocar de tab (via trocarUrgencia).
+  const [todosDaFaixa, setTodosDaFaixa] = useState(false);
+  const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
+
+  const trocarUrgencia = (valor: string) => {
+    setUrgencia(valor);
+    setTodosDaFaixa(false);
+    setMarcadas(new Set());
+  };
+
+  const membros = useOrgMembersDirectory();
 
   const filters: IntimacoesFilters = {
-    type: filtros.type || undefined,
-    user_status: filtros.user_status || undefined,
-    court: filtros.court || undefined,
-    urgencia: filtros.urgencia || undefined,
+    urgencia,
+    assignee: filtrosExtra.responsavel || undefined,
+    type: filtrosExtra.type || undefined,
+    user_status: filtrosExtra.user_status || undefined,
+    court: filtrosExtra.court || undefined,
   };
 
   const {
@@ -115,49 +170,139 @@ export function IntimacoesView() {
     isPending,
     isFetching,
     error,
+    search,
     setSearch,
-    pageSize,
-    setPageSize,
-    pageNumber,
-    canPrev,
-    canNext,
-    onPrev,
-    onNext,
+    hasMore,
+    isLoadingMore,
+    loadMore,
   } = useIntimacoes(filters);
 
-  const summary = useIntimacoesSummary();
+  const intimacoesOrdenadas = useMemo(
+    () => ordenarPorModo(intimacoes, "triagem"),
+    [intimacoes],
+  );
 
-  // Busca local debounce já feita no hook, mas também repassa para o server-side
-  // sincronizando o estado de busca com o filtro externo.
-  const handleSearch = (q: string) => {
-    setSearch(q);
-    setFiltros((f) => ({ ...f, search: q }));
+  // Seleciona o primeiro item por padrão (ou quando a seleção atual sai do
+  // dataset carregado — troca de tab/filtro). Nunca sobrescreve uma seleção
+  // ainda presente na lista. Ajuste síncrono no render (mesmo padrão de
+  // useCursorPagination) — evita o cascading render de um setState em efeito.
+  const selecaoValida = intimacoesOrdenadas.some((i) => i.id === selecionadaId);
+  if (!isPending && !selecaoValida) {
+    const proxima = intimacoesOrdenadas[0]?.id ?? null;
+    if (proxima !== selecionadaId) setSelecionadaId(proxima);
+  }
+
+  const naoAnalisadasNaFaixa = intimacoes.filter(
+    (i) => !i.ai_analyzed_at,
+  ).length;
+
+  // Seleção em massa.
+  const idsCarregados = intimacoesOrdenadas.map((i) => i.id);
+  const todasMarcadas =
+    todosDaFaixa ||
+    (idsCarregados.length > 0 && idsCarregados.every((id) => marcadas.has(id)));
+  const alguma = todosDaFaixa || marcadas.size > 0;
+  const qtdSelecionada = todosDaFaixa ? totalCount : marcadas.size;
+  const estaMarcada = (id: string) => todosDaFaixa || marcadas.has(id);
+
+  const limparSelecao = () => {
+    setTodosDaFaixa(false);
+    setMarcadas(new Set());
+  };
+  // Master: liga o modo ALL (toda a faixa); desliga tudo se já estava tudo marcado.
+  const alternarTodas = () => {
+    setMarcadas(new Set());
+    setTodosDaFaixa(!todasMarcadas);
+  };
+  const alternarMarcada = (id: string) => {
+    if (todosDaFaixa) {
+      // Sai do modo ALL materializando os carregados menos o desmarcado.
+      const next = new Set(idsCarregados);
+      next.delete(id);
+      setTodosDaFaixa(false);
+      setMarcadas(next);
+      return;
+    }
+    setMarcadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
-  const setFiltro = (key: keyof FiltrosAtivos, val: string) =>
-    setFiltros((f) => ({ ...f, [key]: val }));
-
-  const limpar = () => {
-    setFiltros(FILTROS_VAZIOS);
-    setSearch("");
+  const bulkAssign = useBulkAssignResponsaveis();
+  const atribuirEmMassa = (conductorUserId: string) => {
+    bulkAssign.mutate(
+      {
+        conductorUserId,
+        all: todosDaFaixa,
+        ids: todosDaFaixa ? [] : [...marcadas],
+        // filtros da faixa atual (usados só no modo ALL).
+        urgencia,
+        search,
+        type: filtrosExtra.type,
+        user_status: filtrosExtra.user_status,
+        court: filtrosExtra.court,
+        assignee: filtrosExtra.responsavel,
+      },
+      {
+        onSuccess: (r) => {
+          toast(
+            `${r.affected} ${r.affected === 1 ? "intimação atribuída" : "intimações atribuídas"}`,
+          );
+          limparSelecao();
+        },
+      },
+    );
   };
 
-  // Agrupar por urgência da view (client-side apenas para organizar a lista já filtrada).
-  // A contagem exibida no header vem dos `buckets` do BE (contagem REAL), não de
-  // g.itens.length (que é limitado pelo page_size). Mostramos a seção sempre que o
-  // bucket real > 0 ou há itens carregados — evita sumir seção com contagem positiva.
-  const grupos = GRUPOS.map((g) => ({
-    ...g,
-    itens: intimacoes.filter((i) => urgenciaView(i.prazo) === g.urgencia),
-    count: buckets[g.bucketKey],
-  })).filter((g) => g.count > 0 || g.itens.length > 0);
+  const limparFiltrosExtra = () => setFiltrosExtra(FILTROS_EXTRA_VAZIOS);
 
-  const atual =
-    intimacoes.find((i) => i.id === selecionada) ?? intimacoes[0] ?? null;
+  const facetas: Facet[] = useMemo(() => {
+    // O filterOptions do BE devolve o ENUM cru como label ("PENDING"); mapeamos
+    // pelo dicionário pt-BR pra não vazar código na UI. Fallback = chaves do dict.
+    const rotular = (
+      opcoes: { value: string; label: string }[] | undefined,
+      dict: Record<string, string>,
+    ) => {
+      const base =
+        opcoes && opcoes.length > 0
+          ? opcoes
+          : Object.keys(dict).map((value) => ({ value, label: value }));
+      return base.map((o) => ({
+        value: o.value,
+        label: dict[o.value] ?? o.label,
+      }));
+    };
+
+    const fs: Facet[] = [
+      {
+        key: "user_status",
+        label: "Situação",
+        options: rotular(filterOptions["user_status"], USER_STATUS_LABEL),
+      },
+    ];
+    const courts = filterOptions["court"] ?? [];
+    if (courts.length > 0) {
+      fs.push({ key: "court", label: "Tribunal", options: courts });
+    }
+    if (membros.members.length > 0) {
+      fs.push({
+        key: "responsavel",
+        label: "Responsável",
+        options: membros.members.map((m) => ({
+          value: m.id,
+          label: nomeExibicao(m.name, m.email),
+        })),
+      });
+    }
+    return fs;
+  }, [filterOptions, membros.members]);
 
   if (isPending) return <Esqueleto />;
 
-  // Falha de fetch NÃO pode parecer inbox vazia: mostra o erro (espelha o detalhe).
+  // Falha de fetch NÃO pode parecer inbox vazia: mostra o erro.
   if (error)
     return (
       <div className="px-8 pt-6">
@@ -168,477 +313,611 @@ export function IntimacoesView() {
     );
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="px-8 pt-6">
+    <div className="relative -mx-6 -my-10 flex h-[calc(100dvh-4.5rem)] min-h-0 flex-col overflow-hidden">
+      <div className="px-8 pt-8 pb-5">
         <PageHeader
           titulo="Intimações"
           descricao="O que chegou do DJEN e o que precisa ser feito antes do prazo."
+          className="border-b-0 pb-0"
         >
-          {/* Barra de filtros server-side */}
-          <BarraFiltros
-            filtros={filtros}
-            filterOptions={filterOptions}
-            onSearch={handleSearch}
-            onFiltro={setFiltro}
-            onLimpar={limpar}
-            isFetching={isFetching}
-          />
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <ListSearchToolbar
+              className="flex-1"
+              inputWidthClassName="sm:max-w-sm"
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por processo, classe ou órgão…"
+            >
+              {isFetching ? (
+                <span className="text-muted-foreground text-[11.5px]">
+                  Carregando…
+                </span>
+              ) : null}
+            </ListSearchToolbar>
 
-          {/* 4 KPIs do summary real */}
-          <div className="mt-4 grid grid-cols-4 gap-3">
-            <Kpi
-              rotulo="Em atraso"
-              valor={summary.data?.em_atraso ?? 0}
-              tom="danger"
-              icone={<AlarmClock className="size-4" />}
-            />
-            <Kpi
-              rotulo="Vencem hoje"
-              valor={summary.data?.vencem_hoje ?? 0}
-              tom="warning"
-              icone={<Clock className="size-4" />}
-            />
-            <Kpi
-              rotulo="Prazo não confirmado"
-              valor={summary.data?.nao_confirmado ?? 0}
-              tom="info"
-              icone={<Scale className="size-4" />}
-            />
-            <Kpi
-              rotulo="Abertas"
-              valor={summary.data?.pendentes ?? 0}
-              icone={<Inbox className="size-4" />}
+            <FacetedFilter
+              iconOnly
+              className="ml-auto"
+              facets={facetas}
+              values={{
+                user_status: filtrosExtra.user_status,
+                type: filtrosExtra.type,
+                court: filtrosExtra.court,
+                responsavel: filtrosExtra.responsavel,
+              }}
+              onChange={(key, value) =>
+                setFiltrosExtra((f) => ({ ...f, [key]: value }))
+              }
+              onClear={limparFiltrosExtra}
             />
           </div>
         </PageHeader>
       </div>
 
-      {/* Vista triagem: lista + painel lateral */}
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(420px,1fr)_minmax(340px,430px)]">
-        <ListaAgrupada
-          grupos={grupos}
-          totalFiltrado={intimacoes.length}
-          selecionada={atual?.id}
-          onSelecionar={setSelecionada}
-          onLimpar={limpar}
-          isFetching={isFetching}
-          pageSize={pageSize}
-          onPageSizeChange={setPageSize}
-          pageNumber={pageNumber}
-          canPrev={canPrev}
-          canNext={canNext}
-          onPrev={onPrev}
-          onNext={onNext}
-          totalCount={totalCount}
+      {/* Master-detail: coluna esquerda (tabs + seleção + lista) | painel (~40%).
+          A linha horizontal (border-t) separa o bloco de cima (título/busca) do
+          conjunto abaixo; o painel de detalhe começa na mesma altura da tab bar. */}
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(420px,3fr)_minmax(360px,2fr)] border-t">
+        <div className="flex min-h-0 flex-col">
+          <div className="px-8 pt-4">
+            <div
+              role="tablist"
+              aria-label="Urgência"
+              onKeyDown={(e) => {
+                if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+                const tabs = Array.from(
+                  e.currentTarget.querySelectorAll<HTMLButtonElement>(
+                    '[role="tab"]',
+                  ),
+                );
+                const current = tabs.indexOf(
+                  document.activeElement as HTMLButtonElement,
+                );
+                if (current === -1) return;
+                e.preventDefault();
+                const delta = e.key === "ArrowRight" ? 1 : -1;
+                const next =
+                  tabs[(current + delta + tabs.length) % tabs.length];
+                next.focus();
+                next.click();
+              }}
+              className="flex items-center border-b"
+            >
+              {URGENCIA_TABS.map((t) => {
+                const selected = urgencia === t.value;
+                return (
+                  <button
+                    key={t.value}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    tabIndex={selected ? 0 : -1}
+                    onClick={() => trocarUrgencia(t.value)}
+                    className={cn(
+                      "flex cursor-pointer items-center justify-center gap-2 border-b-2 px-4 pb-3 text-[13px] transition-colors",
+                      selected
+                        ? "border-primary text-foreground font-semibold"
+                        : "text-muted-foreground hover:text-foreground border-transparent font-medium",
+                    )}
+                  >
+                    {t.label}
+                    <span
+                      className={cn(
+                        "rounded-full px-2 text-xs tabular-nums",
+                        selected
+                          ? "bg-primary/10 text-primary"
+                          : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {buckets[t.bucketKey]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <label className="text-muted-foreground flex cursor-pointer items-center gap-2 text-[12.5px]">
+                <Checkbox
+                  checked={todasMarcadas}
+                  indeterminate={alguma && !todasMarcadas}
+                  onCheckedChange={() => alternarTodas()}
+                  aria-label="Selecionar todas nesta faixa"
+                />
+                Selecionar {totalCount} nesta faixa
+              </label>
+              <StatusBadge
+                label={`${naoAnalisadasNaFaixa} não analisadas`}
+                tone="warning"
+                dot={false}
+                className="bg-gold/20 text-gold border-transparent"
+              />
+            </div>
+          </div>
+
+          <ListaIntimacoes
+            itens={intimacoesOrdenadas}
+            totalCount={totalCount}
+            selecionadaId={selecionadaId}
+            onSelecionar={setSelecionadaId}
+            estaMarcada={estaMarcada}
+            onMarcar={alternarMarcada}
+            onLimpar={() => {
+              limparFiltrosExtra();
+              setSearch("");
+            }}
+            isFetching={isFetching}
+            hasMore={!!hasMore}
+            isLoadingMore={isLoadingMore}
+            onMostrarMais={() => void loadMore()}
+          />
+        </div>
+        {selecionadaId ? (
+          <PainelDetalhe id={selecionadaId} />
+        ) : (
+          <aside className="border-border text-muted-foreground overflow-y-auto border-l p-6 text-sm">
+            Nenhuma intimação selecionada.
+          </aside>
+        )}
+      </div>
+
+      {alguma ? (
+        <BarraSelecao
+          quantidade={qtdSelecionada}
+          membros={membros.members}
+          atribuindo={bulkAssign.isPending}
+          onAtribuir={atribuirEmMassa}
+          onFechar={limparSelecao}
         />
-        {atual && <PainelLateral item={atual} />}
+      ) : null}
+    </div>
+  );
+}
+
+// Barra flutuante de ações em massa — aparece quando há intimações marcadas. Por
+// ora só "Atribuir": abre um menu com os membros e atribui o condutor a toda a
+// seleção (modo ALL manda flag+filtros; individual manda ids).
+function BarraSelecao({
+  quantidade,
+  membros,
+  atribuindo,
+  onAtribuir,
+  onFechar,
+}: {
+  quantidade: number;
+  membros: { id: string; name: string; email: string }[];
+  atribuindo: boolean;
+  onAtribuir: (conductorUserId: string) => void;
+  onFechar: () => void;
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-y-0 right-[40%] left-0 z-40 flex items-end justify-center pb-6">
+      <div className="bg-foreground text-background pointer-events-auto flex items-center gap-1.5 rounded-2xl p-1.5 pl-4 shadow-xl">
+        <span className="pr-2 text-[13px] leading-tight font-medium">
+          {quantidade} {quantidade === 1 ? "selecionada" : "selecionadas"}
+        </span>
+        <Menu.Root>
+          <Menu.Trigger
+            disabled={atribuindo}
+            className="bg-gold text-foreground hover:bg-gold/90 flex items-center gap-2 rounded-xl px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-60"
+          >
+            <UserPlus className="size-4" />
+            {atribuindo ? "Atribuindo…" : "Atribuir"}
+          </Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Positioner side="top" align="center" sideOffset={8}>
+              <Menu.Popup className="bg-popover text-popover-foreground ring-foreground/10 z-50 max-h-72 min-w-52 overflow-y-auto rounded-lg p-1 shadow-md ring-1 outline-none">
+                {membros.length === 0 ? (
+                  <p className="text-muted-foreground px-2 py-1.5 text-[13px]">
+                    Nenhum membro disponível.
+                  </p>
+                ) : (
+                  membros.map((m) => {
+                    const nome = nomeExibicao(m.name, m.email);
+                    return (
+                      <Menu.Item
+                        key={m.id}
+                        onClick={() => onAtribuir(m.id)}
+                        className="focus:bg-accent focus:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-[13px] outline-none select-none"
+                      >
+                        <Avatar size="sm" initials={initials(nome)} />
+                        <span className="flex-1 truncate">{nome}</span>
+                      </Menu.Item>
+                    );
+                  })
+                )}
+              </Menu.Popup>
+            </Menu.Positioner>
+          </Menu.Portal>
+        </Menu.Root>
+        <button
+          type="button"
+          onClick={onFechar}
+          aria-label="Limpar seleção"
+          className="hover:bg-background/10 ml-1 flex size-8 items-center justify-center rounded-xl transition-colors"
+        >
+          <X className="size-4" />
+        </button>
       </div>
     </div>
   );
 }
 
-// ─── barra de filtros ─────────────────────────────────────────────────────────
+// ─── lista (coluna esquerda) ────────────────────────────────────────────────
 
-function BarraFiltros({
-  filtros,
-  filterOptions,
-  onSearch,
-  onFiltro,
+function ListaIntimacoes({
+  itens,
+  totalCount,
+  selecionadaId,
+  onSelecionar,
+  estaMarcada,
+  onMarcar,
   onLimpar,
   isFetching,
+  hasMore,
+  isLoadingMore,
+  onMostrarMais,
 }: {
-  filtros: FiltrosAtivos;
-  filterOptions: Record<string, { label: string; value: string }[] | undefined>;
-  onSearch: (q: string) => void;
-  onFiltro: (k: keyof FiltrosAtivos, v: string) => void;
+  itens: IntimacaoView[];
+  totalCount: number;
+  selecionadaId: string | null;
+  onSelecionar: (id: string) => void;
+  estaMarcada: (id: string) => boolean;
+  onMarcar: (id: string) => void;
   onLimpar: () => void;
   isFetching: boolean;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  onMostrarMais: () => void;
 }) {
-  const visoes = [
-    { chave: "atraso", label: "Em atraso" },
-    { chave: "hoje", label: "Vencem hoje" },
-  ];
-
-  const visaoAtiva = filtros.urgencia
-    ? (Object.entries(VISAO_URGENCIA).find(
-        ([, v]) => v === filtros.urgencia,
-      )?.[0] ?? null)
-    : null;
-
-  const toggleVisao = (chave: string) => {
-    const urgParam = VISAO_URGENCIA[chave] ?? "";
-    onFiltro("urgencia", filtros.urgencia === urgParam ? "" : urgParam);
-  };
-
-  const typeOpcoes: { valor: string; label: string }[] = [
-    { valor: "__todos__", label: "Todos os tipos" },
-    ...(
-      filterOptions["type"] ??
-      Object.entries(TYPE_LABEL).map(([v, l]) => ({ label: l, value: v }))
-    ).map((o: { value: string; label: string }) => ({
-      valor: o.value,
-      label: o.label,
-    })),
-  ];
-
-  const userStatusOpcoes: { valor: string; label: string }[] = [
-    { valor: "__todos__", label: "Todos" },
-    ...(
-      filterOptions["user_status"] ??
-      Object.entries(USER_STATUS_LABEL).map(([v, l]) => ({
-        label: l,
-        value: v,
-      }))
-    ).map((o: { value: string; label: string }) => ({
-      valor: o.value,
-      label: o.label,
-    })),
-  ];
-
-  const courtOpcoes: { valor: string; label: string }[] = [
-    { valor: "__todos__", label: "Todos os tribunais" },
-    ...(filterOptions["court"] ?? []).map(
-      (o: { value: string; label: string }) => ({
-        valor: o.value,
-        label: o.label,
-      }),
-    ),
-  ];
-
-  // Mapas value→label para o <SelectValue/> renderizar o rótulo (não o código).
-  const typeItems = Object.fromEntries(
-    typeOpcoes.map((o) => [o.valor, o.label]),
-  );
-  const userStatusItems = Object.fromEntries(
-    userStatusOpcoes.map((o) => [o.valor, o.label]),
-  );
-  const courtItems = Object.fromEntries(
-    courtOpcoes.map((o) => [o.valor, o.label]),
-  );
-
   return (
-    <div className="mt-6 flex flex-wrap items-center gap-2.5">
-      <input
-        type="search"
-        placeholder="Buscar por nº do processo…"
-        value={filtros.search}
-        onChange={(e) => onSearch(e.target.value)}
-        className="border-border bg-card text-foreground placeholder:text-muted-foreground focus:ring-ring h-8 w-[280px] rounded-md border px-3 text-[13px] focus:ring-1 focus:outline-none"
-      />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto px-8 pt-4"
+        aria-live="polite"
+        aria-busy={isFetching}
+      >
+        {itens.length === 0 && !isFetching ? (
+          <div className="text-muted-foreground py-16 text-center">
+            <p className="text-sm">Nenhuma intimação nesta faixa.</p>
+            <button
+              type="button"
+              onClick={onLimpar}
+              className="border-border bg-card mt-3 cursor-pointer rounded-lg border px-3.5 py-1.5 text-[12.5px]"
+            >
+              Limpar filtros
+            </button>
+          </div>
+        ) : null}
 
-      {/* Visões rápidas → urgencia param */}
-      {visoes.map((v) => {
-        const on = visaoAtiva === v.chave;
-        return (
+        {itens.map((item) => (
+          <LinhaIntimacao
+            key={item.id}
+            item={item}
+            selecionada={item.id === selecionadaId}
+            onSelecionar={() => onSelecionar(item.id)}
+            marcada={estaMarcada(item.id)}
+            onMarcar={() => onMarcar(item.id)}
+          />
+        ))}
+      </div>
+
+      {hasMore ? (
+        <div className="border-border shrink-0 border-t px-8 py-3">
           <button
-            key={v.chave}
             type="button"
-            onClick={() => toggleVisao(v.chave)}
-            className={cn(
-              "cursor-pointer rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium transition-colors",
-              on
-                ? "text-primary border-[color-mix(in_oklch,var(--primary)_40%,transparent)] bg-[color-mix(in_oklch,var(--primary)_10%,transparent)]"
-                : "border-border bg-card text-muted-foreground hover:border-[color-mix(in_oklch,var(--primary)_40%,transparent)]",
-            )}
+            onClick={onMostrarMais}
+            disabled={isLoadingMore}
+            className="text-primary cursor-pointer text-[12.5px] font-medium hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {v.label}
+            {isLoadingMore
+              ? "Carregando…"
+              : `Mostrar mais ${Math.max(totalCount - itens.length, 0)} de ${totalCount}`}
           </button>
-        );
-      })}
-
-      {/* Tipo */}
-      <Select
-        items={typeItems}
-        value={filtros.type || "__todos__"}
-        onValueChange={(v) =>
-          onFiltro("type", v === "__todos__" || v == null ? "" : v)
-        }
-      >
-        <SelectTrigger
-          className="h-8 text-[12.5px]"
-          aria-label="Tipo de intimação"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {typeOpcoes.map((o) => (
-            <SelectItem key={o.valor} value={o.valor}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {/* Situação */}
-      <Select
-        items={userStatusItems}
-        value={filtros.user_status || "__todos__"}
-        onValueChange={(v) =>
-          onFiltro("user_status", v === "__todos__" || v == null ? "" : v)
-        }
-      >
-        <SelectTrigger className="h-8 text-[12.5px]" aria-label="Situação">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {userStatusOpcoes.map((o) => (
-            <SelectItem key={o.valor} value={o.valor}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {/* Tribunal (só se o BE retornar opções) */}
-      {courtOpcoes.length > 1 && (
-        <Select
-          items={courtItems}
-          value={filtros.court || "__todos__"}
-          onValueChange={(v) =>
-            onFiltro("court", v === "__todos__" || v == null ? "" : v)
-          }
-        >
-          <SelectTrigger className="h-8 text-[12.5px]" aria-label="Tribunal">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {courtOpcoes.map((o) => (
-              <SelectItem key={o.valor} value={o.valor}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
-      {isFetching && (
-        <span className="text-muted-foreground text-[11.5px]">Carregando…</span>
-      )}
-
-      <button
-        type="button"
-        onClick={onLimpar}
-        className="border-border bg-card text-muted-foreground hover:text-foreground ml-auto cursor-pointer rounded-full border px-3.5 py-1.5 text-[12.5px]"
-      >
-        Limpar filtros
-      </button>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-// ─── lista agrupada ───────────────────────────────────────────────────────────
-
-function ListaAgrupada({
-  grupos,
-  totalFiltrado,
+function LinhaIntimacao({
+  item,
   selecionada,
   onSelecionar,
-  onLimpar,
-  isFetching,
-  pageSize,
-  onPageSizeChange,
-  pageNumber,
-  canPrev,
-  canNext,
-  onPrev,
-  onNext,
-  totalCount,
+  marcada,
+  onMarcar,
 }: {
-  grupos: {
-    label: string;
-    urgencia: Urgencia;
-    itens: IntimacaoView[];
-    count: number;
-  }[];
-  totalFiltrado: number;
-  selecionada?: string;
-  onSelecionar: (id: string) => void;
-  onLimpar: () => void;
-  isFetching: boolean;
-  pageSize: number;
-  onPageSizeChange: (size: number) => void;
-  pageNumber: number;
-  canPrev: boolean;
-  canNext: boolean;
-  onPrev: () => void;
-  onNext: () => void;
-  totalCount: number;
+  item: IntimacaoView;
+  selecionada: boolean;
+  onSelecionar: () => void;
+  marcada: boolean;
+  onMarcar: () => void;
 }) {
+  const info = prazoUrgenciaInfo(item.prazo);
+  const analisada = !!item.ai_analyzed_at;
+
   return (
     <div
-      className="overflow-y-auto px-8 pt-4 pb-8"
-      aria-live="polite"
-      aria-busy={isFetching}
+      role="button"
+      tabIndex={0}
+      onClick={onSelecionar}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelecionar();
+        }
+      }}
+      className={cn(
+        "border-border flex w-full items-center justify-between gap-4 border-b py-3 pr-4 text-left transition-colors",
+        "cursor-pointer border-l-[3px]",
+        info?.atrasado ? "border-l-destructive" : "border-l-transparent",
+        selecionada ? "bg-muted/60" : "hover:bg-muted/50",
+      )}
     >
-      {totalFiltrado === 0 && !isFetching && (
-        <div className="text-muted-foreground py-16 text-center">
-          <p className="text-sm">Nenhuma intimação com os filtros aplicados.</p>
-          <button
-            type="button"
-            onClick={onLimpar}
-            className="border-border bg-card mt-3 cursor-pointer rounded-lg border px-3.5 py-1.5 text-[12.5px]"
-          >
-            Limpar filtros
-          </button>
-        </div>
-      )}
-
-      {grupos.map((g) => (
-        <section key={g.label} className="mb-6">
-          <div className="mb-2 flex items-center gap-3">
-            <span className="font-display text-[15px] tracking-wide">
-              {g.label}
+      {/* conteúdo (cresce, com largura máxima) */}
+      <span className="flex max-w-[600px] min-w-0 flex-1 items-center gap-3">
+        <span
+          className="pl-3"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <Checkbox
+            checked={marcada}
+            onCheckedChange={() => onMarcar()}
+            aria-label="Selecionar intimação"
+          />
+        </span>
+        <span className="min-w-0">
+          <span className="text-foreground block truncate text-[14px] font-medium">
+            {tituloIntimacao(item)}
+          </span>
+          <span className="mt-0.5 flex items-center gap-2">
+            <span className="text-muted-foreground truncate text-[12px] tabular-nums">
+              {item.cnj_number}
             </span>
-            <span className="text-muted-foreground text-[11px] tabular-nums">
-              {g.count}
+            <StatusBadge
+              label={analisada ? "analisada" : "não analisada"}
+              tone={analisada ? "success" : "warning"}
+              dot={false}
+            />
+          </span>
+        </span>
+      </span>
+
+      {/* prazo + responsável (canto direito) */}
+      <span className="flex shrink-0 items-center gap-6">
+        <span
+          className={cn(
+            "text-right text-xs whitespace-nowrap tabular-nums",
+            info?.corClass ?? "text-muted-foreground",
+          )}
+        >
+          <span className="block">{rotuloPrazo(item.prazo)}</span>
+          {item.prazo?.end_date ? (
+            <span className="text-muted-foreground block text-[11px]">
+              {formatarData(item.prazo.end_date)}
             </span>
-            <span className="bg-border h-px flex-1" />
-          </div>
+          ) : null}
+        </span>
 
-          {g.itens.map((i) => {
-            const u = urgenciaView(i.prazo);
-            const itemCor = corDaUrgenciaView(u);
-            const naoConfirmado =
-              !!i.prazo && !i.prazo.confirmed && i.prazo.status === "PENDING";
-
-            return (
-              <button
-                key={i.id}
-                type="button"
-                onClick={() => onSelecionar(i.id)}
-                className={cn(
-                  "border-border grid w-full grid-cols-[minmax(0,1fr)_128px] items-center gap-3 border-b py-3 pr-3 text-left",
-                  "hover:bg-muted cursor-pointer border-l-[3px]",
-                  i.id === selecionada && "bg-muted",
-                )}
-                style={{ borderLeftColor: itemCor }}
-              >
-                <span className="min-w-0 pl-3">
-                  <span className="block text-[14.5px] tabular-nums">
-                    {i.cnj_number}
-                  </span>
-                  <span className="text-muted-foreground mt-0.5 block text-[11.5px]">
-                    {TYPE_LABEL[i.type] ?? i.type} · {i.court}
-                  </span>
-                  <span className="text-muted-foreground mt-1 line-clamp-2 block text-[12.5px]">
-                    {i.content_preview}
-                  </span>
-                  <span className="mt-1.5 flex flex-wrap gap-1.5">
-                    <Pilula>
-                      {USER_STATUS_LABEL[i.user_status] ?? i.user_status}
-                    </Pilula>
-                    {naoConfirmado && (
-                      <StatusBadge tone="warning" className="text-[10.5px]">
-                        prazo não confirmado
-                      </StatusBadge>
-                    )}
-                  </span>
-                </span>
-                <span
-                  className="text-xs tabular-nums"
-                  style={{ color: itemCor }}
-                >
-                  <span className="block">{rotuloPrazoView(i.prazo)}</span>
-                  {i.prazo?.end_date && (
-                    <span className="text-muted-foreground block text-[11px]">
-                      {formatarData(i.prazo.end_date)}
-                    </span>
-                  )}
-                </span>
-              </button>
-            );
-          })}
-        </section>
-      ))}
-
-      {/* Paginação — discreta no rodapé, só aparece quando há mais de uma página */}
-      {(canPrev || canNext) && (
-        <ListPagination
-          pageSize={pageSize}
-          onPageSizeChange={onPageSizeChange}
-          pageNumber={pageNumber}
-          canPrev={canPrev}
-          canNext={canNext}
-          onPrev={onPrev}
-          onNext={onNext}
-          totalCount={totalCount}
-          className="border-border border-t pt-4"
-        />
-      )}
+        <AtribuirResponsavel intimacao={item} />
+      </span>
     </div>
   );
 }
 
-// ─── painel lateral ───────────────────────────────────────────────────────────
+// ─── painel de detalhe (coluna direita, sticky) ────────────────────────────
 
-function PainelLateral({ item }: { item: IntimacaoView }) {
-  const u = urgenciaView(item.prazo);
-  const cor = corDaUrgenciaView(u);
-  const naoConfirmado =
-    !!item.prazo && !item.prazo.confirmed && item.prazo.status === "PENDING";
+function PainelDetalhe({ id }: { id: string }) {
+  const { data: i, isPending, error } = useIntimacaoDetalhe(id);
+
+  if (isPending) return <PainelEsqueleto />;
+
+  if (error || !i) {
+    return (
+      <aside className="border-border overflow-y-auto border-l p-6">
+        <p role="alert" className="text-destructive text-sm">
+          Não foi possível carregar esta intimação. Tente novamente.
+        </p>
+      </aside>
+    );
+  }
 
   return (
-    <aside className="border-border overflow-y-auto border-l p-6">
+    <aside className="border-border sticky top-0 flex max-h-full min-w-0 flex-col overflow-y-auto border-l p-6">
+      {/* ── Eyebrow + título + CNJ ── */}
       <p className="text-muted-foreground text-[10.5px] tracking-[0.12em] uppercase">
-        {TYPE_LABEL[item.type] ?? item.type} · {item.court}
+        {TYPE_LABEL[i.type] ?? i.type} · {i.court}
       </p>
-      <h2 className="font-display mt-2 text-[22px] leading-tight font-medium tabular-nums">
-        {item.cnj_number}
+      <h2 className="font-display mt-2 text-[22px] leading-tight font-medium text-pretty">
+        {tituloIntimacao(i)}
       </h2>
-      <p className="text-muted-foreground mt-1 text-xs">
-        Publicado em {formatarData(item.published_at)}
+      <p className="text-muted-foreground mt-1 text-xs tabular-nums">
+        {i.cnj_number}
       </p>
 
-      {item.prazo ? (
-        <div className="border-border my-4 flex items-baseline gap-3 border-y py-3">
+      {/* ── Bloco de prazo (border-y) ── */}
+      <div className="border-border my-4 flex items-center justify-between gap-3 border-y py-3">
+        <PrazoContagemGrande prazo={i.prazo} businessDaysSuffix />
+
+        {/* R2: Selo read-only "✓ prazo confirmado" — só quando confirmed === true */}
+        {i.prazo?.confirmed === true ? (
           <span
-            className="font-display text-[40px] leading-none tabular-nums"
-            style={{ color: cor }}
+            role="status"
+            aria-label="Prazo confirmado por humano"
+            tabIndex={-1}
+            className="text-muted-foreground flex shrink-0 items-center gap-1 text-[12px]"
           >
-            {Math.abs(item.prazo.days_left)}
+            <Check className="size-3.5" strokeWidth={2.2} aria-hidden />
+            prazo confirmado
           </span>
-          <span className="text-muted-foreground text-xs">
-            {rotuloPrazoView(item.prazo)}
-            <span className="block">
-              {item.prazo.end_date ? formatarData(item.prazo.end_date) : "—"}
-              {naoConfirmado && (
-                <StatusBadge tone="warning" className="ml-2 text-[10.5px]">
-                  não confirmado
-                </StatusBadge>
-              )}
-            </span>
-          </span>
-        </div>
-      ) : (
-        <div className="border-border text-muted-foreground my-4 border-y py-3 text-sm">
-          Sem prazo derivado
-        </div>
-      )}
+        ) : null}
+      </div>
 
-      <p className="text-muted-foreground text-[10.5px] tracking-[0.12em] uppercase">
-        Prévia do teor
-      </p>
-      <p className="text-muted-foreground mt-2 mb-4 text-[13.5px] leading-relaxed text-pretty">
-        {item.content_preview}
-      </p>
+      {/* ── R4: Tabela de metadados ── */}
+      <dl className="my-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+        <dt className="text-muted-foreground text-[12.5px]">Órgão</dt>
+        <dd className="text-foreground truncate text-right text-[13px]">
+          {i.judging_body || "—"}
+        </dd>
 
-      <Link
-        href={`/intimacoes/${item.id}`}
-        className="bg-primary text-primary-foreground mt-2 flex w-full items-center justify-center rounded-lg px-4 py-2.5 text-center text-[13.5px] font-medium no-underline hover:no-underline"
-      >
-        Abrir intimação
-      </Link>
+        <dt className="text-muted-foreground text-[12.5px]">Classe</dt>
+        <dd className="text-foreground truncate text-right text-[13px]">
+          {i.class || "—"}
+        </dd>
+
+        <dt className="text-muted-foreground text-[12.5px]">Assunto</dt>
+        <dd className="text-foreground truncate text-right text-[13px]">
+          {i.subject || "—"}
+        </dd>
+
+        <dt className="text-muted-foreground text-[12.5px]">Autor</dt>
+        <dd className="text-foreground truncate text-right text-[13px]">
+          <span aria-label="não disponível">—</span>
+        </dd>
+
+        <dt className="text-muted-foreground text-[12.5px]">Réu</dt>
+        <dd className="text-foreground truncate text-right text-[13px]">
+          <span aria-label="não disponível">—</span>
+        </dd>
+
+        <dt className="text-muted-foreground text-[12.5px]">Valor da causa</dt>
+        <dd className="text-foreground truncate text-right text-[13px]">
+          <span aria-label="não disponível">—</span>
+        </dd>
+
+        <dt className="text-muted-foreground text-[12.5px]">Publicada</dt>
+        <dd className="text-foreground truncate text-right text-[13px]">
+          {formatarData(i.published_at)}
+        </dd>
+
+        <dt className="text-muted-foreground text-[12.5px]">Responsável</dt>
+        <dd className="flex items-center justify-end gap-1.5 truncate text-[13px]">
+          {i.conductor_user_name ? (
+            <>
+              <Avatar size="sm" initials={initials(i.conductor_user_name)} />
+              <span className="text-foreground truncate">
+                {i.conductor_user_name}
+              </span>
+            </>
+          ) : (
+            <span className="text-muted-foreground">A atribuir</span>
+          )}
+        </dd>
+
+        <dt className="text-muted-foreground text-[12.5px]">Estágio</dt>
+        <dd className="text-foreground truncate text-right text-[13px]">
+          <span aria-label="não disponível">—</span>
+        </dd>
+      </dl>
+
+      {/* ── R5: TeorPublicacao — só quando content não estiver vazio ── */}
+      {i.content ? (
+        <TeorPublicacao
+          content={i.content}
+          borderColor="gold"
+          collapsedHeight={180}
+        />
+      ) : null}
+
+      {/* ── AnalisarCard — exatamente como estava ── */}
+      <div className="mt-6 min-w-0 flex-1">
+        <AnalisarCard intimacao={i} />
+      </div>
+
+      {/* ── Ações — exatamente como estavam ── */}
+      <div className="mt-6 flex items-center gap-2.5">
+        <Link
+          href={`/intimacoes/${i.id}`}
+          className="bg-primary text-primary-foreground flex flex-1 items-center justify-center rounded-lg px-4 py-2.5 text-center text-[13.5px] font-medium no-underline hover:no-underline"
+        >
+          Abrir intimação
+        </Link>
+        <Button variant="outline" className="flex-1" onClick={emBreve}>
+          Redigir peça
+        </Button>
+      </div>
     </aside>
   );
 }
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+/**
+ * Wrapper local que envolve PrazoContagemGrande e acrescenta a linha "· dias úteis"
+ * na data de vencimento — APENAS no painel compacto (não modifica PrazoContagemGrande
+ * que é usado SEM esse sufixo na página full /intimacoes/[id]).
+ */
+function PainelPrazoWrapper({ prazo }: { prazo: IntimacaoPrazoView | null }) {
+  const info = prazoUrgenciaInfo(prazo);
 
-function Pilula({ children }: { children: React.ReactNode }) {
+  if (!info || !prazo) {
+    // Sem prazo: delega o estado vazio ao PrazoContagemGrande diretamente.
+    return <PrazoContagemGrande prazo={null} />;
+  }
+
+  // Com prazo: PrazoContagemGrande renderiza o número grande + legenda.
+  // Acrescentamos "· dias úteis" somente aqui via override de layout: substituímos
+  // o componente por uma versão inline que replica sua estrutura + o sufixo.
+  const { magnitude, atrasado, hoje, corClass } = info;
+  const legenda = atrasado
+    ? magnitude === 1
+      ? "dia em atraso"
+      : "dias em atraso"
+    : hoje
+      ? "vence hoje"
+      : magnitude === 1
+        ? "dia restante"
+        : "dias restantes";
+
   return (
-    <span className="border-border text-muted-foreground rounded-sm border px-1.5 py-px text-[10.5px] tracking-wide uppercase">
-      {children}
-    </span>
+    <div className="flex items-center gap-3">
+      <span
+        className={cn(
+          "font-display text-[40px] leading-none tabular-nums",
+          corClass,
+        )}
+      >
+        {hoje ? "0" : magnitude}
+      </span>
+      <div className="text-[12px] leading-snug">
+        <p className="text-foreground font-medium">{legenda}</p>
+        <p className="text-muted-foreground mt-0.5">
+          Fatal em{" "}
+          <span className="text-foreground font-medium tabular-nums">
+            {formatarData(prazo.end_date)}
+          </span>
+          {" · dias úteis"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── esqueletos ─────────────────────────────────────────────────────────────
+
+function PainelEsqueleto() {
+  return (
+    <aside className="border-border overflow-y-auto border-l p-6">
+      {/* Eyebrow + título + CNJ */}
+      <div className="bg-muted h-3 w-32 animate-pulse rounded" />
+      <div className="bg-muted mt-3 h-7 w-52 animate-pulse rounded" />
+      <div className="bg-muted mt-2 h-3 w-40 animate-pulse rounded" />
+      {/* Bloco de prazo */}
+      <div className="bg-muted mt-6 h-12 animate-pulse rounded" />
+      {/* Tabela de metadados */}
+      <div className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="contents">
+            <div className="bg-muted h-3 w-16 animate-pulse rounded" />
+            <div className="bg-muted ml-auto h-3 w-24 animate-pulse rounded" />
+          </div>
+        ))}
+      </div>
+      {/* Teor da publicação */}
+      <div className="bg-muted mt-6 h-3 w-28 animate-pulse rounded" />
+      <div className="bg-muted mt-3 h-24 animate-pulse rounded" />
+      {/* AnalisarCard */}
+      <div className="bg-muted mt-6 h-40 animate-pulse rounded-xl" />
+    </aside>
   );
 }
 
@@ -646,12 +925,12 @@ function Esqueleto() {
   return (
     <div className="p-8">
       <div className="bg-muted h-9 w-64 animate-pulse rounded" />
-      <div className="mt-6 grid grid-cols-4 gap-3">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="bg-muted h-24 animate-pulse rounded-xl" />
-        ))}
+      <div className="bg-muted mt-6 h-10 w-full animate-pulse rounded-lg" />
+      <div className="bg-muted mt-4 h-9 w-full animate-pulse rounded-lg" />
+      <div className="mt-6 grid grid-cols-[3fr_2fr] gap-6">
+        <div className="bg-muted h-96 animate-pulse rounded-xl" />
+        <div className="bg-muted h-96 animate-pulse rounded-xl" />
       </div>
-      <div className="bg-muted mt-6 h-64 animate-pulse rounded-xl" />
     </div>
   );
 }
