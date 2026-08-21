@@ -22,6 +22,7 @@ const STATUS_LABEL: Record<PrazoStatus, string> = {
   MET: "Cumprido",
   MISSED: "Perdido",
   CANCELLED: "Cancelado",
+  NO_DEADLINE: "Mera ciência",
 };
 
 const COUNTING_LABEL: Record<PrazoCounting, string> = {
@@ -51,8 +52,13 @@ function countdown(days_left: number): { value: string; unit: string } {
 }
 
 function fmtDate(iso: string): string {
+  // O BE serializa end_date (coluna DATE) como RFC3339 à meia-noite UTC
+  // ("2026-08-20T00:00:00Z"). Formatar no fuso local (BRT −3) desloca pro dia
+  // anterior — inaceitável numa DATA DE PRAZO. Formata em UTC pra preservar o dia.
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("pt-BR");
+  return Number.isNaN(d.getTime())
+    ? "—"
+    : new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(d);
 }
 
 function hasProcesso(p: PrazoView | PrazoAgendaView): p is PrazoAgendaView {

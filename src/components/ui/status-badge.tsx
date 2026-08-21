@@ -9,21 +9,20 @@ export type StatusTone = "neutral" | "info" | "warning" | "danger" | "success";
 
 const TONE_CLASS: Record<StatusTone, string> = {
   neutral: "border-border bg-muted/60 text-muted-foreground",
-  info: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+  info: "border-info/30 bg-info/10 text-info",
   warning: "border-gold/40 bg-gold/[0.08] text-gold",
   danger: "border-destructive/30 bg-destructive/10 text-destructive",
-  success:
-    "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  success: "border-success/30 bg-success/10 text-success",
 };
 
 // Ponto colorido (mesma paleta dos tons) — reusável na coluna de status da
 // DataTable, onde o rótulo pode ser omitido e só o ponto marca a situação.
 export const DOT_CLASS: Record<StatusTone, string> = {
   neutral: "bg-muted-foreground/50",
-  info: "bg-sky-500",
+  info: "bg-info",
   warning: "bg-gold",
   danger: "bg-destructive",
-  success: "bg-emerald-500",
+  success: "bg-success",
 };
 
 /**
@@ -34,14 +33,19 @@ export function StatusBadge({
   label,
   tone,
   className,
+  dot = true,
 }: {
   label: string;
   tone: StatusTone;
   className?: string;
+  /** Ponto colorido antes do rótulo — default true (comportamento existente). */
+  dot?: boolean;
 }) {
   return (
     <Badge variant="outline" className={cn(TONE_CLASS[tone], className)}>
-      <span className={cn("size-1.5 rounded-full", DOT_CLASS[tone])} />
+      {dot ? (
+        <span className={cn("size-1.5 rounded-full", DOT_CLASS[tone])} />
+      ) : null}
       {label}
     </Badge>
   );

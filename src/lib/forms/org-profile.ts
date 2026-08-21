@@ -1,9 +1,10 @@
 // Schema e mapeamento do PERFIL FISCAL do escritório — fonte única usada pelo
 // onboarding (passo Sua empresa) e pela página /organization (edição). Mensagens
 // vêm de fora (cada feature injeta as suas), a regra é uma só: CNPJ 14 dígitos,
-// telefone 10-11 quando presente, e-mail válido quando presente, endereço opcional
-// como um todo (vazio passa; qualquer campo preenchido exige o núcleo — espelho do
-// BE, onde Address parcial é 400).
+// telefone 10-11 quando presente, e-mail válido quando presente. Localização do
+// escritório = só CIDADE + UF (endereço postal não é usado pelo produto; rua/CEP
+// deixaram de ser coletados). Vazio como um todo passa; qualquer campo preenchido
+// exige cidade+uf — espelho do BE, que agora só exige cidade/uf.
 
 import { z } from "zod";
 
@@ -26,13 +27,14 @@ export interface OrgProfileMessages {
   cnpjInvalid: string;
   phoneInvalid: string;
   emailInvalid: string;
-  cepInvalid: string;
-  logradouroRequired: string;
   cidadeRequired: string;
   ufInvalid: string;
 }
 
 export function makeOrgProfileSchema(m: OrgProfileMessages) {
+  // Rua/CEP/número/complemento/bairro seguem no shape (o que já existe no banco
+  // sobrevive ao round-trip), mas não são mais validados nem coletados. Só
+  // cidade+uf importam: vazios como um todo passam; um preenchido exige o outro.
   const addressSchema = z
     .object({
       cep: z.string(),
@@ -44,30 +46,8 @@ export function makeOrgProfileSchema(m: OrgProfileMessages) {
       uf: z.string(),
     })
     .superRefine((a, ctx) => {
-      const values = [
-        a.cep,
-        a.logradouro,
-        a.numero,
-        a.complemento,
-        a.bairro,
-        a.cidade,
-        a.uf,
-      ];
-      if (!values.some((v) => (v ?? "").trim() !== "")) return;
-      if (onlyDigits(a.cep).length !== 8) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["cep"],
-          message: m.cepInvalid,
-        });
-      }
-      if (!a.logradouro.trim()) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["logradouro"],
-          message: m.logradouroRequired,
-        });
-      }
+      const filled = a.cidade.trim() !== "" || a.uf.trim() !== "";
+      if (!filled) return;
       if (!a.cidade.trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

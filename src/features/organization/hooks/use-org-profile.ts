@@ -35,5 +35,6 @@ export function useOrgProfile() {
     profileLoadFailed: profile.isError,
     updateProfile: update.mutateAsync,
     isSaving: update.isPending,
+    saveError: update.error,
   };
 }

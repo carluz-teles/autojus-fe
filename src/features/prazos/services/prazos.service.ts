@@ -6,6 +6,8 @@ import type {
   PrazoConfirmInput,
   PrazoConfirmResult,
   PrazoDetalheView,
+  PrazoPreviewInput,
+  PrazoPreviewResult,
   PrazosSummary,
   PrazoStatus,
   PrazoView,
@@ -107,4 +109,45 @@ export async function getSuggestedTasks(
   return fetcher<SuggestedTasksResult>(
     `${ENDPOINT}/${prazoId}/suggested-tasks`,
   );
+}
+
+/**
+ * Preview ao vivo — recalcula o vencimento sem persistir.
+ * POST /v1/prazos/preview → PrazoPreviewResult. Chamado com debounce ~300ms
+ * enquanto o advogado ajusta dias/anchor/feriado no form de edição.
+ */
+export async function previewPrazo(
+  fetcher: ApiFetcher,
+  body: PrazoPreviewInput,
+): Promise<PrazoPreviewResult> {
+  return fetcher<PrazoPreviewResult>(`${ENDPOINT}/preview`, {
+    method: "POST",
+    body,
+  });
+}
+
+/**
+ * Declara mera ciência — POST /v1/prazos/:id/no-deadline (sem corpo).
+ * Transição: qualquer status → NO_DEADLINE.
+ */
+export async function noDeadlinePrazo(
+  fetcher: ApiFetcher,
+  prazoId: string,
+): Promise<void> {
+  return fetcher<void>(`${ENDPOINT}/${prazoId}/no-deadline`, {
+    method: "POST",
+  });
+}
+
+/**
+ * Reabre o prazo declarado como mera ciência — POST /v1/prazos/:id/reopen (sem corpo).
+ * Transição: NO_DEADLINE → PENDING.
+ */
+export async function reopenPrazo(
+  fetcher: ApiFetcher,
+  prazoId: string,
+): Promise<void> {
+  return fetcher<void>(`${ENDPOINT}/${prazoId}/reopen`, {
+    method: "POST",
+  });
 }

@@ -47,6 +47,13 @@ import {
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 // Protótipo do peticionamento com IA — tela "Construção" (Construção + Revisão na
@@ -901,18 +908,25 @@ function AnexosView({
                     {a.tamanho}
                   </p>
                 </div>
-                <select
+                <Select
                   value={a.categoria}
-                  onChange={(e) => setCat(a.id, e.target.value)}
-                  aria-label="Categoria do documento"
-                  className="border-input bg-card text-foreground rounded-md border px-2 py-1 text-xs outline-none"
+                  onValueChange={(v) => v != null && setCat(a.id, v)}
                 >
-                  {CATEGORIAS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger
+                    size="sm"
+                    className="text-xs"
+                    aria-label="Categoria do documento"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIAS.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <button
                   type="button"
                   aria-label="Pré-visualizar"

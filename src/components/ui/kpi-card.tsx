@@ -22,10 +22,10 @@ export type KpiTone =
 // Ícone dentro de um quadrado de fundo tênue (bg tom-sobre-tom).
 const ICON_BOX_TONE: Record<KpiTone, string> = {
   neutral: "bg-muted text-muted-foreground",
-  info: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  info: "bg-info/10 text-info",
   warning: "bg-gold/12 text-gold",
   danger: "bg-destructive/10 text-destructive",
-  success: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  success: "bg-success/10 text-success",
   // aliases
   default: "bg-muted text-muted-foreground",
   gold: "bg-gold/12 text-gold",
@@ -35,10 +35,10 @@ const ICON_BOX_TONE: Record<KpiTone, string> = {
 
 const VALUE_TONE: Record<KpiTone, string> = {
   neutral: "text-foreground",
-  info: "text-sky-700 dark:text-sky-300",
+  info: "text-info",
   warning: "text-gold",
   danger: "text-destructive",
-  success: "text-emerald-700 dark:text-emerald-400",
+  success: "text-success",
   // aliases
   default: "text-foreground",
   gold: "text-gold",

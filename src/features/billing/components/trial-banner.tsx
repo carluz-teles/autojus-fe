@@ -66,7 +66,7 @@ export function TrialBanner() {
         <span className="hidden sm:inline">{banner.message}</span>
       </p>
       <Link
-        href="/settings/billing"
+        href="/settings?tab=cobranca"
         className={cn(
           buttonVariants({ variant: ctaVariant, size: "sm" }),
           "shrink-0",

@@ -14,11 +14,13 @@ import type { OrgMemberView } from "../types";
  * (que fala com o Clerk para o painel de time) — aqui a fonte é o BE, via apiFetch,
  * e a saída é um resolvedor `nameFor(id)` memoizado. O time é pequeno; sem cursor.
  */
+export const ORG_MEMBERS_KEY = ["organization", "members"] as const;
+
 export function useOrgMembersDirectory() {
   const fetcher = useApi();
 
   const query = useQuery({
-    queryKey: ["organization", "members"],
+    queryKey: ORG_MEMBERS_KEY,
     queryFn: () => listOrgMembers(fetcher),
     staleTime: 5 * 60 * 1000,
   });

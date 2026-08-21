@@ -4,7 +4,12 @@
 //   GET /v1/prazos               → PageEnvelope<PrazoAgendaView>  (agenda global)
 //   GET /v1/prazos/:id           → PrazoDetalheView               (o "por quê")
 
-export type PrazoStatus = "PENDING" | "OPEN" | "MET" | "MISSED" | "CANCELLED";
+export type PrazoStatus =
+  "PENDING" | "OPEN" | "MET" | "MISSED" | "CANCELLED" | "NO_DEADLINE";
+
+/** Evento de ancoragem do prazo — de onde começa a contagem. */
+export type PrazoAnchorEvent =
+  "MADE_AVAILABLE" | "PUBLISHED" | "DEADLINE_START";
 
 /** Regime de contagem: BUSINESS = dias úteis; CALENDAR = dias corridos. */
 export type PrazoCounting = "BUSINESS" | "CALENDAR";
@@ -26,6 +31,21 @@ export interface PrazoView {
   intimation_id: string;
   /** false = derivado da intimação mas ainda não confirmado por um humano. */
   confirmed: boolean;
+  // ── campos extras entregues pelo BE (migração 0049) ──
+  /** Evento de ancoragem (omitempty quando PENDING e não derivado ainda). */
+  anchor_event?: PrazoAnchorEvent;
+  /** Data de início da contagem (RFC3339 DATE). */
+  start_date?: string;
+  /** Número de dias da contagem base (antes de dobro/feriados). */
+  days?: number;
+  /** Citação legal que fundamenta a regra (omitempty). Ex.: "art. 919, CPC". */
+  legal_citation?: string;
+  /** Dias manuais extras por feriado local ou suspensão forense. */
+  manual_extra_days?: number;
+  /** Nome do responsável que confirmou/declarou (omitempty). */
+  confirmed_by_name?: string;
+  /** ISO8601 de quando foi confirmado/declarado (omitempty). */
+  confirmed_at?: string;
 }
 
 // Agenda global — o prazo base acrescido do contexto do processo.
@@ -65,7 +85,37 @@ export interface PrazoConfirmDeadline {
   counting: PrazoCounting;
   doubled: boolean;
   doubled_reason?: string;
+  anchor_event?: PrazoAnchorEvent;
+  manual_extra_days?: number;
 }
+
+// ── Preview ao vivo (POST /v1/prazos/preview) ──
+
+/** Corpo do POST /v1/prazos/preview — entrada para recalculo client-side. */
+export interface PrazoPreviewInput {
+  intimation_id: string;
+  anchor_event: PrazoAnchorEvent;
+  kind: string;
+  days: number;
+  counting: PrazoCounting;
+  doubled: boolean;
+  manual_extra_days?: number;
+}
+
+/** Resposta 200 do preview: vencimento recalculado sem persistir. */
+export interface PrazoPreviewResult {
+  start_date: string;
+  end_date: string;
+  weekday: string;
+  days_left: number;
+  holidays_applied: string[];
+}
+
+// ── Declarar mera ciência (POST /v1/prazos/:id/no-deadline) ──
+// Sem corpo de entrada — o BE usa o JWT para resolver o autor.
+
+// ── Reabrir prazo (POST /v1/prazos/:id/reopen) ──
+// Sem corpo de entrada — volta a PENDING.
 
 /** Corpo do POST /v1/prazos/confirm (sem tenant_id/org_id — o BE resolve pelo JWT). */
 export interface PrazoConfirmInput {
