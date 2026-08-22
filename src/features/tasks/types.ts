@@ -9,6 +9,11 @@
 
 export type TaskStatus = "OPEN" | "DONE" | "DISMISSED";
 
+// Prioridade da tarefa — flag de triagem HIGH|MEDIUM|LOW, ou ausente ("sem
+// prioridade"). Espelha o task.priority do BE (text nullable). Os rótulos em PT
+// (Alta/Média/Baixa) vivem na UI; o wire é sempre o enum em inglês.
+export type TaskPriority = "HIGH" | "MEDIUM" | "LOW";
+
 // Tarefa base — mesma forma na agenda global e na aba do processo.
 export interface TaskView {
   id: string;
@@ -16,6 +21,8 @@ export interface TaskView {
   description?: string;
   /** Tipo da tarefa (ex.: REVIEW_DEADLINE); humanizado na UI. */
   kind?: string;
+  /** Prioridade HIGH|MEDIUM|LOW; ausente = sem prioridade. */
+  priority?: TaskPriority;
   /** Vencimento (RFC3339) ou null quando a tarefa não tem prazo. */
   due_date: string | null;
   status: TaskStatus;
@@ -66,6 +73,7 @@ export interface TaskDetailView {
   title: string;
   description?: string;
   kind?: string;
+  priority?: TaskPriority;
   due_date: string | null;
   status: TaskStatus;
   display_status?: string;
@@ -80,6 +88,35 @@ export interface TaskDetailView {
 }
 
 /**
+ * Comentário do thread de discussão de uma tarefa — item de GET /v1/tasks/:id/comments
+ * (mais antigo primeiro). `author_name` vem resolvido pelo BE ("" quando o id é
+ * desconhecido). Espelha o TaskCommentView do BE.
+ */
+export interface TaskComment {
+  id: string;
+  author_user_id: string;
+  author_name?: string;
+  body: string;
+  created_at: string;
+}
+
+/**
+ * Linha do log de atividade de uma tarefa — item de GET /v1/tasks/:id/activity (mais
+ * recente primeiro). `event_type` é o conjunto fechado (TASK_CREATED|TITLE_CHANGED|…);
+ * `from_value`/`to_value` são o de/para de uma mudança de campo (vazios para
+ * criação/ciclo de vida/comentário). Espelha o TaskActivityView do BE.
+ */
+export interface TaskActivity {
+  id: string;
+  actor_user_id: string;
+  actor_name?: string;
+  event_type: string;
+  from_value?: string;
+  to_value?: string;
+  created_at: string;
+}
+
+/**
  * Corpo do POST /v1/tasks — cria uma tarefa manual (source MANUAL, status OPEN, ambos
  * server-set). Só `title` é obrigatório; os FKs de contexto (deadline/intimation/court_record)
  * e o assignee são opcionais — a tarefa pode ser avulsa. `due_date` no formato "YYYY-MM-DD"
@@ -90,6 +127,8 @@ export interface CreateTaskInput {
   title: string;
   description?: string;
   kind?: string;
+  /** Prioridade HIGH|MEDIUM|LOW; ausente/"" = sem prioridade. */
+  priority?: TaskPriority | "";
   due_date?: string;
   /** Id INTERNO do responsável (Me.user_id) — nunca org_id/tenant_id. */
   assignee_user_id?: string;
@@ -107,6 +146,8 @@ export interface UpdateTaskInput {
   title?: string;
   description?: string;
   kind?: string;
+  /** Prioridade HIGH|MEDIUM|LOW; "" limpa (sem prioridade). */
+  priority?: TaskPriority | "";
   due_date?: string;
   assignee_user_id?: string;
 }

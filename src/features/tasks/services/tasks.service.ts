@@ -3,6 +3,8 @@ import type { ApiFetcher } from "@/lib/api/use-api";
 import type {
   CreateTaskInput,
   PageEnvelope,
+  TaskActivity,
+  TaskComment,
   TaskDetailView,
   TaskItemView,
   TasksSummary,
@@ -173,4 +175,49 @@ export async function dismissTask(
   id: string,
 ): Promise<void> {
   await fetcher<void>(`${ENDPOINT}/${id}/dismiss`, { method: "POST" });
+}
+
+/**
+ * Thread de comentários da tarefa — GET /v1/tasks/:id/comments → { data: TaskComment[] }
+ * (mais antigo primeiro). Não é paginado (o thread é pequeno); o BE embrulha num `data`.
+ * 404 (ENTITY_NOT_FOUND) quando a tarefa não existe/é de outro tenant.
+ */
+export async function listTaskComments(
+  fetcher: ApiFetcher,
+  taskId: string,
+): Promise<TaskComment[]> {
+  const res = await fetcher<{ data: TaskComment[] }>(
+    `${ENDPOINT}/${taskId}/comments`,
+  );
+  return res.data ?? [];
+}
+
+/**
+ * Escreve um comentário — POST /v1/tasks/:id/comments → 201 com o comentário criado.
+ * `author`/tenant vêm do JWT (nunca do body). Registra também uma linha de atividade
+ * (COMMENTED) no BE, na mesma tx.
+ */
+export async function createTaskComment(
+  fetcher: ApiFetcher,
+  taskId: string,
+  body: string,
+): Promise<TaskComment> {
+  return fetcher<TaskComment>(`${ENDPOINT}/${taskId}/comments`, {
+    method: "POST",
+    body: { body },
+  });
+}
+
+/**
+ * Log de atividade da tarefa — GET /v1/tasks/:id/activity → { data: TaskActivity[] }
+ * (mais recente primeiro). Não paginado. 404 quando a tarefa não existe/é de outro tenant.
+ */
+export async function listTaskActivity(
+  fetcher: ApiFetcher,
+  taskId: string,
+): Promise<TaskActivity[]> {
+  const res = await fetcher<{ data: TaskActivity[] }>(
+    `${ENDPOINT}/${taskId}/activity`,
+  );
+  return res.data ?? [];
 }

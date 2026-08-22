@@ -17,69 +17,99 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { EQUIPE } from "@/features/shared/db";
+import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import {
-  useAddComentario,
-  useIntimacao,
-  useTarefa,
-  useUpdateTarefa,
-} from "@/features/shared/hooks";
-import type {
-  TarefaPrioridade,
-  TarefaStatus,
-  TarefaTipo,
-} from "@/features/shared/types";
-import { formatarData, formatarDataHora } from "@/lib/utils";
+  useCreateTaskComment,
+  useTaskActivity,
+  useTaskComments,
+  useTaskDetalhe,
+} from "@/features/tasks/hooks/use-tasks";
+import {
+  useConcluirTask,
+  useDescartarTask,
+} from "@/features/tasks/hooks/use-tasks-da-intimacao";
+import { useUpdateTask } from "@/features/tasks/hooks/use-update-task";
+import type { TaskPriority } from "@/features/tasks/types";
+import { formatarDataHora } from "@/lib/utils";
 
-// Mapas de apresentação do detalhe mock (antes importados da view; a view foi
-// migrada pro BE real e não os expõe mais). Débito: migrar este detalhe também.
-const TOM_TAREFA: Record<TarefaStatus, Tom> = {
+// Detalhe REAL da tarefa (GET /v1/tasks/:id + comentários/atividade), fiel ao design
+// isTarefa: MAIN (título + abas Comentários/Atividade) à esquerda, ASIDE (Propriedades)
+// à direita. Substitui o mock — consome o BE real. Nada de "IA" no texto (diretiva
+// app-wide): a origem é comunicada pela ação ("derivada da intimação"), não pela tecnologia.
+
+// display_status derivado do BE → tom do StatusBadge (o mesmo mapa da agenda de tarefas).
+const TOM_STATUS: Record<string, Tom> = {
   Aberta: "neutral",
   "Em execução": "info",
   Concluída: "success",
   Atrasada: "danger",
-  Cancelada: "warning",
 };
 
-const COR_PRIORIDADE: Record<string, string> = {
-  Alta: "var(--destructive)",
-  Média: "var(--gold)",
-  Baixa: "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
+// Prioridade: rótulo PT ↔ enum do BE, com a cor do dot (mesma paleta do detalhe mock).
+const PRIORIDADE_LABEL: Record<TaskPriority, string> = {
+  HIGH: "Alta",
+  MEDIUM: "Média",
+  LOW: "Baixa",
+};
+const PRIORIDADE_COR: Record<TaskPriority, string> = {
+  HIGH: "var(--destructive)",
+  MEDIUM: "var(--gold)",
+  LOW: "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
+};
+const PRIORIDADE_OPCOES: TaskPriority[] = ["HIGH", "MEDIUM", "LOW"];
+// Valor-sentinela do Select para "sem prioridade" (o Select não aceita value="").
+const SEM_PRIORIDADE = "__none__";
+
+// Status: as transições ALCANÇÁVEIS a partir de OPEN são Concluída (done) e Dispensada
+// (dismiss); reabrir não existe no BE, então uma tarefa terminal só se mostra (sem opções).
+const STATUS_ACAO = {
+  done: { label: "Concluída", cor: "var(--success)" },
+  dismiss: { label: "Dispensada", cor: "var(--muted-foreground)" },
+} as const;
+
+// Rótulos legíveis dos eventos do log de atividade (event_type do BE → PT).
+const EVENTO_LABEL: Record<string, string> = {
+  TASK_CREATED: "criou a tarefa",
+  TITLE_CHANGED: "mudou o título",
+  DESCRIPTION_CHANGED: "mudou a descrição",
+  KIND_CHANGED: "mudou o tipo",
+  PRIORITY_CHANGED: "mudou a prioridade",
+  DUE_DATE_CHANGED: "mudou o vencimento",
+  ASSIGNEE_CHANGED: "mudou o responsável",
+  TASK_DONE: "concluiu a tarefa",
+  TASK_DISMISSED: "dispensou a tarefa",
+  COMMENTED: "comentou",
 };
 
-const STATUS: TarefaStatus[] = [
-  "Aberta",
-  "Em execução",
-  "Concluída",
-  "Atrasada",
-  "Cancelada",
-];
-const TIPOS: TarefaTipo[] = [
-  "Providência",
-  "Diligência",
-  "Interna",
-  "Prazo judicial",
-];
-const PRIORIDADES: TarefaPrioridade[] = ["Alta", "Média", "Baixa"];
+// A prioridade aparece no de/para da atividade como enum (HIGH…) — humaniza no log.
+function humanizarValor(campo: string, valor: string): string {
+  if (campo === "PRIORITY_CHANGED" && valor in PRIORIDADE_LABEL) {
+    return PRIORIDADE_LABEL[valor as TaskPriority];
+  }
+  return valor;
+}
 
-const COR_STATUS: Record<TarefaStatus, string> = {
-  Aberta: "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
-  "Em execução": "var(--gold)",
-  Concluída: "var(--success)",
-  Atrasada: "var(--destructive)",
-  Cancelada: "color-mix(in oklch, var(--muted-foreground) 40%, transparent)",
-};
+// Código curto derivado do id (o read model não tem um "codigo" próprio) — TAR-XXXX.
+function codigoCurto(id: string): string {
+  return `TAR-${id.replace(/-/g, "").slice(0, 4).toUpperCase()}`;
+}
 
-/** Detalhe no estilo Linear: título e conversa à esquerda, propriedades à direita. */
+/** Detalhe no estilo Linear: título + conversa à esquerda, propriedades à direita. */
 export function TarefaDetail({ id }: { id: string }) {
-  const { data: t, isLoading } = useTarefa(id);
-  const atualizar = useUpdateTarefa(id);
-  const comentar = useAddComentario(id);
-  const intimacao = useIntimacao(t?.intimacaoId ?? "i1");
+  const { data: t, isPending, error } = useTaskDetalhe(id);
+  const comentarios = useTaskComments(id);
+  const atividade = useTaskActivity(id);
+  const { members, nameFor } = useOrgMembersDirectory();
+
+  const update = useUpdateTask();
+  const concluir = useConcluirTask();
+  const descartar = useDescartarTask();
+  const comentar = useCreateTaskComment(id);
+
   const [aba, setAba] = useState<"comentarios" | "atividade">("comentarios");
   const [rascunho, setRascunho] = useState("");
 
-  if (isLoading || !t) {
+  if (isPending) {
     return (
       <div className="p-10">
         <div className="bg-muted h-8 w-80 animate-pulse rounded" />
@@ -87,30 +117,54 @@ export function TarefaDetail({ id }: { id: string }) {
     );
   }
 
-  const proc = intimacao.data?.processoRef;
+  if (error || !t) {
+    return (
+      <div className="p-10">
+        <p role="alert" className="text-destructive text-sm">
+          Não foi possível carregar esta tarefa. Tente novamente.
+        </p>
+      </div>
+    );
+  }
+
+  const enviarComentario = () => {
+    const texto = rascunho.trim();
+    if (!texto) return;
+    comentar.mutate(texto, { onSuccess: () => setRascunho("") });
+  };
+
+  const dueISO = t.due_date ? t.due_date.slice(0, 10) : "";
 
   return (
     <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_320px]">
       <div className="overflow-y-auto px-10 pt-8 pb-10">
         <div className="flex items-center gap-2.5">
-          <Chip>{t.codigo}</Chip>
-          <StatusBadge tone={TOM_TAREFA[t.status]}>{t.status}</StatusBadge>
+          <Chip>{codigoCurto(t.id)}</Chip>
+          {t.display_status ? (
+            <StatusBadge tone={TOM_STATUS[t.display_status] ?? "neutral"}>
+              {t.display_status}
+            </StatusBadge>
+          ) : null}
         </div>
 
         <h1 className="font-display mt-3.5 max-w-160 text-3xl leading-tight font-normal tracking-tight">
-          {t.titulo}
+          {t.title}
         </h1>
-        <p className="mt-4 max-w-160 text-[15px] leading-relaxed text-pretty">
-          {t.descricao}
-        </p>
-        <p className="text-muted-foreground mt-3 text-[12.5px]">
-          Derivada da intimação pela IA · vinculada a{" "}
-          <Link href={`/intimacoes/${t.intimacaoId}`}>
-            {intimacao.data?.titulo ?? "intimação"}
-          </Link>
-        </p>
+        {t.description ? (
+          <p className="mt-4 max-w-160 text-[15px] leading-relaxed text-pretty">
+            {t.description}
+          </p>
+        ) : null}
+        {t.intimation_id ? (
+          <p className="text-muted-foreground mt-3 text-[12.5px]">
+            Derivada da intimação · vinculada a{" "}
+            <Link href={`/intimacoes/${t.intimation_id}`}>
+              intimação de origem
+            </Link>
+          </p>
+        ) : null}
 
-        <div className="border-border mt-9 border-t pt-5">
+        <div className="border-border mt-9 max-w-160 border-t pt-5">
           <Segmented
             valor={aba}
             onChange={setAba}
@@ -118,55 +172,66 @@ export function TarefaDetail({ id }: { id: string }) {
               {
                 valor: "comentarios",
                 label: "Comentários",
-                contagem: String(t.comentarios.length),
+                contagem: String(comentarios.data?.length ?? 0),
               },
               { valor: "atividade", label: "Atividade" },
             ]}
           />
 
           {aba === "comentarios" ? (
-            <div className="mt-5 flex max-w-160 flex-col gap-4.5">
-              {t.comentarios.length === 0 && (
+            <div className="mt-5 flex flex-col gap-4.5">
+              {comentarios.isPending ? (
+                <div className="bg-muted h-14 animate-pulse rounded" />
+              ) : (comentarios.data?.length ?? 0) === 0 ? (
                 <p className="text-muted-foreground text-[13.5px]">
                   Nenhum comentário ainda.
                 </p>
-              )}
-              {t.comentarios.map((c) => (
-                <div
-                  key={c.id}
-                  className="grid grid-cols-[30px_minmax(0,1fr)] gap-3"
-                >
-                  <Avatar nome={c.autor} size={30} />
-                  <div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-[13px] font-medium">{c.autor}</span>
-                      <span className="text-muted-foreground text-[11.5px] tabular-nums">
-                        {formatarDataHora(c.quando)}
-                      </span>
+              ) : (
+                comentarios.data?.map((c) => {
+                  const autor =
+                    c.author_name || nameFor(c.author_user_id) || "Membro";
+                  return (
+                    <div
+                      key={c.id}
+                      className="grid grid-cols-[30px_minmax(0,1fr)] gap-3"
+                    >
+                      <Avatar nome={autor} size={30} />
+                      <div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[13px] font-medium">
+                            {autor}
+                          </span>
+                          <span className="text-muted-foreground text-[11.5px] tabular-nums">
+                            {formatarDataHora(c.created_at)}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[13.5px] leading-relaxed text-pretty">
+                          {c.body}
+                        </p>
+                      </div>
                     </div>
-                    <p className="mt-1 text-[13.5px] leading-relaxed">
-                      {c.texto}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                  );
+                })
+              )}
 
               <div className="grid grid-cols-[30px_minmax(0,1fr)] gap-3">
-                <Avatar nome="Luan Gomes" size={30} destaque />
+                <Avatar nome="Você" size={30} destaque />
                 <div className="flex flex-col gap-2">
                   <Input
                     placeholder="Escrever um comentário…"
                     value={rascunho}
                     onChange={(e) => setRascunho(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                        enviarComentario();
+                      }
+                    }}
                   />
                   <Button
                     size="sm"
                     className="self-start"
                     disabled={!rascunho.trim() || comentar.isPending}
-                    onClick={() => {
-                      comentar.mutate(rascunho.trim());
-                      setRascunho("");
-                    }}
+                    onClick={enviarComentario}
                   >
                     Comentar
                   </Button>
@@ -174,31 +239,57 @@ export function TarefaDetail({ id }: { id: string }) {
               </div>
             </div>
           ) : (
-            <ul className="mt-5 max-w-160">
-              {t.atividade.map((a) => (
-                <li
-                  key={a.id}
-                  className="border-border flex items-baseline justify-between gap-4 border-b py-2.5 text-[13px] last:border-0"
-                >
-                  <span>
-                    <span className="font-medium">{a.autor}</span> {a.evento}
-                    {a.de && a.para && (
-                      <>
-                        {" "}
-                        de{" "}
-                        <span className="line-through opacity-60">
-                          {a.de}
-                        </span>{" "}
-                        para <span className="font-medium">{a.para}</span>
-                      </>
-                    )}
-                  </span>
-                  <span className="text-muted-foreground shrink-0 text-[11.5px] tabular-nums">
-                    {formatarDataHora(a.quando)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-5">
+              {atividade.isPending ? (
+                <div className="bg-muted h-14 animate-pulse rounded" />
+              ) : (atividade.data?.length ?? 0) === 0 ? (
+                <p className="text-muted-foreground text-[13.5px]">
+                  Nenhuma atividade registrada.
+                </p>
+              ) : (
+                <ul>
+                  {atividade.data?.map((a) => {
+                    const autor =
+                      a.actor_name || nameFor(a.actor_user_id) || "Membro";
+                    const de = a.from_value
+                      ? humanizarValor(a.event_type, a.from_value)
+                      : "";
+                    const para = a.to_value
+                      ? humanizarValor(a.event_type, a.to_value)
+                      : "";
+                    return (
+                      <li
+                        key={a.id}
+                        className="border-border flex items-baseline justify-between gap-4 border-b py-2.5 text-[13px] last:border-0"
+                      >
+                        <span>
+                          <span className="font-medium">{autor}</span>{" "}
+                          {EVENTO_LABEL[a.event_type] ?? a.event_type}
+                          {de && para ? (
+                            <>
+                              {" "}
+                              de{" "}
+                              <span className="line-through opacity-60">
+                                {de}
+                              </span>{" "}
+                              para <span className="font-medium">{para}</span>
+                            </>
+                          ) : para ? (
+                            <>
+                              {" "}
+                              para <span className="font-medium">{para}</span>
+                            </>
+                          ) : null}
+                        </span>
+                        <span className="text-muted-foreground shrink-0 text-[11.5px] tabular-nums">
+                          {formatarDataHora(a.created_at)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -211,50 +302,69 @@ export function TarefaDetail({ id }: { id: string }) {
         <div className="mt-3.5 flex flex-col">
           <Propriedade rotulo="Status">
             <Select
-              value={t.status}
-              onValueChange={(v) =>
-                v != null && atualizar.mutate({ status: v as TarefaStatus })
-              }
+              value={t.status === "OPEN" ? "" : t.status}
+              onValueChange={(v) => {
+                if (v == null) return;
+                if (v === "done") concluir.mutate(t.id);
+                else if (v === "dismiss") descartar.mutate(t.id);
+              }}
             >
               <SelectTrigger className="w-46" aria-label="Status da tarefa">
-                <SelectValue>
+                <SelectValue placeholder={t.display_status || "Aberta"}>
                   <span className="flex items-center gap-2">
                     <span
                       className="size-[7px] shrink-0 rounded-full"
-                      style={{ background: COR_STATUS[t.status] }}
+                      style={{
+                        background:
+                          t.status === "DONE"
+                            ? STATUS_ACAO.done.cor
+                            : t.status === "DISMISSED"
+                              ? STATUS_ACAO.dismiss.cor
+                              : "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
+                      }}
                     />
-                    {t.status}
+                    {t.display_status ||
+                      (t.status === "DISMISSED" ? "Dispensada" : "Aberta")}
                   </span>
                 </SelectValue>
               </SelectTrigger>
               <SelectContent align="end">
-                {STATUS.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    <span
-                      className="size-[7px] shrink-0 rounded-full"
-                      style={{ background: COR_STATUS[s] }}
-                    />
-                    {s}
-                  </SelectItem>
-                ))}
+                <SelectItem value="done">
+                  <span
+                    className="size-[7px] shrink-0 rounded-full"
+                    style={{ background: STATUS_ACAO.done.cor }}
+                  />
+                  {STATUS_ACAO.done.label}
+                </SelectItem>
+                <SelectItem value="dismiss">
+                  <span
+                    className="size-[7px] shrink-0 rounded-full"
+                    style={{ background: STATUS_ACAO.dismiss.cor }}
+                  />
+                  {STATUS_ACAO.dismiss.label}
+                </SelectItem>
               </SelectContent>
             </Select>
           </Propriedade>
 
-          <Propriedade rotulo="Tipo">
+          <Propriedade rotulo="Responsável">
             <Select
-              value={t.tipo}
+              value={t.assignee_user_id ?? ""}
               onValueChange={(v) =>
-                v != null && atualizar.mutate({ tipo: v as TarefaTipo })
+                v != null &&
+                update.updateTask({ id: t.id, patch: { assignee_user_id: v } })
               }
             >
-              <SelectTrigger className="w-46" aria-label="Tipo da tarefa">
-                <SelectValue />
+              <SelectTrigger
+                className="w-46"
+                aria-label="Responsável pela tarefa"
+              >
+                <SelectValue placeholder="Ninguém" />
               </SelectTrigger>
               <SelectContent align="end">
-                {TIPOS.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
+                {members.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name?.trim() || m.email?.split("@")[0] || m.id}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -263,54 +373,41 @@ export function TarefaDetail({ id }: { id: string }) {
 
           <Propriedade rotulo="Prioridade">
             <Select
-              value={t.prioridade}
+              value={t.priority ?? SEM_PRIORIDADE}
               onValueChange={(v) =>
                 v != null &&
-                atualizar.mutate({ prioridade: v as TarefaPrioridade })
+                update.updateTask({
+                  id: t.id,
+                  patch: {
+                    priority: v === SEM_PRIORIDADE ? "" : (v as TaskPriority),
+                  },
+                })
               }
             >
               <SelectTrigger className="w-46" aria-label="Prioridade da tarefa">
                 <SelectValue>
                   <span className="flex items-center gap-2">
-                    <span
-                      className="size-[7px] shrink-0 rounded-full"
-                      style={{ background: COR_PRIORIDADE[t.prioridade] }}
-                    />
-                    {t.prioridade}
+                    {t.priority ? (
+                      <span
+                        className="size-[7px] shrink-0 rounded-full"
+                        style={{ background: PRIORIDADE_COR[t.priority] }}
+                      />
+                    ) : null}
+                    {t.priority
+                      ? PRIORIDADE_LABEL[t.priority]
+                      : "Sem prioridade"}
                   </span>
                 </SelectValue>
               </SelectTrigger>
               <SelectContent align="end">
-                {PRIORIDADES.map((s) => (
-                  <SelectItem key={s} value={s}>
+                <SelectItem value={SEM_PRIORIDADE}>Sem prioridade</SelectItem>
+                {PRIORIDADE_OPCOES.map((p) => (
+                  <SelectItem key={p} value={p}>
                     <span
                       className="size-[7px] shrink-0 rounded-full"
-                      style={{ background: COR_PRIORIDADE[s] }}
+                      style={{ background: PRIORIDADE_COR[p] }}
                     />
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Propriedade>
-
-          <Propriedade rotulo="Responsável">
-            <Select
-              value={t.responsavel}
-              onValueChange={(v) =>
-                v != null && atualizar.mutate({ responsavel: v })
-              }
-            >
-              <SelectTrigger
-                className="w-46"
-                aria-label="Responsável pela tarefa"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent align="end">
-                {EQUIPE.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {p}
+                    {PRIORIDADE_LABEL[p]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -319,75 +416,35 @@ export function TarefaDetail({ id }: { id: string }) {
 
           <Propriedade rotulo="Vencimento">
             <DatePicker
-              valor={t.vencimento}
-              onChange={(iso) => atualizar.mutate({ vencimento: iso })}
+              valor={dueISO}
+              onChange={(iso) =>
+                update.updateTask({ id: t.id, patch: { due_date: iso } })
+              }
             />
           </Propriedade>
         </div>
 
-        <p className="text-muted-foreground mt-7 text-[11px] font-medium tracking-[0.08em] uppercase">
-          Origem
-        </p>
-        <div className="mt-3.5 flex flex-col">
-          <Link
-            href={`/intimacoes/${t.intimacaoId}`}
-            className="border-border flex flex-col gap-1 border-b py-2.5 no-underline hover:no-underline"
-          >
-            <span className="text-muted-foreground text-[12.5px]">
-              Intimação
-            </span>
-            <span className="text-primary inline-flex items-center gap-1.5 text-[13px]">
-              {intimacao.data?.titulo}
-              <ArrowUpRight className="size-2.5" strokeWidth={2.4} />
-            </span>
-          </Link>
-          {proc && (
-            <>
+        {t.intimation_id ? (
+          <>
+            <p className="text-muted-foreground mt-7 text-[11px] font-medium tracking-[0.08em] uppercase">
+              Origem
+            </p>
+            <div className="mt-3.5 flex flex-col">
               <Link
-                href={`/processos/${encodeURIComponent(proc.numero)}`}
+                href={`/intimacoes/${t.intimation_id}`}
                 className="border-border flex flex-col gap-1 border-b py-2.5 no-underline hover:no-underline"
               >
                 <span className="text-muted-foreground text-[12.5px]">
-                  Processo
+                  Intimação
                 </span>
-                <span className="text-primary inline-flex items-center gap-1.5 text-[13px] tabular-nums">
-                  {proc.numero}
+                <span className="text-primary inline-flex items-center gap-1.5 text-[13px]">
+                  Abrir intimação
                   <ArrowUpRight className="size-2.5" strokeWidth={2.4} />
                 </span>
               </Link>
-              <div className="border-border flex flex-col gap-1 border-b py-2.5">
-                <span className="text-muted-foreground text-[12.5px]">
-                  Órgão julgador
-                </span>
-                <span className="text-[13px]">{proc.orgao}</span>
-              </div>
-            </>
-          )}
-          <div className="border-border flex items-center justify-between gap-3 border-b py-2.5">
-            <span className="text-muted-foreground text-[12.5px]">
-              Prazo da intimação
-            </span>
-            <span className="text-gold text-[13px] tabular-nums">
-              {intimacao.data?.prazo?.termoFinal
-                ? formatarData(intimacao.data.prazo.termoFinal)
-                : "—"}
-            </span>
-          </div>
-        </div>
-
-        <p className="text-muted-foreground mt-7 text-[11px] font-medium tracking-[0.08em] uppercase">
-          Etiquetas
-        </p>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {t.etiquetas.map((e) => (
-            <span
-              key={e}
-              className="border-border text-muted-foreground rounded-full border px-2.5 py-0.5 text-[11.5px]"
-            >
-              {e}
-            </span>
-          ))}
-        </div>
+            </div>
+          </>
+        ) : null}
       </aside>
     </div>
   );

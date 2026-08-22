@@ -11,8 +11,11 @@ import {
 import { useApi } from "@/lib/api/use-api";
 
 import {
+  createTaskComment,
   getTask,
   getTasksSummary,
+  listTaskActivity,
+  listTaskComments,
   listTasks,
   updateTask,
 } from "../services/tasks.service";
@@ -28,6 +31,8 @@ export const tasksKeys = {
   list: (params: Record<string, unknown>) =>
     [...tasksKeys.lists(), params] as const,
   detail: (id: string) => [...tasksKeys.all, "detail", id] as const,
+  comments: (id: string) => [...tasksKeys.all, "comments", id] as const,
+  activity: (id: string) => [...tasksKeys.all, "activity", id] as const,
   summary: () => [...tasksKeys.all, "summary"] as const,
 };
 
@@ -95,6 +100,45 @@ export function useTaskDetalhe(id: string) {
     queryKey: tasksKeys.detail(id),
     queryFn: () => getTask(fetcher, id),
     enabled: !!id,
+  });
+}
+
+/** Thread de comentários da tarefa — GET /v1/tasks/:id/comments (mais antigo primeiro). */
+export function useTaskComments(id: string) {
+  const fetcher = useApi();
+  return useQuery({
+    queryKey: tasksKeys.comments(id),
+    queryFn: () => listTaskComments(fetcher, id),
+    enabled: !!id,
+  });
+}
+
+/** Log de atividade da tarefa — GET /v1/tasks/:id/activity (mais recente primeiro). */
+export function useTaskActivity(id: string) {
+  const fetcher = useApi();
+  return useQuery({
+    queryKey: tasksKeys.activity(id),
+    queryFn: () => listTaskActivity(fetcher, id),
+    enabled: !!id,
+  });
+}
+
+/**
+ * Escreve um comentário — POST /v1/tasks/:id/comments. No sucesso invalida o thread e o
+ * log de atividade da tarefa (o BE registra COMMENTED na mesma tx). `await` mantém o
+ * isPending ligado até o refetch concluir.
+ */
+export function useCreateTaskComment(id: string) {
+  const fetcher = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: string) => createTaskComment(fetcher, id, body),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: tasksKeys.comments(id) }),
+        qc.invalidateQueries({ queryKey: tasksKeys.activity(id) }),
+      ]);
+    },
   });
 }
 
