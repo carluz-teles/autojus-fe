@@ -2,16 +2,19 @@
 
 import {
   AlertTriangle,
+  Check,
   FileText,
   Loader2,
   ShieldAlert,
   ShieldCheck,
+  X,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/mock-ui/button";
 import { ConfirmDialog } from "@/components/mock-ui/confirm-dialog";
+import { Dialog } from "@/components/mock-ui/dialog";
 import { Field, Input } from "@/components/mock-ui/input";
 import { Card, SectionTitle } from "@/components/mock-ui/layout";
 import { StatusBadge } from "@/components/mock-ui/status-badge";
@@ -24,19 +27,24 @@ import {
   isCertFile,
   useCertificados,
   useDeleteCertificado,
+  usePreviewCertificado,
+  useSignComCertificado,
   useUploadCertificado,
 } from "../hooks/use-cert-upload";
 import type {
   CertificadoPasswordPolicy,
+  CertificadoPreviewResult,
   CertificadoScope,
 } from "../types/certificado";
 
 // ── Wizard steps ────────────────────────────────────────────────────────────
-// Validação (leitura do PKCS#12) é feita pelo BE no POST; não há endpoint de
-// pré-validação no contrato, então o wizard usa 3 passos: Arquivo → Senha →
-// Consentimento. Débito: adicionar passo de confirmação pós-parse quando o BE
-// expuser /v1/certificates/preview.
-const PASSOS = ["Arquivo", "Senha", "Consentimento"] as const;
+// Arquivo → Senha → Validação → Consentimento. A etapa Validação chama
+// POST /v1/certificates/preview (parse read-only no BE) e mostra os metadados
+// lidos + as checagens (✓/✗) ANTES do POST definitivo — "é a sua identidade que
+// vai assinar".
+const PASSOS = ["Arquivo", "Senha", "Validação", "Consentimento"] as const;
+const PASSO_VALIDACAO = 2;
+const PASSO_CONSENTIMENTO = 3;
 
 const POLITICAS: {
   valor: CertificadoPasswordPolicy;
@@ -75,6 +83,103 @@ function errorMessage(err: unknown): string {
   return "Não foi possível concluir a operação. Tente novamente.";
 }
 
+/** SHA-256 (base64) de um conteúdo, via WebCrypto — o digest que o BE assina. */
+async function sha256Base64(data: string): Promise<string> {
+  const bytes = new TextEncoder().encode(data);
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  let bin = "";
+  for (const b of new Uint8Array(hash)) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+/**
+ * Etapa "Validação" do wizard: mostra os metadados lidos do arquivo pelo BE
+ * (POST /v1/certificates/preview) + as checagens (✓/✗) antes do POST definitivo.
+ * "Foi isto que lemos do arquivo. Confira antes de ativar — é a sua identidade
+ * que vai assinar." Fiel ao design (grid rótulo · valor · estado).
+ */
+function ValidacaoStep({ resultado }: { resultado: CertificadoPreviewResult }) {
+  const linhas: { rotulo: string; valor: string; ok: boolean; nota: string }[] =
+    [
+      {
+        rotulo: "Titular",
+        valor: resultado.subject_cn || "—",
+        ok: resultado.checks.titular_confere,
+        nota: resultado.checks.titular_confere
+          ? "titular identificado"
+          : "titular não identificado",
+      },
+      { rotulo: "OAB", valor: resultado.oab || "—", ok: true, nota: "lida" },
+      {
+        rotulo: "Emissor",
+        valor: resultado.issuer || "—",
+        ok: resultado.checks.cadeia_ok,
+        nota: resultado.checks.cadeia_ok
+          ? "cadeia da AC presente"
+          : "cadeia da AC ausente",
+      },
+      {
+        rotulo: "Série",
+        valor: resultado.serial || "—",
+        ok: true,
+        nota: "lida",
+      },
+      {
+        rotulo: "Válido de",
+        valor: formatDate(resultado.not_before),
+        ok: true,
+        nota: "lida",
+      },
+      {
+        rotulo: "Validade",
+        valor: formatDate(resultado.not_after),
+        ok: resultado.checks.nao_expirado,
+        nota: resultado.checks.nao_expirado ? "dentro da validade" : "expirado",
+      },
+    ];
+
+  return (
+    <div>
+      <p className="text-muted-foreground mb-3 text-[13px]">
+        Foi isto que lemos do arquivo. Confira antes de ativar — é a sua
+        identidade que vai assinar.
+      </p>
+      <div>
+        {linhas.map((l) => (
+          <div
+            key={l.rotulo}
+            className="border-border grid grid-cols-[130px_minmax(0,1fr)_180px] items-center gap-3.5 border-t py-2.5 text-[13px] sm:grid-cols-[170px_minmax(0,1fr)_240px]"
+          >
+            <span className="text-muted-foreground">{l.rotulo}</span>
+            <span className="min-w-0 truncate font-medium">{l.valor}</span>
+            <span
+              className={cn(
+                "flex items-center gap-1.5 text-xs",
+                l.ok ? "text-success" : "text-destructive",
+              )}
+            >
+              {l.ok ? (
+                <Check className="size-3.5 shrink-0" />
+              ) : (
+                <X className="size-3.5 shrink-0" />
+              )}
+              {l.nota}
+            </span>
+          </div>
+        ))}
+      </div>
+      {(!resultado.checks.nao_expirado || !resultado.checks.cadeia_ok) && (
+        <p className="text-muted-foreground mt-3 flex items-start gap-2 text-xs leading-relaxed">
+          <AlertTriangle className="text-gold mt-px size-3.5 shrink-0" />
+          {!resultado.checks.nao_expirado
+            ? "Este certificado está fora da validade e não poderá assinar. Use um e-CPF A1 vigente."
+            : "A cadeia da autoridade certificadora não veio no arquivo. Confirme com quem emitiu o certificado antes de ativar."}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
  * Aba de certificado digital A1.
  *
@@ -92,6 +197,7 @@ export function CertificadoTab() {
   // ── Server state ──────────────────────────────────────────────────────────
   const { data: certificados, isLoading, error: listError } = useCertificados();
   const uploadMutation = useUploadCertificado();
+  const previewMutation = usePreviewCertificado();
   const deleteMutation = useDeleteCertificado();
 
   // Certificado do usuário logado = primeiro com revoked_at null
@@ -117,6 +223,13 @@ export function CertificadoTab() {
   // ── Delete confirmation state ─────────────────────────────────────────────
   const [confirmacaoRemocao, setConfirmacaoRemocao] = useState(false);
 
+  // ── Signing (session password) state ──────────────────────────────────────
+  // A senha de assinatura é de SESSÃO: mora só neste estado enquanto o diálogo
+  // está aberto e é limpa ao fechar. Nunca é persistida nem logada.
+  const signMutation = useSignComCertificado();
+  const [assinaturaAberta, setAssinaturaAberta] = useState(false);
+  const [senhaAssinatura, setSenhaAssinatura] = useState("");
+
   // ── Wizard helpers ────────────────────────────────────────────────────────
   function selecionarArquivo(file: File | undefined) {
     if (!file) return;
@@ -133,12 +246,31 @@ export function CertificadoTab() {
     setArquivo(null);
     setSenha(""); // limpa a senha do estado — não há persistência além do submit
     setAceite(false);
+    previewMutation.reset();
+  }
+
+  // Avança um passo. Ao ENTRAR na etapa de Validação (de Senha → Validação),
+  // dispara o preview no BE com o arquivo + senha. Uma senha errada / arquivo
+  // inválido falha aqui (erro tipado do BE) e o wizard permanece na etapa de
+  // senha, evitando o POST definitivo com dados quebrados.
+  async function avancar() {
+    if (passo === 1) {
+      if (!arquivo || !senha) return;
+      try {
+        await previewMutation.mutateAsync({ file: arquivo, password: senha });
+      } catch {
+        // O erro é exibido inline na etapa de senha (previewMutation.error).
+        return;
+      }
+    }
+    setPasso((p) => p + 1);
   }
 
   const podeAvancar =
     (passo === 0 && !!arquivo) ||
-    (passo === 1 && senha.length > 0) ||
-    (passo === 2 && aceite && !uploadMutation.isPending);
+    (passo === 1 && senha.length > 0 && !previewMutation.isPending) ||
+    (passo === PASSO_VALIDACAO && !!previewMutation.data) ||
+    (passo === PASSO_CONSENTIMENTO && aceite && !uploadMutation.isPending);
 
   async function ativarCertificado() {
     if (!arquivo || !senha) return;
@@ -146,6 +278,34 @@ export function CertificadoTab() {
       await uploadMutation.mutateAsync({ file: arquivo, password: senha });
       toast.success("Certificado ativado com sucesso.");
       fecharInstalador();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  }
+
+  // ── Signing ───────────────────────────────────────────────────────────────
+  function fecharAssinatura() {
+    setAssinaturaAberta(false);
+    setSenhaAssinatura(""); // limpa a senha de sessão — sem persistência
+    signMutation.reset();
+  }
+
+  async function assinar() {
+    if (!meuCert || !senhaAssinatura) return;
+    try {
+      // O empacotamento real (PDF/peça) é de outra frente; aqui o mecanismo
+      // (assinar um digest com a chave do cert) basta — assinamos o SHA-256 de
+      // uma amostra para provar que o certificado assina de ponta a ponta.
+      const digest = await sha256Base64(
+        `atjus-teste-assinatura:${meuCert.id}:${crypto.randomUUID()}`,
+      );
+      await signMutation.mutateAsync({
+        id: meuCert.id,
+        password: senhaAssinatura,
+        digestSha256: digest,
+      });
+      setSenhaAssinatura("");
+      toast.success("Assinatura gerada com sucesso.");
     } catch (err) {
       toast.error(errorMessage(err));
     }
@@ -254,7 +414,7 @@ export function CertificadoTab() {
           </div>
         )}
 
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           <Button
             variant="outline"
             onClick={() =>
@@ -267,8 +427,75 @@ export function CertificadoTab() {
                 ? "Substituir certificado"
                 : "Instalar certificado"}
           </Button>
+          {meuCert && !meuCert.revoked_at && (
+            <Button variant="outline" onClick={() => setAssinaturaAberta(true)}>
+              Testar assinatura
+            </Button>
+          )}
         </div>
       </Card>
+
+      {/* ── Assinatura de sessão (mecanismo server-side) ─────────────────── */}
+      <Dialog
+        aberto={assinaturaAberta}
+        titulo="Testar assinatura"
+        onFechar={fecharAssinatura}
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-muted-foreground text-[13px] leading-relaxed">
+            Informe a senha do certificado para gerar uma assinatura. A senha é
+            usada apenas para esta assinatura e não é armazenada.
+          </p>
+          <Field label="Senha do certificado">
+            <Input
+              type="password"
+              placeholder="••••••••"
+              value={senhaAssinatura}
+              onChange={(e) => setSenhaAssinatura(e.target.value)}
+              autoComplete="off"
+            />
+          </Field>
+
+          {signMutation.data && (
+            <div className="border-border rounded-xl border p-3 text-[12.5px]">
+              <span className="text-success flex items-center gap-1.5 font-medium">
+                <ShieldCheck className="size-4" />
+                Assinatura gerada
+              </span>
+              <span className="text-muted-foreground mt-1.5 block font-mono text-[11px] break-all">
+                {signMutation.data.signature.slice(0, 44)}…
+              </span>
+            </div>
+          )}
+
+          {signMutation.error && (
+            <div className="flex items-start gap-2 rounded-xl border border-[color-mix(in_oklch,var(--destructive)_25%,transparent)] bg-[color-mix(in_oklch,var(--destructive)_4%,transparent)] p-3 text-[12.5px]">
+              <ShieldAlert className="text-destructive mt-0.5 size-4 shrink-0" />
+              <span>{errorMessage(signMutation.error)}</span>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={fecharAssinatura}>
+              Fechar
+            </Button>
+            <Button
+              size="sm"
+              disabled={!senhaAssinatura || signMutation.isPending}
+              onClick={assinar}
+            >
+              {signMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                  Assinando…
+                </>
+              ) : (
+                "Assinar"
+              )}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       {/* ── Wizard de instalação ─────────────────────────────────────────── */}
       {instalando && (
@@ -424,11 +651,23 @@ export function CertificadoTab() {
                     </button>
                   ))}
                 </div>
+
+                {previewMutation.error && (
+                  <div className="flex items-start gap-2 rounded-xl border border-[color-mix(in_oklch,var(--destructive)_25%,transparent)] bg-[color-mix(in_oklch,var(--destructive)_4%,transparent)] p-3 text-[12.5px]">
+                    <ShieldAlert className="text-destructive mt-0.5 size-4 shrink-0" />
+                    <span>{errorMessage(previewMutation.error)}</span>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Passo 2 — Consentimento + Escopo */}
-            {passo === 2 && (
+            {/* Passo 2 — Validação (leitura do arquivo pelo BE) */}
+            {passo === PASSO_VALIDACAO && previewMutation.data && (
+              <ValidacaoStep resultado={previewMutation.data} />
+            )}
+
+            {/* Passo 3 — Consentimento + Escopo */}
+            {passo === PASSO_CONSENTIMENTO && (
               <div className="flex flex-col gap-4">
                 <div>
                   <SectionTitle className="mb-2">
@@ -536,7 +775,7 @@ export function CertificadoTab() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setPasso((p) => p - 1)}
-                disabled={uploadMutation.isPending}
+                disabled={uploadMutation.isPending || previewMutation.isPending}
               >
                 Voltar
               </Button>
@@ -544,12 +783,15 @@ export function CertificadoTab() {
               <span />
             )}
             {passo < PASSOS.length - 1 ? (
-              <Button
-                size="sm"
-                disabled={!podeAvancar}
-                onClick={() => setPasso((p) => p + 1)}
-              >
-                Continuar
+              <Button size="sm" disabled={!podeAvancar} onClick={avancar}>
+                {previewMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                    Validando…
+                  </>
+                ) : (
+                  "Continuar"
+                )}
               </Button>
             ) : (
               <Button

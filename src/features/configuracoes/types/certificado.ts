@@ -40,6 +40,55 @@ export interface CertificadosListResult {
   data: CertificateView[];
 }
 
+/**
+ * Checagens que o BE consegue determinar ao parsear o .pfx na etapa de validação.
+ * Contrato: POST /v1/certificates/preview → PreviewResult.checks.
+ */
+export interface CertificadoChecks {
+  /** A janela de validade contém "agora" (não expirado nem futuro). */
+  nao_expirado: boolean;
+  /** O .pfx trouxe a cadeia da AC (um A1 ICP-Brasil embarca a cadeia). */
+  cadeia_ok: boolean;
+  /** O certificado tem um titular identificável (CN não vazio). */
+  titular_confere: boolean;
+}
+
+/**
+ * Resultado da pré-validação do certificado (etapa "Validação" do wizard).
+ * O BE parseia o .pfx e REPORTA os metadados + checagens sem armazenar nada;
+ * a senha é usada apenas para abrir o arquivo e é descartada.
+ * Contrato: POST /v1/certificates/preview (multipart {file, password}).
+ */
+export interface CertificadoPreviewResult {
+  subject_cn: string;
+  oab: string;
+  issuer: string;
+  serial: string;
+  not_before: string;
+  not_after: string;
+  fingerprint: string;
+  checks: CertificadoChecks;
+}
+
+/**
+ * Corpo do POST /v1/certificates/:id/sign. A senha é de sessão, usada apenas para
+ * o BE decifrar o .pfx e assinar — nunca persistida nem logada.
+ */
+export interface CertificadoSignRequest {
+  password: string;
+  /** SHA-256 (base64) do documento a assinar, computado pelo chamador. */
+  digest_sha256: string;
+}
+
+/**
+ * Resposta do sign: a assinatura (base64) e a cadeia de certificados (DER base64,
+ * folha primeiro). Nada aqui é segredo — a assinatura é pública por natureza.
+ */
+export interface CertificadoSignResult {
+  signature: string;
+  cert_chain: string[];
+}
+
 /** Política de quando pedir a senha do certificado (preferência do usuário, local). */
 export type CertificadoPasswordPolicy = "sempre" | "sessao";
 

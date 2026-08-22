@@ -7,9 +7,15 @@ import { useApi } from "@/lib/api/use-api";
 import {
   deleteCertificado,
   listCertificados,
+  previewCertificado,
+  signComCertificado,
   uploadCertificado,
 } from "../services/certificado.service";
-import type { CertificateView } from "../types/certificado";
+import type {
+  CertificadoPreviewResult,
+  CertificadoSignResult,
+  CertificateView,
+} from "../types/certificado";
 
 // Aceitos pelo design: e-CPF A1 em .pfx / .p12.
 export const CERT_ACCEPT = ".pfx,.p12";
@@ -57,6 +63,47 @@ export function useUploadCertificado() {
     mutationFn: ({ file, password }) =>
       uploadCertificado(fetcher, file, password),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+  });
+}
+
+export interface PreviewCertificadoArgs {
+  file: File;
+  /** Usada APENAS para o BE abrir o PKCS#12 e ler os metadados. Descartada pelo
+   *  servidor após o parse. Nunca persistida. Não logar. */
+  password: string;
+}
+
+/**
+ * Pré-valida o certificado (etapa "Validação" do wizard). Mutation porque depende
+ * do arquivo + senha em mãos e não deve cachear (a senha nunca vira chave de
+ * cache). Não invalida nada — é read-only no servidor.
+ */
+export function usePreviewCertificado() {
+  const fetcher = useApi();
+  return useMutation<CertificadoPreviewResult, Error, PreviewCertificadoArgs>({
+    mutationFn: ({ file, password }) =>
+      previewCertificado(fetcher, file, password),
+  });
+}
+
+export interface SignCertificadoArgs {
+  id: string;
+  /** Senha de sessão — usada só para o BE decifrar o .pfx e assinar. Não logar. */
+  password: string;
+  /** SHA-256 (base64) do documento a assinar. */
+  digestSha256: string;
+}
+
+/**
+ * Assina um digest com o certificado (mecanismo criptográfico real, server-side).
+ * O empacotamento final (PAdES/PDF) é de outra frente; aqui basta assinar o
+ * digest. Não cacheia nem invalida — a assinatura é um efeito, não estado de tela.
+ */
+export function useSignComCertificado() {
+  const fetcher = useApi();
+  return useMutation<CertificadoSignResult, Error, SignCertificadoArgs>({
+    mutationFn: ({ id, password, digestSha256 }) =>
+      signComCertificado(fetcher, id, password, digestSha256),
   });
 }
 

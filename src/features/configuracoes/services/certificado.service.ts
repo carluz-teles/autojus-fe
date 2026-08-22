@@ -12,6 +12,8 @@
 import type { ApiFetcher } from "@/lib/api/use-api";
 
 import type {
+  CertificadoPreviewResult,
+  CertificadoSignResult,
   CertificadosListResult,
   CertificateView,
 } from "../types/certificado";
@@ -32,6 +34,43 @@ export async function uploadCertificado(
   fd.append("file", file);
   fd.append("password", password);
   return fetcher<CertificateView>(ENDPOINT, { method: "POST", formData: fd });
+}
+
+/**
+ * Pré-valida o certificado (etapa "Validação" do wizard) SEM armazenar nada.
+ * O BE parseia o .pfx, extrai os metadados e devolve as checagens (✓/✗). A senha
+ * é usada apenas para abrir o arquivo e é descartada — nunca persistida, nunca
+ * logada. Mesmo shape multipart do upload.
+ */
+export async function previewCertificado(
+  fetcher: ApiFetcher,
+  file: File,
+  password: string,
+): Promise<CertificadoPreviewResult> {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("password", password);
+  return fetcher<CertificadoPreviewResult>(`${ENDPOINT}/preview`, {
+    method: "POST",
+    formData: fd,
+  });
+}
+
+/**
+ * Assina um digest SHA-256 (base64) server-side com a chave do certificado. A
+ * senha é de sessão, usada apenas para o BE decifrar o .pfx e assinar — nunca
+ * persistida nem logada. Devolve {signature, cert_chain} (base64).
+ */
+export async function signComCertificado(
+  fetcher: ApiFetcher,
+  id: string,
+  password: string,
+  digestSha256: string,
+): Promise<CertificadoSignResult> {
+  return fetcher<CertificadoSignResult>(`${ENDPOINT}/${id}/sign`, {
+    method: "POST",
+    body: { password, digest_sha256: digestSha256 },
+  });
 }
 
 /** Lista os certificados do tenant (o do usuário corrente é owner_user_id = meu ID). */
