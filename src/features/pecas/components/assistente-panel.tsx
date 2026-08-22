@@ -168,7 +168,7 @@ export function AssistentePanel({
           </div>
           <div className="border-border flex flex-col gap-2 border-t p-4">
             <Button variant="outline" size="sm">
-              Revisar com IA
+              Revisar peça
             </Button>
             <Button size="sm">Regenerar minuta</Button>
           </div>
@@ -182,7 +182,7 @@ export function AssistentePanel({
                 className="grid grid-cols-[26px_minmax(0,1fr)] gap-2.5"
               >
                 <Avatar
-                  nome={m.autor === "Você" ? "Luan Gomes" : "IA"}
+                  nome={m.autor === "Você" ? "Luan Gomes" : "Assistente"}
                   size={26}
                   destaque={m.autor !== "Você"}
                 />

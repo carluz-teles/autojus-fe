@@ -48,7 +48,7 @@ export function PecaWorkspace({ id }: { id: string }) {
           href={`/intimacoes/${i.id}`}
           className="text-muted-foreground text-xs no-underline hover:no-underline"
         >
-          ← Intimação
+          ← Intimações
         </Link>
         <StepperPeca atual={passo} onIr={setPasso} />
         <div className="ml-auto flex gap-2">
@@ -72,7 +72,21 @@ export function PecaWorkspace({ id }: { id: string }) {
               {p.numero}
             </p>
 
-            <Rotulo className="mt-4">Intimação de origem</Rotulo>
+            {/* Prazo em destaque no topo do contexto (design: bloco cercado) */}
+            <div className="border-border my-4 border-y py-3">
+              <p className="text-muted-foreground text-xs">Prazo</p>
+              <p
+                className="font-display text-xl tabular-nums"
+                style={{ color: corPrazo }}
+              >
+                {termo ? formatarData(termo) : "—"}
+              </p>
+              <p className="text-muted-foreground text-[11.5px]">
+                {rotuloPrazo(dias)} · dias úteis
+              </p>
+            </div>
+
+            <Rotulo>Intimação de origem</Rotulo>
             <Link
               href={`/intimacoes/${i.id}`}
               className="block no-underline hover:no-underline"
@@ -107,6 +121,7 @@ export function PecaWorkspace({ id }: { id: string }) {
               valor={`${p.tribunal} · ${p.grau}`}
             />
             <Campo rotulo="Valor da causa" valor={p.valorCausa} />
+            <Campo rotulo="Distribuição" valor={p.distribuicao} />
 
             <Rotulo className="mt-6">Partes</Rotulo>
             <CampoEmpilhado rotulo="Autor" valor={p.autor} />
@@ -117,17 +132,6 @@ export function PecaWorkspace({ id }: { id: string }) {
                 <p key={proc}>{proc}</p>
               ))}
             </div>
-
-            <Rotulo className="mt-6">Prazo</Rotulo>
-            <p
-              className="font-display text-xl tabular-nums"
-              style={{ color: corPrazo }}
-            >
-              {termo ? formatarData(termo) : "—"}
-            </p>
-            <p className="text-muted-foreground text-[11.5px]">
-              {rotuloPrazo(dias)} · dias úteis
-            </p>
 
             <Rotulo className="mt-6">Providências</Rotulo>
             {i.providencias.map((t) => (
