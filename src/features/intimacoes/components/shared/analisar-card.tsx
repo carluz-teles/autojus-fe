@@ -58,14 +58,14 @@ export function AnalisarCard({
   // Pré-análise: nunca analisada ainda → CTA centrado.
   if (!i.ai_analyzed_at) {
     return (
-      <section className="border-border flex flex-col items-center rounded-xl border px-6 py-10 text-center">
-        <span className="bg-muted text-foreground/70 flex size-9 items-center justify-center rounded-lg">
-          <Sparkles className="size-4" strokeWidth={1.8} />
+      <section className="flex flex-col items-center rounded-2xl border border-dashed border-[color-mix(in_oklch,var(--gold)_30%,transparent)] bg-[color-mix(in_oklch,var(--gold)_6%,transparent)] px-6 py-9 text-center">
+        <span className="flex size-11 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--gold)_16%,transparent)] text-[var(--gold-foreground)] ring-1 ring-[color-mix(in_oklch,var(--gold)_22%,transparent)]">
+          <Sparkles className="size-5" strokeWidth={1.6} />
         </span>
         <h3 className="font-display text-foreground mt-4 text-[20px] leading-tight font-normal">
           Analisar esta intimação
         </h3>
-        <p className="text-muted-foreground mt-2 max-w-[440px] text-[14px] leading-relaxed">
+        <p className="text-muted-foreground mt-2 max-w-[400px] text-[13.5px] leading-relaxed text-pretty">
           Leitura do teor da publicação para gerar o resumo do que aconteceu e
           as providências a cumprir. Você revisa antes de tudo virar tarefa.
         </p>
@@ -282,7 +282,7 @@ export function ProvidenciaRow({
               </Badge>
               {p.task_id ? (
                 <Link
-                  href={`/tarefas/${p.task_id}`}
+                  href={`/tarefas?task=${p.task_id}`}
                   className="border-border text-muted-foreground hover:bg-muted inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[12px] tabular-nums transition-colors"
                 >
                   {codigoTarefa(p.task_id)}

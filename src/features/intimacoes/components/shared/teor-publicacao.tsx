@@ -2,13 +2,16 @@
 
 // TeorPublicacao — movido de intimacao-detail.tsx (Regra nº1) para shared/
 // para ser reutilizado também pelo PainelDetalhe do master-detail compacto.
-// A prop borderColor distingue o contexto: "gold" no painel lateral compacto
-// (border-l-2 border-[var(--gold)]) vs "border" na tela full (padrão: border-border).
-// O comportamento de colapso (mask-image + "Ver mais"/"Ver menos" + aria-expanded)
-// é idêntico nos dois contextos — só a altura de colapso e a cor da borda diferem.
+// Dois modos (prop `variant`):
+//  • "section"   — título + teor sempre visível, colapsado por ALTURA com fade
+//                  (mask-image) + "Ver mais". Usado na tela full /intimacoes/[id].
+//  • "disclosure" — teor ESCONDIDO atrás de um botão "Ver teor da publicação ▸"
+//                  que expande sob demanda. Usado no painel compacto (não despeja
+//                  o parágrafo inteiro na ficha).
+// `borderColor` distingue o contexto da borda-esquerda: "gold" no painel, "border" na full.
 
-import { ChevronDown } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { sanitizeContentHtml } from "@/lib/html/sanitize-content";
@@ -25,23 +28,101 @@ export interface TeorPublicacaoProps {
    */
   borderColor?: "gold" | "border";
   /**
-   * Altura máxima (px) do estado colapsado.
-   * 260 na tela full; 180 no painel compacto.
+   * Altura máxima (px) do estado colapsado — só no variant "section".
    * Default: 260.
    */
   collapsedHeight?: number;
+  /**
+   * "section" (padrão) = teor sempre visível, colapso por altura + fade (tela full).
+   * "disclosure" = escondido atrás de "Ver teor da publicação ▸", expande sob demanda
+   * (painel compacto do master-detail).
+   */
+  variant?: "section" | "disclosure";
 }
 
-/**
- * Teor da publicação com colapso progressivo. Publicações longas (comuns no DJEN)
- * ficam limitadas a `collapsedHeight` com fade no rodapé + "Ver mais". Mede a altura
- * real do conteúdo (via ref) para só mostrar o botão quando de fato excede o limite.
- */
 export function TeorPublicacao({
   content,
   borderColor = "border",
   collapsedHeight = 260,
+  variant = "section",
 }: TeorPublicacaoProps) {
+  if (variant === "disclosure") {
+    return <TeorDisclosure content={content} borderColor={borderColor} />;
+  }
+  return (
+    <TeorSection
+      content={content}
+      borderColor={borderColor}
+      collapsedHeight={collapsedHeight}
+    />
+  );
+}
+
+/** Classes da borda-esquerda + tipografia do corpo do teor — compartilhadas pelos 2 modos. */
+function corpoClasses(borderColor: "gold" | "border"): string {
+  return cn(
+    "prose-intimacao text-foreground/90 border-l-2 pl-4 text-[14px] leading-relaxed",
+    borderColor === "gold" ? "border-[var(--gold)]" : "border-border",
+  );
+}
+
+/**
+ * Modo disclosure: só um botão "Ver teor da publicação ▸". Ao expandir, mostra o teor
+ * COMPLETO (o painel lateral já tem overflow-y-auto, então rola dentro dele). Sem fade —
+ * expandir é justamente o gesto de "quero ler tudo".
+ */
+function TeorDisclosure({
+  content,
+  borderColor,
+}: {
+  content: string;
+  borderColor: "gold" | "border";
+}) {
+  const [aberto, setAberto] = useState(false);
+  const painelId = useId();
+
+  return (
+    <section className="mt-4">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-muted-foreground gap-1.5 pl-0"
+        onClick={() => setAberto((v) => !v)}
+        aria-expanded={aberto}
+        aria-controls={painelId}
+      >
+        <ChevronRight
+          className={cn("size-3.5 transition-transform", aberto && "rotate-90")}
+          strokeWidth={1.8}
+        />
+        {aberto ? "Ocultar teor da publicação" : "Ver teor da publicação"}
+      </Button>
+      {aberto ? (
+        <div
+          id={painelId}
+          className={cn(corpoClasses(borderColor), "mt-3")}
+          // sanitizeContentHtml remove scripts/handlers/URIs perigosas (DJEN externo).
+          dangerouslySetInnerHTML={{ __html: sanitizeContentHtml(content) }}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * Modo section: teor sempre visível, colapsado a `collapsedHeight` com fade (mask-image)
+ * + "Ver mais". Mede a altura real do conteúdo (via ref) para só mostrar o botão quando
+ * de fato excede o limite.
+ */
+function TeorSection({
+  content,
+  borderColor,
+  collapsedHeight,
+}: {
+  content: string;
+  borderColor: "gold" | "border";
+  collapsedHeight: number;
+}) {
   const [expandido, setExpandido] = useState(false);
   const [transborda, setTransborda] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -81,10 +162,7 @@ export function TeorPublicacao({
               }
             : undefined
         }
-        className={cn(
-          "prose-intimacao text-foreground/90 mt-3 border-l-2 pl-4 text-[14px] leading-relaxed",
-          borderColor === "gold" ? "border-[var(--gold)]" : "border-border",
-        )}
+        className={cn(corpoClasses(borderColor), "mt-3")}
         // sanitizeContentHtml remove scripts/handlers/URIs perigosas (DJEN externo).
         dangerouslySetInnerHTML={{ __html: sanitizeContentHtml(content) }}
       />

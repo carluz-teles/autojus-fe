@@ -1,7 +1,7 @@
 "use client";
 
 import { Menu } from "@base-ui/react/menu";
-import { Check, UserPlus, X } from "lucide-react";
+import { Building2, Check, CircleCheck, User, UserPlus, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -35,7 +35,7 @@ import {
 } from "./shared/atribuir-responsavel";
 import { Avatar, initials } from "./shared/avatar";
 import { PrazoContagemGrande } from "./shared/prazo-contagem-grande";
-import { prazoUrgenciaInfo } from "./shared/prazo-urgencia";
+import { corUrgencia, prazoUrgenciaInfo } from "./shared/prazo-urgencia";
 import { TeorPublicacao } from "./shared/teor-publicacao";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,14 +78,16 @@ function emBreve() {
   toast("Em breve.");
 }
 
-/** Rótulo curto do prazo pra coluna direita da linha da lista. */
+/** Rótulo curto do prazo pra coluna direita da linha da lista — wording do design
+ * (rotuloPrazo): "N dias em atraso" · "vence hoje" · "vence amanhã" · "em N dias". */
 function rotuloPrazo(prazo: IntimacaoPrazoView | null): string {
   const info = prazoUrgenciaInfo(prazo);
   if (!info) return "sem prazo";
   if (info.atrasado)
-    return `${info.magnitude} ${info.magnitude === 1 ? "dia em atraso" : "dias em atraso"}`;
+    return `${info.magnitude} ${info.magnitude === 1 ? "dia" : "dias"} em atraso`;
   if (info.hoje) return "vence hoje";
-  return `vence em ${info.magnitude} ${info.magnitude === 1 ? "dia" : "dias"}`;
+  if (info.magnitude === 1) return "vence amanhã";
+  return `em ${info.magnitude} dias`;
 }
 
 /**
@@ -276,25 +278,34 @@ export function IntimacoesView() {
       }));
     };
 
-    const fs: Facet[] = [
-      {
-        key: "user_status",
-        label: "Situação",
-        options: rotular(filterOptions["user_status"], USER_STATUS_LABEL),
-      },
-    ];
-    const courts = filterOptions["court"] ?? [];
-    if (courts.length > 0) {
-      fs.push({ key: "court", label: "Tribunal", options: courts });
-    }
+    // Ordem + ícones do design (Claude Design): Responsável, Status, Tribunal.
+    // Etapa do peticionamento / Órgão julgador / Classe do protótipo dependem de
+    // facetas que o BE ainda não expõe — não dá pra inventar opção em filtro real.
+    const fs: Facet[] = [];
     if (membros.members.length > 0) {
       fs.push({
         key: "responsavel",
         label: "Responsável",
+        icon: User,
         options: membros.members.map((m) => ({
           value: m.id,
           label: nomeExibicao(m.name, m.email),
         })),
+      });
+    }
+    fs.push({
+      key: "user_status",
+      label: "Status",
+      icon: CircleCheck,
+      options: rotular(filterOptions["user_status"], USER_STATUS_LABEL),
+    });
+    const courts = filterOptions["court"] ?? [];
+    if (courts.length > 0) {
+      fs.push({
+        key: "court",
+        label: "Tribunal",
+        icon: Building2,
+        options: courts,
       });
     }
     return fs;
@@ -336,7 +347,6 @@ export function IntimacoesView() {
             </ListSearchToolbar>
 
             <FacetedFilter
-              iconOnly
               className="ml-auto"
               facets={facetas}
               values={{
@@ -354,10 +364,12 @@ export function IntimacoesView() {
         </PageHeader>
       </div>
 
-      {/* Master-detail: coluna esquerda (tabs + seleção + lista) | painel (~40%).
+      {/* Master-detail: coluna esquerda (tabs + seleção + lista) | painel de detalhe.
+          Larguras EXATAS do protótipo (Claude Design): lista minmax(420px,1fr), painel
+          capado em minmax(340px,430px) — a lista absorve o resto; o painel não estica.
           A linha horizontal (border-t) separa o bloco de cima (título/busca) do
           conjunto abaixo; o painel de detalhe começa na mesma altura da tab bar. */}
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(420px,3fr)_minmax(360px,2fr)] border-t">
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(420px,1fr)_minmax(340px,430px)] border-t">
         <div className="flex min-h-0 flex-col">
           <div className="px-8 pt-4">
             <div
@@ -633,7 +645,7 @@ function LinhaIntimacao({
   marcada: boolean;
   onMarcar: () => void;
 }) {
-  const info = prazoUrgenciaInfo(item.prazo);
+  const cor = corUrgencia(item.prazo);
   const analisada = !!item.ai_analyzed_at;
 
   return (
@@ -647,59 +659,57 @@ function LinhaIntimacao({
           onSelecionar();
         }
       }}
+      style={{ borderLeftColor: cor }}
       className={cn(
-        "border-border flex w-full items-center justify-between gap-4 border-b py-3 pr-4 text-left transition-colors",
-        "cursor-pointer border-l-[3px]",
-        info?.atrasado ? "border-l-destructive" : "border-l-transparent",
-        selecionada ? "bg-muted/60" : "hover:bg-muted/50",
+        "border-border grid w-full grid-cols-[22px_minmax(0,1fr)_118px_88px] items-center gap-2.5 border-b border-l-[3px] py-2.5 pr-3 pl-[9px] text-left transition-colors",
+        "cursor-pointer",
+        selecionada ? "bg-gold/[0.1]" : "hover:bg-gold/[0.08]",
       )}
     >
-      {/* conteúdo (cresce, com largura máxima) */}
-      <span className="flex max-w-[600px] min-w-0 flex-1 items-center gap-3">
-        <span
-          className="pl-3"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-        >
-          <Checkbox
-            checked={marcada}
-            onCheckedChange={() => onMarcar()}
-            aria-label="Selecionar intimação"
-          />
+      {/* col 1 — seleção */}
+      <span
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <Checkbox
+          checked={marcada}
+          onCheckedChange={() => onMarcar()}
+          aria-label="Selecionar intimação"
+        />
+      </span>
+
+      {/* col 2 — título + processo + tag de análise */}
+      <span className="min-w-0">
+        <span className="text-foreground block truncate text-[14px]">
+          {tituloIntimacao(item)}
         </span>
-        <span className="min-w-0">
-          <span className="text-foreground block truncate text-[14px] font-medium">
-            {tituloIntimacao(item)}
+        <span className="mt-0.5 flex items-center gap-2">
+          <span className="text-muted-foreground truncate text-[11.5px] tabular-nums">
+            {item.cnj_number}
           </span>
-          <span className="mt-0.5 flex items-center gap-2">
-            <span className="text-muted-foreground truncate text-[12px] tabular-nums">
-              {item.cnj_number}
-            </span>
-            <StatusBadge
-              label={analisada ? "analisada" : "não analisada"}
-              tone={analisada ? "success" : "warning"}
-              dot={false}
-            />
+          <span
+            className={cn(
+              "shrink-0 rounded-full px-2 py-px text-[10.5px] whitespace-nowrap",
+              analisada ? "bg-primary/10 text-primary" : "bg-gold/15 text-gold",
+            )}
+          >
+            {analisada ? "analisada" : "não analisada"}
           </span>
         </span>
       </span>
 
-      {/* prazo + responsável (canto direito) */}
-      <span className="flex shrink-0 items-center gap-6">
-        <span
-          className={cn(
-            "text-right text-xs whitespace-nowrap tabular-nums",
-            info?.corClass ?? "text-muted-foreground",
-          )}
-        >
-          <span className="block">{rotuloPrazo(item.prazo)}</span>
-          {item.prazo?.end_date ? (
-            <span className="text-muted-foreground block text-[11px]">
-              {formatarData(item.prazo.end_date)}
-            </span>
-          ) : null}
-        </span>
+      {/* col 3 — prazo (cor = urgência) */}
+      <span className="text-[12px] tabular-nums" style={{ color: cor }}>
+        <span className="block">{rotuloPrazo(item.prazo)}</span>
+        {item.prazo?.end_date ? (
+          <span className="text-muted-foreground block text-[11px]">
+            {formatarData(item.prazo.end_date)}
+          </span>
+        ) : null}
+      </span>
 
+      {/* col 4 — responsável */}
+      <span className="flex min-w-0 items-center">
         <AtribuirResponsavel intimacao={item} />
       </span>
     </div>
@@ -729,7 +739,7 @@ function PainelDetalhe({ id }: { id: string }) {
       <p className="text-muted-foreground text-[10.5px] tracking-[0.12em] uppercase">
         {TYPE_LABEL[i.type] ?? i.type} · {i.court}
       </p>
-      <h2 className="font-display mt-2 text-[22px] leading-tight font-medium text-pretty">
+      <h2 className="font-display mt-2 text-[26px] leading-tight font-medium text-pretty">
         {tituloIntimacao(i)}
       </h2>
       <p className="text-muted-foreground mt-1 text-xs tabular-nums">
@@ -753,69 +763,33 @@ function PainelDetalhe({ id }: { id: string }) {
         ) : null}
       </div>
 
-      {/* ── R4: Tabela de metadados ── */}
+      {/* ── Ficha compacta: só Órgão, Partes e Valor. Classe/Assunto/Publicada já
+          aparecem no kicker/título e na lista; o resto vive na intimação aberta. ── */}
       <dl className="my-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
         <dt className="text-muted-foreground text-[12.5px]">Órgão</dt>
         <dd className="text-foreground truncate text-right text-[13px]">
           {i.judging_body || "—"}
         </dd>
 
-        <dt className="text-muted-foreground text-[12.5px]">Classe</dt>
+        <dt className="text-muted-foreground text-[12.5px]">Partes</dt>
         <dd className="text-foreground truncate text-right text-[13px]">
-          {i.class || "—"}
-        </dd>
-
-        <dt className="text-muted-foreground text-[12.5px]">Assunto</dt>
-        <dd className="text-foreground truncate text-right text-[13px]">
-          {i.subject || "—"}
-        </dd>
-
-        <dt className="text-muted-foreground text-[12.5px]">Autor</dt>
-        <dd className="text-foreground truncate text-right text-[13px]">
-          <span aria-label="não disponível">—</span>
-        </dd>
-
-        <dt className="text-muted-foreground text-[12.5px]">Réu</dt>
-        <dd className="text-foreground truncate text-right text-[13px]">
-          <span aria-label="não disponível">—</span>
+          {/* Autor × Réu numa linha — partes ainda não expostas no read model
+              (party table); placeholder honesto até o BE landar. */}
+          <span aria-label="autor e réu não disponíveis">— × —</span>
         </dd>
 
         <dt className="text-muted-foreground text-[12.5px]">Valor da causa</dt>
         <dd className="text-foreground truncate text-right text-[13px]">
           <span aria-label="não disponível">—</span>
         </dd>
-
-        <dt className="text-muted-foreground text-[12.5px]">Publicada</dt>
-        <dd className="text-foreground truncate text-right text-[13px]">
-          {formatarData(i.published_at)}
-        </dd>
-
-        <dt className="text-muted-foreground text-[12.5px]">Responsável</dt>
-        <dd className="flex items-center justify-end gap-1.5 truncate text-[13px]">
-          {i.conductor_user_name ? (
-            <>
-              <Avatar size="sm" initials={initials(i.conductor_user_name)} />
-              <span className="text-foreground truncate">
-                {i.conductor_user_name}
-              </span>
-            </>
-          ) : (
-            <span className="text-muted-foreground">A atribuir</span>
-          )}
-        </dd>
-
-        <dt className="text-muted-foreground text-[12.5px]">Estágio</dt>
-        <dd className="text-foreground truncate text-right text-[13px]">
-          <span aria-label="não disponível">—</span>
-        </dd>
       </dl>
 
-      {/* ── R5: TeorPublicacao — só quando content não estiver vazio ── */}
+      {/* ── Teor recolhível: "Ver teor da publicação ▸", expande sob demanda ── */}
       {i.content ? (
         <TeorPublicacao
           content={i.content}
           borderColor="gold"
-          collapsedHeight={180}
+          variant="disclosure"
         />
       ) : null}
 
@@ -875,7 +849,7 @@ function Esqueleto() {
       <div className="bg-muted h-9 w-64 animate-pulse rounded" />
       <div className="bg-muted mt-6 h-10 w-full animate-pulse rounded-lg" />
       <div className="bg-muted mt-4 h-9 w-full animate-pulse rounded-lg" />
-      <div className="mt-6 grid grid-cols-[3fr_2fr] gap-6">
+      <div className="mt-6 grid grid-cols-[minmax(420px,1fr)_minmax(340px,430px)] gap-6">
         <div className="bg-muted h-96 animate-pulse rounded-xl" />
         <div className="bg-muted h-96 animate-pulse rounded-xl" />
       </div>

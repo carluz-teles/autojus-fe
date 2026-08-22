@@ -10,16 +10,18 @@ import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar";
 
 // Item de navegação da sidebar (usado na nav principal E no rodapé). Fonte única
-// do estilo do link + indicador de latão da rota ativa. Com a sidebar recolhida
-// mostra só o ícone (com tooltip do label).
+// do estilo do link: fio de latão à esquerda (border-l) na rota ativa + contagem
+// opcional à direita. Com a sidebar recolhida mostra só o ícone (com tooltip).
 export function NavLink({
   href,
   label,
   icon: Icon,
+  count,
 }: {
   href: string;
   label: string;
   icon: LucideIcon;
+  count?: number;
 }) {
   const pathname = usePathname();
   const { collapsed } = useSidebar();
@@ -32,30 +34,28 @@ export function NavLink({
       aria-label={collapsed ? label : undefined}
       title={collapsed ? label : undefined}
       className={cn(
-        "group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-        collapsed && "justify-center px-0",
+        "flex items-center gap-3 rounded-lg border-l-2 px-3 py-2 text-[13.5px] font-medium transition-colors",
+        collapsed ? "justify-center px-0" : "justify-between",
         active
-          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-          : "text-sidebar-foreground/65 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+          ? "border-gold bg-sidebar-accent text-foreground"
+          : "text-muted-foreground/75 hover:bg-sidebar-accent hover:text-foreground border-transparent",
       )}
     >
-      {/* indicador de latão da rota ativa */}
-      <span
-        aria-hidden
-        className={cn(
-          "bg-gold absolute left-0 h-5 w-0.5 rounded-full transition-opacity",
-          active ? "opacity-100" : "opacity-0",
-        )}
-      />
-      <Icon
-        className={cn(
-          "size-4 shrink-0 transition-colors",
-          active
-            ? "text-sidebar-primary"
-            : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground/80",
-        )}
-      />
-      {collapsed ? null : label}
+      <span className="flex min-w-0 items-center gap-3">
+        <Icon
+          strokeWidth={1.8}
+          className={cn(
+            "size-4 shrink-0 transition-colors",
+            active ? "text-primary" : "text-muted-foreground/60",
+          )}
+        />
+        {collapsed ? null : label}
+      </span>
+      {!collapsed && count !== undefined ? (
+        <span className="text-muted-foreground text-[11px] tabular-nums">
+          {count}
+        </span>
+      ) : null}
     </Link>
   );
 

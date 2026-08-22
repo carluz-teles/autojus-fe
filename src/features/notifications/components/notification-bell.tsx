@@ -36,11 +36,11 @@ export function NotificationBell() {
     <Popover.Root>
       <Popover.Trigger
         aria-label="Notificações"
-        className="hover:bg-muted relative flex size-9 items-center justify-center rounded-full transition-colors"
+        className="text-muted-foreground hover:bg-muted relative grid size-9 place-items-center rounded-lg transition-colors"
       >
-        <Bell className="size-5" />
+        <Bell className="size-4.5" strokeWidth={1.8} />
         {count > 0 ? (
-          <span className="bg-destructive absolute -top-0.5 -right-0.5 flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold text-white tabular-nums">
+          <span className="bg-destructive absolute top-px right-px grid h-4 min-w-4 place-items-center rounded-full px-1 text-[9.5px] font-medium text-white tabular-nums">
             {count > 9 ? "9+" : count}
           </span>
         ) : null}

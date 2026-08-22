@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import {
   createContext,
   useContext,
@@ -9,6 +10,8 @@ import {
 } from "react";
 
 import { type Crumb, DetailBreadcrumb } from "@/components/ui/detail-layout";
+
+import { NAV_ITEMS } from "./nav-config";
 
 // Publica a trilha de breadcrumb das 4 telas de detalhe (Intimação/Peça/Tarefa/
 // Processo) pro header sticky do AppShell. Provider fino: guarda só o array
@@ -69,9 +72,45 @@ function useBreadcrumbValue(): Crumb[] | undefined {
   return useBreadcrumbContext().items;
 }
 
-/** Slot renderizado dentro do <header> do AppShell. */
+// Rótulos por segmento de rota — reusa os labels da nav (fonte única) + settings.
+const SEG_LABEL: Record<string, string> = {
+  ...Object.fromEntries(
+    NAV_ITEMS.map((n) => [n.href.replace(/^\//, ""), n.label]),
+  ),
+  settings: "Configurações",
+};
+
+/**
+ * Trilha derivada do pathname — sempre presente no header (inclusive nas listas),
+ * no padrão do design. As telas de DETALHE publicam uma trilha semântica via
+ * useSetBreadcrumb (título real em vez do id cru), que tem prioridade.
+ */
+function RouteBreadcrumb() {
+  const pathname = usePathname();
+  const segmentos = pathname.split("/").filter(Boolean);
+  // Só monta crumbs de segmentos CONHECIDOS (rotas de lista) e para no primeiro
+  // desconhecido — ids de detalhe (uuid/número) NUNCA viram crumb cru; a tela de
+  // detalhe publica a trilha semântica via useSetBreadcrumb (que tem prioridade).
+  const conhecidos: string[] = [];
+  for (const seg of segmentos) {
+    if (!SEG_LABEL[seg]) break;
+    conhecidos.push(seg);
+  }
+  if (conhecidos.length === 0) return null;
+  const items: Crumb[] = conhecidos.map((seg, i) => {
+    const isLast = i === conhecidos.length - 1;
+    return {
+      label: SEG_LABEL[seg],
+      href: isLast ? undefined : "/" + conhecidos.slice(0, i + 1).join("/"),
+    };
+  });
+  return <DetailBreadcrumb items={items} />;
+}
+
+/** Slot renderizado dentro do <header> do AppShell: trilha semântica das telas de
+ *  detalhe quando publicada; senão, a trilha derivada do pathname (listas). */
 export function BreadcrumbSlot() {
   const items = useBreadcrumbValue();
-  if (!items) return null;
-  return <DetailBreadcrumb items={items} />;
+  if (items) return <DetailBreadcrumb items={items} />;
+  return <RouteBreadcrumb />;
 }

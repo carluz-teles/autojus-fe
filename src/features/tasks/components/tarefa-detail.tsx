@@ -9,7 +9,7 @@ import { Avatar } from "@/components/mock-ui/data-display";
 import { DatePicker } from "@/components/mock-ui/date-picker";
 import { Input } from "@/components/mock-ui/input";
 import { Segmented } from "@/components/mock-ui/layout";
-import { Chip, StatusBadge } from "@/components/mock-ui/status-badge";
+import { Chip, StatusBadge, type Tom } from "@/components/mock-ui/status-badge";
 import {
   Select,
   SelectContent,
@@ -31,7 +31,21 @@ import type {
 } from "@/features/shared/types";
 import { formatarData, formatarDataHora } from "@/lib/utils";
 
-import { COR_PRIORIDADE, TOM_TAREFA } from "./tarefas-view";
+// Mapas de apresentação do detalhe mock (antes importados da view; a view foi
+// migrada pro BE real e não os expõe mais). Débito: migrar este detalhe também.
+const TOM_TAREFA: Record<TarefaStatus, Tom> = {
+  Aberta: "neutral",
+  "Em execução": "info",
+  Concluída: "success",
+  Atrasada: "danger",
+  Cancelada: "warning",
+};
+
+const COR_PRIORIDADE: Record<string, string> = {
+  Alta: "var(--destructive)",
+  Média: "var(--gold)",
+  Baixa: "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
+};
 
 const STATUS: TarefaStatus[] = [
   "Aberta",
