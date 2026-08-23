@@ -40,6 +40,7 @@ import {
 } from "@/features/shared/prazo";
 import { useTasksDaIntimacao } from "@/features/tasks/hooks/use-tasks-da-intimacao";
 import { formatBytes, formatClaimValueBRL, formatDate } from "@/lib/format";
+import { sanitizeContentHtml } from "@/lib/html/sanitize-content";
 import { cn } from "@/lib/utils";
 
 import { type PassoPeca, StepperPeca } from "./stepper-peca";
@@ -74,20 +75,12 @@ export function PecaTopBar({
   );
   useSetBreadcrumb(crumbs);
 
+  // Mini-header do peticionamento: apenas o link de voltar + stepper + slot de
+  // ações. O breadcrumb "Peticionamento › Processo {CNJ}" fica APENAS no header
+  // do AppShell (publicado via useSetBreadcrumb acima) — evita duplicação.
   return (
     <div className="border-border flex items-center gap-6 border-b px-8 py-4">
-      {cnj ? (
-        <p className="text-muted-foreground text-xs">
-          <span>Peticionamento</span>
-          <span className="mx-2 text-[10px]">›</span>
-          <Link
-            href={`/processos/${encodeURIComponent(cnj)}`}
-            className="text-foreground tabular-nums no-underline hover:no-underline"
-          >
-            Processo {cnj}
-          </Link>
-        </p>
-      ) : peca.intimation ? (
+      {peca.intimation ? (
         <Link
           href={`/intimacoes/${peca.intimation.id}`}
           className="text-muted-foreground text-xs no-underline hover:no-underline"
@@ -158,9 +151,14 @@ export function PecaContexto({ peca }: { peca: PecaDetail }) {
           </Link>
 
           <Rotulo className="mt-3.5">Teor da publicação</Rotulo>
-          <p className="border-border text-muted-foreground max-h-33 overflow-y-auto border-l-2 pl-2.5 text-[11.5px] leading-[1.6] whitespace-pre-wrap">
-            {intim.content}
-          </p>
+          <div
+            className="border-border text-muted-foreground max-h-33 overflow-y-auto border-l-2 pl-2.5 text-[11.5px] leading-[1.6] [&_p]:mb-1 [&_p]:last:mb-0"
+            // teor DJEN às vezes vem com HTML embutido (fragmentos <a>, ou até
+            // <html>...</html> colado no fim); sanitizeContentHtml normaliza.
+            dangerouslySetInnerHTML={{
+              __html: sanitizeContentHtml(intim.content),
+            }}
+          />
         </>
       )}
 
