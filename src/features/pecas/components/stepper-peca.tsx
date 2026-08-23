@@ -6,6 +6,10 @@ const PASSOS = ["Construção", "Assinatura", "Protocolo"] as const;
 
 export type PassoPeca = 1 | 2 | 3;
 
+// Stepper compartilhado entre a tela de partida (PecaPartida) e — hoje —
+// apenas ela: a Construção v2 (features/pecas-v2) traz seu próprio stepper
+// dedicado no ConstrucaoHeader. Mantido aqui porque PecaShell/PecaTopBar
+// ainda ancoram o passo 1 na partida.
 export function StepperPeca({
   atual,
   onIr,

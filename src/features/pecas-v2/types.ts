@@ -1,0 +1,165 @@
+// Tipos do domínio da tela de Construção (etapa 2).
+//
+// Nesta rodada tudo é mockado. Na rodada seguinte, cada função de service vai
+// virar chamada real ao BE (endpoints já existentes: /generate, /chat, /theses;
+// e novos: /iterate, /iterate-section, /quick-adjust, /refazer-section).
+// Os tipos a seguir são a fronteira estável — só o corpo dos services muda.
+
+export type SagaState =
+  "CREATED" | "EXTRACTING" | "DRAFTED" | "REVIEWED" | "FAILED";
+
+export type Status = "DRAFT" | "SIGNED" | "FILED" | "DISCARDED";
+
+/** Uma seção do rascunho, derivada do parser (heading romano). */
+export interface DraftSection {
+  /** id estável derivado do romano — usado como chave e no scope de iteração. */
+  id: string;
+  /** "I", "II", "III"… — o próprio marcador. */
+  roman: string;
+  /** Título curto pra chip ("Fatos", "Direito", "Pedidos"). */
+  shortTitle: string;
+  /** Título completo do heading ("Dos fatos", "Do direito", "Dos pedidos"). */
+  title: string;
+  /** Parágrafos da seção, em ordem. */
+  paragraphs: string[];
+}
+
+/** Bloco de preâmbulo (o endereçamento e a qualificação) antes da 1ª seção. */
+export interface DraftPreamble {
+  paragraphs: string[];
+}
+
+/** Wrapper do conteúdo estruturado — preâmbulo + seções. Espelha o shape que
+ *  o BE persiste em `draft.structured_content` (Peça v2, migration 0056). */
+export interface StructuredContent {
+  preamble: DraftPreamble;
+  sections: DraftSection[];
+}
+
+/** Contexto da intimação de origem — o que a coluna esquerda mostra em cima. */
+export interface DraftIntimation {
+  id: string;
+  title: string;
+  publishedAt: string;
+  teor: string;
+}
+
+/** Bloco Processo do sidebar de contexto. */
+export interface DraftProcess {
+  cnj: string;
+  classe: string;
+  assunto: string;
+  orgao: string;
+  tribunalGrau: string;
+  valor: string;
+  distribuicao: string;
+}
+
+export interface DraftParty {
+  role: "autor" | "reu" | "procurador";
+  name: string;
+  detail?: string;
+}
+
+export interface DraftProvidence {
+  code: string;
+  title: string;
+  origin: "sugerida" | "manual";
+}
+
+export interface DraftAttachment {
+  id: string;
+  name: string;
+  sizeLabel: string;
+}
+
+/** Prazo derivado da intimação. */
+export interface DraftDeadline {
+  /** DD/MM/AAAA. */
+  endDate: string;
+  /** Nº de dias corridos até vencer (0 = vence hoje, negativo = em atraso). */
+  daysLeft: number;
+}
+
+export type Authorship = "assistant" | "human_taken";
+
+/** Peça completa que a tela consome. */
+export interface Draft {
+  id: string;
+  pieceType: string;
+  /** Nome curto exibido no header do sidebar ("Defesa", "Petição"). */
+  title: string;
+  status: Status;
+  sagaState: SagaState;
+  authorship: Authorship;
+  updatedAt: string;
+  preamble: DraftPreamble;
+  sections: DraftSection[];
+  intimation: DraftIntimation;
+  process: DraftProcess;
+  parties: DraftParty[];
+  providences: DraftProvidence[];
+  attachments: DraftAttachment[];
+  deadline: DraftDeadline;
+  /** Total de teses usadas na geração (aparece no banner: "…e de 3 teses"). */
+  thesisCount: number;
+}
+
+// ── Iteração / ajustes rápidos ───────────────────────────────────────────────
+
+/** Escopo de uma iteração: "peça toda" ou o id de uma seção específica. */
+export type IterateScope = { kind: "whole" } | { kind: "section"; id: string };
+
+export type QuickAdjustKind =
+  "emphatic" | "concise" | "reinforce_thesis" | "add_grounds";
+
+/** Resultado de qualquer iteração (livre ou ajuste rápido, peça toda ou seção).
+ *  Cada mudança já vem com categoria/explicação/old+new paragraphs prontas
+ *  pra virar um card no painel Ajuste proposto (Peça v2 — POST /iterate no BE). */
+export interface IterationResult {
+  changes: PendingChange[];
+}
+
+/** Uma mudança pendente numa seção — vira 1 card no painel Ajuste proposto.
+ *  Cada card mostra categoria (badge âmbar), título da seção, explicação curta
+ *  do porquê da mudança e o diff em blocos (removido/adicionado). */
+export interface PendingChange {
+  sectionId: string;
+  sectionRoman: string;
+  sectionTitle: string;
+  /** Rótulo curto na badge — "CLAREZA", "CONCISÃO", "ÊNFASE", "FUNDAMENTAÇÃO",
+   *  "AJUSTE" (fallback para iteração livre). */
+  category: string;
+  /** Uma frase explicando o porquê da mudança. Vazio = omite. */
+  explanation: string;
+  oldParagraphs: string[];
+  newParagraphs: string[];
+}
+
+/** Estado do painel "Ajuste proposto" — 1..N cards pendentes derivados de uma
+ *  iteração (escopo "whole" gera N cards, escopo "section" gera 1). O painel
+ *  fecha automaticamente quando pending fica vazio. */
+export interface PreviewState {
+  scope: IterateScope;
+  scopeLabel: string;
+  pending: PendingChange[];
+  onAcceptOne: (sectionId: string) => void;
+  onDismissOne: (sectionId: string) => void;
+  onAcceptAll: () => void;
+  onDismissAll: () => void;
+}
+
+// ── Chat ─────────────────────────────────────────────────────────────────────
+
+export type ChatRole = "user" | "assistant";
+
+export interface ChatMessage {
+  id: string;
+  role: ChatRole;
+  content: string;
+  /** ISO-8601. */
+  createdAt: string;
+}
+
+export type QuickActionKind =
+  "summarize_case" | "suggest_theses" | "check_deadline" | "find_precedents";
