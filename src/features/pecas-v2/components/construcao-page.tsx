@@ -35,6 +35,7 @@ import type {
   QuickActionKind,
   QuickAdjustKind,
 } from "../types";
+import { useSendToSigning } from "../hooks/use-workflow";
 import { ConstrucaoHeader } from "./construcao-header";
 import { ContextoSidebar } from "./contexto-sidebar";
 import { EditorArea } from "./editor/editor-area";
@@ -54,6 +55,7 @@ export function ConstrucaoPage({ pecaId }: { pecaId: string }) {
   const assumirAutoria = useAssumirAutoria(pecaId);
   const refazerDoZeroMut = useRefazerDoZero(pecaId);
   const sendChat = useSendChatMessage(pecaId);
+  const sendToSigning = useSendToSigning(pecaId);
   const runAction = useRunQuickAction(pecaId);
 
   const [tab, setTab] = useState<PainelTab>("iterar");
@@ -286,7 +288,15 @@ export function ConstrucaoPage({ pecaId }: { pecaId: string }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ConstrucaoHeader step={1} enviarDisabled />
+      <ConstrucaoHeader
+        step={1}
+        enviarDisabled={sendToSigning.isPending}
+        onEnviar={() =>
+          sendToSigning.mutate(undefined, {
+            onError: () => toast.error("Não foi possível enviar para assinatura."),
+          })
+        }
+      />
       <div className="flex min-h-0 flex-1">
         <ContextoSidebar draft={draft} />
         <EditorArea

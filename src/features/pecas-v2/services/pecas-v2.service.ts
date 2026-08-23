@@ -245,6 +245,42 @@ export async function refazerDoZero(
   return { sagaState: "EXTRACTING" };
 }
 
+// ── Workflow steps (Fatia 2a) ───────────────────────────────────────────────
+
+/** "Enviar para assinatura" — marca sent_to_signing_at=now(). Idempotente. */
+export async function sendToSigning(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<void> {
+  await fetcher(`${ENDPOINT}/${id}/enviar-para-assinatura`, { method: "POST" });
+}
+
+/** Voltar pra Construção — nulla sent_to_signing_at. 404 se já assinado. */
+export async function revertToConstruction(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<void> {
+  await fetcher(`${ENDPOINT}/${id}/voltar-para-construcao`, { method: "POST" });
+}
+
+/** Assinar peça — marca status=SIGNED, signed_at=now(). Fatia 2a: assinatura
+ *  simbólica (só marca). Fatia 2b vai receber {certificate_id, password} + PDF. */
+export async function signPeca(fetcher: ApiFetcher, id: string): Promise<void> {
+  await fetcher(`${ENDPOINT}/${id}/sign`, { method: "POST" });
+}
+
+/** Marcar como protocolada — grava filed_at + filing_number opcional. */
+export async function filePeca(
+  fetcher: ApiFetcher,
+  id: string,
+  filingNumber: string,
+): Promise<void> {
+  await fetcher(`${ENDPOINT}/${id}/file`, {
+    method: "POST",
+    body: { filing_number: filingNumber },
+  });
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function mapScopeToApi(scope: IterateScope): {

@@ -35,6 +35,12 @@ export interface PecaDetailAPI {
   providences: ProvidenceAPI[];
   parties: PartyAPI[];
   review: ReviewAPI | null; // legacy — v2 UI não lê
+
+  // Workflow steps (Fatia 2a — 0060). ISO 8601 UTC ou null.
+  sent_to_signing_at: string | null;
+  signed_at: string | null;
+  filed_at: string | null;
+  filing_number: string;
 }
 
 // role é o enum bruto do BE — o mapper converte pra autor/reu/procurador

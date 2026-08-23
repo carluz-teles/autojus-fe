@@ -50,6 +50,10 @@ export function mapPecaDetailToDraft(api: PecaDetailAPI): Draft {
     attachments: (api.attachments ?? []).map(mapAttachment),
     deadline: mapDeadline(api.deadline),
     thesisCount: 3, // BE não devolve o count; fixture pré-Fatia B (documentar débito)
+    sentToSigningAt: api.sent_to_signing_at,
+    signedAt: api.signed_at,
+    filedAt: api.filed_at,
+    filingNumber: api.filing_number ?? "",
   };
 }
 

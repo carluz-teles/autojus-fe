@@ -103,6 +103,32 @@ export interface Draft {
   deadline: DraftDeadline;
   /** Total de teses usadas na geração (aparece no banner: "…e de 3 teses"). */
   thesisCount: number;
+
+  // ── Workflow steps (Fatia 2a — 0060) ──
+  /** ISO 8601 quando o usuário clicou "Enviar para assinatura"; null antes. */
+  sentToSigningAt: string | null;
+  /** ISO 8601 quando a peça foi assinada; null antes. */
+  signedAt: string | null;
+  /** ISO 8601 quando foi protocolada; null antes. */
+  filedAt: string | null;
+  /** Número/protocolo do tribunal (input manual v0). */
+  filingNumber: string;
+}
+
+/** Step atual do peticionamento — derivado dos timestamps. */
+export type WorkflowStep = "construcao" | "assinatura" | "protocolo" | "concluida";
+
+/** Deriva o step atual a partir dos 3 timestamps datados. Regra:
+ *  sentToSigningAt=null → Construção;
+ *  sentToSigningAt!=null && signedAt=null → Assinatura;
+ *  signedAt!=null && filedAt=null → Protocolo;
+ *  filedAt!=null → Concluída.
+ */
+export function deriveStep(d: Pick<Draft, "sentToSigningAt" | "signedAt" | "filedAt">): WorkflowStep {
+  if (d.filedAt) return "concluida";
+  if (d.signedAt) return "protocolo";
+  if (d.sentToSigningAt) return "assinatura";
+  return "construcao";
 }
 
 // ── Iteração / ajustes rápidos ───────────────────────────────────────────────
