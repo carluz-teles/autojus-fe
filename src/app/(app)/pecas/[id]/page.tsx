@@ -24,12 +24,21 @@ function PecaPageClient({ id }: { id: string }) {
   }
 
   const showPartida = !skipPartida && isPartidaState(peca);
+  const child = showPartida ? (
+    <PecaPartida id={id} onWorkspace={() => setSkipPartida(true)} />
+  ) : (
+    <PecaWorkspace id={id} />
+  );
 
-  if (showPartida) {
-    return <PecaPartida id={id} onWorkspace={() => setSkipPartida(true)} />;
-  }
-
-  return <PecaWorkspace id={id} />;
+  // Cancela o padding do <main> do AppShell (px-6 py-10). O fluxo de
+  // peticionamento tem shell própria (PecaTopBar + coluna Contexto) que
+  // precisa encostar no header e na sidebar principal — sem "moldura" em
+  // volta, como no mockup.
+  return (
+    <div className="-mx-6 -my-10 flex h-[calc(100dvh-4rem)] min-h-0 flex-col">
+      {child}
+    </div>
+  );
 }
 
 export default function PecaPage({
