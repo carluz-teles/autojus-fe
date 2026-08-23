@@ -24,6 +24,7 @@ import { formatClaimValueBRL, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import type { PecaTone, Thesis, ThesisConfidence } from "../types";
+import { PecaContexto, PecaTopBar } from "./peca-shell";
 
 // ── Constantes de tom ────────────────────────────────────────────────────────
 
@@ -308,11 +309,7 @@ export function PecaPartida({ id, onWorkspace }: PecaPartidaProps) {
   const instrId = useId();
   const instrErrorId = `${instrId}-error`;
 
-  if (gerando) {
-    return <GeneratingScreen pieceType={peca?.piece_type ?? "BLANK"} />;
-  }
-
-  // Dados de contexto da peça.
+  // Dados de contexto da peça (usados na aside "A IA vai usar").
   const proc = peca?.process ?? null;
   const intim = peca?.intimation ?? null;
   const prazo = peca?.deadline ?? null;
@@ -321,258 +318,283 @@ export function PecaPartida({ id, onWorkspace }: PecaPartidaProps) {
   const corPrazo = corDaUrgencia(urgenciaDe(dias));
   const tipoPecaLabel = rotuloTipoPeca(peca?.piece_type ?? "BLANK");
 
+  // Enquanto a peça carrega, renderiza loading simples (a shell precisa da
+  // peça pra montar TopBar + Contexto).
+  if (!peca) {
+    if (gerando) {
+      return <GeneratingScreen pieceType="BLANK" />;
+    }
+    return <div className="p-8">Carregando…</div>;
+  }
+
   return (
-    <div className="min-h-screen">
-      {/* Layout 2 colunas: principal + aside */}
-      <div className="mx-auto grid max-w-[960px] grid-cols-1 gap-8 px-6 py-10 lg:grid-cols-[minmax(560px,1fr)_330px]">
-        {/* ── Coluna principal ── */}
-        <main className="flex flex-col gap-8">
-          {/* 1. Cabeçalho */}
-          <div className="flex flex-col gap-1.5">
-            <p className="text-[10.5px] font-semibold tracking-[0.14em] text-[var(--gold)] uppercase">
-              Redigir com IA
-            </p>
-            <h1 className="font-display text-[28px] leading-tight font-medium">
-              Vamos redigir sua {tipoPecaLabel}
-            </h1>
-            <p className="text-muted-foreground text-[13.5px] leading-relaxed">
-              A IA parte da intimação e das providências desta tarefa. Oriente
-              como conduzir — você revisa e refaz o que quiser antes de assinar.
-            </p>
-          </div>
+    <div className="flex h-full min-h-0 min-w-[1230px] flex-col overflow-x-auto">
+      <PecaTopBar peca={peca} passo={1} />
 
-          {/* 2. Painel "A IA vai usar" */}
-          {(intim ?? proc ?? prazo) && (
-            <section className="border-border bg-muted/40 rounded-xl border px-5 py-4">
-              <p className="text-muted-foreground mb-3 text-[10.5px] font-semibold tracking-[0.12em] uppercase">
-                A IA vai usar
-              </p>
-              <ul className="flex flex-col gap-2">
-                {intim && (
-                  <li className="flex items-start gap-2 text-[13px]">
-                    <span
-                      className="mt-0.5 size-1.5 flex-none rounded-full bg-[var(--gold)]"
-                      aria-hidden="true"
-                    />
-                    <span>
-                      {TYPE_LABEL[intim.type as IntimacaoType] ?? intim.type}
-                    </span>
-                  </li>
-                )}
-                {prazo && (
-                  <li className="flex items-start gap-2 text-[13px]">
-                    <span
-                      className="mt-0.5 size-1.5 flex-none rounded-full bg-[var(--gold)]"
-                      aria-hidden="true"
-                    />
-                    <span>
-                      Prazo{" "}
-                      <span
-                        style={{ color: corPrazo }}
-                        className="tabular-nums"
-                      >
-                        {formatDate(termo)}
-                      </span>
-                      {" · "}
-                      {rotuloPrazo(dias)}
-                      {proc?.claim_value
-                        ? ` · valor ${formatClaimValueBRL(proc.claim_value)}`
-                        : ""}
-                    </span>
-                  </li>
-                )}
-                {proc && (
-                  <li className="flex items-start gap-2 text-[13px]">
-                    <span
-                      className="mt-0.5 size-1.5 flex-none rounded-full bg-[var(--gold)]"
-                      aria-hidden="true"
-                    />
-                    <span className="text-muted-foreground tabular-nums">
-                      {proc.cnj_number}
-                    </span>
-                  </li>
-                )}
-              </ul>
-            </section>
-          )}
+      {gerando ? (
+        <div className="grid min-h-0 flex-1 grid-cols-[300px_1fr]">
+          <PecaContexto peca={peca} />
+          <GeneratingScreen pieceType={peca.piece_type} />
+        </div>
+      ) : (
+        <div className="grid min-h-0 flex-1 grid-cols-[300px_minmax(560px,1fr)_330px]">
+          {/* Coluna esquerda: Contexto (mesma do workspace) */}
+          <PecaContexto peca={peca} />
 
-          {/* 3. Teses a sustentar */}
-          <section>
-            <div className="mb-1.5">
-              <p className="text-[15px] font-semibold">Teses a sustentar</p>
-              <p className="text-muted-foreground text-[13px]">
-                A IA sugeriu estas — escolha as que entram.
-              </p>
-            </div>
-
-            {thesesQuery.isPending ? (
-              <div className="text-muted-foreground mt-3 flex items-center gap-2 text-[13px]">
-                <Loader2 className="size-4 animate-spin" />
-                Sugerindo teses…
+          {/* Coluna do meio: formulário de partida */}
+          <section className="overflow-y-auto">
+            <div className="mx-auto flex max-w-[600px] flex-col gap-8 px-8 py-10">
+              {/* 1. Cabeçalho */}
+              <div className="flex flex-col gap-1.5">
+                <p className="text-[10.5px] font-semibold tracking-[0.14em] text-[var(--gold)] uppercase">
+                  Redigir com IA
+                </p>
+                <h1 className="font-display text-[28px] leading-tight font-medium">
+                  Vamos redigir sua {tipoPecaLabel}
+                </h1>
+                <p className="text-muted-foreground text-[13.5px] leading-relaxed">
+                  A IA parte da intimação e das providências desta tarefa.
+                  Oriente como conduzir — você revisa e refaz o que quiser antes
+                  de assinar.
+                </p>
               </div>
-            ) : theses.length === 0 ? (
-              <p className="border-border bg-muted/30 text-muted-foreground mt-3 rounded-lg border px-4 py-3 text-[13px]">
-                {thesesQuery.isError
-                  ? "Não foi possível sugerir teses agora. Continue sem selecionar ou tente novamente."
-                  : "Nenhuma tese sugerida para esta peça."}
-              </p>
-            ) : (
-              <div
-                className="mt-3 flex flex-col gap-2"
-                role="group"
-                aria-label="Teses a sustentar"
-              >
-                {theses.map((t, i) => (
-                  <ThesisCard
-                    key={i}
-                    thesis={t}
-                    selected={selecionadas.has(i)}
-                    onToggle={() => {
-                      setSelecionadas((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(i)) next.delete(i);
-                        else next.add(i);
-                        return next;
-                      });
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
 
-          {/* 4. Tom da peça */}
-          <section>
-            <p className="mb-3 text-[15px] font-semibold">Tom da peça</p>
-            <div role="radiogroup" aria-label="Tom da peça">
-              <Segmented<PecaTone>
-                valor={tom}
-                opcoes={TOM_OPCOES}
-                onChange={setTom}
-              />
-            </div>
-          </section>
+              {/* 2. Painel "A IA vai usar" */}
+              {(intim ?? proc ?? prazo) && (
+                <section className="border-border bg-muted/40 rounded-xl border px-5 py-4">
+                  <p className="text-muted-foreground mb-3 text-[10.5px] font-semibold tracking-[0.12em] uppercase">
+                    A IA vai usar
+                  </p>
+                  <ul className="flex flex-col gap-2">
+                    {intim && (
+                      <li className="flex items-start gap-2 text-[13px]">
+                        <span
+                          className="mt-0.5 size-1.5 flex-none rounded-full bg-[var(--gold)]"
+                          aria-hidden="true"
+                        />
+                        <span>
+                          {TYPE_LABEL[intim.type as IntimacaoType] ??
+                            intim.type}
+                        </span>
+                      </li>
+                    )}
+                    {prazo && (
+                      <li className="flex items-start gap-2 text-[13px]">
+                        <span
+                          className="mt-0.5 size-1.5 flex-none rounded-full bg-[var(--gold)]"
+                          aria-hidden="true"
+                        />
+                        <span>
+                          Prazo{" "}
+                          <span
+                            style={{ color: corPrazo }}
+                            className="tabular-nums"
+                          >
+                            {formatDate(termo)}
+                          </span>
+                          {" · "}
+                          {rotuloPrazo(dias)}
+                          {proc?.claim_value
+                            ? ` · valor ${formatClaimValueBRL(proc.claim_value)}`
+                            : ""}
+                        </span>
+                      </li>
+                    )}
+                    {proc && (
+                      <li className="flex items-start gap-2 text-[13px]">
+                        <span
+                          className="mt-0.5 size-1.5 flex-none rounded-full bg-[var(--gold)]"
+                          aria-hidden="true"
+                        />
+                        <span className="text-muted-foreground tabular-nums">
+                          {proc.cnj_number}
+                        </span>
+                      </li>
+                    )}
+                  </ul>
+                </section>
+              )}
 
-          {/* 5. Instruções à IA */}
-          <section>
-            <div className="mb-2 flex items-center gap-2">
-              <label htmlFor={instrId} className="text-[15px] font-semibold">
-                Instruções à IA
-              </label>
-              <span className="text-muted-foreground text-[12px]">
-                opcional
-              </span>
-            </div>
-            <Textarea
-              id={instrId}
-              value={instrucoes}
-              onChange={(e) => setInstrucoes(e.target.value)}
-              placeholder="Ex.: enfatize a ausência de contrato escrito e peça a extinção da execução."
-              className="min-h-[76px] resize-y text-[13.5px]"
-              aria-describedby={instrError ? instrErrorId : undefined}
-              aria-invalid={instrError ? true : undefined}
-            />
-            {instrError && (
-              <p
-                id={instrErrorId}
-                role="alert"
-                className="text-destructive mt-1.5 text-[12px]"
-              >
-                {instrError}
-              </p>
-            )}
-            <p className="text-muted-foreground mt-1 text-right text-[11.5px] tabular-nums">
-              {instrucoes.length}/{MAX_INSTRUCTIONS}
-            </p>
-          </section>
+              {/* 3. Teses a sustentar */}
+              <section>
+                <div className="mb-1.5">
+                  <p className="text-[15px] font-semibold">Teses a sustentar</p>
+                  <p className="text-muted-foreground text-[13px]">
+                    A IA sugeriu estas — escolha as que entram.
+                  </p>
+                </div>
 
-          {/* 6. CTAs */}
-          <div className="flex flex-col gap-3">
-            {gerarPeca.isError && (
-              <p role="alert" className="text-destructive text-[12.5px]">
-                Não foi possível iniciar a geração. Tente novamente.
-              </p>
-            )}
-            <Button
-              size="lg"
-              onClick={handleGerar}
-              disabled={gerarPeca.isPending || !!instrError}
-              className="w-full sm:w-auto"
-            >
-              <Sparkles className="mr-2 size-4" />
-              {gerarPeca.isPending ? "Iniciando…" : "Gerar minuta"}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onWorkspace}
-              className="text-muted-foreground w-fit self-start text-[13px]"
-            >
-              Prefiro começar em branco
-            </Button>
-          </div>
-        </main>
-
-        {/* ── Aside "Como funciona" ── */}
-        <aside className="hidden lg:block">
-          <div className="sticky top-8 flex flex-col gap-5">
-            <p className="text-muted-foreground text-[10.5px] font-semibold tracking-[0.12em] uppercase">
-              Como funciona
-            </p>
-
-            <ol className="flex flex-col gap-5">
-              {[
-                {
-                  n: 1,
-                  titulo: "IA lê o contexto",
-                  descricao:
-                    "Analisa a intimação, o teor da publicação e os prazos do processo.",
-                },
-                {
-                  n: 2,
-                  titulo: "Você orienta",
-                  descricao:
-                    "Escolha as teses, o tom e acrescente instruções específicas se quiser.",
-                },
-                {
-                  n: 3,
-                  titulo: "Minuta gerada",
-                  descricao:
-                    "A IA redige uma versão completa que você revisa livremente antes de assinar.",
-                },
-                {
-                  n: 4,
-                  titulo: "Revisão e assinatura",
-                  descricao:
-                    "Edite, peça sugestões e assine. A autoria é sempre sua.",
-                },
-              ].map((passo) => (
-                <li key={passo.n} className="flex items-start gap-3">
-                  <span className="flex size-6 flex-none items-center justify-center rounded-full bg-[var(--gold)]/15 text-[11px] font-bold text-[var(--gold-foreground)]">
-                    {passo.n}
-                  </span>
-                  <div>
-                    <p className="text-[13.5px] font-semibold">
-                      {passo.titulo}
-                    </p>
-                    <p className="text-muted-foreground mt-0.5 text-[12.5px] leading-relaxed">
-                      {passo.descricao}
-                    </p>
+                {thesesQuery.isPending ? (
+                  <div className="text-muted-foreground mt-3 flex items-center gap-2 text-[13px]">
+                    <Loader2 className="size-4 animate-spin" />
+                    Sugerindo teses…
                   </div>
-                </li>
-              ))}
-            </ol>
+                ) : theses.length === 0 ? (
+                  <p className="border-border bg-muted/30 text-muted-foreground mt-3 rounded-lg border px-4 py-3 text-[13px]">
+                    {thesesQuery.isError
+                      ? "Não foi possível sugerir teses agora. Continue sem selecionar ou tente novamente."
+                      : "Nenhuma tese sugerida para esta peça."}
+                  </p>
+                ) : (
+                  <div
+                    className="mt-3 flex flex-col gap-2"
+                    role="group"
+                    aria-label="Teses a sustentar"
+                  >
+                    {theses.map((t) => (
+                      <ThesisCard
+                        key={t.label}
+                        thesis={t}
+                        selected={selecionadas.has(theses.indexOf(t))}
+                        onToggle={() => {
+                          const i = theses.indexOf(t);
+                          setSelecionadas((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(i)) next.delete(i);
+                            else next.add(i);
+                            return next;
+                          });
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
 
-            {/* Card de aviso */}
-            <div className="border-border bg-muted/50 rounded-xl border px-4 py-4">
-              <p className="text-muted-foreground text-[12.5px] leading-relaxed">
-                Nenhuma peça é protocolada sem revisão humana. A IA redige e
-                sugere; a assinatura e a autoria são sempre suas.
-              </p>
+              {/* 4. Tom da peça */}
+              <section>
+                <p className="mb-3 text-[15px] font-semibold">Tom da peça</p>
+                <div role="radiogroup" aria-label="Tom da peça">
+                  <Segmented<PecaTone>
+                    valor={tom}
+                    opcoes={TOM_OPCOES}
+                    onChange={setTom}
+                  />
+                </div>
+              </section>
+
+              {/* 5. Instruções à IA */}
+              <section>
+                <div className="mb-2 flex items-center gap-2">
+                  <label
+                    htmlFor={instrId}
+                    className="text-[15px] font-semibold"
+                  >
+                    Instruções à IA
+                  </label>
+                  <span className="text-muted-foreground text-[12px]">
+                    opcional
+                  </span>
+                </div>
+                <Textarea
+                  id={instrId}
+                  value={instrucoes}
+                  onChange={(e) => setInstrucoes(e.target.value)}
+                  placeholder="Ex.: enfatize a ausência de contrato escrito e peça a extinção da execução."
+                  className="min-h-[76px] resize-y text-[13.5px]"
+                  aria-describedby={instrError ? instrErrorId : undefined}
+                  aria-invalid={instrError ? true : undefined}
+                />
+                {instrError && (
+                  <p
+                    id={instrErrorId}
+                    role="alert"
+                    className="text-destructive mt-1.5 text-[12px]"
+                  >
+                    {instrError}
+                  </p>
+                )}
+                <p className="text-muted-foreground mt-1 text-right text-[11.5px] tabular-nums">
+                  {instrucoes.length}/{MAX_INSTRUCTIONS}
+                </p>
+              </section>
+
+              {/* 6. CTAs (fiéis ao mockup: lado a lado) */}
+              <div className="flex flex-col gap-2">
+                {gerarPeca.isError && (
+                  <p role="alert" className="text-destructive text-[12.5px]">
+                    Não foi possível iniciar a geração. Tente novamente.
+                  </p>
+                )}
+                <div className="flex items-center gap-4">
+                  <Button
+                    size="lg"
+                    onClick={handleGerar}
+                    disabled={gerarPeca.isPending || !!instrError}
+                  >
+                    <Sparkles className="mr-2 size-4" />
+                    {gerarPeca.isPending ? "Iniciando…" : "Gerar minuta"}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={onWorkspace}
+                    className="text-muted-foreground hover:text-foreground text-[13px] transition-colors"
+                  >
+                    Prefiro começar em branco
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </aside>
-      </div>
+          </section>
+
+          {/* Coluna direita: Como funciona */}
+          <aside className="border-border overflow-y-auto border-l px-6 py-8">
+            <div className="flex flex-col gap-5">
+              <p className="text-muted-foreground text-[10.5px] font-semibold tracking-[0.12em] uppercase">
+                Como funciona
+              </p>
+
+              <ol className="flex flex-col gap-5">
+                {[
+                  {
+                    n: 1,
+                    titulo: "Você orienta",
+                    descricao: "Escolhe as teses, o tom e escreve instruções.",
+                  },
+                  {
+                    n: 2,
+                    titulo: "A IA redige",
+                    descricao:
+                      "Uma primeira minuta a partir da intimação e das providências.",
+                  },
+                  {
+                    n: 3,
+                    titulo: "Você itera",
+                    descricao:
+                      "Refaz trechos, troca o tom ou reforça uma tese — quantas vezes precisar.",
+                  },
+                  {
+                    n: 4,
+                    titulo: "Assina e protocola",
+                    descricao: "Com a peça revisada e assumida por você.",
+                  },
+                ].map((passo) => (
+                  <li key={passo.n} className="flex items-start gap-3">
+                    <span className="border-border text-muted-foreground flex size-6 flex-none items-center justify-center rounded-full border text-[11px] tabular-nums">
+                      {passo.n}
+                    </span>
+                    <div>
+                      <p className="text-[13.5px] font-semibold">
+                        {passo.titulo}
+                      </p>
+                      <p className="text-muted-foreground mt-0.5 text-[12.5px] leading-relaxed">
+                        {passo.descricao}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+
+              <div className="border-border bg-muted/40 rounded-xl border px-4 py-4">
+                <p className="text-muted-foreground text-[12.5px] leading-relaxed">
+                  Nenhuma peça é protocolada sem revisão humana. A IA redige e
+                  sugere; a assinatura e a autoria são sempre suas.
+                </p>
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 }
