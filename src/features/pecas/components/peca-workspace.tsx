@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TYPE_LABEL } from "@/features/intimacoes/lib/labels";
+import type { IntimacaoType } from "@/features/intimacoes/types";
 import {
   useExportPeca,
   useFilePeca,
@@ -26,6 +28,7 @@ import {
   useUploadAttachment,
   validateAttachmentSize,
 } from "@/features/pecas/hooks/use-peca";
+import { rotuloTipoPeca } from "@/features/pecas/lib/labels";
 import {
   ATTACHMENT_CATEGORIES,
   type AttachmentCategory,
@@ -43,20 +46,6 @@ import { cn } from "@/lib/utils";
 import { AssistentePanel } from "./assistente-panel";
 import { EditorToolbar } from "./editor-toolbar";
 import { type PassoPeca, StepperPeca } from "./stepper-peca";
-
-// Rótulo legível do tipo de peça (piece_type do BE) para o cabeçalho do Contexto.
-const TIPO_PECA_LABEL: Record<string, string> = {
-  DEFENSE: "Defesa",
-  APPEAL: "Recurso",
-  PETITION: "Petição",
-  MANIFESTATION: "Manifestação",
-  COUNTERCLAIM: "Reconvenção",
-  BLANK: "Peça",
-};
-
-function rotuloTipoPeca(pieceType: string): string {
-  return TIPO_PECA_LABEL[pieceType] ?? "Peça";
-}
 
 // "salvo há …" — tempo relativo curto em pt-BR, recalculado a cada minuto.
 function tempoRelativo(from: Date | null): string {
@@ -330,7 +319,7 @@ export function PecaWorkspace({ id }: { id: string }) {
                   className="block no-underline hover:no-underline"
                 >
                   <span className="text-primary inline-flex items-center gap-1.5 text-[13px] font-medium">
-                    {intim.type}
+                    {TYPE_LABEL[intim.type as IntimacaoType] ?? intim.type}
                     <ArrowUpRight className="size-2.5" strokeWidth={2.4} />
                   </span>
                   <span className="text-muted-foreground mt-0.5 block text-[11.5px]">

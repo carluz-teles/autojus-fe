@@ -6,11 +6,14 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Segmented } from "@/components/mock-ui/layout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { TYPE_LABEL } from "@/features/intimacoes/lib/labels";
+import type { IntimacaoType } from "@/features/intimacoes/types";
 import {
   useGerarPeca,
   usePeca,
   useTheses,
 } from "@/features/pecas/hooks/use-peca";
+import { rotuloTipoPeca } from "@/features/pecas/lib/labels";
 import {
   corDaUrgencia,
   diasRestantes,
@@ -33,20 +36,6 @@ const TOM_OPCOES: { valor: PecaTone; label: string }[] = [
 const MAX_INSTRUCTIONS = 2000;
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 60_000;
-
-// Rótulo legível do tipo de peça.
-const TIPO_PECA_LABEL: Record<string, string> = {
-  DEFENSE: "Defesa",
-  APPEAL: "Recurso",
-  PETITION: "Petição",
-  MANIFESTATION: "Manifestação",
-  COUNTERCLAIM: "Reconvenção",
-  BLANK: "Peça",
-};
-
-function rotuloTipoPeca(pieceType: string): string {
-  return TIPO_PECA_LABEL[pieceType] ?? "Peça";
-}
 
 // ── Badge de confiança ────────────────────────────────────────────────────────
 
@@ -365,7 +354,9 @@ export function PecaPartida({ id, onWorkspace }: PecaPartidaProps) {
                       className="mt-0.5 size-1.5 flex-none rounded-full bg-[var(--gold)]"
                       aria-hidden="true"
                     />
-                    <span>{intim.type}</span>
+                    <span>
+                      {TYPE_LABEL[intim.type as IntimacaoType] ?? intim.type}
+                    </span>
                   </li>
                 )}
                 {prazo && (
