@@ -13,11 +13,13 @@ import { type Facet, FacetedFilter } from "@/components/ui/faceted-filter";
 import { ListSearchToolbar } from "@/components/ui/list-search-toolbar";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+
+import { PartesInline } from "./shared/partes-inline";
 import { cn, formatarData } from "@/lib/utils";
 
 import {
   type IntimacoesFilters,
-  useBulkAssignResponsaveis,
+  useBulkAssignResponsavel,
   useIntimacaoDetalhe,
   useIntimacoes,
 } from "../hooks/use-intimacoes";
@@ -233,11 +235,11 @@ export function IntimacoesView() {
     });
   };
 
-  const bulkAssign = useBulkAssignResponsaveis();
-  const atribuirEmMassa = (conductorUserId: string) => {
+  const bulkAssign = useBulkAssignResponsavel();
+  const atribuirEmMassa = (assigneeUserId: string) => {
     bulkAssign.mutate(
       {
-        conductorUserId,
+        assigneeUserId,
         all: todosDaFaixa,
         ids: todosDaFaixa ? [] : [...marcadas],
         // filtros da faixa atual (usados só no modo ALL).
@@ -773,9 +775,9 @@ function PainelDetalhe({ id }: { id: string }) {
 
         <dt className="text-muted-foreground text-[12.5px]">Partes</dt>
         <dd className="text-foreground truncate text-right text-[13px]">
-          {/* Autor × Réu numa linha — partes ainda não expostas no read model
-              (party table); placeholder honesto até o BE landar. */}
-          <span aria-label="autor e réu não disponíveis">— × —</span>
+          {/* Autor × Réu numa linha — reusa o read model /processos/:id/partes
+              já exposto pelo slice acquisition (mesma fonte do cockpit). */}
+          <PartesInline courtRecordId={i.court_record_id} />
         </dd>
 
         <dt className="text-muted-foreground text-[12.5px]">Valor da causa</dt>

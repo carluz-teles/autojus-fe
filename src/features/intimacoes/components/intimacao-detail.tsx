@@ -21,10 +21,11 @@ import {
 } from "@/features/pecas/hooks/use-peca";
 import type { PecaListItem } from "@/features/pecas/types";
 import { ConfirmarPrazo } from "@/features/prazos/components/confirmar-prazo";
+import { usePartes } from "@/features/processos/hooks/use-processos";
 import { cn, formatarData } from "@/lib/utils";
 
 import {
-  useAssignIntimacaoResponsaveis,
+  useAssignIntimacaoResponsavel,
   useIntimacaoDetalhe,
 } from "../hooks/use-intimacoes";
 import { tituloIntimacao } from "../lib/titulo";
@@ -73,16 +74,17 @@ export function IntimacaoDetail({ id }: { id: string }) {
 
   return (
     <div className="px-8 pt-4 pb-16">
-      {/* ── Header ── */}
-      <header className="flex flex-wrap items-start justify-between gap-6">
-        <div className="min-w-0">
-          <p className="text-muted-foreground text-[10.5px] font-medium tracking-[0.14em] uppercase">
-            Intimação · {i.court}
-          </p>
-          <h1 className="font-display text-foreground mt-2 text-[32px] leading-[1.1] font-normal text-pretty">
+      {/* ── Header — eyebrow + título ─── ações inline à direita ── */}
+      <p className="text-muted-foreground text-[10.5px] font-medium tracking-[0.14em] uppercase">
+        Intimação · {i.judging_body || i.court}
+      </p>
+      <header className="mt-2 flex items-start justify-between gap-6">
+        <div className="min-w-0 flex-1">
+          <h1 className="font-display text-foreground text-[32px] leading-[1.1] font-normal text-pretty">
             {tituloIntimacao(i)}
           </h1>
           <p className="text-muted-foreground mt-2.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12.5px]">
+            {i.class ? <span>{i.class} ·</span> : null}
             <span>publicado em {formatarData(i.published_at)} ·</span>
             <Link
               href={`/processos/${encodeURIComponent(i.court_record_id)}`}
@@ -94,7 +96,7 @@ export function IntimacaoDetail({ id }: { id: string }) {
           </p>
         </div>
 
-        {/* Ações de peticionamento */}
+        {/* Ações de peticionamento — inline com o título */}
         <div className="flex shrink-0 items-center gap-2.5">
           <Button variant="outline" onClick={emBreve}>
             Sem providência
@@ -150,7 +152,8 @@ export function IntimacaoDetail({ id }: { id: string }) {
 
         {/* Coluna lateral */}
         <aside className="flex min-w-0 flex-col gap-4">
-          <ResponsaveisCard intimacao={i} />
+          <ResponsavelCard intimacao={i} />
+          <PartesCard intimacao={i} />
           <HistoricoCard intimacao={i} />
         </aside>
       </div>
@@ -407,105 +410,69 @@ function StatusBadgePeca({ status }: { status: string }) {
   );
 }
 
-// ─── 6c. Responsáveis (aside) — REAL ─────────────────────────────────────────
+// ─── 6c. Responsável (aside) — REAL, papel único (0057) ─────────────────────
 
-/**
- * Picker de membro do escritório para um papel (condutor / revisor).
- * Reutiliza useOrgMembersDirectory (mesma fonte que o seletor de processo).
- * value="__none__" representa "A atribuir" (nenhuma seleção).
- */
-function RolePicker({
-  role,
-  currentUserId,
-  currentUserName,
-  onAssign,
-  isPending,
+function ResponsavelCard({
+  intimacao: i,
 }: {
-  role: string;
-  currentUserId: string | null;
-  currentUserName: string | null;
-  onAssign: (userId: string | null) => void;
-  isPending: boolean;
+  intimacao: IntimacaoDetalheView;
 }) {
   const { members } = useOrgMembersDirectory();
-  const value = currentUserId ?? "__none__";
-  // items mapeia value→label pro <SelectValue/> do base-ui renderizar o rótulo
-  // (senão o trigger mostra o valor cru, ex. "__none__").
+  const assign = useAssignIntimacaoResponsavel(i.id);
+
+  const value = i.assignee_user_id ?? "__none__";
+  const currentName = i.assignee_user_name?.trim() || "";
+  // items resolve value→label pro SelectValue (base-ui exige quando o value
+  // sozinho não corresponde ao texto visível — ex.: "__none__" → "A atribuir").
   const items = {
     __none__: "A atribuir",
     ...Object.fromEntries(members.map((m) => [m.id, m.name])),
   };
 
-  return (
-    <li className="flex items-center gap-3">
-      <Avatar initials={currentUserName ? initials(currentUserName) : "?"} />
-      <div className="min-w-0 flex-1">
-        <Select
-          value={value}
-          items={items}
-          onValueChange={(v) => onAssign(v === "__none__" ? null : v)}
-          disabled={isPending}
-        >
-          <SelectTrigger
-            size="sm"
-            className="text-foreground h-auto w-full justify-start border-none bg-transparent px-0 py-0 text-[13.5px] font-medium shadow-none focus-visible:ring-0"
-          >
-            <SelectValue placeholder="A atribuir" />
-          </SelectTrigger>
-          <SelectContent align="start">
-            <SelectItem value="__none__">A atribuir</SelectItem>
-            {members.map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                {m.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-muted-foreground text-[12px]">{role}</p>
-      </div>
-    </li>
-  );
-}
-
-function ResponsaveisCard({
-  intimacao: i,
-}: {
-  intimacao: IntimacaoDetalheView;
-}) {
-  const assign = useAssignIntimacaoResponsaveis(i.id);
-
-  const handleAssign = (
-    role: "conductor" | "reviewer",
-    userId: string | null,
-  ) => {
-    const params =
-      role === "conductor"
-        ? { conductorUserId: userId, reviewerUserId: i.reviewer_user_id }
-        : { conductorUserId: i.conductor_user_id, reviewerUserId: userId };
-    assign.mutate(params, {
-      onError: () => toast.error("Não foi possível salvar o responsável."),
-    });
+  const onChange = (v: string | null) => {
+    assign.mutate(
+      { assigneeUserId: v && v !== "__none__" ? v : null },
+      {
+        onError: () => toast.error("Não foi possível salvar o responsável."),
+      },
+    );
   };
 
   return (
     <div className="border-border rounded-xl border p-4">
-      <EyebrowTitle>Responsáveis</EyebrowTitle>
-      <ul className="mt-3 flex flex-col gap-3">
-        <RolePicker
-          role="condutor do prazo"
-          currentUserId={i.conductor_user_id}
-          currentUserName={i.conductor_user_name}
-          onAssign={(uid) => handleAssign("conductor", uid)}
-          isPending={assign.isPending}
-        />
-        <RolePicker
-          role="revisão e assinatura"
-          currentUserId={i.reviewer_user_id}
-          currentUserName={i.reviewer_user_name}
-          onAssign={(uid) => handleAssign("reviewer", uid)}
-          isPending={assign.isPending}
-        />
-      </ul>
+      <EyebrowTitle>Responsável</EyebrowTitle>
+      <div className="mt-3 flex items-center gap-3">
+        <Avatar initials={currentName ? initials(currentName) : "?"} />
+        <div className="min-w-0 flex-1">
+          <Select
+            value={value}
+            items={items}
+            onValueChange={onChange}
+            disabled={assign.isPending}
+          >
+            <SelectTrigger
+              size="sm"
+              className="text-foreground h-auto w-full justify-start border-none bg-transparent px-0 py-0 text-[13.5px] font-medium shadow-none focus-visible:ring-0"
+            >
+              <SelectValue placeholder="A atribuir" />
+            </SelectTrigger>
+            <SelectContent align="start">
+              <SelectItem value="__none__">A atribuir</SelectItem>
+              {members.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {/* Subtítulo descritivo do papel (design). Fica sempre "condutor
+              do prazo" — a distinção conductor vs reviewer foi removida na
+              migration 0057, mas o rótulo humano é útil pra o advogado. */}
+          <p className="text-muted-foreground mt-0.5 text-[12px]">
+            condutor do prazo
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -550,6 +517,122 @@ function formatarDataCurta(iso: string): string {
   const dd = String(d.getUTCDate()).padStart(2, "0");
   const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
   return `${dd}/${mm}`;
+}
+
+// ─── 6d. Partes (aside) — REAL, autor/réu/procuradores ──────────────────────
+
+// Labels processuais: dependem da classe do processo (cumprimento → EXEQUENTE/
+// EXECUTADO; trabalhista → RECLAMANTE/RECLAMADO; comum/desconhecido → AUTOR/RÉU).
+// Fallback conservador (AUTOR/RÉU) sempre que a classe não bater com um pattern
+// conhecido — mais correto errar pelo genérico do que inventar rótulo específico.
+function labelsPolo(classe: string): { autor: string; reu: string } {
+  const c = (classe || "").toLowerCase();
+  if (c.includes("execu") || c.includes("cumprimento")) {
+    return { autor: "EXEQUENTE", reu: "EXECUTADO" };
+  }
+  if (c.includes("trabalh") || c.includes("reclama")) {
+    return { autor: "RECLAMANTE", reu: "RECLAMADO" };
+  }
+  if (c.includes("mandado de seguran")) {
+    return { autor: "IMPETRANTE", reu: "IMPETRADO" };
+  }
+  return { autor: "AUTOR", reu: "RÉU" };
+}
+
+function PartesCard({ intimacao: i }: { intimacao: IntimacaoDetalheView }) {
+  const { data, isPending } = usePartes(i.court_record_id);
+  const labels = labelsPolo(i.class);
+
+  if (isPending) {
+    return (
+      <div className="border-border rounded-xl border p-4">
+        <EyebrowTitle>Partes</EyebrowTitle>
+        <div className="bg-muted mt-3 h-16 animate-pulse rounded" />
+      </div>
+    );
+  }
+
+  const autor = data?.autor[0];
+  const reu = data?.reu[0];
+  // Procuradores agregados de todos os polos (autor + réu + terceiros).
+  const procuradores = [
+    ...(data?.autor ?? []),
+    ...(data?.reu ?? []),
+    ...(data?.terceiros ?? []),
+  ].flatMap((p) => p.counsels ?? []);
+
+  // "cliente do escritório": detecta qual polo o escritório defende cruzando
+  // a OAB de cada procurador com os recipients matched da intimação (OABs
+  // monitoradas pelo escritório). O polo cujo procurador está na lista
+  // matched é o do cliente. Vazio quando não conseguirmos inferir.
+  const ourOabs = new Set(
+    (i.recipients ?? [])
+      .filter((r) => r.matched)
+      .map((r) => `${r.oab_number}/${r.oab_uf}`),
+  );
+  const oabsPolo = (parts: NonNullable<typeof data>["autor"] | undefined) =>
+    (parts ?? []).flatMap((p) =>
+      (p.counsels ?? []).map((c) => `${c.oab}/${c.uf}`),
+    );
+  const autorIsClient = oabsPolo(data?.autor).some((o) => ourOabs.has(o));
+  const reuIsClient =
+    !autorIsClient && oabsPolo(data?.reu).some((o) => ourOabs.has(o));
+
+  return (
+    <div className="border-border flex flex-col gap-4 rounded-xl border p-4">
+      <EyebrowTitle>Partes</EyebrowTitle>
+
+      <div>
+        <p className="text-muted-foreground text-[10.5px] font-medium tracking-[0.12em] uppercase">
+          {labels.autor}
+        </p>
+        <p className="text-foreground mt-0.5 text-[13.5px]">
+          {autor?.name || "Sem partes identificadas ainda."}
+        </p>
+        {autorIsClient ? (
+          <p className="text-muted-foreground mt-0.5 text-[12px]">
+            cliente do escritório
+          </p>
+        ) : null}
+      </div>
+
+      <div>
+        <p className="text-muted-foreground text-[10.5px] font-medium tracking-[0.12em] uppercase">
+          {labels.reu}
+        </p>
+        <p className="text-foreground mt-0.5 text-[13.5px]">
+          {reu?.name || "Sem partes identificadas ainda."}
+        </p>
+        {reuIsClient ? (
+          <p className="text-muted-foreground mt-0.5 text-[12px]">
+            cliente do escritório
+          </p>
+        ) : null}
+      </div>
+
+      {procuradores.length > 0 ? (
+        <div>
+          <p className="text-muted-foreground text-[10.5px] font-medium tracking-[0.12em] uppercase">
+            Procuradores
+          </p>
+          <ul className="mt-0.5 flex flex-col gap-0.5 text-[13.5px]">
+            {procuradores.map((c, idx) => (
+              <li key={`${c.oab}-${c.uf}-${idx}`}>
+                {c.name}
+                {c.oab ? (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · OAB {c.oab}
+                    {c.uf ? `/${c.uf}` : ""}
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 // ─── skeleton ─────────────────────────────────────────────────────────────────

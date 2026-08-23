@@ -16,10 +16,10 @@ import { useDebounce } from "@/lib/hooks/use-debounce";
 import {
   analisarIntimacao,
   aprovarProvidencia,
-  assignIntimacaoResponsaveis,
-  type AssignResponsaveisParams,
+  assignIntimacaoResponsavel,
+  type AssignResponsavelParams,
   type BulkAssignParams,
-  bulkAssignResponsaveis,
+  bulkAssignResponsavel,
   descartarProvidencia,
   getIntimacao,
   getIntimacoesSummary,
@@ -278,15 +278,15 @@ export function useDescartarProvidencia(intimacaoId: string) {
 }
 
 /**
- * Atribui/desatribui condutor e revisor — PUT /v1/intimacoes/:id/responsaveis.
+ * Atribui/desatribui o responsável único (0057) — PUT /v1/intimacoes/:id/responsavel.
  * Atualiza o cache do detalhe com o IntimacaoDetalheView fresco do BE.
  */
-export function useAssignIntimacaoResponsaveis(intimacaoId: string) {
+export function useAssignIntimacaoResponsavel(intimacaoId: string) {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (params: AssignResponsaveisParams) =>
-      assignIntimacaoResponsaveis(fetcher, intimacaoId, params),
+    mutationFn: (params: AssignResponsavelParams) =>
+      assignIntimacaoResponsavel(fetcher, intimacaoId, params),
     onSuccess: (detalhe) => {
       qc.setQueryData(intimacoesKeys.detail(intimacaoId), detalhe);
     },
@@ -294,15 +294,15 @@ export function useAssignIntimacaoResponsaveis(intimacaoId: string) {
 }
 
 /**
- * Atribuição em massa do condutor — POST /v1/intimacoes/bulk/responsaveis. Invalida
+ * Atribuição em massa do responsável — POST /v1/intimacoes/bulk/responsavel. Invalida
  * a lista (e o detalhe, caso a intimação aberta tenha sido afetada) pra reidratar.
  */
-export function useBulkAssignResponsaveis() {
+export function useBulkAssignResponsavel() {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (params: BulkAssignParams) =>
-      bulkAssignResponsaveis(fetcher, params),
+      bulkAssignResponsavel(fetcher, params),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: intimacoesKeys.lists() });
       qc.invalidateQueries({ queryKey: intimacoesKeys.all });

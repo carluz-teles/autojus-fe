@@ -228,6 +228,33 @@
     font-family: var(--font-display), Georgia, "Times New Roman", serif;
     font-optical-sizing: auto;
   }
+
+  /* Editor de peça (pecas-v2): parágrafos com espaçamento generoso e leitura confortável.
+     Aplica a áreas contentEditable e aos blocos de preview inline. */
+  .prose-editor {
+    font-size: var(--text-base);
+    line-height: 1.7;
+    color: var(--foreground);
+  }
+  .prose-editor p {
+    margin-bottom: 0.9em;
+  }
+  .prose-editor p:last-child {
+    margin-bottom: 0;
+  }
+  .prose-editor .diff-ins {
+    background: color-mix(in oklch, var(--success) 18%, transparent);
+    color: color-mix(in oklch, var(--success) 65%, var(--foreground));
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+  .prose-editor .diff-del {
+    background: color-mix(in oklch, var(--destructive) 15%, transparent);
+    color: color-mix(in oklch, var(--destructive) 55%, var(--foreground));
+    text-decoration: line-through;
+    padding: 0 2px;
+    border-radius: 2px;
+  }
 }
 
 /* Reveal escalonado no load — alto impacto, sutil. Desligado em reduced-motion. */

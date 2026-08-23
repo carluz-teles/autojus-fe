@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 import {
   intimacoesKeys,
-  useAssignIntimacaoResponsaveis,
+  useAssignIntimacaoResponsavel,
 } from "../../hooks/use-intimacoes";
 import type { IntimacaoView } from "../../types";
 import { Avatar, initials } from "./avatar";
@@ -32,10 +32,9 @@ export function nomeExibicao(
   return e ? e.split("@")[0] : "";
 }
 
-/** Atribui o condutor do prazo direto da linha da lista. O trigger é o avatar do
- *  condutor (ou um círculo tracejado quando não atribuído); o menu lista os
- *  membros do escritório. Preserva o revisor (PUT /responsaveis substitui os dois
- *  papéis) e invalida a lista pra a linha reidratar. */
+/** Atribui o responsável da intimação direto da linha da lista. O trigger é o
+ *  avatar do responsável (ou um círculo tracejado quando não atribuído); o menu
+ *  lista os membros do escritório e invalida a lista pra reidratar. */
 export function AtribuirResponsavel({
   intimacao,
 }: {
@@ -43,11 +42,11 @@ export function AtribuirResponsavel({
 }) {
   const { members } = useOrgMembersDirectory();
   const qc = useQueryClient();
-  const assign = useAssignIntimacaoResponsaveis(intimacao.id);
+  const assign = useAssignIntimacaoResponsavel(intimacao.id);
 
-  const atribuir = (conductorUserId: string | null) => {
+  const atribuir = (assigneeUserId: string | null) => {
     assign.mutate(
-      { conductorUserId, reviewerUserId: intimacao.reviewer_user_id },
+      { assigneeUserId },
       {
         onSuccess: () =>
           qc.invalidateQueries({ queryKey: intimacoesKeys.lists() }),
@@ -55,32 +54,32 @@ export function AtribuirResponsavel({
     );
   };
 
-  const atual = intimacao.conductor_user_id ?? "";
-  // Nome do condutor: o join do BE (conductor_user_name) pode vir vazio; resolve
-  // pelo diretório (nome ou e-mail) a partir do id pra a linha não parecer vazia.
-  const condutor = intimacao.conductor_user_id
-    ? members.find((m) => m.id === intimacao.conductor_user_id)
+  const atual = intimacao.assignee_user_id ?? "";
+  // Nome do responsável: o join do BE (assignee_user_name) pode vir vazio;
+  // resolve pelo diretório (nome ou e-mail) pra a linha não parecer vazia.
+  const assignee = intimacao.assignee_user_id
+    ? members.find((m) => m.id === intimacao.assignee_user_id)
     : undefined;
-  const condutorNome =
-    intimacao.conductor_user_name?.trim() ||
-    (condutor ? nomeExibicao(condutor.name, condutor.email) : "");
+  const assigneeNome =
+    intimacao.assignee_user_name?.trim() ||
+    (assignee ? nomeExibicao(assignee.name, assignee.email) : "");
 
   return (
     <Menu.Root>
       <Menu.Trigger
         aria-label={
-          condutorNome ? `Responsável: ${condutorNome}` : "Atribuir responsável"
+          assigneeNome ? `Responsável: ${assigneeNome}` : "Atribuir responsável"
         }
-        title={condutorNome || "Atribuir responsável"}
+        title={assigneeNome || "Atribuir responsável"}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
         className="hover:ring-border flex cursor-pointer items-center rounded-full outline-none hover:ring-2"
       >
-        {condutorNome ? (
+        {assigneeNome ? (
           <Avatar
             size="sm"
             variant="outline"
-            initials={initials(condutorNome)}
+            initials={initials(assigneeNome)}
           />
         ) : (
           <span

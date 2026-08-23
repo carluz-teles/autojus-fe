@@ -56,13 +56,11 @@ export interface IntimacaoView {
    * Espelha IntimacaoView.ai_analyzed_at do BE.
    */
   ai_analyzed_at: string | null;
-  /** Id interno do condutor do prazo; null = não atribuído. Espelha o BE. */
-  conductor_user_id: string | null;
-  /** Nome do condutor do prazo (joined no BE); null = não atribuído. */
-  conductor_user_name: string | null;
-  /** Id do revisor — exposto na linha só pra preservá-lo ao atribuir o condutor
-   *  (PUT /responsaveis substitui os dois papéis). null = não atribuído. */
-  reviewer_user_id: string | null;
+  /** Id interno do responsável pela intimação (0057, ex-conductor/reviewer);
+   *  null = não atribuído. Espelha o BE. */
+  assignee_user_id: string | null;
+  /** Nome do responsável (joined no BE); null = não atribuído. */
+  assignee_user_name: string | null;
 }
 
 /**
@@ -138,15 +136,8 @@ export interface IntimacaoDetalheView extends IntimacaoView {
   judging_body: string;
   /** Destinatários (jsonb) — sempre um array (nunca null); pode vir vazio. */
   recipients: IntimacaoRecipient[];
-  /** Condutor do prazo (id interno do app_user); null = não atribuído. */
-  conductor_user_id: string | null;
-  /** Nome do condutor do prazo; null = não atribuído. */
-  conductor_user_name: string | null;
-  /** Responsável pela revisão e assinatura; null = não atribuído. */
-  reviewer_user_id: string | null;
-  /** Nome do revisor/assinador; null = não atribuído. */
-  reviewer_user_name: string | null;
-  /** Timeline derivada (ASC) — sempre array (nunca null); pode vir vazio. */
+  /** Timeline derivada (ASC) — sempre array (nunca null); pode vir vazio.
+   *  O responsável único (assignee_*) já vem do IntimacaoView embedado (0057). */
   history: IntimacaoHistoryEntry[];
 
   // ── Análise IA (card "Analisar esta intimação") ──
