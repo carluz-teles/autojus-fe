@@ -41,6 +41,7 @@ export interface PecaDetailAPI {
   signed_at: string | null;
   filed_at: string | null;
   filing_number: string;
+  signed_pdf_url: string | null; // Fatia 2b — presigned GET (15 min); null antes de assinar
 }
 
 // role é o enum bruto do BE — o mapper converte pra autor/reu/procurador

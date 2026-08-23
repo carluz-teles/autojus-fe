@@ -68,6 +68,17 @@ export function ConcluidaPage({ pecaId }: { pecaId: string }) {
               </div>
             </dl>
           </div>
+
+          {draft.signedPDFURL && (
+            <a
+              href={draft.signedPDFURL}
+              target="_blank"
+              rel="noreferrer"
+              className="border-border hover:bg-muted rounded-xl border px-5 py-4 text-center text-[13.5px] font-medium no-underline"
+            >
+              ↓ Baixar peça assinada (PDF)
+            </a>
+          )}
         </aside>
       </div>
     </div>

@@ -1,15 +1,25 @@
 "use client";
 
-// Step Assinatura (Fatia 2a — placeholder da 2b).
-// Preview da peça em read-only + card lateral com Assinar / Voltar.
-// Assinatura real de PDF (PAdES via GCP KMS + digitorus/pdfsign) fica pra
-// Fatia 2b — este passo só marca signed_at no draft.
+// Step Assinatura (Fatia 2b — assinatura REAL do PDF).
+// Fluxo: user seleciona um certificado ativo do tenant → clica Assinar.
+// BE gera PDF (maroto) → chama GCP KMS via cert slice → aplica PAdES via
+// digitorus/pdfsign → sobe PDF assinado no storage → marca SIGNED.
+// A senha do .pfx NÃO é pedida aqui — vem cifrada com o cert (trade-off
+// documentado no commit da Fatia 2b).
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useCertificados } from "@/features/configuracoes/hooks/use-cert-upload";
 
 import { useDraft } from "../hooks/use-draft";
 import { useRevertToConstruction, useSignPeca } from "../hooks/use-workflow";
@@ -18,8 +28,10 @@ import { PecaPreview } from "./peca-preview";
 
 export function AssinaturaPage({ pecaId }: { pecaId: string }) {
   const { data: draft, isLoading } = useDraft(pecaId);
+  const { data: certs, isLoading: certsLoading } = useCertificados();
   const sign = useSignPeca(pecaId);
   const revert = useRevertToConstruction(pecaId);
+  const [certId, setCertId] = useState<string>("");
   const [confirming, setConfirming] = useState(false);
 
   useSetBreadcrumb(
@@ -28,14 +40,31 @@ export function AssinaturaPage({ pecaId }: { pecaId: string }) {
       : [{ label: "Peticionamento" }],
   );
 
+  // Auto-seleção quando há um único cert ativo (UX comum — advogado só tem 1).
+  const activeCerts = useMemo(
+    () => (certs ?? []).filter((c) => !c.revoked_at),
+    [certs],
+  );
+  const defaultCertId = activeCerts.length === 1 ? activeCerts[0].id : "";
+  const selectedId = certId || defaultCertId;
+
   if (isLoading) {
     return <div className="text-muted-foreground p-8 text-sm">Carregando…</div>;
   }
   if (!draft) return null;
 
   const handleSign = () => {
-    sign.mutate(undefined, {
-      onError: () => toast.error("Não foi possível assinar a peça."),
+    if (!selectedId) {
+      toast.error("Selecione um certificado.");
+      return;
+    }
+    sign.mutate(selectedId, {
+      onError: (e) =>
+        toast.error(
+          e instanceof Error
+            ? e.message
+            : "Não foi possível assinar a peça.",
+        ),
     });
   };
 
@@ -50,7 +79,7 @@ export function AssinaturaPage({ pecaId }: { pecaId: string }) {
     <div className="flex h-full min-h-0 flex-col">
       <ConstrucaoHeader step={2} enviarDisabled backHref="/pecas" />
 
-      <div className="grid min-h-0 flex-1 gap-6 overflow-hidden px-8 py-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid min-h-0 flex-1 gap-6 overflow-hidden px-8 py-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 overflow-y-auto">
           <PecaPreview
             title={draft.title}
@@ -62,45 +91,80 @@ export function AssinaturaPage({ pecaId }: { pecaId: string }) {
         <aside className="flex flex-col gap-4">
           <div className="border-border rounded-xl border p-5">
             <h2 className="font-display text-lg font-medium">
-              Pronto para assinar
+              Assinar peça
             </h2>
             <p className="text-muted-foreground mt-2 text-[12.5px] leading-relaxed">
-              Revise a peça ao lado. Ao assinar, a peça é marcada como pronta
-              para protocolo e não pode mais ser editada.
+              O PDF é gerado, assinado com seu certificado A1 (ICP-Brasil) e
+              armazenado. Após assinar, a peça não pode mais ser editada.
             </p>
 
-            {!confirming ? (
-              <Button
-                className="mt-4 w-full"
-                onClick={() => setConfirming(true)}
-                disabled={sign.isPending}
-              >
-                Assinar peça
-              </Button>
-            ) : (
-              <div className="mt-4 flex flex-col gap-2">
-                <p className="text-foreground text-[13px]">
-                  Confirmar a assinatura?
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    className="flex-1"
-                    onClick={handleSign}
+            <label className="mt-4 block">
+              <span className="text-foreground text-[12px]">Certificado</span>
+              <div className="mt-1.5">
+                {certsLoading ? (
+                  <p className="text-muted-foreground text-[12.5px]">
+                    Carregando certificados…
+                  </p>
+                ) : activeCerts.length === 0 ? (
+                  <p className="text-destructive text-[12.5px]">
+                    Nenhum certificado ativo. Cadastre em Configurações →
+                    Certificado.
+                  </p>
+                ) : (
+                  <Select
+                    value={selectedId}
+                    onValueChange={(v) => setCertId(v ?? "")}
                     disabled={sign.isPending}
                   >
-                    {sign.isPending ? "Assinando…" : "Confirmar"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setConfirming(false)}
-                    disabled={sign.isPending}
-                  >
-                    Cancelar
-                  </Button>
-                </div>
+                    <SelectTrigger size="sm" className="w-full">
+                      <SelectValue placeholder="Escolha um certificado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeCerts.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.subject_cn}
+                          {c.oab ? ` · OAB ${c.oab}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
-            )}
+            </label>
+
+            {activeCerts.length > 0 &&
+              (!confirming ? (
+                <Button
+                  className="mt-4 w-full"
+                  onClick={() => setConfirming(true)}
+                  disabled={sign.isPending || !selectedId}
+                >
+                  Assinar peça
+                </Button>
+              ) : (
+                <div className="mt-4 flex flex-col gap-2">
+                  <p className="text-foreground text-[13px]">
+                    Confirmar a assinatura?
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1"
+                      onClick={handleSign}
+                      disabled={sign.isPending}
+                    >
+                      {sign.isPending ? "Assinando…" : "Confirmar"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setConfirming(false)}
+                      disabled={sign.isPending}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ))}
 
             <button
               type="button"
@@ -114,9 +178,8 @@ export function AssinaturaPage({ pecaId }: { pecaId: string }) {
 
           <div className="border-border/60 bg-muted/30 rounded-xl border p-4 text-[11.5px] leading-relaxed">
             <p className="text-muted-foreground">
-              <strong className="text-foreground">Débito:</strong> nesta versão
-              a assinatura é apenas um marco. A assinatura digital real do PDF
-              (ICP-Brasil via GCP KMS) chega na próxima fatia.
+              PAdES-BASIC · SHA-256 · chave privada protegida em GCP Cloud KMS.
+              Débito: carimbo de tempo (TSA) fica pra próxima fatia.
             </p>
           </div>
         </aside>

@@ -84,6 +84,17 @@ export function ProtocoloPage({ pecaId }: { pecaId: string }) {
             </Button>
           </div>
 
+          {draft.signedPDFURL && (
+            <a
+              href={draft.signedPDFURL}
+              target="_blank"
+              rel="noreferrer"
+              className="border-border hover:bg-muted rounded-xl border px-5 py-4 text-center text-[13.5px] font-medium no-underline"
+            >
+              ↓ Baixar peça assinada (PDF)
+            </a>
+          )}
+
           <div className="border-border/60 bg-muted/30 rounded-xl border p-4 text-[11.5px] leading-relaxed">
             <p className="text-muted-foreground">
               <strong className="text-foreground">Débito:</strong> integração

@@ -31,7 +31,7 @@ export function useSignPeca(id: string) {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => svc.signPeca(fetcher, id),
+    mutationFn: (certificateId: string) => svc.signPeca(fetcher, id, certificateId),
     onSuccess: () => qc.invalidateQueries({ queryKey: draftKeys.detail(id) }),
   });
 }

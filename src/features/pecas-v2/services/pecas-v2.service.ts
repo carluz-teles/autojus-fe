@@ -263,10 +263,19 @@ export async function revertToConstruction(
   await fetcher(`${ENDPOINT}/${id}/voltar-para-construcao`, { method: "POST" });
 }
 
-/** Assinar peça — marca status=SIGNED, signed_at=now(). Fatia 2a: assinatura
- *  simbólica (só marca). Fatia 2b vai receber {certificate_id, password} + PDF. */
-export async function signPeca(fetcher: ApiFetcher, id: string): Promise<void> {
-  await fetcher(`${ENDPOINT}/${id}/sign`, { method: "POST" });
+/** Assinar peça — Fatia 2b. Gera PDF no BE, chama GCP KMS pra assinatura RSA,
+ *  aplica PAdES via digitorus/pdfsign, sobe PDF assinado no storage. Requer
+ *  certificate_id do certificado A1 cadastrado. Senha vem do vault (não é
+ *  pedida ao user — armazenada cifrada no upload). */
+export async function signPeca(
+  fetcher: ApiFetcher,
+  id: string,
+  certificateId: string,
+): Promise<void> {
+  await fetcher(`${ENDPOINT}/${id}/sign`, {
+    method: "POST",
+    body: { certificate_id: certificateId },
+  });
 }
 
 /** Marcar como protocolada — grava filed_at + filing_number opcional. */

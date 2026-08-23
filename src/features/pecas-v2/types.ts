@@ -113,6 +113,8 @@ export interface Draft {
   filedAt: string | null;
   /** Número/protocolo do tribunal (input manual v0). */
   filingNumber: string;
+  /** Presigned GET URL do PDF assinado (Fatia 2b). null antes de assinar. */
+  signedPDFURL: string | null;
 }
 
 /** Step atual do peticionamento — derivado dos timestamps. */
