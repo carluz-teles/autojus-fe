@@ -1,17 +1,43 @@
 "use client";
 
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Download, Loader2, Save, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
-import { usePeca, useSalvarRascunho } from "@/features/pecas/hooks/use-peca";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  useExportPeca,
+  useFilePeca,
+  usePeca,
+  usePreviewAttachment,
+  useRemoveAttachment,
+  useSalvarRascunho,
+  useSignPeca,
+  useUpdateAttachmentCategory,
+  useUpdateResult,
+  useUploadAttachment,
+  validateAttachmentSize,
+} from "@/features/pecas/hooks/use-peca";
+import {
+  ATTACHMENT_CATEGORIES,
+  type AttachmentCategory,
+  type PecaAttachment,
+} from "@/features/pecas/types";
 import {
   corDaUrgencia,
   diasRestantes,
   rotuloPrazo,
   urgenciaDe,
 } from "@/features/shared/prazo";
-import { formatClaimValueBRL, formatDate } from "@/lib/format";
+import { formatBytes, formatClaimValueBRL, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import { AssistentePanel } from "./assistente-panel";
@@ -53,8 +79,37 @@ function contarTexto(texto: string): { palavras: number; caracteres: number } {
 
 export function PecaWorkspace({ id }: { id: string }) {
   const { data: peca, isLoading, isError } = usePeca(id);
-  const { save, isSaving, lastSavedAt } = useSalvarRascunho(id);
-  const [passo, setPasso] = useState<PassoPeca>(1);
+  const { save, saveNow, isSaving, lastSavedAt } = useSalvarRascunho(id);
+  const signPeca = useSignPeca();
+  const filePeca = useFilePeca();
+  const updateResult = useUpdateResult();
+  const exportPeca = useExportPeca();
+
+  // Deriva o step a partir do status da peça (computado, não via useEffect).
+  const passoPorStatus: PassoPeca = (() => {
+    if (!peca) return 1;
+    if (peca.status === "FILED") return 3;
+    if (peca.status === "SIGNED") return 2;
+    return 1;
+  })();
+
+  // Permite navegação manual temporária (clicando no stepper) que é
+  // "resetada" quando a peça muda de status.
+  const [passoOverride, setPassoOverride] = useState<PassoPeca | null>(null);
+  const passo = passoOverride ?? passoPorStatus;
+
+  const handleSetPasso = (p: PassoPeca) => {
+    setPassoOverride(p);
+  };
+
+  // Reseta override quando a peça muda de status.
+  const prevStatus = useRef(peca?.status);
+  useEffect(() => {
+    if (peca?.status !== prevStatus.current) {
+      prevStatus.current = peca?.status;
+      setPassoOverride(null);
+    }
+  }, [peca?.status]);
 
   // Contagem viva do editor — semeada do content real, atualizada a cada tecla.
   const [contagem, setContagem] = useState({ palavras: 0, caracteres: 0 });
@@ -62,6 +117,12 @@ export function PecaWorkspace({ id }: { id: string }) {
   const [, setTick] = useState(0);
   const editorRef = useRef<HTMLDivElement>(null);
   const semeado = useRef(false);
+
+  // Estados para o modal de protocolo (step 3).
+  const [showFileModal, setShowFileModal] = useState(false);
+  const [receipt, setReceipt] = useState("");
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [observedResult, setObservedResult] = useState("");
 
   useEffect(() => {
     if (peca && !semeado.current && editorRef.current) {
@@ -100,6 +161,78 @@ export function PecaWorkspace({ id }: { id: string }) {
       ? `Rascunho salvo ${tempoRelativo(lastSavedAt)}`
       : "Rascunho";
 
+  const isDraft = peca.status === "DRAFT";
+  const isSigned = peca.status === "SIGNED";
+  const isFiled = peca.status === "FILED";
+
+  const handleSaveNow = () => {
+    const texto = editorRef.current?.textContent ?? "";
+    save(texto);
+    saveNow();
+  };
+
+  const handleAdvance = () => {
+    if (passo === 1 && isDraft) {
+      // Avança para assinatura — sign a peça.
+      signPeca.mutate(id, {
+        onSuccess: () => {
+          toast.success("Peça assinada com sucesso.");
+        },
+        onError: () => toast.error("Não foi possível assinar a peça."),
+      });
+    } else if (passo === 2 && isSigned) {
+      // Avança para protocolo — abre modal de receipt.
+      setShowFileModal(true);
+    }
+  };
+
+  const handleFile = () => {
+    let parsedReceipt: Record<string, unknown> | undefined;
+    if (receipt.trim()) {
+      try {
+        parsedReceipt = JSON.parse(receipt);
+      } catch {
+        parsedReceipt = { notes: receipt };
+      }
+    }
+    filePeca.mutate(
+      { id, params: { receipt: parsedReceipt } },
+      {
+        onSuccess: () => {
+          toast.success("Peça protocolada com sucesso.");
+          setShowFileModal(false);
+        },
+        onError: () => toast.error("Não foi possível protocolar a peça."),
+      },
+    );
+  };
+
+  const handleResult = () => {
+    if (!observedResult) return;
+    updateResult.mutate(
+      { id, observedResult },
+      {
+        onSuccess: () => {
+          toast.success("Resultado registrado.");
+          setShowResultModal(false);
+        },
+        onError: () => toast.error("Não foi possível registrar o resultado."),
+      },
+    );
+  };
+
+  const handleExport = () => {
+    exportPeca.mutate(
+      { id, format: "docx" },
+      {
+        onSuccess: (res) => {
+          window.open(res.url, "_blank");
+        },
+        onError: () => toast.error("Não foi possível exportar a peça."),
+      },
+    );
+  };
+
   return (
     <div className="flex h-full min-h-0 min-w-[1230px] flex-col overflow-x-auto">
       <div className="border-border flex items-center gap-6 border-b px-8 py-4">
@@ -118,7 +251,45 @@ export function PecaWorkspace({ id }: { id: string }) {
             ← Peças
           </Link>
         )}
-        <StepperPeca atual={passo} onIr={setPasso} />
+        <StepperPeca atual={passo} onIr={handleSetPasso} />
+
+        {/* Botões de ação do header */}
+        <div className="ml-auto flex items-center gap-2">
+          {isDraft && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSaveNow}
+              disabled={isSaving}
+            >
+              <Save className="mr-1.5 size-3.5" />
+              {isSaving ? "Salvando…" : "Salvar rascunho"}
+            </Button>
+          )}
+          <Button
+            size="sm"
+            onClick={handleAdvance}
+            disabled={
+              signPeca.isPending ||
+              filePeca.isPending ||
+              (passo === 1 && !isDraft) ||
+              (passo === 2 && !isSigned)
+            }
+          >
+            {signPeca.isPending
+              ? "Assinando…"
+              : filePeca.isPending
+                ? "Protocolando…"
+                : passo === 1
+                  ? "Avançar"
+                  : passo === 2
+                    ? "Protocolar"
+                    : "Concluído"}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleExport}>
+            <Download className="size-3.5" />
+          </Button>
+        </div>
       </div>
 
       {passo === 1 && (
@@ -193,32 +364,20 @@ export function PecaWorkspace({ id }: { id: string }) {
                 />
                 <Campo
                   rotulo="Valor da causa"
-                  valor={formatClaimValueBRL(proc.claim_value)}
+                  valor={formatClaimValueBRL(proc.claim_value ?? "")}
                 />
 
                 <Rotulo className="mt-6">Partes</Rotulo>
-                <CampoEmpilhado rotulo="Autor" valores={proc.plaintiffs} />
-                <CampoEmpilhado rotulo="Réu" valores={proc.defendants} />
+                <CampoEmpilhado
+                  rotulo="Autor"
+                  valores={proc.plaintiffs ?? []}
+                />
+                <CampoEmpilhado rotulo="Réu" valores={proc.defendants ?? []} />
               </>
             )}
 
             <Rotulo className="mt-6">Anexos</Rotulo>
-            <div className="flex flex-col gap-2">
-              {peca.attachments.length === 0 ? (
-                <p className="text-muted-foreground text-[11.5px]">
-                  Nenhum documento anexado.
-                </p>
-              ) : (
-                peca.attachments.map((a) => (
-                  <div
-                    key={a.id}
-                    className="border-border truncate rounded-lg border px-2 py-1.5 text-xs"
-                  >
-                    {a.name}
-                  </div>
-                ))
-              )}
-            </div>
+            <AnexosSection pecaId={peca.id} anexos={peca.attachments} />
           </aside>
 
           {/* Papel: editor real, autosave por debounce */}
@@ -251,25 +410,131 @@ export function PecaWorkspace({ id }: { id: string }) {
             </div>
           </section>
 
-          <AssistentePanel />
+          <AssistentePanel pecaId={peca.id} review={peca.review ?? null} />
         </div>
       )}
 
-      {passo === 2 && <EmBreve titulo="Assinatura" />}
-      {passo === 3 && <EmBreve titulo="Protocolo" />}
-    </div>
-  );
-}
+      {passo === 2 && (
+        <div className="mx-auto w-full max-w-220 px-8 py-8">
+          <h1 className="font-display text-[34px] font-normal">Assinatura</h1>
+          <p className="text-muted-foreground mt-2 text-[13.5px]">
+            {isSigned
+              ? "Esta peça já foi assinada."
+              : "Clique em 'Protocolar' no cabeçalho para assinar e avançar para o protocolo."}
+          </p>
+          {isSigned && (
+            <Button className="mt-4" onClick={() => setShowFileModal(true)}>
+              Protocolar
+            </Button>
+          )}
+        </div>
+      )}
 
-// Passos 2/3 (assinatura, protocolo) são sub-epics de outras frentes — placeholder
-// honesto até serem ligados ao BE, sem simular fluxo com dado falso.
-function EmBreve({ titulo }: { titulo: string }) {
-  return (
-    <div className="mx-auto w-full max-w-220 px-8 py-8">
-      <h1 className="font-display text-[34px] font-normal">{titulo}</h1>
-      <p className="text-muted-foreground mt-2 text-[13.5px]">
-        Esta etapa entra em uma próxima atualização.
-      </p>
+      {passo === 3 && (
+        <div className="mx-auto w-full max-w-220 px-8 py-8">
+          <h1 className="font-display text-[34px] font-normal">Protocolo</h1>
+          <p className="text-muted-foreground mt-2 text-[13.5px]">
+            {isFiled
+              ? "Esta peça já foi protocolada."
+              : "Protocole a peça e registre o resultado."}
+          </p>
+          {isFiled && (
+            <div className="mt-4 flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowResultModal(true)}
+              >
+                Registrar resultado
+              </Button>
+              <Button onClick={handleExport}>Exportar</Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal de protocolo (step 2 → 3) */}
+      {showFileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card border-border w-full max-w-md rounded-xl border p-6 shadow-lg">
+            <h2 className="font-display text-lg font-medium">
+              Protocolar peça
+            </h2>
+            <p className="text-muted-foreground mt-1 text-[13px]">
+              Informe o comprovante de protocolo (JSON ou texto).
+            </p>
+            <textarea
+              value={receipt}
+              onChange={(e) => setReceipt(e.target.value)}
+              placeholder='{"protocol_number": "123456", "court": "TJSP"}'
+              className="border-border placeholder:text-muted-foreground/50 focus:ring-ring mt-4 w-full rounded-lg border px-3 py-2 font-mono text-[13px] focus:ring-1 focus:outline-none"
+              rows={5}
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowFileModal(false)}
+                disabled={filePeca.isPending}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={handleFile} disabled={filePeca.isPending}>
+                {filePeca.isPending ? "Protocolando…" : "Protocolar"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de resultado (step 3) */}
+      {showResultModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card border-border w-full max-w-md rounded-xl border p-6 shadow-lg">
+            <h2 className="font-display text-lg font-medium">
+              Resultado observado
+            </h2>
+            <p className="text-muted-foreground mt-1 text-[13px]">
+              Qual foi o resultado desta peça?
+            </p>
+            <div className="mt-4 flex flex-col gap-2">
+              {[
+                { value: "OK", label: "Procedente" },
+                { value: "AMENDMENT", label: "Emenda" },
+                { value: "UNKNOWN", label: "Não conhecido" },
+                { value: "UNTIMELY", label: "Intempestivo" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setObservedResult(opt.value)}
+                  className={cn(
+                    "border-border rounded-lg border px-3 py-2 text-left text-[13px] transition-colors",
+                    observedResult === opt.value
+                      ? "bg-primary/10 border-primary"
+                      : "hover:bg-muted/40",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowResultModal(false)}
+                disabled={updateResult.isPending}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleResult}
+                disabled={updateResult.isPending || !observedResult}
+              >
+                {updateResult.isPending ? "Salvando…" : "Registrar"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -321,6 +586,130 @@ function CampoEmpilhado({
           </span>
         ))
       )}
+    </div>
+  );
+}
+
+// Aba Anexos: upload presigned (3 passos) + vincular + categorizar + remover +
+// pré-visualizar. Cada item expande no hover para revelar categoria e remoção.
+function AnexosSection({
+  pecaId,
+  anexos,
+}: {
+  pecaId: string;
+  anexos: PecaAttachment[];
+}) {
+  const { uploadAttachment, isUploading, progress } =
+    useUploadAttachment(pecaId);
+  const updateCategoria = useUpdateAttachmentCategory(pecaId);
+  const removerAnexo = useRemoveAttachment(pecaId);
+  const previsualizar = usePreviewAttachment();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const validacao = validateAttachmentSize(file);
+    if (!validacao.ok) {
+      toast.error(
+        validacao.reason === "vazio"
+          ? "Arquivo vazio não pode ser anexado."
+          : "Arquivo excede o limite de 50MB.",
+      );
+      return;
+    }
+    uploadAttachment(file, {
+      onError: () => toast.error("Não foi possível anexar o documento."),
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      {anexos.length === 0 ? (
+        <p className="text-muted-foreground text-[11.5px]">
+          Nenhum documento anexado.
+        </p>
+      ) : (
+        anexos.map((a) => (
+          <div
+            key={a.id}
+            className="border-border group flex flex-col gap-1.5 rounded-lg border px-2 py-1.5 text-xs"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => previsualizar.mutate(a.document_id)}
+                className="truncate text-left hover:underline"
+                title={a.name}
+              >
+                {a.name}
+              </button>
+              <div className="flex flex-none items-center gap-1.5">
+                <span className="text-muted-foreground">
+                  {formatBytes(a.size_bytes)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    removerAnexo.mutate(a.id, {
+                      onError: () =>
+                        toast.error("Não foi possível remover o anexo."),
+                    })
+                  }
+                  disabled={removerAnexo.isPending}
+                  className="text-muted-foreground hover:text-destructive hidden group-hover:inline-flex"
+                  aria-label={`Remover ${a.name}`}
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
+            </div>
+            <Select
+              value={a.category}
+              onValueChange={(v) =>
+                updateCategoria.mutate({
+                  attachmentId: a.id,
+                  category: v as AttachmentCategory,
+                })
+              }
+            >
+              <SelectTrigger className="h-6 w-full text-[11px]" size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ATTACHMENT_CATEGORIES.map((cat) => (
+                  <SelectItem key={cat} value={cat} className="text-[11px]">
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ))
+      )}
+
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={isUploading}
+        className="text-muted-foreground hover:bg-muted/40 rounded-lg border border-transparent px-3 py-2 text-[12px] font-medium transition-colors disabled:opacity-60"
+      >
+        {isUploading ? (
+          <span className="inline-flex items-center gap-1.5">
+            <Loader2 className="size-3 animate-spin" />
+            Enviando{progress !== null ? ` ${progress}%` : "…"}
+          </span>
+        ) : (
+          "+ Anexar documento"
+        )}
+      </button>
     </div>
   );
 }

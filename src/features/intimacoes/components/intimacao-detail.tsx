@@ -15,6 +15,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+import {
+  useCriarPeca,
+  usePecasByProcesso,
+} from "@/features/pecas/hooks/use-peca";
+import type { PecaListItem } from "@/features/pecas/types";
 import { ConfirmarPrazo } from "@/features/prazos/components/confirmar-prazo";
 import { cn, formatarData } from "@/lib/utils";
 
@@ -39,6 +44,7 @@ import { TeorPublicacao } from "./shared/teor-publicacao";
 
 export function IntimacaoDetail({ id }: { id: string }) {
   const { data: i, isPending, error } = useIntimacaoDetalhe(id);
+  const criarPeca = useCriarPeca();
 
   // Breadcrumb padrão publicado no header sticky do AppShell (NÃO dentro da página).
   const crumbs = useMemo(
@@ -88,12 +94,31 @@ export function IntimacaoDetail({ id }: { id: string }) {
           </p>
         </div>
 
-        {/* MOCK: peticionamento — ações ainda não implementadas */}
+        {/* Ações de peticionamento */}
         <div className="flex shrink-0 items-center gap-2.5">
           <Button variant="outline" onClick={emBreve}>
             Sem providência
           </Button>
-          <Button onClick={emBreve}>Redigir peça</Button>
+          <Button
+            onClick={() => {
+              criarPeca.mutate(
+                {
+                  source: "intimation",
+                  intimation_id: i.id,
+                  case_id: i.court_record_id,
+                },
+                {
+                  onSuccess: (criada) => {
+                    window.location.href = `/pecas/${criada.id}`;
+                  },
+                  onError: () => toast.error("Não foi possível criar a peça."),
+                },
+              );
+            }}
+            disabled={criarPeca.isPending}
+          >
+            {criarPeca.isPending ? "Criando…" : "Redigir peça"}
+          </Button>
         </div>
       </header>
 
@@ -101,7 +126,7 @@ export function IntimacaoDetail({ id }: { id: string }) {
       <hr className="border-border/70 mt-8 mb-8 border-t" />
 
       {/* ── 4. Barra-herói do prazo ── */}
-      <PrazoHero prazo={i.prazo} />
+      <PrazoHero prazo={i.prazo} courtRecordId={i.court_record_id} />
 
       {/* ── 5. Painel de PRAZO (feature prazos, reutilizado) ── */}
       <div className="mt-8">
@@ -115,8 +140,8 @@ export function IntimacaoDetail({ id }: { id: string }) {
           {/* Card: Analisar esta intimação (IA) — pré vs pós-análise. REAL. */}
           <AnalisarCard intimacao={i} />
 
-          {/* Peças desta intimação — MOCK: peticionamento */}
-          <PecasSection />
+          {/* Peças desta intimação — REAL (peticionamento) */}
+          <PecasSection courtRecordId={i.court_record_id} intimationId={i.id} />
 
           {/* Teor da publicação — REAL (HTML sanitizado). Guarda conteúdo vazio
                para consistência com o painel lateral compacto. */}
@@ -140,25 +165,94 @@ function emBreve() {
   toast("Em breve.");
 }
 
-// ─── 4. Barra-herói do prazo (REAL, derivada de i.prazo) ─────────────────────
+// ─── Helpers de status da peça (derivado da lista real) ──────────────────────
 
-function PrazoHero({ prazo }: { prazo: IntimacaoPrazoView | null }) {
+interface StatusPecaDerivado {
+  label: string;
+  tone: "gold" | "success" | "info" | "neutral";
+  assinatura: string;
+  protocolo: string;
+}
+
+function derivingStatusPeca(pecas: PecaListItem[]): StatusPecaDerivado {
+  if (pecas.length === 0) {
+    return {
+      label: "Sem peça",
+      tone: "neutral",
+      assinatura: "—",
+      protocolo: "—",
+    };
+  }
+
+  // Pega a peça mais recente (primeira da lista — ordenada por created_at DESC).
+  const latest = pecas[0];
+  const status = latest.status;
+
+  if (status === "FILED") {
+    return {
+      label: "Protocolada",
+      tone: "success",
+      assinatura: "Concluída",
+      protocolo: latest.filed_at ? formatarData(latest.filed_at) : "Concluído",
+    };
+  }
+  if (status === "SIGNED") {
+    return {
+      label: "Assinada",
+      tone: "success",
+      assinatura: "Concluída",
+      protocolo: "Pendente",
+    };
+  }
+  if (status === "DISCARDED") {
+    return {
+      label: "Descartada",
+      tone: "neutral",
+      assinatura: "—",
+      protocolo: "—",
+    };
+  }
+  // DRAFT (ou qualquer outro)
+  return {
+    label: "Rascunho",
+    tone: "gold",
+    assinatura: "Pendente",
+    protocolo: "Não iniciado",
+  };
+}
+
+// ─── 4. Barra-herói do prazo (REAL, derivada de i.prazo + peças) ─────────────
+
+function PrazoHero({
+  prazo,
+  courtRecordId,
+}: {
+  prazo: IntimacaoPrazoView | null;
+  courtRecordId: string;
+}) {
+  const { items: pecas } = usePecasByProcesso(courtRecordId);
+  const statusPeca = derivingStatusPeca(pecas);
+
   return (
     <div className="flex flex-wrap items-start justify-between gap-8">
       <PrazoContagemGrande prazo={prazo} />
 
-      {/* Status de peça/assinatura/protocolo — MOCK: peticionamento */}
+      {/* Status de peça/assinatura/protocolo — derivado das peças reais */}
       <div className="flex flex-wrap gap-x-10 gap-y-4">
-        <StatusColuna label="Peça" value="Rascunho" tone="gold" />
-        <StatusColuna label="Assinatura" value="Pendente" />
-        <StatusColuna label="Protocolo" value="Não iniciado" />
+        <StatusColuna
+          label="Peça"
+          value={statusPeca.label}
+          tone={statusPeca.tone}
+        />
+        <StatusColuna label="Assinatura" value={statusPeca.assinatura} />
+        <StatusColuna label="Protocolo" value={statusPeca.protocolo} />
       </div>
     </div>
   );
 }
 
 /** Uma coluna do trio de status (rótulo uppercase muted + valor). tone="gold"
- * pinta o valor em âmbar (o "Rascunho"). MOCK: peticionamento. */
+ * pinta o valor em âmbar (o "Rascunho"). */
 function StatusColuna({
   label,
   value,
@@ -166,7 +260,7 @@ function StatusColuna({
 }: {
   label: string;
   value: string;
-  tone?: "gold";
+  tone?: "gold" | "success" | "info" | "neutral";
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -178,7 +272,9 @@ function StatusColuna({
           "text-[13px]",
           tone === "gold"
             ? "font-medium text-[var(--gold-foreground)]"
-            : "text-foreground/80",
+            : tone === "success"
+              ? "font-medium text-[var(--success-foreground)]"
+              : "text-foreground/80",
         )}
       >
         {value}
@@ -192,46 +288,122 @@ function StatusColuna({
 // também pelo PainelDetalhe do master-detail compacto (com borderColor="gold" e
 // collapsedHeight=180). A tela full usa os defaults ("border", 260px).
 
-// ─── 6c. Peças desta intimação (MOCK: peticionamento) ────────────────────────
+// ─── 6c. Peças desta intimação (REAL: peticionamento) ────────────────────────
 
-function PecasSection() {
+function PecasSection({
+  courtRecordId,
+  intimationId,
+}: {
+  courtRecordId: string;
+  intimationId: string;
+}) {
+  const { items: pecas, isPending } = usePecasByProcesso(courtRecordId);
+  const criarPeca = useCriarPeca();
+
+  const handleCriarPeca = () => {
+    criarPeca.mutate(
+      {
+        source: "intimation",
+        intimation_id: intimationId,
+        case_id: courtRecordId,
+      },
+      {
+        onSuccess: (criada) => {
+          window.location.href = `/pecas/${criada.id}`;
+        },
+        onError: () => toast.error("Não foi possível criar a peça."),
+      },
+    );
+  };
+
   return (
     <section className="mt-10">
       <div className="flex items-center justify-between gap-3">
         <EyebrowTitle>Peças desta intimação</EyebrowTitle>
         <button
           type="button"
-          onClick={emBreve}
-          className="text-primary text-[12.5px] font-medium transition-colors hover:opacity-80"
+          onClick={handleCriarPeca}
+          disabled={criarPeca.isPending}
+          className="text-primary text-[12.5px] font-medium transition-colors hover:opacity-80 disabled:opacity-50"
         >
-          + Nova peça
+          {criarPeca.isPending ? "Criando…" : "+ Nova peça"}
         </button>
       </div>
 
-      {/* MOCK: peticionamento — uma peça exemplo */}
-      <button
-        type="button"
-        onClick={emBreve}
-        className="border-border hover:bg-muted/40 mt-3 flex w-full items-center gap-3 border-t py-3.5 text-left transition-colors"
-      >
-        <span className="text-foreground text-[14px]">
-          Manifestação sobre cálculo
-        </span>
-        <span className="text-muted-foreground text-[12px] tabular-nums">
-          v2
-        </span>
-        <span className="rounded-full bg-[color-mix(in_oklch,var(--gold)_15%,transparent)] px-2 py-0.5 text-[11px] font-medium text-[var(--gold-foreground)]">
-          Rascunho
-        </span>
-        <span className="text-muted-foreground ml-auto text-[12px]">
-          Luan Gomes · ontem, 17:40
-        </span>
-        <ArrowUpRight
-          className="text-muted-foreground size-3.5"
-          strokeWidth={2}
-        />
-      </button>
+      {isPending ? (
+        <div className="mt-3 space-y-3">
+          <div className="bg-muted h-12 animate-pulse rounded" />
+          <div className="bg-muted h-12 animate-pulse rounded" />
+        </div>
+      ) : pecas.length === 0 ? (
+        <p className="text-muted-foreground mt-3 text-[12.5px]">
+          Nenhuma peça criada para esta intimação.
+        </p>
+      ) : (
+        pecas.map((p) => (
+          <Link
+            key={p.id}
+            href={`/pecas/${p.id}`}
+            className="border-border hover:bg-muted/40 mt-3 flex w-full items-center gap-3 border-t py-3.5 text-left transition-colors"
+          >
+            <span className="text-foreground text-[14px]">
+              {rotuloPieceType(p.piece_type)}
+            </span>
+            <span className="text-foreground text-[14px]">{p.title}</span>
+            <StatusBadgePeca status={p.status} />
+            {p.coverage_summary?.grounded && (
+              <span className="rounded-full bg-[color-mix(in_oklch,var(--success)_15%,transparent)] px-2 py-0.5 text-[11px] font-medium text-[var(--success-foreground)]">
+                Fundamentada
+              </span>
+            )}
+            <span className="text-muted-foreground ml-auto text-[12px] tabular-nums">
+              {formatarData(p.created_at)}
+            </span>
+            <ArrowUpRight
+              className="text-muted-foreground size-3.5"
+              strokeWidth={2}
+            />
+          </Link>
+        ))
+      )}
     </section>
+  );
+}
+
+const PIECE_TYPE_LABEL: Record<string, string> = {
+  DEFENSE: "Defesa",
+  APPEAL: "Recurso",
+  PETITION: "Petição",
+  MANIFESTATION: "Manifestação",
+  COUNTERCLAIM: "Reconvenção",
+  BLANK: "Peça",
+};
+
+function rotuloPieceType(pieceType: string): string {
+  return PIECE_TYPE_LABEL[pieceType] ?? "Peça";
+}
+
+const STATUS_PECA_LABEL: Record<string, string> = {
+  DRAFT: "Rascunho",
+  SIGNED: "Assinada",
+  FILED: "Protocolada",
+  DISCARDED: "Descartada",
+};
+
+function StatusBadgePeca({ status }: { status: string }) {
+  const label = STATUS_PECA_LABEL[status] ?? status;
+  const isDraft = status === "DRAFT";
+  return (
+    <span
+      className={cn(
+        "rounded-full px-2 py-0.5 text-[11px] font-medium",
+        isDraft
+          ? "bg-[color-mix(in_oklch,var(--gold)_15%,transparent)] text-[var(--gold-foreground)]"
+          : "bg-[color-mix(in_oklch,var(--success)_15%,transparent)] text-[var(--success-foreground)]",
+      )}
+    >
+      {label}
+    </span>
   );
 }
 
