@@ -6,9 +6,10 @@
 
 import { ArrowUpRight, Loader2, X } from "lucide-react";
 import Link from "next/link";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { toast } from "sonner";
 
+import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
 import {
   Select,
   SelectContent,
@@ -25,7 +26,6 @@ import {
   useUploadAttachment,
   validateAttachmentSize,
 } from "@/features/pecas/hooks/use-peca";
-import { rotuloTipoPeca } from "@/features/pecas/lib/labels";
 import {
   ATTACHMENT_CATEGORIES,
   type AttachmentCategory,
@@ -38,6 +38,7 @@ import {
   rotuloPrazo,
   urgenciaDe,
 } from "@/features/shared/prazo";
+import { useTasksDaIntimacao } from "@/features/tasks/hooks/use-tasks-da-intimacao";
 import { formatBytes, formatClaimValueBRL, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -60,6 +61,19 @@ export function PecaTopBar({
   actions,
 }: PecaTopBarProps) {
   const cnj = peca.process?.cnj_number;
+
+  // Publica trilha "Peticionamento › Processo {CNJ}" no header do AppShell —
+  // fiel ao mockup. Sem CNJ (peça blank / de processo sem case_id), publica
+  // só "Peticionamento". Referência estável (deps primitivas).
+  const crumbs = useMemo(
+    () =>
+      cnj
+        ? [{ label: "Peticionamento" }, { label: `Processo ${cnj}` }]
+        : [{ label: "Peticionamento" }],
+    [cnj],
+  );
+  useSetBreadcrumb(crumbs);
+
   return (
     <div className="border-border flex items-center gap-6 border-b px-8 py-4">
       {cnj ? (
@@ -106,37 +120,30 @@ export function PecaContexto({ peca }: { peca: PecaDetail }) {
   const dias = termo ? diasRestantes(termo) : null;
   const corPrazo = corDaUrgencia(urgenciaDe(dias));
 
+  // Providências = tasks vinculadas à intimação da peça.
+  const { tasks: providencias } = useTasksDaIntimacao(intim?.id ?? null);
+
   return (
     <aside className="border-border overflow-y-auto border-r px-4 py-6">
-      <p className="text-muted-foreground text-[10.5px] tracking-[0.12em] uppercase">
-        Contexto
-      </p>
-      <h3 className="font-display mt-2 text-[19px] font-medium">
-        {rotuloTipoPeca(peca.piece_type)}
-      </h3>
-      {proc && (
-        <p className="text-muted-foreground text-[11.5px] tabular-nums">
-          {proc.cnj_number}
+      {/* Bloco Prazo (topo) — sem cabeçalho "Contexto"/tipo peça acima. */}
+      <div className="pb-3">
+        <p className="text-muted-foreground text-[10.5px] tracking-[0.12em] uppercase">
+          Prazo
         </p>
-      )}
-
-      {/* Prazo em destaque */}
-      <div className="border-border my-4 border-y py-3">
-        <p className="text-muted-foreground text-xs">Prazo</p>
         <p
-          className="font-display text-xl tabular-nums"
+          className="font-display mt-1.5 text-xl tabular-nums"
           style={{ color: corPrazo }}
         >
           {termo ? formatDate(termo) : "—"}
         </p>
-        <p className="text-muted-foreground text-[11.5px]">
+        <p className="text-muted-foreground mt-0.5 text-[11.5px]">
           {rotuloPrazo(dias)}
         </p>
       </div>
 
       {intim && (
         <>
-          <Rotulo>Intimação de origem</Rotulo>
+          <Rotulo className="mt-4">Intimação de origem</Rotulo>
           <Link
             href={`/intimacoes/${intim.id}`}
             className="block no-underline hover:no-underline"
@@ -151,7 +158,7 @@ export function PecaContexto({ peca }: { peca: PecaDetail }) {
           </Link>
 
           <Rotulo className="mt-3.5">Teor da publicação</Rotulo>
-          <p className="border-border text-muted-foreground max-h-33 overflow-y-auto border-l-2 pl-2.5 text-[11.5px] leading-relaxed whitespace-pre-wrap">
+          <p className="border-border text-muted-foreground max-h-33 overflow-y-auto border-l-2 pl-2.5 text-[11.5px] leading-[1.6] whitespace-pre-wrap">
             {intim.content}
           </p>
         </>
@@ -174,14 +181,51 @@ export function PecaContexto({ peca }: { peca: PecaDetail }) {
             rotulo="Tribunal · grau"
             valor={`${proc.court} · ${proc.degree}`}
           />
-          <Campo
-            rotulo="Valor da causa"
-            valor={formatClaimValueBRL(proc.claim_value ?? "")}
-          />
+          {proc.claim_value ? (
+            <Campo
+              rotulo="Valor da causa"
+              valor={formatClaimValueBRL(proc.claim_value)}
+            />
+          ) : null}
 
-          <Rotulo className="mt-6">Partes</Rotulo>
-          <CampoEmpilhado rotulo="Autor" valores={proc.plaintiffs ?? []} />
-          <CampoEmpilhado rotulo="Réu" valores={proc.defendants ?? []} />
+          {proc.plaintiffs?.length || proc.defendants?.length ? (
+            <>
+              <Rotulo className="mt-6">Partes</Rotulo>
+              <CampoEmpilhado rotulo="Autor" valores={proc.plaintiffs ?? []} />
+              <CampoEmpilhado rotulo="Réu" valores={proc.defendants ?? []} />
+            </>
+          ) : null}
+        </>
+      )}
+
+      {providencias.length > 0 && (
+        <>
+          <Rotulo className="mt-6">Providências</Rotulo>
+          <div className="flex flex-col gap-1.5">
+            {providencias.map((t) => (
+              <div
+                key={t.id}
+                className="flex gap-2 py-1 text-[12.5px] leading-[1.35]"
+              >
+                <span className="text-[var(--gold)]">•</span>
+                <div className="min-w-0 flex-1">
+                  <span className="block">{t.title}</span>
+                  <Link
+                    href={`/tarefas?task=${t.id}`}
+                    className="text-primary mt-0.5 inline-flex items-center gap-1 font-mono text-[10.5px] no-underline hover:no-underline"
+                  >
+                    {t.source ? `${t.source} · ` : ""}
+                    {t.status === "DONE"
+                      ? "Concluída"
+                      : t.status === "DISMISSED"
+                        ? "Descartada"
+                        : "Aberta"}
+                    <ArrowUpRight className="size-2.5" strokeWidth={2.4} />
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
         </>
       )}
 

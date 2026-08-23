@@ -253,9 +253,8 @@ export type PecaChatResponse = PecaChatMessage;
 /** Confiança de uma tese sugerida pela IA. */
 export type ThesisConfidence = "alta" | "media" | "baixa";
 
-/** Tom da peça enviado ao BE no generate. */
-export type PecaTone =
-  "tecnico-formal" | "direto-assertivo" | "conciliador-institucional";
+/** Tom da peça enviado ao BE no generate — rótulos curtos, fiéis ao mockup. */
+export type PecaTone = "tecnico" | "objetivo" | "enfatico";
 
 /** Uma tese sugerida pela IA — POST /v1/pecas/:id/theses. */
 export interface Thesis {

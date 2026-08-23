@@ -1,11 +1,8 @@
 "use client";
 
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
-import { Segmented } from "@/components/mock-ui/layout";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { TYPE_LABEL } from "@/features/intimacoes/lib/labels";
 import type { IntimacaoType } from "@/features/intimacoes/types";
 import {
@@ -14,31 +11,26 @@ import {
   useTheses,
 } from "@/features/pecas/hooks/use-peca";
 import { rotuloTipoPeca } from "@/features/pecas/lib/labels";
-import {
-  corDaUrgencia,
-  diasRestantes,
-  rotuloPrazo,
-  urgenciaDe,
-} from "@/features/shared/prazo";
+import { diasRestantes, rotuloPrazo } from "@/features/shared/prazo";
 import { formatClaimValueBRL, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import type { PecaTone, Thesis, ThesisConfidence } from "../types";
 import { PecaContexto, PecaTopBar } from "./peca-shell";
 
-// ── Constantes de tom ────────────────────────────────────────────────────────
-
+// Tom da peça — 3 opções curtas fiéis ao mockup "Atjus Fluxo v2.dc.html".
+// Wire idêntico ao BE (migração 0055).
 const TOM_OPCOES: { valor: PecaTone; label: string }[] = [
-  { valor: "tecnico-formal", label: "Técnico-formal" },
-  { valor: "direto-assertivo", label: "Direto-assertivo" },
-  { valor: "conciliador-institucional", label: "Conciliador-institucional" },
+  { valor: "tecnico", label: "Técnico" },
+  { valor: "objetivo", label: "Objetivo" },
+  { valor: "enfatico", label: "Enfático" },
 ];
 
 const MAX_INSTRUCTIONS = 2000;
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 60_000;
 
-// ── Badge de confiança ────────────────────────────────────────────────────────
+// ── Badge de confiança (fiel ao protótipo: uppercase, 9.5px, padding 1/7) ────
 
 const CONFIDENCE_LABEL: Record<ThesisConfidence, string> = {
   alta: "alta confiança",
@@ -47,8 +39,8 @@ const CONFIDENCE_LABEL: Record<ThesisConfidence, string> = {
 };
 
 const CONFIDENCE_CLASS: Record<ThesisConfidence, string> = {
-  alta: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-  media: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+  alta: "bg-emerald-50 text-emerald-700",
+  media: "bg-amber-50 text-amber-700",
   baixa: "bg-muted text-muted-foreground",
 };
 
@@ -56,7 +48,7 @@ function ConfidenceBadge({ confidence }: { confidence: ThesisConfidence }) {
   return (
     <span
       className={cn(
-        "inline-block rounded-full px-2 py-0.5 text-[10.5px] font-medium tabular-nums",
+        "inline-block rounded-full px-[7px] py-px text-[9.5px] tracking-[0.05em] uppercase",
         CONFIDENCE_CLASS[confidence],
       )}
     >
@@ -65,7 +57,7 @@ function ConfidenceBadge({ confidence }: { confidence: ThesisConfidence }) {
   );
 }
 
-// ── Card de tese ─────────────────────────────────────────────────────────────
+// ── Card de tese (fiel ao protótipo: radius 10px, padding 10/12, checkbox 18×18) ─
 
 function ThesisCard({
   thesis,
@@ -83,58 +75,94 @@ function ThesisCard({
       aria-checked={selected}
       onClick={onToggle}
       className={cn(
-        "focus-visible:ring-ring w-full rounded-xl border px-4 py-3.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none",
+        "focus-visible:ring-ring flex w-full items-start gap-2.5 rounded-[10px] border px-3 py-2.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none",
         selected
           ? "border-primary/40 bg-primary/5"
           : "border-border bg-card hover:bg-muted/40",
       )}
     >
-      <div className="flex items-start gap-3">
-        {/* Checkbox visual */}
-        <span
-          aria-hidden="true"
-          className={cn(
-            "mt-0.5 flex size-4 flex-none items-center justify-center rounded border transition-colors",
-            selected
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-border bg-background",
-          )}
-        >
-          {selected && (
-            <svg
-              viewBox="0 0 12 12"
-              className="size-2.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M2 6l3 3 5-5" />
-            </svg>
-          )}
-        </span>
+      {/* Checkbox visual — 18×18px radius 6px */}
+      <span
+        aria-hidden="true"
+        className={cn(
+          "mt-px grid size-[18px] flex-none place-items-center rounded-md border transition-colors",
+          selected
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-border bg-background",
+        )}
+      >
+        {selected && (
+          <svg
+            viewBox="0 0 12 12"
+            className="size-2.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M2 6l3 3 5-5" />
+          </svg>
+        )}
+      </span>
 
-        <div className="flex flex-1 flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[13.5px] leading-snug font-medium">
-              {thesis.label}
-            </span>
-            <ConfidenceBadge confidence={thesis.confidence} />
-          </div>
-          {thesis.reference && (
-            <p className="text-muted-foreground text-[11.5px]">
-              {thesis.reference}
-            </p>
-          )}
-          {thesis.foundation && (
-            <p className="text-muted-foreground text-[12px] leading-relaxed">
-              ↳ {thesis.foundation}
-            </p>
-          )}
-        </div>
-      </div>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="text-foreground text-[12.5px]">{thesis.label}</span>
+          <ConfidenceBadge confidence={thesis.confidence} />
+        </span>
+        {thesis.reference && (
+          <span className="text-muted-foreground mt-px block text-[11px]">
+            {thesis.reference}
+          </span>
+        )}
+        {thesis.foundation && (
+          <span className="text-muted-foreground mt-1 flex gap-1.5 text-[11px] leading-[1.45]">
+            <span className="flex-none text-[var(--gold)]">↳</span>
+            <span>{thesis.foundation}</span>
+          </span>
+        )}
+      </span>
     </button>
+  );
+}
+
+// ── Segmented control do Tom (fiel ao protótipo, sem depender do mock-ui) ────
+
+function TomSegmented({
+  valor,
+  onChange,
+}: {
+  valor: PecaTone;
+  onChange: (v: PecaTone) => void;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Tom da peça"
+      className="bg-muted/60 flex gap-0.5 rounded-[10px] p-[3px]"
+    >
+      {TOM_OPCOES.map((o) => {
+        const ativo = valor === o.valor;
+        return (
+          <button
+            key={o.valor}
+            type="button"
+            role="radio"
+            aria-checked={ativo}
+            onClick={() => onChange(o.valor)}
+            className={cn(
+              "flex-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium transition-colors",
+              ativo
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -144,15 +172,15 @@ function GeneratingScreen({ pieceType }: { pieceType: string }) {
   const label = rotuloTipoPeca(pieceType);
   return (
     <div
-      className="flex min-h-[60vh] flex-col items-center justify-center gap-4 py-24"
+      className="flex min-h-[60vh] flex-col items-center justify-center gap-2 py-24 text-center"
       aria-busy="true"
       aria-live="polite"
     >
-      <Loader2 className="text-muted-foreground size-10 animate-spin" />
-      <p className="font-display text-foreground/70 text-[21px]">
+      <div className="border-border border-t-primary size-10 animate-spin rounded-full border-2" />
+      <p className="font-display mt-[22px] text-[21px]">
         Redigindo sua {label}…
       </p>
-      <p className="text-muted-foreground text-[12.5px]">
+      <p className="text-muted-foreground mt-1.5 text-[12.5px]">
         Lendo o teor da intimação e estruturando os argumentos.
       </p>
     </div>
@@ -178,7 +206,6 @@ function useSagaPolling({
   const onTerminalRef = useRef(onTerminal);
   const mounted = useRef(true);
 
-  // Atualiza a ref no effect para não mutar durante render.
   useEffect(() => {
     onTerminalRef.current = onTerminal;
   });
@@ -193,7 +220,6 @@ function useSagaPolling({
     };
   }, []);
 
-  // Observa saga_state: se terminat navega imediatamente.
   useEffect(() => {
     const state = peca?.saga_state;
     if (active && (state === "DRAFTED" || state === "FAILED")) {
@@ -203,7 +229,6 @@ function useSagaPolling({
     }
   }, [peca?.saga_state, active]);
 
-  // Arranca o polling quando active muda para true.
   useEffect(() => {
     if (!active) {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -217,7 +242,6 @@ function useSagaPolling({
       if (!mounted.current) return;
       const elapsed = Date.now() - pollStartRef.current;
       if (elapsed >= POLL_TIMEOUT_MS) {
-        // Timeout — força workspace.
         onTerminalRef.current();
         return;
       }
@@ -238,7 +262,6 @@ function useSagaPolling({
 
 interface PecaPartidaProps {
   id: string;
-  /** Callback chamado quando o workspace deve ser exibido (gerar ou pular). */
   onWorkspace: () => void;
 }
 
@@ -247,17 +270,13 @@ export function PecaPartida({ id, onWorkspace }: PecaPartidaProps) {
   const thesesQuery = useTheses(id);
   const gerarPeca = useGerarPeca();
 
-  // Estado de tom — padrão: técnico-formal.
-  const [tom, setTom] = useState<PecaTone>("tecnico-formal");
-
-  // Estado de instruções.
+  const [tom, setTom] = useState<PecaTone>("tecnico");
   const [instrucoes, setInstrucoes] = useState("");
   const instrError =
     instrucoes.length > MAX_INSTRUCTIONS
-      ? `Máximo de ${MAX_INSTRUCTIONS} caracteres. Você digitou ${instrucoes.length}.`
+      ? `Máximo de ${MAX_INSTRUCTIONS} caracteres.`
       : null;
 
-  // Teses selecionadas — todas pré-selecionadas por padrão.
   const theses = useMemo(
     () => thesesQuery.data?.theses ?? [],
     [thesesQuery.data],
@@ -265,7 +284,6 @@ export function PecaPartida({ id, onWorkspace }: PecaPartidaProps) {
   const [selecionadas, setSelecionadas] = useState<Set<number>>(new Set());
   const semeado = useRef(false);
 
-  // Semear seleção quando teses carregam (todas on por padrão).
   useEffect(() => {
     if (!semeado.current && theses.length > 0) {
       setSelecionadas(new Set(theses.map((_, i) => i)));
@@ -273,7 +291,6 @@ export function PecaPartida({ id, onWorkspace }: PecaPartidaProps) {
     }
   }, [theses]);
 
-  // Controla se estamos aguardando o saga_state DRAFTED.
   const [gerando, setGerando] = useState(false);
 
   useSagaPolling({
@@ -300,32 +317,28 @@ export function PecaPartida({ id, onWorkspace }: PecaPartidaProps) {
           theses: tesesSelecionadas.length > 0 ? tesesSelecionadas : undefined,
         },
       },
-      {
-        onSuccess: () => setGerando(true),
-      },
+      { onSuccess: () => setGerando(true) },
     );
   };
 
   const instrId = useId();
   const instrErrorId = `${instrId}-error`;
 
-  // Dados de contexto da peça (usados na aside "A IA vai usar").
-  const proc = peca?.process ?? null;
-  const intim = peca?.intimation ?? null;
-  const prazo = peca?.deadline ?? null;
+  if (!peca) {
+    if (gerando) return <GeneratingScreen pieceType="BLANK" />;
+    return <div className="text-muted-foreground p-8 text-sm">Carregando…</div>;
+  }
+
+  // ── Dados de contexto pra o painel "A IA vai usar" ────────────────────────
+  const proc = peca.process;
+  const intim = peca.intimation;
+  const prazo = peca.deadline;
   const termo = prazo?.end_date ?? null;
   const dias = termo ? diasRestantes(termo) : null;
-  const corPrazo = corDaUrgencia(urgenciaDe(dias));
-  const tipoPecaLabel = rotuloTipoPeca(peca?.piece_type ?? "BLANK");
-
-  // Enquanto a peça carrega, renderiza loading simples (a shell precisa da
-  // peça pra montar TopBar + Contexto).
-  if (!peca) {
-    if (gerando) {
-      return <GeneratingScreen pieceType="BLANK" />;
-    }
-    return <div className="p-8">Carregando…</div>;
-  }
+  const tipoPecaLabel = rotuloTipoPeca(peca.piece_type);
+  const origemLabel = intim
+    ? `${TYPE_LABEL[intim.type as IntimacaoType] ?? intim.type} — teor recebido em ${formatDate(intim.made_available_at)}`
+    : null;
 
   return (
     <div className="flex h-full min-h-0 min-w-[1230px] flex-col overflow-x-auto">
@@ -338,58 +351,44 @@ export function PecaPartida({ id, onWorkspace }: PecaPartidaProps) {
         </div>
       ) : (
         <div className="grid min-h-0 flex-1 grid-cols-[300px_minmax(560px,1fr)_330px]">
-          {/* Coluna esquerda: Contexto (mesma do workspace) */}
+          {/* Coluna esquerda — Contexto (mesma do workspace) */}
           <PecaContexto peca={peca} />
 
-          {/* Coluna do meio: formulário de partida */}
+          {/* Coluna central — Vamos redigir sua {peça} */}
           <section className="overflow-y-auto">
-            <div className="mx-auto flex max-w-[600px] flex-col gap-8 px-8 py-10">
-              {/* 1. Cabeçalho */}
-              <div className="flex flex-col gap-1.5">
-                <p className="text-[10.5px] font-semibold tracking-[0.14em] text-[var(--gold)] uppercase">
-                  Redigir com IA
-                </p>
-                <h1 className="font-display text-[28px] leading-tight font-medium">
-                  Vamos redigir sua {tipoPecaLabel}
-                </h1>
-                <p className="text-muted-foreground text-[13.5px] leading-relaxed">
-                  A IA parte da intimação e das providências desta tarefa.
-                  Oriente como conduzir — você revisa e refaz o que quiser antes
-                  de assinar.
-                </p>
-              </div>
+            <div className="mx-auto max-w-[560px] px-10 pt-10 pb-14">
+              {/* Cabeçalho */}
+              <p className="text-[10.5px] tracking-[0.12em] text-[var(--gold)] uppercase">
+                Redigir com IA
+              </p>
+              <h2 className="font-display mt-2 text-[28px] leading-[1.15] font-medium">
+                Vamos redigir sua {tipoPecaLabel}
+              </h2>
+              <p className="text-muted-foreground mt-1.5 text-[13px] leading-[1.6]">
+                A IA parte da intimação e das providências desta tarefa. Oriente
+                como conduzir — você revisa e refaz o que quiser antes de
+                assinar.
+              </p>
 
-              {/* 2. Painel "A IA vai usar" */}
-              {(intim ?? proc ?? prazo) && (
-                <section className="border-border bg-muted/40 rounded-xl border px-5 py-4">
-                  <p className="text-muted-foreground mb-3 text-[10.5px] font-semibold tracking-[0.12em] uppercase">
+              {/* Painel "A IA vai usar" */}
+              {(origemLabel || prazo) && (
+                <div className="border-border bg-muted/40 my-6 rounded-xl border px-4 py-3.5">
+                  <p className="text-muted-foreground mb-2 text-[10.5px] tracking-[0.1em] uppercase">
                     A IA vai usar
                   </p>
-                  <ul className="flex flex-col gap-2">
-                    {intim && (
-                      <li className="flex items-start gap-2 text-[13px]">
-                        <span
-                          className="mt-0.5 size-1.5 flex-none rounded-full bg-[var(--gold)]"
-                          aria-hidden="true"
-                        />
-                        <span>
-                          {TYPE_LABEL[intim.type as IntimacaoType] ??
-                            intim.type}
-                        </span>
+                  <ul className="flex flex-col gap-[7px] text-[12.5px] leading-[1.5]">
+                    {origemLabel && (
+                      <li className="flex gap-2">
+                        <span className="text-[var(--gold)]">•</span>
+                        <span>{origemLabel}</span>
                       </li>
                     )}
                     {prazo && (
-                      <li className="flex items-start gap-2 text-[13px]">
-                        <span
-                          className="mt-0.5 size-1.5 flex-none rounded-full bg-[var(--gold)]"
-                          aria-hidden="true"
-                        />
+                      <li className="flex gap-2">
+                        <span className="text-[var(--gold)]">•</span>
                         <span>
                           Prazo{" "}
-                          <span
-                            style={{ color: corPrazo }}
-                            className="tabular-nums"
-                          >
+                          <span className="tabular-nums">
                             {formatDate(termo)}
                           </span>
                           {" · "}
@@ -400,197 +399,178 @@ export function PecaPartida({ id, onWorkspace }: PecaPartidaProps) {
                         </span>
                       </li>
                     )}
-                    {proc && (
-                      <li className="flex items-start gap-2 text-[13px]">
-                        <span
-                          className="mt-0.5 size-1.5 flex-none rounded-full bg-[var(--gold)]"
-                          aria-hidden="true"
-                        />
-                        <span className="text-muted-foreground tabular-nums">
-                          {proc.cnj_number}
-                        </span>
-                      </li>
-                    )}
                   </ul>
-                </section>
+                </div>
               )}
 
-              {/* 3. Teses a sustentar */}
-              <section>
-                <div className="mb-1.5">
-                  <p className="text-[15px] font-semibold">Teses a sustentar</p>
-                  <p className="text-muted-foreground text-[13px]">
-                    A IA sugeriu estas — escolha as que entram.
-                  </p>
-                </div>
+              {/* Teses a sustentar — título inline (12px + span 11px cinza) */}
+              <div className="mb-2 flex flex-wrap items-baseline gap-2">
+                <span className="text-[12px] font-medium">
+                  Teses a sustentar
+                </span>
+                <span className="text-muted-foreground text-[11px]">
+                  a IA sugeriu estas — escolha as que entram
+                </span>
+              </div>
 
-                {thesesQuery.isPending ? (
-                  <div className="text-muted-foreground mt-3 flex items-center gap-2 text-[13px]">
-                    <Loader2 className="size-4 animate-spin" />
-                    Sugerindo teses…
-                  </div>
-                ) : theses.length === 0 ? (
-                  <p className="border-border bg-muted/30 text-muted-foreground mt-3 rounded-lg border px-4 py-3 text-[13px]">
-                    {thesesQuery.isError
-                      ? "Não foi possível sugerir teses agora. Continue sem selecionar ou tente novamente."
-                      : "Nenhuma tese sugerida para esta peça."}
-                  </p>
-                ) : (
-                  <div
-                    className="mt-3 flex flex-col gap-2"
-                    role="group"
-                    aria-label="Teses a sustentar"
-                  >
-                    {theses.map((t) => (
+              {thesesQuery.isPending ? (
+                <div className="text-muted-foreground mt-3 flex items-center gap-2 text-[12.5px]">
+                  <Loader2 className="size-4 animate-spin" />
+                  Sugerindo teses…
+                </div>
+              ) : theses.length === 0 ? (
+                <p className="border-border bg-muted/30 text-muted-foreground mt-2 rounded-[10px] border px-3 py-2.5 text-[12.5px]">
+                  {thesesQuery.isError
+                    ? "Não foi possível sugerir teses agora. Continue sem selecionar ou tente novamente."
+                    : "Nenhuma tese sugerida para esta peça."}
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {theses.map((t) => {
+                    const i = theses.indexOf(t);
+                    return (
                       <ThesisCard
                         key={t.label}
                         thesis={t}
-                        selected={selecionadas.has(theses.indexOf(t))}
-                        onToggle={() => {
-                          const i = theses.indexOf(t);
+                        selected={selecionadas.has(i)}
+                        onToggle={() =>
                           setSelecionadas((prev) => {
                             const next = new Set(prev);
                             if (next.has(i)) next.delete(i);
                             else next.add(i);
                             return next;
-                          });
-                        }}
+                          })
+                        }
                       />
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {/* 4. Tom da peça */}
-              <section>
-                <p className="mb-3 text-[15px] font-semibold">Tom da peça</p>
-                <div role="radiogroup" aria-label="Tom da peça">
-                  <Segmented<PecaTone>
-                    valor={tom}
-                    opcoes={TOM_OPCOES}
-                    onChange={setTom}
-                  />
+                    );
+                  })}
                 </div>
-              </section>
+              )}
 
-              {/* 5. Instruções à IA */}
-              <section>
-                <div className="mb-2 flex items-center gap-2">
-                  <label
-                    htmlFor={instrId}
-                    className="text-[15px] font-semibold"
-                  >
-                    Instruções à IA
-                  </label>
-                  <span className="text-muted-foreground text-[12px]">
-                    opcional
-                  </span>
-                </div>
-                <Textarea
-                  id={instrId}
-                  value={instrucoes}
-                  onChange={(e) => setInstrucoes(e.target.value)}
-                  placeholder="Ex.: enfatize a ausência de contrato escrito e peça a extinção da execução."
-                  className="min-h-[76px] resize-y text-[13.5px]"
-                  aria-describedby={instrError ? instrErrorId : undefined}
-                  aria-invalid={instrError ? true : undefined}
-                />
-                {instrError && (
-                  <p
-                    id={instrErrorId}
-                    role="alert"
-                    className="text-destructive mt-1.5 text-[12px]"
-                  >
-                    {instrError}
-                  </p>
-                )}
-                <p className="text-muted-foreground mt-1 text-right text-[11.5px] tabular-nums">
-                  {instrucoes.length}/{MAX_INSTRUCTIONS}
+              {/* Tom da peça */}
+              <p className="mt-[22px] mb-2 text-[12px] font-medium">
+                Tom da peça
+              </p>
+              <TomSegmented valor={tom} onChange={setTom} />
+
+              {/* Instruções à IA */}
+              <p className="mt-[22px] mb-2 text-[12px] font-medium">
+                <label htmlFor={instrId}>Instruções à IA</label>{" "}
+                <span className="text-muted-foreground font-normal">
+                  opcional
+                </span>
+              </p>
+              <textarea
+                id={instrId}
+                value={instrucoes}
+                onChange={(e) => setInstrucoes(e.target.value)}
+                placeholder="Ex.: enfatize a ausência de contrato escrito e peça a extinção da execução."
+                className="border-border bg-card text-foreground focus-visible:ring-ring block min-h-[76px] w-full resize-y rounded-[10px] border px-3 py-2.5 text-[12.5px] leading-[1.55] focus-visible:ring-2 focus-visible:outline-none"
+                aria-describedby={instrError ? instrErrorId : undefined}
+                aria-invalid={instrError ? true : undefined}
+              />
+              {instrError && (
+                <p
+                  id={instrErrorId}
+                  role="alert"
+                  className="text-destructive mt-1.5 text-[11.5px]"
+                >
+                  {instrError}
                 </p>
-              </section>
+              )}
 
-              {/* 6. CTAs (fiéis ao mockup: lado a lado) */}
-              <div className="flex flex-col gap-2">
-                {gerarPeca.isError && (
-                  <p role="alert" className="text-destructive text-[12.5px]">
-                    Não foi possível iniciar a geração. Tente novamente.
-                  </p>
-                )}
-                <div className="flex items-center gap-4">
-                  <Button
-                    size="lg"
-                    onClick={handleGerar}
-                    disabled={gerarPeca.isPending || !!instrError}
+              {/* CTAs lado a lado */}
+              {gerarPeca.isError && (
+                <p role="alert" className="text-destructive mt-4 text-[12.5px]">
+                  Não foi possível iniciar a geração. Tente novamente.
+                </p>
+              )}
+              <div className="mt-[22px] flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleGerar}
+                  disabled={gerarPeca.isPending || !!instrError}
+                  className="bg-primary text-primary-foreground inline-flex items-center gap-2 rounded-[11px] px-5 py-[11px] text-[13.5px] font-medium shadow-sm transition-colors hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   >
-                    <Sparkles className="mr-2 size-4" />
-                    {gerarPeca.isPending ? "Iniciando…" : "Gerar minuta"}
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={onWorkspace}
-                    className="text-muted-foreground hover:text-foreground text-[13px] transition-colors"
-                  >
-                    Prefiro começar em branco
-                  </button>
-                </div>
+                    <path d="M9.94 5.34 12 2l2.06 3.34 3.9.86-2.6 3.02.36 3.96L12 15.6l-3.68 1.54.36-3.96-2.6-3.02 3.9-.86Z" />
+                  </svg>
+                  {gerarPeca.isPending ? "Iniciando…" : "Gerar minuta"}
+                </button>
+                <button
+                  type="button"
+                  onClick={onWorkspace}
+                  className="text-muted-foreground hover:text-foreground p-2 text-[13px] transition-colors"
+                >
+                  Prefiro começar em branco
+                </button>
               </div>
             </div>
           </section>
 
-          {/* Coluna direita: Como funciona */}
-          <aside className="border-border overflow-y-auto border-l px-6 py-8">
-            <div className="flex flex-col gap-5">
-              <p className="text-muted-foreground text-[10.5px] font-semibold tracking-[0.12em] uppercase">
-                Como funciona
-              </p>
+          {/* Coluna direita — Como funciona (grid 24px|1fr, border-b por item) */}
+          <aside className="border-border overflow-y-auto border-l px-[18px] py-6">
+            <p className="text-muted-foreground text-[10.5px] tracking-[0.12em] uppercase">
+              Como funciona
+            </p>
 
-              <ol className="flex flex-col gap-5">
-                {[
-                  {
-                    n: 1,
-                    titulo: "Você orienta",
-                    descricao: "Escolhe as teses, o tom e escreve instruções.",
-                  },
-                  {
-                    n: 2,
-                    titulo: "A IA redige",
-                    descricao:
-                      "Uma primeira minuta a partir da intimação e das providências.",
-                  },
-                  {
-                    n: 3,
-                    titulo: "Você itera",
-                    descricao:
-                      "Refaz trechos, troca o tom ou reforça uma tese — quantas vezes precisar.",
-                  },
-                  {
-                    n: 4,
-                    titulo: "Assina e protocola",
-                    descricao: "Com a peça revisada e assumida por você.",
-                  },
-                ].map((passo) => (
-                  <li key={passo.n} className="flex items-start gap-3">
-                    <span className="border-border text-muted-foreground flex size-6 flex-none items-center justify-center rounded-full border text-[11px] tabular-nums">
-                      {passo.n}
+            <ol className="mt-3.5 flex flex-col">
+              {[
+                {
+                  n: 1,
+                  titulo: "Você orienta",
+                  descricao: "Escolhe as teses, o tom e escreve instruções.",
+                },
+                {
+                  n: 2,
+                  titulo: "A IA redige",
+                  descricao:
+                    "Uma primeira minuta a partir da intimação e das providências.",
+                },
+                {
+                  n: 3,
+                  titulo: "Você itera",
+                  descricao:
+                    "Refaz trechos, troca o tom ou reforça uma tese — quantas vezes precisar.",
+                },
+                {
+                  n: 4,
+                  titulo: "Assina e protocola",
+                  descricao: "Com a peça revisada e assumida por você.",
+                },
+              ].map((passo) => (
+                <li
+                  key={passo.n}
+                  className="border-border grid grid-cols-[24px_1fr] gap-2.5 border-b py-2.5"
+                >
+                  <span className="border-border text-muted-foreground grid size-[22px] place-items-center rounded-full border text-[11px] tabular-nums">
+                    {passo.n}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[12.5px] font-medium">
+                      {passo.titulo}
                     </span>
-                    <div>
-                      <p className="text-[13.5px] font-semibold">
-                        {passo.titulo}
-                      </p>
-                      <p className="text-muted-foreground mt-0.5 text-[12.5px] leading-relaxed">
-                        {passo.descricao}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
+                    <span className="text-muted-foreground mt-0.5 block text-[11.5px] leading-[1.5]">
+                      {passo.descricao}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ol>
 
-              <div className="border-border bg-muted/40 rounded-xl border px-4 py-4">
-                <p className="text-muted-foreground text-[12.5px] leading-relaxed">
-                  Nenhuma peça é protocolada sem revisão humana. A IA redige e
-                  sugere; a assinatura e a autoria são sempre suas.
-                </p>
-              </div>
+            {/* Card de aviso — apenas border + radius, sem fundo */}
+            <div className="border-border text-muted-foreground mt-[22px] rounded-xl border px-3.5 py-3 text-[11.5px] leading-[1.6]">
+              Nenhuma peça é protocolada sem revisão humana. A IA redige e
+              sugere; a assinatura e a autoria são sempre suas.
             </div>
           </aside>
         </div>
