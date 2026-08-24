@@ -34,11 +34,15 @@ export function AssinaturaPage({ pecaId }: { pecaId: string }) {
   const [certId, setCertId] = useState<string>("");
   const [confirming, setConfirming] = useState(false);
 
-  useSetBreadcrumb(
-    draft?.process.cnj
-      ? [{ label: "Peticionamento" }, { label: `Processo ${draft.process.cnj}` }]
-      : [{ label: "Peticionamento" }],
+  const cnj = draft?.process.cnj;
+  const crumbs = useMemo(
+    () =>
+      cnj
+        ? [{ label: "Peticionamento" }, { label: `Processo ${cnj}` }]
+        : [{ label: "Peticionamento" }],
+    [cnj],
   );
+  useSetBreadcrumb(crumbs);
 
   // Auto-seleção quando há um único cert ativo (UX comum — advogado só tem 1).
   const activeCerts = useMemo(

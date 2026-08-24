@@ -5,7 +5,7 @@
 // Input opcional: número/protocolo do tribunal. Ao confirmar, o BE grava
 // filed_at + filing_number no draft; o router redireciona pra tela Concluída.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
@@ -22,11 +22,15 @@ export function ProtocoloPage({ pecaId }: { pecaId: string }) {
   const file = useFilePeca(pecaId);
   const [filingNumber, setFilingNumber] = useState("");
 
-  useSetBreadcrumb(
-    draft?.process.cnj
-      ? [{ label: "Peticionamento" }, { label: `Processo ${draft.process.cnj}` }]
-      : [{ label: "Peticionamento" }],
+  const cnj = draft?.process.cnj;
+  const crumbs = useMemo(
+    () =>
+      cnj
+        ? [{ label: "Peticionamento" }, { label: `Processo ${cnj}` }]
+        : [{ label: "Peticionamento" }],
+    [cnj],
   );
+  useSetBreadcrumb(crumbs);
 
   if (isLoading) {
     return <div className="text-muted-foreground p-8 text-sm">Carregando…</div>;

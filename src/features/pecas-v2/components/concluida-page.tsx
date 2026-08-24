@@ -3,6 +3,8 @@
 // Step Concluída — a peça foi protocolada. Read-only, mostra dados finais
 // (número do protocolo, quando foi protocolada) + preview da peça.
 
+import { useMemo } from "react";
+
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
 
 import { useDraft } from "../hooks/use-draft";
@@ -12,11 +14,15 @@ import { PecaPreview } from "./peca-preview";
 export function ConcluidaPage({ pecaId }: { pecaId: string }) {
   const { data: draft, isLoading } = useDraft(pecaId);
 
-  useSetBreadcrumb(
-    draft?.process.cnj
-      ? [{ label: "Peticionamento" }, { label: `Processo ${draft.process.cnj}` }]
-      : [{ label: "Peticionamento" }],
+  const cnj = draft?.process.cnj;
+  const crumbs = useMemo(
+    () =>
+      cnj
+        ? [{ label: "Peticionamento" }, { label: `Processo ${cnj}` }]
+        : [{ label: "Peticionamento" }],
+    [cnj],
   );
+  useSetBreadcrumb(crumbs);
 
   if (isLoading) {
     return <div className="text-muted-foreground p-8 text-sm">Carregando…</div>;
