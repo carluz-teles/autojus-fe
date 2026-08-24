@@ -22,8 +22,20 @@ import { Underline } from "@tiptap/extension-underline";
 import { StarterKit } from "@tiptap/starter-kit";
 import { useEffect, useRef } from "react";
 
+import { forwardRef, useImperativeHandle } from "react";
+
 import { RichToolbar } from "./rich-toolbar";
 import "./rich-editor.css";
+
+export interface RichEditorHandle {
+  /** Append de HTML no fim do documento — usado pelo streaming da geração
+   *  (useDraftStream chama pra cada chunk que chega). Bypass do onChange. */
+  appendHtml(html: string): void;
+  /** Substitui o conteúdo inteiro. */
+  setHtml(html: string): void;
+  /** Rola pro fim (útil enquanto o cursor da IA vai descendo). */
+  scrollToEnd(): void;
+}
 
 interface Props {
   /** HTML inicial (Tiptap sincroniza no mount e quando muda `key`/`content`). */
@@ -37,7 +49,10 @@ interface Props {
   placeholder?: string;
 }
 
-export function RichEditor({ html, onChange, onStats, readOnly = false, placeholder }: Props) {
+export const RichEditor = forwardRef<RichEditorHandle, Props>(function RichEditor(
+  { html, onChange, onStats, readOnly = false, placeholder },
+  ref,
+) {
   // Guarda ref pro último HTML aplicado externamente pra não disparar
   // ciclo (Tiptap → onUpdate → parent → prop → setContent → onUpdate…).
   const lastAppliedHtml = useRef(html);
@@ -95,6 +110,30 @@ export function RichEditor({ html, onChange, onStats, readOnly = false, placehol
     editor.setEditable(!readOnly);
   }, [editor, readOnly]);
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      appendHtml(chunk: string) {
+        if (!editor) return;
+        const end = editor.state.doc.content.size;
+        editor.commands.insertContentAt(end, chunk, {
+          updateSelection: false,
+          parseOptions: { preserveWhitespace: "full" },
+        });
+      },
+      setHtml(next: string) {
+        if (!editor) return;
+        lastAppliedHtml.current = next;
+        editor.commands.setContent(next, { emitUpdate: false });
+      },
+      scrollToEnd() {
+        const el = document.querySelector(".tiptap-a4-page");
+        if (el) el.scrollTo({ top: (el as HTMLElement).scrollHeight, behavior: "smooth" });
+      },
+    }),
+    [editor],
+  );
+
   return (
     <div className="flex flex-col gap-3">
       <RichToolbar editor={editor} />
@@ -103,4 +142,4 @@ export function RichEditor({ html, onChange, onStats, readOnly = false, placehol
       </div>
     </div>
   );
-}
+});
