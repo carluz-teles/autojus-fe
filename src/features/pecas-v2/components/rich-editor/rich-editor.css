@@ -1,0 +1,121 @@
+/* Rich editor — folha A4 visual + prose styles pra formatação forense.
+ *
+ * A "folha" é um contêiner max-width 210mm com padding equivalente às
+ * margens forenses (3-3-2-2 cm = 30-30-20-20 mm), fundo branco, sombra
+ * discreta pra separar visualmente do canvas de fundo. Quebra de página
+ * automática é responsabilidade do CSS Paged Media (só ativa na hora
+ * do print / PDF renderer) — no editor, é uma folha longa contínua.
+ *
+ * As classes .tiptap-a4-page e .tiptap-content são aplicadas pelo
+ * RichEditor.tsx. .tiptap-content herda a fonte configurada pra que o
+ * WYSIWYG bata com o PDF renderizado (Liberation Serif ~= Times New Roman).
+ */
+
+.tiptap-a4-page {
+  background: #ffffff;
+  color: #0f172a;
+  max-width: 210mm;
+  margin: 24px auto;
+  padding: 30mm 20mm 20mm 30mm; /* top-right-bottom-left = margens ABNT/forense */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.08);
+  border-radius: 2px;
+  min-height: 297mm; /* altura A4; cresce conforme conteúdo */
+  font-family: "Liberation Serif", "Times New Roman", Times, serif;
+  font-size: 12pt;
+  line-height: 1.5;
+}
+
+/* ProseMirror injeta um wrapper — remove estilo default (border/outline no focus). */
+.tiptap-content .ProseMirror {
+  outline: none;
+  min-height: 100%;
+}
+
+.tiptap-content .ProseMirror p {
+  margin: 0 0 0.5em 0;
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
+}
+
+.tiptap-content .ProseMirror h1,
+.tiptap-content .ProseMirror h2,
+.tiptap-content .ProseMirror h3 {
+  font-weight: 700;
+  text-align: center;
+  margin: 1.5em 0 0.75em 0;
+}
+.tiptap-content .ProseMirror h1 { font-size: 14pt; text-transform: uppercase; }
+.tiptap-content .ProseMirror h2 { font-size: 12pt; text-transform: uppercase; }
+.tiptap-content .ProseMirror h3 { font-size: 12pt; }
+
+.tiptap-content .ProseMirror ul,
+.tiptap-content .ProseMirror ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+.tiptap-content .ProseMirror li p { margin: 0; }
+
+.tiptap-content .ProseMirror blockquote {
+  border-left: 3px solid #cbd5e1;
+  margin: 0.75em 0 0.75em 2em;
+  padding: 0 0 0 1em;
+  color: #334155;
+  font-size: 10pt;
+  line-height: 1.2;
+}
+
+.tiptap-content .ProseMirror hr {
+  border: none;
+  border-top: 1px solid #cbd5e1;
+  margin: 1em 0;
+}
+
+/* Tabelas — bordas colapsadas, cell padding forense. */
+.tiptap-content .ProseMirror table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  width: 100%;
+  table-layout: fixed;
+}
+.tiptap-content .ProseMirror table td,
+.tiptap-content .ProseMirror table th {
+  border: 1px solid #0f172a;
+  padding: 6px 8px;
+  vertical-align: top;
+  min-width: 2em;
+}
+.tiptap-content .ProseMirror table th {
+  background: #f1f5f9;
+  font-weight: 600;
+  text-align: left;
+}
+.tiptap-content .ProseMirror table .selectedCell::after {
+  background: rgba(59, 130, 246, 0.12);
+  content: "";
+  left: 0; right: 0; top: 0; bottom: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+.tiptap-content .ProseMirror table {
+  position: relative;
+}
+.tiptap-content .ProseMirror table .column-resize-handle {
+  background-color: #3b82f6;
+  bottom: -2px;
+  pointer-events: none;
+  position: absolute;
+  right: -2px;
+  top: 0;
+  width: 4px;
+}
+
+/* Placeholder do editor vazio. */
+.tiptap-content .ProseMirror p.is-editor-empty:first-child::before {
+  color: #94a3b8;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
