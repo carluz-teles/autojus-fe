@@ -1,17 +1,21 @@
 "use client";
 
-// EditorArea (Fase A do editor rico) — passou de multi-card (Preâmbulo +
-// SectionCard[]) pra um único RichEditor (Tiptap). A peça vira UMA folha
-// A4 contínua com toolbar Word-like em cima. Autosave preservado via
-// debounce: HTML muda → converte pra StructuredContent (adapter no cliente,
-// intermediário até a Fase B) → dispara handlers existentes onSavePreamble/
-// onSaveSection sem perder compat com o BE atual.
+// EditorArea (Fase A/B/C do editor rico) — RichEditor único com folha A4.
+//
+// Persistência (Fase B): source-of-truth é draft.contentHtml (coluna
+// draft.content_html no BE). Quando é null (peça recém-gerada pela IA ou
+// legacy), derivamos HTML de structured_content client-side pra popular
+// o editor. Autosave grava direto em content_html via PUT /content-html.
+//
+// PDF (Fase C): o BE renderiza HTML → PDF via chromedp usando o mesmo
+// content_html — bate visualmente com o WYSIWYG.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { countChars, countWords } from "../../lib/count";
+import { useSaveContentHtml } from "../../hooks/use-workflow";
 import type { Draft, DraftSection } from "../../types";
-import { htmlToStructured, structuredToHtml } from "../rich-editor/html-adapter";
+import { structuredToHtml } from "../rich-editor/html-adapter";
 import { RichEditor } from "../rich-editor/rich-editor";
 import { EditorBanner } from "./editor-banner";
 import { EditorFooter } from "./editor-footer";
@@ -20,14 +24,13 @@ const AUTOSAVE_DEBOUNCE_MS = 1200;
 
 interface Props {
   draft: Draft;
-  onRefazerSection: (sectionId: string) => void; // preservado, mas sem UI dedicada na Fase A
+  onRefazerSection: (sectionId: string) => void; // preservado, sem UI dedicada na Fase A
   onAssumirAutoria: () => void;
   onRefazerDoZero: () => void;
-  onSavePreamble: (paragraphs: string[]) => void;
-  onSaveSection: (sectionId: string, paragraphs: string[]) => void;
+  onSavePreamble: (paragraphs: string[]) => void; // legacy — não usado mais
+  onSaveSection: (sectionId: string, paragraphs: string[]) => void; // legacy — não usado mais
   /** Trava a edição enquanto há um ajuste sendo revisado no painel lateral. */
   isPreviewActive?: boolean;
-  /** Mantido por compat com a assinatura antiga; sem efeito na Fase A. */
   hideRefazerSection?: boolean;
 }
 
@@ -35,30 +38,29 @@ export function EditorArea({
   draft,
   onAssumirAutoria,
   onRefazerDoZero,
-  onSavePreamble,
-  onSaveSection,
   isPreviewActive = false,
 }: Props) {
-  // HTML derivado da peça — recalcula apenas quando o SHAPE do JSON muda
-  // (não quando o Tiptap emite novo HTML pra dentro). Sincroniza no load
-  // e quando o parent troca a peça (aplicar iteração etc.).
+  const saveHtml = useSaveContentHtml(draft.id);
+
+  // HTML inicial: preferir contentHtml (Fase B) quando disponível; senão
+  // deriva de structured_content (peça recém-gerada). Sincroniza quando o
+  // BE devolve conteúdo novo (fetch, iterate aplicado, etc.).
   const initialHtml = useMemo(
-    () =>
-      structuredToHtml({
-        preamble: draft.preamble,
-        sections: draft.sections,
-      }),
+    () => {
+      if (draft.contentHtml && draft.contentHtml.trim() !== "") return draft.contentHtml;
+      return structuredToHtml({ preamble: draft.preamble, sections: draft.sections });
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draftShapeKey(draft)],
+    [draft.id, draft.contentHtml, draftShapeKey(draft)],
   );
 
-  // Stats reais vindas do Tiptap (mais precisas que contar do JSON).
   const [stats, setStats] = useState<{ words: number; chars: number }>(() => ({
     words: countWords(allText(draft)),
     chars: countChars(allText(draft)),
   }));
 
-  // Autosave debounced. Precisa 1 timer só — a peça é salva inteira.
+  // Autosave debounced. Fase B: apenas 1 chamada por debounce que grava
+  // o HTML inteiro — o BE não precisa mais parsear em sections.
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
@@ -70,19 +72,7 @@ export function EditorArea({
   const handleHtmlChange = (html: string) => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      const sc = htmlToStructured(html);
-      onSavePreamble(sc.preamble.paragraphs);
-      // Emit por section (id preservado via data-section-id ou derivado do texto).
-      // Se o número/ordem de sections mudou (usuário deletou um <h2>), o BE
-      // ainda recebe as remanescentes; sections órfãs ficam no backend até
-      // futura reconciliação (débito Fase B).
-      const byIdBefore = new Map(draft.sections.map((s) => [s.id, s]));
-      for (const s of sc.sections) {
-        const before = byIdBefore.get(s.id);
-        if (!before || !arrEq(before.paragraphs, s.paragraphs)) {
-          onSaveSection(s.id, s.paragraphs);
-        }
-      }
+      saveHtml.mutate(html);
     }, AUTOSAVE_DEBOUNCE_MS);
   };
 
@@ -117,9 +107,9 @@ export function EditorArea({
   );
 }
 
-/** Chave que muda somente quando o SHAPE do JSON (não o texto) mudar —
- *  ids/roman/qty de sections + qty de parágrafos. Evita rebuild do HTML
- *  a cada tecla (Tiptap já mantém seu próprio state interno). */
+/** Chave que muda quando o SHAPE de structured_content mudar — usada só
+ *  quando contentHtml é null (fallback). Evita rebuild do HTML a cada
+ *  tecla enquanto o Tiptap mantém seu próprio state interno. */
 function draftShapeKey(d: Draft): string {
   const secs = d.sections.map((s) => `${s.id}:${s.paragraphs.length}`).join("|");
   return `p${d.preamble.paragraphs.length}|s${secs}`;
@@ -132,11 +122,4 @@ function allText(draft: Draft): string {
   return parts.join(" ");
 }
 
-function arrEq(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
-
-// Reexport pra facilitar imports do painel (mantém contrato antigo).
 export type { DraftSection };

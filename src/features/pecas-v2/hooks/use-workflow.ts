@@ -44,3 +44,14 @@ export function useFilePeca(id: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: draftKeys.detail(id) }),
   });
 }
+
+/** Autosave do editor rico (Fase B) — grava HTML do Tiptap. Não invalida
+ *  o cache (autosave é frequente; o cache mais recente já é o do próprio
+ *  editor). O refetch acontece só quando o usuário sai da tela ou muda
+ *  de step. */
+export function useSaveContentHtml(id: string) {
+  const fetcher = useApi();
+  return useMutation({
+    mutationFn: (html: string) => svc.saveContentHtml(fetcher, id, html),
+  });
+}

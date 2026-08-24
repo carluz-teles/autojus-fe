@@ -263,6 +263,21 @@ export async function revertToConstruction(
   await fetcher(`${ENDPOINT}/${id}/voltar-para-construcao`, { method: "POST" });
 }
 
+/** Autosave do editor rico (Fase B). Grava content_html direto na coluna.
+ *  A partir do 1º save, content_html vira source-of-truth pro renderer PDF
+ *  (Fase C, chromedp). structured_content fica congelado (a IA continua
+ *  gerando pra novas gerações, mas edição humana só toca em content_html). */
+export async function saveContentHtml(
+  fetcher: ApiFetcher,
+  id: string,
+  contentHtml: string,
+): Promise<void> {
+  await fetcher(`${ENDPOINT}/${id}/content-html`, {
+    method: "PUT",
+    body: { content_html: contentHtml },
+  });
+}
+
 /** Assinar peça — Fatia 2b. Gera PDF no BE, chama GCP KMS pra assinatura RSA,
  *  aplica PAdES via digitorus/pdfsign, sobe PDF assinado no storage. Requer
  *  certificate_id do certificado A1 cadastrado. Senha vem do vault (não é

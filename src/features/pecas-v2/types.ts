@@ -115,6 +115,12 @@ export interface Draft {
   filingNumber: string;
   /** Presigned GET URL do PDF assinado (Fatia 2b). null antes de assinar. */
   signedPDFURL: string | null;
+
+  /** HTML rico do editor Tiptap (Fase B do editor rico). null quando a peça
+   *  ainda não passou pelo editor humano (IA gerou só structured_content).
+   *  Quando não-null: source-of-truth. FE dá preferência pra este campo
+   *  ao popular o editor; PDF final (Fase C, chromedp) usa ele direto. */
+  contentHtml: string | null;
 }
 
 /** Step atual do peticionamento — derivado dos timestamps. */

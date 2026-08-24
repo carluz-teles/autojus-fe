@@ -26,6 +26,10 @@ export interface PecaDetailAPI {
   created_at: string;
   updated_at: string;
   structured_content: StructuredContentAPI | null;
+  // Fase B do editor rico: HTML do Tiptap. null pra peças legacy ou geradas
+  // pela IA antes do 1º save humano. Quando não-null, source-of-truth
+  // pro editor (RichEditor) e pro renderer PDF (chromedp, Fase C).
+  content_html: string | null;
   authorship: "assistant" | "human_taken";
 
   intimation: IntimationAPI | null;
