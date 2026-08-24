@@ -45,17 +45,24 @@ export function useDraftStream(draftId: string, opts: Options): void {
     let es: EventSource | null = null;
 
     (async () => {
-      // EventSource não permite headers custom (spec HTML5) — passa token
-      // via query string. O BE usa o Fiber auth middleware que já aceita
-      // ?token=... como fallback do Authorization header quando definido.
-      // Se o BE não aceitar query token, o débito é adicionar aceitação lá.
-      const token = await getToken();
-      if (cancelled || !token) return;
+      // Fluxo em 2 passos (spec HTML5 EventSource não aceita headers custom):
+      // 1) POST /stream-token com Bearer JWT → recebe token opaco (2min)
+      // 2) EventSource com ?stream_token=xxx (token não é JWT — não vaza credencial)
+      const jwt = await getToken();
+      if (cancelled || !jwt) return;
+
+      const tokenRes = await fetch(`${API}/v1/pecas/${draftId}/stream-token`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      if (cancelled || !tokenRes.ok) return;
+      const { token: streamToken } = (await tokenRes.json()) as { token: string };
+      if (cancelled || !streamToken) return;
 
       // Reseta parser por conexão (nova geração pode reiniciar do zero)
       parserRef.current = createHTMLStreamParser();
 
-      const url = `${API}/v1/pecas/${draftId}/generation-stream?token=${encodeURIComponent(token)}`;
+      const url = `${API}/v1/pecas/${draftId}/generation-stream?stream_token=${encodeURIComponent(streamToken)}`;
       es = new EventSource(url, { withCredentials: false });
 
       es.addEventListener("chunk", (e: MessageEvent) => {
