@@ -6,12 +6,14 @@ import { useApi } from "@/lib/api/use-api";
 
 import { createTask } from "../services/tasks.service";
 import type { CreateTaskInput } from "../types";
+import { tasksKeys } from "./use-tasks";
 
 /**
- * Mutation de criar tarefa manual (POST /v1/tasks). No sucesso invalida as tarefas (a
- * nova entra na agenda / na aba do processo) e os prazos (uma tarefa avulsa ligada a um
- * deadline muda o "por quê" do painel). `await Promise.all` mantém `isPending` ligado até
- * o refetch concluir. Espelha useConfirmarPrazo (mesma dupla de query keys).
+ * Mutation de criar tarefa manual (POST /v1/tasks). No sucesso invalida tudo o que uma
+ * task nova pode tocar: as tarefas (agenda + aba do processo), os prazos (uma tarefa
+ * avulsa ligada a um deadline muda o "por quê" do painel) e a intimação de origem.
+ * `await Promise.all` mantém `isPending` ligado até o refetch concluir. Espelha
+ * useConfirmarPrazo.
  */
 export function useCreateTask() {
   const fetcher = useApi();
@@ -21,8 +23,9 @@ export function useCreateTask() {
     mutationFn: (input: CreateTaskInput) => createTask(fetcher, input),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+        queryClient.invalidateQueries({ queryKey: tasksKeys.all }),
         queryClient.invalidateQueries({ queryKey: ["prazos"] }),
+        queryClient.invalidateQueries({ queryKey: ["intimacoes"] }),
       ]);
     },
   });

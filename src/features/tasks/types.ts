@@ -1,11 +1,11 @@
 // Espelha os read models de tarefa (task) do BE — a lista de "o que fazer"
 // derivada dos prazos/intimações (source) e atribuída a um usuário.
-//   GET  /v1/tasks                 → PageEnvelope<TaskView>   (agenda global)
-//   GET  /v1/processos/:id/tasks   → PageEnvelope<TaskView>   (tarefas do processo)
-//   POST /v1/tasks                 → cria uma tarefa manual (avulsa ou com contexto)
+//   GET   /v1/tasks                → PageEnvelope<TaskView>   (agenda global)
+//   GET   /v1/processos/:id/tasks  → PageEnvelope<TaskView>   (tarefas do processo)
+//   POST  /v1/tasks                → cria uma tarefa manual (avulsa ou com contexto)
 //   PATCH /v1/tasks/:id            → edita os campos da tarefa (ajuste parcial)
-//   POST /v1/tasks/:id/done        → conclui a tarefa
-//   POST /v1/tasks/:id/dismiss     → dispensa a tarefa
+//   POST  /v1/tasks/:id/done       → conclui a tarefa
+//   POST  /v1/tasks/:id/dismiss    → dispensa a tarefa
 
 export type TaskStatus = "OPEN" | "DONE" | "DISMISSED";
 
@@ -86,6 +86,10 @@ export interface TaskDetailView {
   items: TaskItemView[];
   progress: TaskProgress;
 }
+
+// ── Criar / editar tarefa (mutations) ──
+// POST /v1/tasks (201) e PATCH /v1/tasks/:id (200) devolvem a task no mesmo shape
+// do TaskView — por isso o retorno das mutations reusa TaskView (Regra nº1).
 
 /**
  * Comentário do thread de discussão de uma tarefa — item de GET /v1/tasks/:id/comments
