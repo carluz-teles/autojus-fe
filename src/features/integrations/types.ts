@@ -90,15 +90,23 @@ export interface WatchedOab {
   oab: string;
   /** Nome mais frequente em party_counsel; null quando ainda não há captura. */
   name: string | null;
+  /** Liga/desliga a captura para esta OAB sem removê-la do scope. */
+  enabled: boolean;
 }
 
 export interface WatchedOabsResponse {
   data: WatchedOab[];
 }
 
+/** Resposta de POST/PATCH em /v1/acquisition/watched-oabs — sem `name` (o BE só
+ * deriva o nome depois que a captura roda ao menos uma vez). */
+export interface WatchedOabToggle {
+  oab: string;
+  enabled: boolean;
+}
+
 // ——— Integrações (OAB monitoring scope) ———
-// Espelha integrationView do BE (internal/acquisition/handler.go). A fonte de
-// verdade do monitoramento de OABs é o scope.oab da integração source==="DJEN".
+// Espelha integrationView do BE (internal/acquisition/handler.go).
 export interface IntegrationScope {
   oab: string[];
   taxId?: string[];

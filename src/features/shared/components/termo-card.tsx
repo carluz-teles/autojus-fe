@@ -1,8 +1,7 @@
 "use client";
 
-import { X } from "lucide-react";
-
 import { StatusBadge } from "@/components/mock-ui/status-badge";
+import { Switch } from "@/components/ui/switch";
 
 export interface TermoCardDiario {
   nome: string;
@@ -11,22 +10,28 @@ export interface TermoCardDiario {
 
 /**
  * Card de OAB monitorada — aba Configurações › Termos: header (nome/OAB, badge
- * "sem certificado", remover) + uma linha por diário (nome + fontes).
+ * "sem certificado", switch liga/desliga) + uma linha por diário (nome + fontes).
  * `titular` é o nome do advogado derivado de party_counsel; quando vazio/undefined
  * o header exibe somente a OAB, sem o "— " duplicado.
+ * O switch reflete `enabled` (PATCH /v1/acquisition/watched-oabs/:oab) — não há
+ * mais ação de remover, só ligar/desligar a captura.
  */
 export function TermoCard({
   titular,
   oab,
   temCertificado,
   diarios,
-  onRemover,
+  enabled,
+  onToggleEnabled,
+  toggleDisabled = false,
 }: {
   titular?: string;
   oab: string;
   temCertificado: boolean;
   diarios: TermoCardDiario[];
-  onRemover: () => void;
+  enabled: boolean;
+  onToggleEnabled?: (enabled: boolean) => void;
+  toggleDisabled?: boolean;
 }) {
   return (
     <article className="ring-hairline bg-card rounded-xl p-4.5">
@@ -45,14 +50,15 @@ export function TermoCard({
             sem certificado
           </StatusBadge>
         )}
-        <button
-          type="button"
-          title="Remover inscrição"
-          onClick={onRemover}
-          className="text-muted-foreground hover:text-destructive ml-auto cursor-pointer"
-        >
-          <X className="size-3.5" />
-        </button>
+        <Switch
+          className="ml-auto"
+          checked={enabled}
+          onCheckedChange={onToggleEnabled}
+          disabled={toggleDisabled || !onToggleEnabled}
+          aria-label={
+            enabled ? "Desativar monitoramento" : "Ativar monitoramento"
+          }
+        />
       </header>
 
       <div className="mt-3">
