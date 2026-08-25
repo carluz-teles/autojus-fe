@@ -5,11 +5,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "@/lib/api/use-api";
 
 import {
+  addWatchedOab,
   getIntegrations,
   getWatchedOabs,
-  updateIntegrationScope,
+  toggleWatchedOab,
 } from "../services/integrations.service";
-import type { IntegrationScope } from "../types";
 
 export const INTEGRATIONS_KEY = ["acquisition", "integrations"] as const;
 export const WATCHED_OABS_KEY = ["acquisition", "watched-oabs"] as const;
@@ -34,20 +34,31 @@ export function useWatchedOabs() {
   });
 }
 
-/** Upsert do scope de integração DJEN. No sucesso invalida a key de integrações
- * para que a lista recarregue com o estado persistido. */
-export function useUpdateIntegrationScope() {
+/** Adiciona 1 OAB ao monitoramento (POST /v1/acquisition/watched-oabs). No
+ * sucesso invalida a lista para refletir a nova inscrição (nasce habilitada). */
+export function useAddWatchedOab() {
   const fetcher = useApi();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (scope: IntegrationScope) =>
-      updateIntegrationScope(fetcher, scope),
+    mutationFn: (oab: string) => addWatchedOab(fetcher, oab),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: INTEGRATIONS_KEY }),
-        queryClient.invalidateQueries({ queryKey: WATCHED_OABS_KEY }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: WATCHED_OABS_KEY });
+    },
+  });
+}
+
+/** Liga/desliga a captura de 1 OAB (PATCH /v1/acquisition/watched-oabs/:oab).
+ * Ligar dispara catch-up no BE; só invalida a lista no sucesso. */
+export function useToggleWatchedOab() {
+  const fetcher = useApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ oab, enabled }: { oab: string; enabled: boolean }) =>
+      toggleWatchedOab(fetcher, oab, enabled),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: WATCHED_OABS_KEY });
     },
   });
 }

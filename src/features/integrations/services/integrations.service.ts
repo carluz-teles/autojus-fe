@@ -1,15 +1,13 @@
 import type { ApiFetcher } from "@/lib/api/use-api";
 
 import type {
-  IntegrationScope,
   IntegrationsListResponse,
   IntegrationView,
   WatchedOabsResponse,
+  WatchedOabToggle,
 } from "../types";
 
 // Camada de rede para integrações de aquisição — sem React, só HTTP.
-// POST /v1/acquisition/integrations = upsert TOTAL do scope (manda a lista
-// completa: existentes ± a mudança). Requer role ADMIN no token.
 
 /** Lista as integrações do tenant autenticado. */
 export function getIntegrations(
@@ -18,15 +16,29 @@ export function getIntegrations(
   return fetcher<IntegrationsListResponse>("/v1/acquisition/integrations");
 }
 
-/** Upsert do scope de integração DJEN — manda a lista COMPLETA de OABs. */
-export function updateIntegrationScope(
+/** Adiciona 1 OAB ao monitoramento (chave canônica "UFNUMERO"). Nasce habilitada;
+ * dispara a captura nas próximas rodadas do DJEN. Requer role ADMIN no token. */
+export function addWatchedOab(
   fetcher: ApiFetcher,
-  scope: IntegrationScope,
-): Promise<IntegrationsListResponse> {
-  return fetcher<IntegrationsListResponse>("/v1/acquisition/integrations", {
+  oab: string,
+): Promise<WatchedOabToggle> {
+  return fetcher<WatchedOabToggle>("/v1/acquisition/watched-oabs", {
     method: "POST",
-    body: { scope },
+    body: { oab },
   });
+}
+
+/** Liga/desliga a captura de 1 OAB já monitorada. Ligar dispara automaticamente
+ * uma varredura de catch-up no BE. Requer role ADMIN no token. */
+export function toggleWatchedOab(
+  fetcher: ApiFetcher,
+  oab: string,
+  enabled: boolean,
+): Promise<WatchedOabToggle> {
+  return fetcher<WatchedOabToggle>(
+    `/v1/acquisition/watched-oabs/${encodeURIComponent(oab)}`,
+    { method: "PATCH", body: { enabled } },
+  );
 }
 
 /** Lookup de nome por OAB (ex.: "SP123456"). Pode dar 404/501/503 — o chamador

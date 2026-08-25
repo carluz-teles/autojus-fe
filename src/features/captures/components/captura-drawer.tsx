@@ -11,6 +11,7 @@ import {
   fmtQuando,
   kindLabel,
   statusTom,
+  triggerLabel,
 } from "./capturas-formatters";
 
 function MiniCard({ rotulo, valor }: { rotulo: string; valor: number }) {
@@ -63,6 +64,15 @@ export function CapturaDrawer({
         </span>
         <StatusBadge tone={tom}>{run.display_status}</StatusBadge>
       </div>
+
+      {/* Motivo: qual OAB disparou essa captura (INITIAL_LOAD/CATCH_UP only) */}
+      {triggerLabel(run.trigger_reason, run.trigger_oabs) && (
+        <div className="-mt-1">
+          <span className="text-muted-foreground text-[12.5px]">
+            {triggerLabel(run.trigger_reason, run.trigger_oabs)}
+          </span>
+        </div>
+      )}
 
       {/* Efeito no acervo */}
       <section>

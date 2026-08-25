@@ -1,6 +1,10 @@
 import type { Tom } from "@/components/mock-ui/status-badge";
 
-import type { CaptureDisplayStatus, CaptureKind } from "../types";
+import type {
+  CaptureDisplayStatus,
+  CaptureKind,
+  CaptureTriggerReason,
+} from "../types";
 
 // ─── Formatadores de data (pt-BR) ────────────────────────────────────────────
 
@@ -86,7 +90,24 @@ export function kindLabel(kind: CaptureKind): string {
       return "Enriquecimento";
     case "INITIAL_LOAD":
       return "Carga inicial";
+    case "CATCH_UP":
+      return "Varredura de religamento";
   }
+}
+
+/**
+ * Rótulo "o que provocou essa captura": presente só em INITIAL_LOAD (OAB
+ * adicionada) e CATCH_UP (OAB religada) — ausente (null) em DAILY_CAPTURE/
+ * ENRICHMENT, que nunca são disparadas por uma OAB específica. Ex.:
+ * "OAB adicionada — SP347019" ou "OAB religada — SP347019, MG198988".
+ */
+export function triggerLabel(
+  reason: CaptureTriggerReason | null,
+  oabs: string[] | null,
+): string | null {
+  if (!reason || !oabs || oabs.length === 0) return null;
+  const acao = reason === "OAB_ADDED" ? "OAB adicionada" : "OAB religada";
+  return `${acao} — ${oabs.join(", ")}`;
 }
 
 /** Mapeia display_status → Tom do StatusBadge. */

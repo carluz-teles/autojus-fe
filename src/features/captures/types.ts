@@ -1,7 +1,9 @@
 export type CaptureSource = "DJEN" | "DATAJUD";
-export type CaptureKind = "DAILY_CAPTURE" | "ENRICHMENT" | "INITIAL_LOAD";
+export type CaptureKind =
+  "DAILY_CAPTURE" | "ENRICHMENT" | "INITIAL_LOAD" | "CATCH_UP";
 export type CaptureDisplayStatus =
   "Concluída" | "Concluída com avisos" | "Falha parcial" | "Em andamento";
+export type CaptureTriggerReason = "OAB_ADDED" | "OAB_REENABLED";
 
 export interface CaptureRunView {
   id: string;
@@ -21,6 +23,11 @@ export interface CaptureRunView {
   errors: number;
   duration_sec: number | null;
   oab_count: number;
+  // trigger_reason/trigger_oabs atribuem a captura à OAB que a disparou — presente
+  // só em INITIAL_LOAD (OAB_ADDED) e CATCH_UP (OAB_REENABLED); ausente em
+  // DAILY_CAPTURE/ENRICHMENT, que nunca são disparadas por uma OAB específica.
+  trigger_reason: CaptureTriggerReason | null;
+  trigger_oabs: string[] | null;
 }
 
 export interface CapturesSummary {

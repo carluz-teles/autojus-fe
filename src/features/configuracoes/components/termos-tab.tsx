@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/mock-ui/button";
 import { Input } from "@/components/mock-ui/input";
 import {
-  useUpdateIntegrationScope,
+  useAddWatchedOab,
+  useToggleWatchedOab,
   useWatchedOabs,
 } from "@/features/integrations/hooks/use-integrations";
 import { useIsOrgAdmin } from "@/features/organization/hooks/use-org-role";
@@ -18,15 +19,15 @@ import { ApiError } from "@/lib/api/errors";
 
 /**
  * Parseia rascunho → chave CANÔNICA no formato do BE "UFNUMERO" (ex.: "SP123456")
- * ou null se inválido. É esse o formato que o scope.oab guarda/retorna e que o
- * regex do BE (^[A-Z]{2}\d{1,6}$) valida — dedup, POST e remoção usam esta chave.
- * A exibição é reformatada por formatOab (ver abaixo).
+ * ou null se inválido. É esse o formato que o BE valida em POST /v1/acquisition/
+ * watched-oabs (regex ^[A-Z]{2}\d{1,6}$, sem barra) e devolve em GET — dedup e
+ * adição usam esta chave. A exibição é reformatada por formatOab (ver abaixo).
  */
 function parseOabInput(raw: string): { chave: string; uf: string } | null {
   const bruto = raw.trim().toUpperCase();
   const m =
-    /^([A-Z]{2})\s*([0-9]{4,6})$/.exec(bruto) ??
-    /^([0-9]{4,6})\/?([A-Z]{2})$/.exec(bruto);
+    /^([A-Z]{2})\s*([0-9]{1,6})$/.exec(bruto) ??
+    /^([0-9]{1,6})\/?([A-Z]{2})$/.exec(bruto);
   if (!m) return null;
   const uf = m[1].length === 2 ? m[1] : m[2];
   const numero = m[1].length === 2 ? m[2] : m[1];
@@ -59,13 +60,12 @@ export function TermosTab() {
   const { isAdmin } = useIsOrgAdmin();
 
   // ——— dados do servidor ———
-  // useWatchedOabs é a fonte primária: traz a lista de OABs COM o nome derivado
-  // de party_counsel. useUpdateIntegrationScope continua sendo o write path
-  // (POST /v1/acquisition/integrations com o scope completo).
   const { data, isLoading, isError } = useWatchedOabs();
-  const { mutateAsync: updateScope, isPending } = useUpdateIntegrationScope();
+  const { mutateAsync: addOab, isPending: isAdding } = useAddWatchedOab();
+  const { mutateAsync: toggleOab, isPending: isToggling } =
+    useToggleWatchedOab();
 
-  // OABs actuais (chaves canônicas "UFNUMERO") para dedup e montagem do scope.
+  // OABs actuais (chaves canônicas "UFNUMERO") só para dedup no client.
   const oabsAtuais = useMemo(() => data?.data.map((r) => r.oab) ?? [], [data]);
 
   // ——— estado local de rascunho ———
@@ -76,46 +76,53 @@ export function TermosTab() {
   const adicionar = useCallback(async () => {
     const parsed = parseOabInput(rascunho);
     if (!parsed) {
-      setRascunho("");
+      toast.error(
+        "OAB inválida. Use UF + número (ex.: SP123456 ou 123456/SP).",
+      );
       return;
     }
     const { chave } = parsed;
 
     // dedup contra as OABs reais do BE (mesmo formato canônico "UFNUMERO")
     if (oabsAtuais.includes(chave)) {
+      toast.error(`OAB ${formatOab(chave)} já está monitorada.`);
       setRascunho("");
       return;
     }
 
-    const novasOabs = [...oabsAtuais, chave];
     try {
-      await updateScope({ oab: novasOabs });
+      await addOab(chave);
       setRascunho("");
-      toast.success(`OAB ${formatOab(chave)} adicionada.`);
+      toast.success(`OAB ${formatOab(chave)} adicionada — varredura iniciada.`);
     } catch (err) {
       const msg =
         err instanceof ApiError && err.kind === "FORBIDDEN"
           ? "Sem permissão para alterar os termos monitorados."
-          : "Não foi possível adicionar a OAB. Tente novamente.";
+          : err instanceof ApiError && err.kind === "VALIDATION"
+            ? "Formato de OAB inválido."
+            : "Não foi possível adicionar a OAB. Tente novamente.";
       toast.error(msg);
     }
-  }, [rascunho, oabsAtuais, updateScope]);
+  }, [rascunho, oabsAtuais, addOab]);
 
-  const remover = useCallback(
-    async (oab: string) => {
-      const novasOabs = oabsAtuais.filter((o) => o !== oab);
+  const alternar = useCallback(
+    async (oab: string, enabled: boolean) => {
       try {
-        await updateScope({ oab: novasOabs });
-        toast.success(`OAB ${formatOab(oab)} removida.`);
+        await toggleOab({ oab, enabled });
+        toast.success(
+          enabled
+            ? `Captura de ${formatOab(oab)} reativada — varredura de catch-up iniciada.`
+            : `Captura de ${formatOab(oab)} desativada.`,
+        );
       } catch (err) {
         const msg =
           err instanceof ApiError && err.kind === "FORBIDDEN"
             ? "Sem permissão para alterar os termos monitorados."
-            : "Não foi possível remover a OAB. Tente novamente.";
+            : "Não foi possível atualizar a OAB. Tente novamente.";
         toast.error(msg);
       }
     },
-    [oabsAtuais, updateScope],
+    [toggleOab],
   );
 
   // ——— render ———
@@ -140,14 +147,14 @@ export function TermosTab() {
                 if (e.key === "Enter") void adicionar();
               }}
               placeholder="ex.: SP123456"
-              disabled={isPending}
+              disabled={isAdding}
             />
             <Button
               className="shrink-0"
               onClick={() => void adicionar()}
-              disabled={isPending}
+              disabled={isAdding}
             >
-              {isPending ? "Adicionando…" : "Adicionar"}
+              {isAdding ? "Adicionando…" : "Adicionar"}
             </Button>
           </div>
           <p className="text-muted-foreground mt-2 text-[11.5px]">
@@ -174,30 +181,27 @@ export function TermosTab() {
             const uf = item.oab.slice(0, 2);
             const display = formatOab(item.oab);
             return (
-              // Para não-admin, oculta o botão X via CSS sem modificar TermoCard.
-              <div
+              <TermoCard
                 key={item.oab}
-                className={
-                  !isAdmin
-                    ? "[&_button[title='Remover inscrição']]:hidden"
+                titular={item.name ?? undefined}
+                oab={display}
+                temCertificado={false}
+                enabled={item.enabled}
+                lastAction={item.last_action}
+                lastActionAt={item.last_action_at}
+                toggleDisabled={isToggling}
+                onToggleEnabled={
+                  isAdmin
+                    ? (enabled) => void alternar(item.oab, enabled)
                     : undefined
                 }
-              >
-                <TermoCard
-                  titular={item.name ?? undefined}
-                  oab={display}
-                  temCertificado={false}
-                  diarios={[
-                    {
-                      nome: diarioLabelPorUf(uf),
-                      fontes: ["DJEN"],
-                    },
-                  ]}
-                  onRemover={() => {
-                    void remover(item.oab);
-                  }}
-                />
-              </div>
+                diarios={[
+                  {
+                    nome: diarioLabelPorUf(uf),
+                    fontes: ["DJEN"],
+                  },
+                ]}
+              />
             );
           })}
         </div>
