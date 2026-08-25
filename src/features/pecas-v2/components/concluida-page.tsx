@@ -51,15 +51,17 @@ export function ConcluidaPage({ pecaId }: { pecaId: string }) {
 
             <dl className="mt-4 grid grid-cols-1 gap-2 text-[13px]">
               <div>
-                <dt className="text-muted-foreground text-[11.5px]">Assinada em</dt>
+                <dt className="text-muted-foreground text-[11.5px]">
+                  Assinada em
+                </dt>
                 <dd className="text-foreground">
-                  {draft.signedAt
-                    ? formatarDataHora(draft.signedAt)
-                    : "—"}
+                  {draft.signedAt ? formatarDataHora(draft.signedAt) : "—"}
                 </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground text-[11.5px]">Protocolada em</dt>
+                <dt className="text-muted-foreground text-[11.5px]">
+                  Protocolada em
+                </dt>
                 <dd className="text-foreground">
                   {draft.filedAt ? formatarDataHora(draft.filedAt) : "—"}
                 </dd>

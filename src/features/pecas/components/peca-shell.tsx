@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useIntimacaoDetalhe } from "@/features/intimacoes/hooks/use-intimacoes";
 import { TYPE_LABEL } from "@/features/intimacoes/lib/labels";
 import type { IntimacaoType } from "@/features/intimacoes/types";
 import {
@@ -32,6 +33,7 @@ import {
   type PecaAttachment,
   type PecaDetail,
 } from "@/features/pecas/types";
+import { usePartes } from "@/features/processos/hooks/use-processos";
 import {
   corDaUrgencia,
   diasRestantes,
@@ -43,6 +45,7 @@ import { formatBytes, formatClaimValueBRL, formatDate } from "@/lib/format";
 import { sanitizeContentHtml } from "@/lib/html/sanitize-content";
 import { cn } from "@/lib/utils";
 
+import { PartesBlock } from "./partida-ui";
 import { type PassoPeca, StepperPeca } from "./stepper-peca";
 
 // ── Top bar (breadcrumb + stepper + slot de ações) ───────────────────────────
@@ -104,21 +107,169 @@ export function PecaTopBar({
 }
 
 // ── Coluna Contexto (aside 300px) ────────────────────────────────────────────
+//
+// Componente ÚNICO da sidebar de contexto — usado em 3 lugares:
+//   • Peça criada (PecaPartida legada + workspace)     → <PecaContexto peca={..}>
+//   • Construção v2 (ConstrucaoPage)                    → <PecaContexto peca={..}>
+//     (o wrapper busca PecaDetail via usePeca antes)
+//   • Partida ephemeral (/pecas/nova, sem peça ainda)   → <PecaContextoFromIntimacao intimationId=".." pieceType="..">
+//
+// Antes existiam 3 componentes divergentes (peca-shell/PecaContexto, pecas-v2/
+// contexto-sidebar, partida-ephemeral/ContextoEphemeral) — cada fix precisava
+// ser aplicado 3 vezes e frequentemente ficava pra trás. Consolidação em 1
+// PecaContextoBody + 2 adapters elimina divergência de vez.
 
+// PecaContexto: adapter pra peças já criadas (recebe PecaDetail direto).
 export function PecaContexto({ peca }: { peca: PecaDetail }) {
   const proc = peca.process;
   const intim = peca.intimation;
   const prazo = peca.deadline;
-  const termo = prazo?.end_date ?? null;
-  const dias = termo ? diasRestantes(termo) : null;
-  const corPrazo = corDaUrgencia(urgenciaDe(dias));
-
-  // Providências = tasks vinculadas à intimação da peça.
-  const { tasks: providencias } = useTasksDaIntimacao(intim?.id ?? null);
 
   return (
-    <aside className="border-border overflow-y-auto border-r px-4 py-6">
-      {/* Bloco Prazo (topo) — sem cabeçalho "Contexto"/tipo peça acima. */}
+    <PecaContextoBody
+      // Prazo
+      prazoEndDate={prazo?.end_date ?? null}
+      // Intimação
+      intimId={intim?.id ?? ""}
+      intimType={intim?.type ?? ""}
+      intimContent={intim?.content ?? ""}
+      intimMadeAvailableAt={intim?.made_available_at ?? ""}
+      // Processo
+      cnj={proc?.cnj_number ?? ""}
+      courtRecordId={proc?.court_record_id ?? ""}
+      classe={proc?.class ?? ""}
+      assunto={proc?.subject ?? ""}
+      orgao={proc?.judging_body ?? ""}
+      court={proc?.court ?? ""}
+      degree={proc?.degree ?? ""}
+      claimValue={proc?.claim_value ?? ""}
+      // Anexos (só quando existe peça)
+      pecaId={peca.id}
+      attachments={peca.attachments}
+      // Fallback pra partes quando usePartes ainda não retornou
+      fallbackPlaintiffs={proc?.plaintiffs ?? []}
+      fallbackDefendants={proc?.defendants ?? []}
+    />
+  );
+}
+
+// PecaContextoFromIntimacao: adapter pra Partida ephemeral (/pecas/nova) —
+// não tem PecaDetail ainda, busca IntimacaoDetalheView via hook. Sem anexos.
+export function PecaContextoFromIntimacao({
+  intimationId,
+}: {
+  intimationId: string;
+  /** pieceType não é mais renderizado na sidebar (o Select inline do título
+   *  da /pecas/nova já mostra). Mantido no assinatura pra retro-compat. */
+  pieceType?: string;
+}) {
+  const { data: intim } = useIntimacaoDetalhe(intimationId);
+  if (!intim) {
+    return (
+      <aside className="border-border w-[300px] shrink-0 overflow-y-auto border-r px-4 py-6">
+        <p className="text-muted-foreground text-[12px]">
+          Carregando contexto…
+        </p>
+      </aside>
+    );
+  }
+  return (
+    <PecaContextoBody
+      prazoEndDate={intim.prazo?.end_date ?? null}
+      intimId={intim.id}
+      intimType={intim.type}
+      intimContent={intim.content}
+      intimMadeAvailableAt={intim.made_available_at}
+      cnj={intim.cnj_number}
+      courtRecordId={intim.court_record_id}
+      classe={intim.class}
+      assunto={intim.subject}
+      orgao={intim.judging_body}
+      court={intim.court}
+      degree={intim.degree}
+      claimValue=""
+      distributionDateOverride={intim.distribution_date ?? ""}
+    />
+  );
+}
+
+// PecaContextoBody é o render puro — todas as buscas dependentes acontecem
+// aqui (usePartes, useIntimacaoDetalhe pra distribution_date, useTasksDaIntimacao).
+// Nunca importado por telas — só por adapters PecaContexto/PecaContextoFromIntimacao.
+interface PecaContextoBodyProps {
+  // Prazo
+  prazoEndDate: string | null;
+  // Intimação
+  intimId: string;
+  intimType: string;
+  intimContent: string;
+  intimMadeAvailableAt: string;
+  // Processo
+  cnj: string;
+  courtRecordId: string;
+  classe: string;
+  assunto: string;
+  orgao: string;
+  court: string;
+  degree: string;
+  claimValue: string;
+  // Se já sabemos a distribuição (path ephemeral), usa direto — evita
+  // segunda chamada a useIntimacaoDetalhe.
+  distributionDateOverride?: string;
+  // Anexos — só passa quando a peça existe.
+  pecaId?: string;
+  attachments?: PecaAttachment[];
+  // Fallback pra partes quando o read-model ainda não achou (PecaProcess
+  // já traz nomes soltos; usePartes traz Party[] com counsels[]).
+  fallbackPlaintiffs?: string[];
+  fallbackDefendants?: string[];
+}
+
+function PecaContextoBody({
+  prazoEndDate,
+  intimId,
+  intimType,
+  intimContent,
+  intimMadeAvailableAt,
+  cnj,
+  courtRecordId,
+  classe,
+  assunto,
+  orgao,
+  court,
+  degree,
+  claimValue,
+  distributionDateOverride,
+  pecaId,
+  attachments,
+  fallbackPlaintiffs,
+  fallbackDefendants,
+}: PecaContextoBodyProps) {
+  const dias = prazoEndDate ? diasRestantes(prazoEndDate) : null;
+  const corPrazo = corDaUrgencia(urgenciaDe(dias));
+
+  // Partes com procuradores — fonte única (retorna Party[] com counsels[]).
+  const { data: partes } = usePartes(courtRecordId);
+
+  // distribution_date: se o caller já passou (path ephemeral), usa direto.
+  // Senão, busca via useIntimacaoDetalhe.
+  const { data: intimDetail } = useIntimacaoDetalhe(
+    distributionDateOverride === undefined ? intimId : "",
+  );
+  const distribuicao =
+    distributionDateOverride || intimDetail?.distribution_date || "";
+
+  // Providências = tasks vinculadas à intimação (quando existe).
+  const { tasks: providencias } = useTasksDaIntimacao(intimId || null);
+
+  return (
+    // w-[300px] shrink-0 — a sidebar tem largura FIXA em todas as 3 telas
+    // que a usam (Partida legada em grid[300px_...], Construção v2 em flex,
+    // Partida ephemeral em grid[300px_...]). Sem essa constraint o flex-parent
+    // deixa ela crescer conforme o conteúdo (CNJ, órgão longo). shrink-0
+    // impede ela de encolher quando o editor demanda espaço extra.
+    <aside className="border-border w-[300px] shrink-0 overflow-y-auto border-r px-4 py-6">
+      {/* Bloco Prazo (topo) */}
       <div className="pb-3">
         <p className="text-muted-foreground text-[10.5px] tracking-[0.12em] uppercase">
           Prazo
@@ -127,70 +278,84 @@ export function PecaContexto({ peca }: { peca: PecaDetail }) {
           className="font-display mt-1.5 text-xl tabular-nums"
           style={{ color: corPrazo }}
         >
-          {termo ? formatDate(termo) : "—"}
+          {prazoEndDate ? formatDate(prazoEndDate) : "—"}
         </p>
         <p className="text-muted-foreground mt-0.5 text-[11.5px]">
           {rotuloPrazo(dias)}
         </p>
       </div>
 
-      {intim && (
+      {intimId && (
         <>
           <Rotulo className="mt-4">Intimação de origem</Rotulo>
           <Link
-            href={`/intimacoes/${intim.id}`}
+            href={`/intimacoes/${intimId}`}
             className="block no-underline hover:no-underline"
           >
             <span className="text-primary inline-flex items-center gap-1.5 text-[13px] font-medium">
-              {TYPE_LABEL[intim.type as IntimacaoType] ?? intim.type}
+              {TYPE_LABEL[intimType as IntimacaoType] ?? intimType}
               <ArrowUpRight className="size-2.5" strokeWidth={2.4} />
             </span>
             <span className="text-muted-foreground mt-0.5 block text-[11.5px]">
-              publicada em {formatDate(intim.made_available_at)}
+              publicada em {formatDate(intimMadeAvailableAt)}
             </span>
           </Link>
 
-          <Rotulo className="mt-3.5">Teor da publicação</Rotulo>
-          <div
-            className="border-border text-muted-foreground max-h-33 overflow-y-auto border-l-2 pl-2.5 text-[11.5px] leading-[1.6] [&_p]:mb-1 [&_p]:last:mb-0"
-            // teor DJEN às vezes vem com HTML embutido (fragmentos <a>, ou até
-            // <html>...</html> colado no fim); sanitizeContentHtml normaliza.
-            dangerouslySetInnerHTML={{
-              __html: sanitizeContentHtml(intim.content),
-            }}
-          />
+          {intimContent && (
+            <>
+              <Rotulo className="mt-3.5">Teor da publicação</Rotulo>
+              <div
+                // prose-intimacao (globals.css) colapsa tabelas DJEN, neutraliza
+                // section/article, normaliza whitespace. Fonte única do fix.
+                className="prose-intimacao border-border text-muted-foreground max-h-33 overflow-y-auto border-l-2 pl-2.5 text-[11.5px] leading-[1.6]"
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeContentHtml(intimContent),
+                }}
+              />
+            </>
+          )}
         </>
       )}
 
-      {proc && (
+      {cnj && (
         <>
           <Rotulo className="mt-6">Processo</Rotulo>
           <Link
-            href={`/processos/${encodeURIComponent(proc.cnj_number)}`}
+            href={`/processos/${encodeURIComponent(cnj)}`}
             className="mb-2 inline-flex items-center gap-1.5 text-[12.5px] tabular-nums"
           >
-            {proc.cnj_number}
+            {cnj}
             <ArrowUpRight className="size-2.5" strokeWidth={2.4} />
           </Link>
-          <Campo rotulo="Classe" valor={proc.class || "—"} />
-          <Campo rotulo="Assunto" valor={proc.subject || "—"} />
-          <Campo rotulo="Órgão" valor={proc.judging_body || "—"} />
-          <Campo
-            rotulo="Tribunal · grau"
-            valor={`${proc.court} · ${proc.degree}`}
-          />
-          {proc.claim_value ? (
+          <Campo rotulo="Classe" valor={classe || "—"} />
+          <Campo rotulo="Assunto" valor={assunto || "—"} />
+          <Campo rotulo="Órgão" valor={orgao || "—"} />
+          <Campo rotulo="Tribunal · grau" valor={`${court} · ${degree}`} />
+          {claimValue ? (
             <Campo
               rotulo="Valor da causa"
-              valor={formatClaimValueBRL(proc.claim_value)}
+              valor={formatClaimValueBRL(claimValue)}
             />
           ) : null}
+          {distribuicao && (
+            <Campo rotulo="Distribuição" valor={formatDate(distribuicao)} />
+          )}
 
-          {proc.plaintiffs?.length || proc.defendants?.length ? (
+          {partes && (partes.autor.length > 0 || partes.reu.length > 0) ? (
             <>
               <Rotulo className="mt-6">Partes</Rotulo>
-              <CampoEmpilhado rotulo="Autor" valores={proc.plaintiffs ?? []} />
-              <CampoEmpilhado rotulo="Réu" valores={proc.defendants ?? []} />
+              <PartesBlock autor={partes.autor} reu={partes.reu} />
+            </>
+          ) : fallbackPlaintiffs?.length || fallbackDefendants?.length ? (
+            // Fallback: se usePartes ainda não carregou (ou não achou), mostra
+            // ao menos os nomes que já vêm no PecaProcess. Sem procuradores.
+            <>
+              <Rotulo className="mt-6">Partes</Rotulo>
+              <CampoEmpilhado
+                rotulo="Autor"
+                valores={fallbackPlaintiffs ?? []}
+              />
+              <CampoEmpilhado rotulo="Réu" valores={fallbackDefendants ?? []} />
             </>
           ) : null}
         </>
@@ -227,8 +392,13 @@ export function PecaContexto({ peca }: { peca: PecaDetail }) {
         </>
       )}
 
-      <Rotulo className="mt-6">Anexos</Rotulo>
-      <AnexosSection pecaId={peca.id} anexos={peca.attachments} />
+      {/* Anexos só quando a peça existe (path ephemeral não tem pecaId). */}
+      {pecaId && attachments && (
+        <>
+          <Rotulo className="mt-6">Anexos</Rotulo>
+          <AnexosSection pecaId={pecaId} anexos={attachments} />
+        </>
+      )}
     </aside>
   );
 }

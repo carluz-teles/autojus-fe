@@ -23,7 +23,8 @@ export function useSendChatMessage(id: string) {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (question: string) => svc.sendChatMessage(fetcher, id, question),
+    mutationFn: (question: string) =>
+      svc.sendChatMessage(fetcher, id, question),
     onMutate: async (question) => {
       await qc.cancelQueries({ queryKey: draftKeys.chat(id) });
       const previous = qc.getQueryData<ChatMessage[]>(draftKeys.chat(id)) ?? [];
@@ -57,7 +58,8 @@ export function useRunQuickAction(id: string) {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (action: QuickActionKind) => svc.runQuickAction(fetcher, id, action),
+    mutationFn: (action: QuickActionKind) =>
+      svc.runQuickAction(fetcher, id, action),
     onSuccess: (res) => {
       qc.setQueryData<ChatMessage[]>(draftKeys.chat(id), (prev) => [
         ...(prev ?? []),

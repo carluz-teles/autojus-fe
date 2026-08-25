@@ -85,6 +85,10 @@ export interface ListPecasParams {
   piece_type?: string;
   /** Filtra por status (DRAFT, SIGNED, FILED, DISCARDED). */
   status?: string;
+  /** Chip do FE: "aguardando_assinatura" | "aguardando_protocolo". */
+  workflow_state?: string;
+  /** Chip do FE: "atraso" | "hoje" (contra deadline da intimação de origem). */
+  urgencia?: string;
   limit?: number;
   cursor?: string;
 }
@@ -92,10 +96,17 @@ export interface ListPecasParams {
 /** Lista todas as peças do tenant — GET /v1/pecas (paginação por cursor). */
 export async function listPecas(
   fetcher: ApiFetcher,
-  { piece_type, status, limit = 20, cursor }: ListPecasParams = {},
+  {
+    piece_type,
+    status,
+    workflow_state,
+    urgencia,
+    limit = 20,
+    cursor,
+  }: ListPecasParams = {},
 ): Promise<PageEnvelope<PecaListItem>> {
   return fetcher<PageEnvelope<PecaListItem>>(ENDPOINT, {
-    query: { piece_type, status, limit, cursor },
+    query: { piece_type, status, workflow_state, urgencia, limit, cursor },
   });
 }
 
@@ -269,6 +280,19 @@ export async function getTheses(
     `${ENDPOINT}/${id}/theses`,
     { method: "POST" },
   );
+  return res.data;
+}
+
+/** Sugere teses ANTES da peça existir — POST /v1/theses. Usado pela tela
+ *  /pecas/nova (Partida ephemeral) — evita criar draft zumbi só pra ver teses. */
+export async function getThesesFromIntimation(
+  fetcher: ApiFetcher,
+  params: { intimation_id: string; piece_type: string },
+): Promise<ThesesResponse> {
+  const res = await fetcher<DataEnvelope<ThesesResponse>>("/v1/theses", {
+    method: "POST",
+    body: params,
+  });
   return res.data;
 }
 

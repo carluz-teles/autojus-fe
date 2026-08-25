@@ -154,8 +154,8 @@ function NoIssuesState({ onRun }: { onRun: () => void }) {
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
       <h3 className="font-display mb-1 text-[15px]">Sem sugestões</h3>
       <p className="text-muted-foreground mb-4 text-[12.5px] leading-[1.5]">
-        A peça passou pela análise sem apontamentos. Edite à vontade e revise
-        de novo quando quiser.
+        A peça passou pela análise sem apontamentos. Edite à vontade e revise de
+        novo quando quiser.
       </p>
       <button
         type="button"

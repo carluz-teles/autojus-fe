@@ -317,7 +317,13 @@ export function PecaPartida({ id, onWorkspace }: PecaPartidaProps) {
           theses: tesesSelecionadas.length > 0 ? tesesSelecionadas : undefined,
         },
       },
-      { onSuccess: () => setGerando(true) },
+      {
+        // Assim que o BE aceita (202, saga já em EXTRACTING), navegamos pro
+        // workspace — o streaming da geração (useDraftStream no EditorArea)
+        // é o próprio feedback visual, tornando a spinner intermediária
+        // desnecessária e apagando a ilusão de delay.
+        onSuccess: () => onWorkspace(),
+      },
     );
   };
 

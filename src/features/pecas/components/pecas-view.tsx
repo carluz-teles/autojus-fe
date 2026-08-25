@@ -31,9 +31,14 @@ const STATUS_LABEL: Record<string, string> = {
   DISCARDED: "Descartada",
 };
 
+// Closed set alinhado ao BE (DEFENSE|COMPLAINT|APPEAL|MOTION|OTHER).
+// Legados mantidos como fallback pra rows antigas.
 const PIECE_TYPE_LABEL: Record<string, string> = {
   DEFENSE: "Defesa",
+  COMPLAINT: "Petição inicial",
   APPEAL: "Recurso",
+  MOTION: "Petição",
+  OTHER: "Peça",
   PETITION: "Petição",
   MANIFESTATION: "Manifestação",
   COUNTERCLAIM: "Reconvenção",

@@ -119,6 +119,7 @@ function humanizeIntimationType(t: string): string {
 function mapProcess(api: ProcessAPI | null): DraftProcess {
   if (!api) {
     return {
+      courtRecordId: "",
       cnj: "",
       classe: "",
       assunto: "",
@@ -129,6 +130,7 @@ function mapProcess(api: ProcessAPI | null): DraftProcess {
     };
   }
   return {
+    courtRecordId: api.court_record_id,
     cnj: api.cnj_number,
     classe: api.class,
     assunto: api.subject,
@@ -152,6 +154,7 @@ function mapAttachment(api: AttachmentAPI): DraftAttachment {
     id: api.id,
     name: api.name,
     sizeLabel: formatBytes(api.size_bytes),
+    category: api.category ?? "Outro",
   };
 }
 

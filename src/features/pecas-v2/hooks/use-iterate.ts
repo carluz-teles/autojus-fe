@@ -32,6 +32,7 @@ export function useQuickAdjust(id: string) {
 export function useRefazerSection(id: string) {
   const fetcher = useApi();
   return useMutation({
-    mutationFn: (sectionId: string) => svc.refazerSection(fetcher, id, sectionId),
+    mutationFn: (sectionId: string) =>
+      svc.refazerSection(fetcher, id, sectionId),
   });
 }

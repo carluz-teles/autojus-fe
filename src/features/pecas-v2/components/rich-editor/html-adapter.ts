@@ -18,7 +18,11 @@
 // remontar sections com os mesmos ids (necessário pra iterate-section
 // mapear de volta ao BE).
 
-import type { DraftPreamble, DraftSection, StructuredContent } from "../../types";
+import type {
+  DraftPreamble,
+  DraftSection,
+  StructuredContent,
+} from "../../types";
 
 /** Constrói HTML rico a partir de StructuredContent. Preamble vira <p>s;
  *  cada section vira <h2> + <p>s. Preserva IDs via data-section-id. */

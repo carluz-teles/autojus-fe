@@ -46,6 +46,9 @@ export interface DraftIntimation {
 
 /** Bloco Processo do sidebar de contexto. */
 export interface DraftProcess {
+  /** UUID do court_record — usado pelo upload de anexos (POST /documents
+   *  presigned exige `court_record_id`). Não é exibido na UI. */
+  courtRecordId: string;
   cnj: string;
   classe: string;
   assunto: string;
@@ -71,6 +74,9 @@ export interface DraftAttachment {
   id: string;
   name: string;
   sizeLabel: string;
+  /** Categoria escolhida pelo advogado ao anexar (Procuração, Comprovante etc).
+   *  Casa com o CHECK do BE (migração 0043) e o enum AttachmentCategory. */
+  category: string;
 }
 
 /** Prazo derivado da intimação. */
@@ -124,7 +130,8 @@ export interface Draft {
 }
 
 /** Step atual do peticionamento — derivado dos timestamps. */
-export type WorkflowStep = "construcao" | "assinatura" | "protocolo" | "concluida";
+export type WorkflowStep =
+  "construcao" | "assinatura" | "protocolo" | "concluida";
 
 /** Deriva o step atual a partir dos 3 timestamps datados. Regra:
  *  sentToSigningAt=null → Construção;
@@ -132,7 +139,9 @@ export type WorkflowStep = "construcao" | "assinatura" | "protocolo" | "concluid
  *  signedAt!=null && filedAt=null → Protocolo;
  *  filedAt!=null → Concluída.
  */
-export function deriveStep(d: Pick<Draft, "sentToSigningAt" | "signedAt" | "filedAt">): WorkflowStep {
+export function deriveStep(
+  d: Pick<Draft, "sentToSigningAt" | "signedAt" | "filedAt">,
+): WorkflowStep {
   if (d.filedAt) return "concluida";
   if (d.signedAt) return "protocolo";
   if (d.sentToSigningAt) return "assinatura";

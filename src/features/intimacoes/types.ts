@@ -134,6 +134,10 @@ export interface IntimacaoDetalheView extends IntimacaoView {
   content: string;
   /** Órgão julgador (court_record.judging_body). */
   judging_body: string;
+  /** Data de distribuição/ajuizamento (court_record.filed_at) — "YYYY-MM-DD".
+   *  Vazio quando o processo ainda não foi enriquecido pelo DATAJUD (DJEN não
+   *  carrega). A UI só renderiza a linha "Distribuição" quando não-vazio. */
+  distribution_date?: string;
   /** Destinatários (jsonb) — sempre um array (nunca null); pode vir vazio. */
   recipients: IntimacaoRecipient[];
   /** Timeline derivada (ASC) — sempre array (nunca null); pode vir vazio.

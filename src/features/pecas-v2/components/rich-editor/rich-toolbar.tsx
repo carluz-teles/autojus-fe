@@ -54,7 +54,10 @@ interface Props {
 }
 
 const FONT_FAMILIES = [
-  { label: "Times", value: "'Liberation Serif', 'Times New Roman', Times, serif" },
+  {
+    label: "Times",
+    value: "'Liberation Serif', 'Times New Roman', Times, serif",
+  },
   { label: "Arial", value: "Arial, Helvetica, sans-serif" },
   { label: "Courier", value: "'Courier New', Courier, monospace" },
 ];
@@ -81,11 +84,15 @@ export function RichToolbar({ editor }: Props) {
         aria-label="Estilo de bloco"
         className="hover:bg-muted h-8 rounded-md border-0 bg-transparent px-2 text-[13px] focus-visible:ring-1 focus-visible:outline-none"
         value={
-          editor.isActive("heading", { level: 1 }) ? "h1"
-          : editor.isActive("heading", { level: 2 }) ? "h2"
-          : editor.isActive("heading", { level: 3 }) ? "h3"
-          : editor.isActive("blockquote") ? "quote"
-          : "p"
+          editor.isActive("heading", { level: 1 })
+            ? "h1"
+            : editor.isActive("heading", { level: 2 })
+              ? "h2"
+              : editor.isActive("heading", { level: 3 })
+                ? "h3"
+                : editor.isActive("blockquote")
+                  ? "quote"
+                  : "p"
         }
         onChange={(e) => {
           const v = e.target.value;
@@ -110,38 +117,70 @@ export function RichToolbar({ editor }: Props) {
       <select
         aria-label="Fonte"
         className="hover:bg-muted h-8 rounded-md border-0 bg-transparent px-2 text-[13px] focus-visible:ring-1 focus-visible:outline-none"
-        value={FONT_FAMILIES.find((f) => editor.isActive("textStyle", { fontFamily: f.value }))?.value ?? FONT_FAMILIES[0].value}
-        onChange={(e) => editor.chain().focus().setFontFamily(e.target.value).run()}
+        value={
+          FONT_FAMILIES.find((f) =>
+            editor.isActive("textStyle", { fontFamily: f.value }),
+          )?.value ?? FONT_FAMILIES[0].value
+        }
+        onChange={(e) =>
+          editor.chain().focus().setFontFamily(e.target.value).run()
+        }
       >
         {FONT_FAMILIES.map((f) => (
-          <option key={f.value} value={f.value}>{f.label}</option>
+          <option key={f.value} value={f.value}>
+            {f.label}
+          </option>
         ))}
       </select>
 
       <select
         aria-label="Tamanho"
         className="hover:bg-muted h-8 w-16 rounded-md border-0 bg-transparent px-2 text-[13px] focus-visible:ring-1 focus-visible:outline-none"
-        value={FONT_SIZES.find((sz) => editor.isActive("textStyle", { fontSize: sz })) ?? "12pt"}
-        onChange={(e) => editor.chain().focus().setFontSize(e.target.value).run()}
+        value={
+          FONT_SIZES.find((sz) =>
+            editor.isActive("textStyle", { fontSize: sz }),
+          ) ?? "12pt"
+        }
+        onChange={(e) =>
+          editor.chain().focus().setFontSize(e.target.value).run()
+        }
       >
         {FONT_SIZES.map((sz) => (
-          <option key={sz} value={sz}>{sz}</option>
+          <option key={sz} value={sz}>
+            {sz}
+          </option>
         ))}
       </select>
 
       <Separator orientation="vertical" className="h-6" />
 
       {/* Grupo 3 — Marcas inline */}
-      <ToolBtn label="Negrito" active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()}>
+      <ToolBtn
+        label="Negrito"
+        active={editor.isActive("bold")}
+        onClick={() => editor.chain().focus().toggleBold().run()}
+      >
         <Bold className="size-4" />
       </ToolBtn>
-      <ToolBtn label="Itálico" active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()}>
+      <ToolBtn
+        label="Itálico"
+        active={editor.isActive("italic")}
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+      >
         <Italic className="size-4" />
       </ToolBtn>
-      <ToolBtn label="Sublinhado" active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+      <ToolBtn
+        label="Sublinhado"
+        active={editor.isActive("underline")}
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+      >
         <UnderlineIcon className="size-4" />
       </ToolBtn>
-      <ToolBtn label="Tachado" active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()}>
+      <ToolBtn
+        label="Tachado"
+        active={editor.isActive("strike")}
+        onClick={() => editor.chain().focus().toggleStrike().run()}
+      >
         <Strikethrough className="size-4" />
       </ToolBtn>
 
@@ -165,42 +204,77 @@ export function RichToolbar({ editor }: Props) {
       <Separator orientation="vertical" className="h-6" />
 
       {/* Grupo 5 — Alinhamento */}
-      <ToolBtn label="Esquerda" active={editor.isActive({ textAlign: "left" })} onClick={() => editor.chain().focus().setTextAlign("left").run()}>
+      <ToolBtn
+        label="Esquerda"
+        active={editor.isActive({ textAlign: "left" })}
+        onClick={() => editor.chain().focus().setTextAlign("left").run()}
+      >
         <AlignLeft className="size-4" />
       </ToolBtn>
-      <ToolBtn label="Centro" active={editor.isActive({ textAlign: "center" })} onClick={() => editor.chain().focus().setTextAlign("center").run()}>
+      <ToolBtn
+        label="Centro"
+        active={editor.isActive({ textAlign: "center" })}
+        onClick={() => editor.chain().focus().setTextAlign("center").run()}
+      >
         <AlignCenter className="size-4" />
       </ToolBtn>
-      <ToolBtn label="Direita" active={editor.isActive({ textAlign: "right" })} onClick={() => editor.chain().focus().setTextAlign("right").run()}>
+      <ToolBtn
+        label="Direita"
+        active={editor.isActive({ textAlign: "right" })}
+        onClick={() => editor.chain().focus().setTextAlign("right").run()}
+      >
         <AlignRight className="size-4" />
       </ToolBtn>
-      <ToolBtn label="Justificar" active={editor.isActive({ textAlign: "justify" })} onClick={() => editor.chain().focus().setTextAlign("justify").run()}>
+      <ToolBtn
+        label="Justificar"
+        active={editor.isActive({ textAlign: "justify" })}
+        onClick={() => editor.chain().focus().setTextAlign("justify").run()}
+      >
         <AlignJustify className="size-4" />
       </ToolBtn>
 
       <Separator orientation="vertical" className="h-6" />
 
       {/* Grupo 6 — Listas */}
-      <ToolBtn label="Lista com marcadores" active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()}>
+      <ToolBtn
+        label="Lista com marcadores"
+        active={editor.isActive("bulletList")}
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+      >
         <List className="size-4" />
       </ToolBtn>
-      <ToolBtn label="Lista numerada" active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+      <ToolBtn
+        label="Lista numerada"
+        active={editor.isActive("orderedList")}
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+      >
         <ListOrdered className="size-4" />
       </ToolBtn>
-      <ToolBtn label="Citação" active={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
+      <ToolBtn
+        label="Citação"
+        active={editor.isActive("blockquote")}
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+      >
         <Quote className="size-4" />
       </ToolBtn>
 
       <Separator orientation="vertical" className="h-6" />
 
       {/* Grupo 7 — Blocos: linha horizontal + tabela + undo/redo */}
-      <ToolBtn label="Linha horizontal" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+      <ToolBtn
+        label="Linha horizontal"
+        onClick={() => editor.chain().focus().setHorizontalRule().run()}
+      >
         <Minus className="size-4" />
       </ToolBtn>
       <ToolBtn
         label="Inserir tabela"
         onClick={() =>
-          editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+          editor
+            .chain()
+            .focus()
+            .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+            .run()
         }
       >
         <TableIcon className="size-4" />
@@ -208,10 +282,16 @@ export function RichToolbar({ editor }: Props) {
 
       <Separator orientation="vertical" className="h-6" />
 
-      <ToolBtn label="Desfazer" onClick={() => editor.chain().focus().undo().run()}>
+      <ToolBtn
+        label="Desfazer"
+        onClick={() => editor.chain().focus().undo().run()}
+      >
         <Undo2 className="size-4" />
       </ToolBtn>
-      <ToolBtn label="Refazer" onClick={() => editor.chain().focus().redo().run()}>
+      <ToolBtn
+        label="Refazer"
+        onClick={() => editor.chain().focus().redo().run()}
+      >
         <Redo2 className="size-4" />
       </ToolBtn>
     </div>
@@ -238,7 +318,11 @@ function ToolBtn({
       title={label}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
-      className={active ? "bg-muted text-foreground size-8 p-0" : "text-muted-foreground size-8 p-0"}
+      className={
+        active
+          ? "bg-muted text-foreground size-8 p-0"
+          : "text-muted-foreground size-8 p-0"
+      }
     >
       {children}
     </Button>

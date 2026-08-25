@@ -39,20 +39,24 @@ export function ConstrucaoHeader({
 
       <Stepper current={step} onChange={onStepChange} />
 
-      <div className="ml-auto">
-        <button
-          type="button"
-          onClick={onEnviar}
-          disabled={enviarDisabled}
-          className={cn(
-            "rounded-md px-4 py-2 text-sm font-medium transition-colors",
-            "bg-primary text-primary-foreground hover:bg-primary/90",
-            "disabled:cursor-not-allowed disabled:opacity-60",
-          )}
-        >
-          Enviar para assinatura
-        </button>
-      </div>
+      {/* CTA "Enviar para assinatura" só aparece na Construção — nas etapas
+       * Assinatura/Protocolo o botão perde sentido (a peça já foi enviada). */}
+      {step === 1 && (
+        <div className="ml-auto">
+          <button
+            type="button"
+            onClick={onEnviar}
+            disabled={enviarDisabled}
+            className={cn(
+              "rounded-md px-4 py-2 text-sm font-medium transition-colors",
+              "bg-primary text-primary-foreground hover:bg-primary/90",
+              "disabled:cursor-not-allowed disabled:opacity-60",
+            )}
+          >
+            Enviar para assinatura
+          </button>
+        </div>
+      )}
     </div>
   );
 }

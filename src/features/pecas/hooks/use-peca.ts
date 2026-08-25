@@ -27,6 +27,7 @@ import {
   getChatThread,
   getPeca,
   getTheses,
+  getThesesFromIntimation,
   listPecas,
   listPecasByProcesso,
   type ListPecasParams,
@@ -289,6 +290,31 @@ export function useTheses(id: string) {
     queryFn: () => getTheses(fetcher, id),
     enabled: !!id,
     // Não refetch automático — o resultado é estável por sessão.
+    staleTime: Infinity,
+    retry: 1,
+  });
+}
+
+/** Variante da /pecas/nova: sugere teses direto da intimação (POST /v1/theses),
+ *  sem exigir draft ainda. Usado só na Partida ephemeral. */
+export function useThesesFromIntimation(
+  intimationId: string,
+  pieceType: string,
+) {
+  const fetcher = useApi();
+  return useQuery<ThesesResponse, Error>({
+    queryKey: [
+      ...pecasKeys.all,
+      "theses-intimation",
+      intimationId,
+      pieceType,
+    ] as const,
+    queryFn: () =>
+      getThesesFromIntimation(fetcher, {
+        intimation_id: intimationId,
+        piece_type: pieceType,
+      }),
+    enabled: !!intimationId && !!pieceType,
     staleTime: Infinity,
     retry: 1,
   });

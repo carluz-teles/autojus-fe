@@ -6,8 +6,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { useApi } from "@/lib/api/use-api";
 
-import { draftKeys } from "./use-draft";
 import * as svc from "../services/pecas-v2.service";
+import { draftKeys } from "./use-draft";
 
 export function useSendToSigning(id: string) {
   const fetcher = useApi();
@@ -31,7 +31,8 @@ export function useSignPeca(id: string) {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (certificateId: string) => svc.signPeca(fetcher, id, certificateId),
+    mutationFn: (certificateId: string) =>
+      svc.signPeca(fetcher, id, certificateId),
     onSuccess: () => qc.invalidateQueries({ queryKey: draftKeys.detail(id) }),
   });
 }
@@ -40,7 +41,8 @@ export function useFilePeca(id: string) {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (filingNumber: string) => svc.filePeca(fetcher, id, filingNumber),
+    mutationFn: (filingNumber: string) =>
+      svc.filePeca(fetcher, id, filingNumber),
     onSuccess: () => qc.invalidateQueries({ queryKey: draftKeys.detail(id) }),
   });
 }

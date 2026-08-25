@@ -113,7 +113,9 @@ export async function iterateDraft(
     `${ENDPOINT}/${id}/iterate`,
     { method: "POST", body },
   );
-  return { changes: (res.data.changes ?? []).map((c) => mapSectionChangeFromApi(c)) };
+  return {
+    changes: (res.data.changes ?? []).map((c) => mapSectionChangeFromApi(c)),
+  };
 }
 
 export async function applyQuickAdjust(
@@ -130,7 +132,9 @@ export async function applyQuickAdjust(
     `${ENDPOINT}/${id}/iterate`,
     { method: "POST", body },
   );
-  return { changes: (res.data.changes ?? []).map((c) => mapSectionChangeFromApi(c)) };
+  return {
+    changes: (res.data.changes ?? []).map((c) => mapSectionChangeFromApi(c)),
+  };
 }
 
 /**
@@ -145,13 +149,16 @@ export async function refazerSection(
 ): Promise<IterationResult> {
   const body = {
     scope: { kind: "section", section_id: sectionId },
-    instruction: "Refaça esta seção mantendo o mesmo conteúdo com melhor redação.",
+    instruction:
+      "Refaça esta seção mantendo o mesmo conteúdo com melhor redação.",
   };
   const res = await fetcher<DataEnvelope<IterateResultAPI>>(
     `${ENDPOINT}/${id}/iterate`,
     { method: "POST", body },
   );
-  return { changes: (res.data.changes ?? []).map((c) => mapSectionChangeFromApi(c)) };
+  return {
+    changes: (res.data.changes ?? []).map((c) => mapSectionChangeFromApi(c)),
+  };
 }
 
 // ── Revisão (aba "Revisão" — reusa /iterate com instruction de revisão) ─────
@@ -210,10 +217,14 @@ export async function runQuickAction(
 }
 
 const QUICK_ACTION_PROMPTS: Record<QuickActionKind, string> = {
-  summarize_case: "Resuma os autos em 3-5 linhas, destacando partes, pedido e estágio.",
-  suggest_theses: "Sugira as principais teses jurídicas aplicáveis a este caso, ordenadas por força.",
-  check_deadline: "Confira o prazo desta peça: qual é o termo final e se é dias úteis ou corridos.",
-  find_precedents: "Encontre precedentes STJ/STF/tribunais relevantes pra esta peça.",
+  summarize_case:
+    "Resuma os autos em 3-5 linhas, destacando partes, pedido e estágio.",
+  suggest_theses:
+    "Sugira as principais teses jurídicas aplicáveis a este caso, ordenadas por força.",
+  check_deadline:
+    "Confira o prazo desta peça: qual é o termo final e se é dias úteis ou corridos.",
+  find_precedents:
+    "Encontre precedentes STJ/STF/tribunais relevantes pra esta peça.",
 };
 
 // ── Ações (assumir autoria + refazer do zero) ───────────────────────────────
@@ -302,6 +313,51 @@ export async function filePeca(
   await fetcher(`${ENDPOINT}/${id}/file`, {
     method: "POST",
     body: { filing_number: filingNumber },
+  });
+}
+
+// ── Anexos (POST/DELETE /pecas/:id/anexos) ────────────────────────────────────
+
+/** Categorias de anexo — casadas com o CHECK do BE (migração 0043) e o enum
+ *  `AttachmentCategory` em internal/draft/entity.go. */
+export type AttachmentCategory =
+  | "Procuração"
+  | "Comprovante de endereço"
+  | "Contrato"
+  | "Provas documentais"
+  | "Declaração de hipossuficiência"
+  | "Outro";
+
+export const ATTACHMENT_CATEGORIES: AttachmentCategory[] = [
+  "Procuração",
+  "Comprovante de endereço",
+  "Contrato",
+  "Provas documentais",
+  "Declaração de hipossuficiência",
+  "Outro",
+];
+
+/** Vincula um documento já uploadado (via document slice) à peça, com categoria. */
+export async function attachDocument(
+  fetcher: ApiFetcher,
+  draftId: string,
+  documentId: string,
+  category: AttachmentCategory,
+): Promise<void> {
+  await fetcher(`${ENDPOINT}/${draftId}/anexos`, {
+    method: "POST",
+    body: { document_id: documentId, category },
+  });
+}
+
+/** Remove o vínculo peça↔documento. O documento em si permanece (owned pelo slice document). */
+export async function removeAttachment(
+  fetcher: ApiFetcher,
+  draftId: string,
+  attachmentId: string,
+): Promise<void> {
+  await fetcher(`${ENDPOINT}/${draftId}/anexos/${attachmentId}`, {
+    method: "DELETE",
   });
 }
 

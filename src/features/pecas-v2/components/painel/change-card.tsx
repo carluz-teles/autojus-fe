@@ -23,8 +23,7 @@ export function ChangeCard({ change, onAccept, onDismiss }: Props) {
           className="rounded-md px-1.5 py-0.5 text-[10px] font-medium tracking-[0.08em] uppercase"
           style={{
             background: "color-mix(in oklch, var(--gold) 22%, transparent)",
-            color:
-              "color-mix(in oklch, var(--gold) 65%, var(--foreground))",
+            color: "color-mix(in oklch, var(--gold) 65%, var(--foreground))",
           }}
         >
           {change.category}

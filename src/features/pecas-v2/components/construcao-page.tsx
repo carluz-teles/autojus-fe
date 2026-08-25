@@ -11,22 +11,26 @@
 // central vira read-only. Cada card pode ser aplicado ou descartado
 // individualmente; quando pending fica vazio, volta ao estado normal.
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/mock-ui/confirm-dialog";
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
+import { PecaContexto } from "@/features/pecas/components/peca-shell";
+import { usePeca } from "@/features/pecas/hooks/use-peca";
 
 import {
   useChatThread,
   useRunQuickAction,
   useSendChatMessage,
 } from "../hooks/use-chat";
-import { useDraft, useSaveDraft } from "../hooks/use-draft";
+import { draftKeys, useDraft, useSaveDraft } from "../hooks/use-draft";
 import { useIterate, useQuickAdjust } from "../hooks/use-iterate";
 import { useAssumirAutoria, useRefazerDoZero } from "../hooks/use-refazer";
 import { useRunReview } from "../hooks/use-review";
+import { useSendToSigning } from "../hooks/use-workflow";
 import type {
   Draft,
   IterateScope,
@@ -35,21 +39,21 @@ import type {
   QuickActionKind,
   QuickAdjustKind,
 } from "../types";
-import { useSendToSigning } from "../hooks/use-workflow";
 import { ConstrucaoHeader } from "./construcao-header";
-import { ContextoSidebar } from "./contexto-sidebar";
 import { EditorArea } from "./editor/editor-area";
 import { PainelLateral, type PainelTab } from "./painel/painel-lateral";
 import { TabAjusteProposto } from "./painel/tab-ajuste-proposto";
 import { TabChat } from "./painel/tab-chat";
 import { TabIterar, type TabIterarHandle } from "./painel/tab-iterar";
 import { TabRevisao } from "./painel/tab-revisao";
+import { structuredToHtml } from "./rich-editor/html-adapter";
 
 export function ConstrucaoPage({ pecaId }: { pecaId: string }) {
   const router = useRouter();
   const { data: draft, isLoading } = useDraft(pecaId);
   const { data: messages = [] } = useChatThread(pecaId);
   const save = useSaveDraft(pecaId);
+  const qc = useQueryClient();
   const iterate = useIterate(pecaId);
   const quickAdjust = useQuickAdjust(pecaId);
   const assumirAutoria = useAssumirAutoria(pecaId);
@@ -65,6 +69,42 @@ export function ConstrucaoPage({ pecaId }: { pecaId: string }) {
   const [chatResetKey, setChatResetKey] = useState(0);
   const [refazerZeroOpen, setRefazerZeroOpen] = useState(false);
   const tabIterarRef = useRef<TabIterarHandle>(null);
+  // Trigger de highlight no editor após aceitar uma iteração. O nonce
+  // incrementa a cada aceite pra forçar re-trigger mesmo quando o mesmo
+  // roman é aplicado duas vezes seguidas (dois cards da mesma seção).
+  const [highlightTrigger, setHighlightTrigger] = useState<{
+    roman: string;
+    nonce: number;
+  }>({ roman: "", nonce: 0 });
+  const triggerHighlight = (roman: string) => {
+    setHighlightTrigger((prev) => ({ roman, nonce: prev.nonce + 1 }));
+  };
+
+  // Aplica uma mudança de seção (do painel Iterar ou da aba Revisão):
+  // (1) update otimista do cache com o structuredToHtml rebuild — o BE PATCH
+  //     grava structured_content mas NÃO regenera content_html, então
+  //     precisamos mergear no cliente pro editor refletir a mudança;
+  // (2) save.mutate persiste em paralelo (fire-and-forget);
+  // (3) dispara highlight animado na seção alterada.
+  const applyChangeToDraft = (
+    sectionId: string,
+    sectionRoman: string,
+    newParagraphs: string[],
+  ) => {
+    qc.setQueryData<Draft>(draftKeys.detail(pecaId), (prev) => {
+      if (!prev) return prev;
+      const nextSections = prev.sections.map((s) =>
+        s.id === sectionId ? { ...s, paragraphs: newParagraphs } : s,
+      );
+      const nextHtml = structuredToHtml({
+        preamble: prev.preamble,
+        sections: nextSections,
+      });
+      return { ...prev, sections: nextSections, contentHtml: nextHtml };
+    });
+    save.mutate({ sections: [{ id: sectionId, paragraphs: newParagraphs }] });
+    triggerHighlight(sectionRoman);
+  };
 
   // Revisão: null = ainda não rodou; [] = rodou e não achou nada; N = pendentes.
   const [reviewSuggestions, setReviewSuggestions] = useState<
@@ -91,16 +131,21 @@ export function ConstrucaoPage({ pecaId }: { pecaId: string }) {
   // As changes chegam prontas do BE (SectionChange[] com category/explanation/
   // old_paragraphs/new_paragraphs já hidratados via hydrateChanges no /iterate).
   // Aceitar UMA change = PATCH /pecas/:id com a seção substituída.
-  const enterPreview = (currentScope: IterateScope, changes: PendingChange[]) => {
+  const enterPreview = (
+    currentScope: IterateScope,
+    changes: PendingChange[],
+  ) => {
     if (changes.length === 0) {
       toast("Nenhuma mudança sugerida.");
       return;
     }
 
     const applyOne = (change: PendingChange) => {
-      save.mutate({
-        sections: [{ id: change.sectionId, paragraphs: change.newParagraphs }],
-      });
+      applyChangeToDraft(
+        change.sectionId,
+        change.sectionRoman,
+        change.newParagraphs,
+      );
     };
 
     const acceptOne = (sectionId: string) => {
@@ -225,11 +270,7 @@ export function ConstrucaoPage({ pecaId }: { pecaId: string }) {
     setReviewSuggestions((prev) => {
       if (!prev) return prev;
       const s = prev[index];
-      if (s) {
-        save.mutate({
-          sections: [{ id: s.sectionId, paragraphs: s.newParagraphs }],
-        });
-      }
+      if (s) applyChangeToDraft(s.sectionId, s.sectionRoman, s.newParagraphs);
       return prev.filter((_, i) => i !== index);
     });
   };
@@ -243,12 +284,11 @@ export function ConstrucaoPage({ pecaId }: { pecaId: string }) {
   const handleReviewAcceptAll = () => {
     setReviewSuggestions((prev) => {
       if (!prev) return prev;
-      for (const s of prev) {
-        save.mutate({
-          sections: [{ id: s.sectionId, paragraphs: s.newParagraphs }],
-        });
-      }
-      toast.success(prev.length === 1 ? "Sugestão aplicada." : "Sugestões aplicadas.");
+      for (const s of prev)
+        applyChangeToDraft(s.sectionId, s.sectionRoman, s.newParagraphs);
+      toast.success(
+        prev.length === 1 ? "Sugestão aplicada." : "Sugestões aplicadas.",
+      );
       return [];
     });
   };
@@ -280,11 +320,7 @@ export function ConstrucaoPage({ pecaId }: { pecaId: string }) {
   // Corrige inconsistências (ex.: tab "iterar" ficou setada e agora autoria virou
   // human_taken; ou vice-versa). Cai pro chat se a work-tab do modo não bate.
   const effectiveTab: PainelTab =
-    tab === "chat"
-      ? "chat"
-      : mode === "revisao"
-        ? "revisao"
-        : "iterar";
+    tab === "chat" ? "chat" : mode === "revisao" ? "revisao" : "iterar";
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -293,12 +329,13 @@ export function ConstrucaoPage({ pecaId }: { pecaId: string }) {
         enviarDisabled={sendToSigning.isPending}
         onEnviar={() =>
           sendToSigning.mutate(undefined, {
-            onError: () => toast.error("Não foi possível enviar para assinatura."),
+            onError: () =>
+              toast.error("Não foi possível enviar para assinatura."),
           })
         }
       />
       <div className="flex min-h-0 flex-1">
-        <ContextoSidebar draft={draft} />
+        <PecaContextoV2Wrapper pecaId={draft.id} />
         <EditorArea
           draft={draft}
           onRefazerSection={handleRefazerSection}
@@ -312,6 +349,7 @@ export function ConstrucaoPage({ pecaId }: { pecaId: string }) {
           }
           isPreviewActive={inPreview}
           hideRefazerSection={isHumanAuthor}
+          highlightTrigger={highlightTrigger}
         />
         <PainelLateral
           tab={effectiveTab}
@@ -379,4 +417,23 @@ function labelForScope(scope: IterateScope, draft: Draft): string {
   if (scope.kind === "whole") return "Peça toda";
   const s = draft.sections.find((x) => x.id === scope.id);
   return s ? `${s.roman} — ${s.shortTitle}` : "Peça toda";
+}
+
+// PecaContextoV2Wrapper — a ConstrucaoPage v2 recebe `Draft` (shape v2, montado
+// pelo api-mapper), mas o PecaContexto ÚNICO consome PecaDetail (shape v1 do
+// slice pecas). Este wrapper busca o PecaDetail por id — a query já roda em
+// paralelo com useDraft(id) via React Query, então zero overhead perceptível.
+// Elimina a divergência antiga entre ContextoSidebar (v2) e PecaContexto (v1).
+function PecaContextoV2Wrapper({ pecaId }: { pecaId: string }) {
+  const { data: peca } = usePeca(pecaId);
+  if (!peca) {
+    return (
+      <aside className="border-border w-[300px] shrink-0 overflow-y-auto border-r px-4 py-6">
+        <p className="text-muted-foreground text-[12px]">
+          Carregando contexto…
+        </p>
+      </aside>
+    );
+  }
+  return <PecaContexto peca={peca} />;
 }

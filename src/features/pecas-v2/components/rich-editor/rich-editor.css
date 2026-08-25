@@ -14,49 +14,67 @@
 .tiptap-a4-page {
   background: #ffffff;
   color: #0f172a;
+  /* Largura A4 fixa (com fallback: 100% do container quando menor que 210mm) —
+   * sem `width` explícito, o flex parent colapsa a folha em uma coluna fina
+   * quando o editor está vazio (peça recém-gerada, sem chunks ainda). */
+  width: 100%;
   max-width: 210mm;
+  min-width: min(210mm, 100%);
   margin: 24px auto;
   padding: 30mm 20mm 20mm 30mm; /* top-right-bottom-left = margens ABNT/forense */
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.08);
   border-radius: 2px;
   min-height: 297mm; /* altura A4; cresce conforme conteúdo */
   font-family: "Liberation Serif", "Times New Roman", Times, serif;
   font-size: 12pt;
   line-height: 1.5;
+  box-sizing: border-box;
 }
 
 /* ProseMirror injeta um wrapper — remove estilo default (border/outline no focus). */
-.tiptap-content .ProseMirror {
+.ProseMirror.tiptap-content {
   outline: none;
   min-height: 100%;
 }
 
-.tiptap-content .ProseMirror p {
+.ProseMirror.tiptap-content p {
   margin: 0 0 0.5em 0;
   text-align: justify;
   text-justify: inter-word;
   hyphens: auto;
 }
 
-.tiptap-content .ProseMirror h1,
-.tiptap-content .ProseMirror h2,
-.tiptap-content .ProseMirror h3 {
+.ProseMirror.tiptap-content h1,
+.ProseMirror.tiptap-content h2,
+.ProseMirror.tiptap-content h3 {
   font-weight: 700;
   text-align: center;
   margin: 1.5em 0 0.75em 0;
 }
-.tiptap-content .ProseMirror h1 { font-size: 14pt; text-transform: uppercase; }
-.tiptap-content .ProseMirror h2 { font-size: 12pt; text-transform: uppercase; }
-.tiptap-content .ProseMirror h3 { font-size: 12pt; }
+.ProseMirror.tiptap-content h1 {
+  font-size: 14pt;
+  text-transform: uppercase;
+}
+.ProseMirror.tiptap-content h2 {
+  font-size: 12pt;
+  text-transform: uppercase;
+}
+.ProseMirror.tiptap-content h3 {
+  font-size: 12pt;
+}
 
-.tiptap-content .ProseMirror ul,
-.tiptap-content .ProseMirror ol {
+.ProseMirror.tiptap-content ul,
+.ProseMirror.tiptap-content ol {
   padding-left: 1.5em;
   margin: 0.5em 0;
 }
-.tiptap-content .ProseMirror li p { margin: 0; }
+.ProseMirror.tiptap-content li p {
+  margin: 0;
+}
 
-.tiptap-content .ProseMirror blockquote {
+.ProseMirror.tiptap-content blockquote {
   border-left: 3px solid #cbd5e1;
   margin: 0.75em 0 0.75em 2em;
   padding: 0 0 0 1em;
@@ -65,43 +83,46 @@
   line-height: 1.2;
 }
 
-.tiptap-content .ProseMirror hr {
+.ProseMirror.tiptap-content hr {
   border: none;
   border-top: 1px solid #cbd5e1;
   margin: 1em 0;
 }
 
 /* Tabelas — bordas colapsadas, cell padding forense. */
-.tiptap-content .ProseMirror table {
+.ProseMirror.tiptap-content table {
   border-collapse: collapse;
   margin: 1em 0;
   width: 100%;
   table-layout: fixed;
 }
-.tiptap-content .ProseMirror table td,
-.tiptap-content .ProseMirror table th {
+.ProseMirror.tiptap-content table td,
+.ProseMirror.tiptap-content table th {
   border: 1px solid #0f172a;
   padding: 6px 8px;
   vertical-align: top;
   min-width: 2em;
 }
-.tiptap-content .ProseMirror table th {
+.ProseMirror.tiptap-content table th {
   background: #f1f5f9;
   font-weight: 600;
   text-align: left;
 }
-.tiptap-content .ProseMirror table .selectedCell::after {
+.ProseMirror.tiptap-content table .selectedCell::after {
   background: rgba(59, 130, 246, 0.12);
   content: "";
-  left: 0; right: 0; top: 0; bottom: 0;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
   pointer-events: none;
   position: absolute;
   z-index: 2;
 }
-.tiptap-content .ProseMirror table {
+.ProseMirror.tiptap-content table {
   position: relative;
 }
-.tiptap-content .ProseMirror table .column-resize-handle {
+.ProseMirror.tiptap-content table .column-resize-handle {
   background-color: #3b82f6;
   bottom: -2px;
   pointer-events: none;
@@ -112,10 +133,44 @@
 }
 
 /* Placeholder do editor vazio. */
-.tiptap-content .ProseMirror p.is-editor-empty:first-child::before {
+.ProseMirror.tiptap-content p.is-editor-empty:first-child::before {
   color: #94a3b8;
   content: attr(data-placeholder);
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/* Highlight temporário após aplicar uma iteração — overlay absoluto dentro
+ * de .tiptap-a4-page (posicionado sobre a seção alterada). O ProseMirror
+ * reconcilia o DOM interno e apagava qualquer classe que a gente adicionasse
+ * nos nós dele, então o overlay tem que ser um irmão externo. Fade em 4s. */
+@keyframes section-highlight-overlay-fade {
+  0% {
+    background-color: rgba(234, 179, 8, 0.45);
+    border-left-color: rgba(234, 179, 8, 0.95);
+  }
+  15% {
+    background-color: rgba(234, 179, 8, 0.45);
+    border-left-color: rgba(234, 179, 8, 0.95);
+  }
+  70% {
+    background-color: rgba(234, 179, 8, 0.2);
+    border-left-color: rgba(234, 179, 8, 0.55);
+  }
+  100% {
+    background-color: rgba(234, 179, 8, 0);
+    border-left-color: rgba(234, 179, 8, 0);
+  }
+}
+.section-highlight-overlay {
+  position: absolute;
+  left: 20mm; /* Alinha com o padding-left da folha (margem forense esquerda 30mm menos 10mm de folga) */
+  right: 12mm;
+  border-left: 4px solid rgba(234, 179, 8, 0.95);
+  background-color: rgba(234, 179, 8, 0.45);
+  border-radius: 3px;
+  pointer-events: none; /* Nunca bloqueia clique/seleção no editor */
+  z-index: 5;
+  animation: section-highlight-overlay-fade 4000ms ease-out forwards;
 }

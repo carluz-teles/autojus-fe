@@ -15,10 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
-import {
-  useCriarPeca,
-  usePecasByProcesso,
-} from "@/features/pecas/hooks/use-peca";
+import { usePecasByProcesso } from "@/features/pecas/hooks/use-peca";
 import type { PecaListItem } from "@/features/pecas/types";
 import { ConfirmarPrazo } from "@/features/prazos/components/confirmar-prazo";
 import { usePartes } from "@/features/processos/hooks/use-processos";
@@ -45,7 +42,6 @@ import { TeorPublicacao } from "./shared/teor-publicacao";
 
 export function IntimacaoDetail({ id }: { id: string }) {
   const { data: i, isPending, error } = useIntimacaoDetalhe(id);
-  const criarPeca = useCriarPeca();
 
   // Breadcrumb padrão publicado no header sticky do AppShell (NÃO dentro da página).
   const crumbs = useMemo(
@@ -101,26 +97,12 @@ export function IntimacaoDetail({ id }: { id: string }) {
           <Button variant="outline" onClick={emBreve}>
             Sem providência
           </Button>
-          <Button
-            onClick={() => {
-              criarPeca.mutate(
-                {
-                  source: "intimation",
-                  intimation_id: i.id,
-                  case_id: i.court_record_id,
-                },
-                {
-                  onSuccess: (criada) => {
-                    window.location.href = `/pecas/${criada.id}`;
-                  },
-                  onError: () => toast.error("Não foi possível criar a peça."),
-                },
-              );
-            }}
-            disabled={criarPeca.isPending}
+          <Link
+            href={`/pecas/nova?intimation_id=${encodeURIComponent(i.id)}`}
+            className="bg-primary text-primary-foreground inline-flex items-center rounded-md px-4 py-2 text-[13.5px] font-medium no-underline transition-opacity hover:no-underline hover:opacity-95"
           >
-            {criarPeca.isPending ? "Criando…" : "Redigir peça"}
-          </Button>
+            Redigir peça
+          </Link>
         </div>
       </header>
 
@@ -301,36 +283,17 @@ function PecasSection({
   intimationId: string;
 }) {
   const { items: pecas, isPending } = usePecasByProcesso(courtRecordId);
-  const criarPeca = useCriarPeca();
-
-  const handleCriarPeca = () => {
-    criarPeca.mutate(
-      {
-        source: "intimation",
-        intimation_id: intimationId,
-        case_id: courtRecordId,
-      },
-      {
-        onSuccess: (criada) => {
-          window.location.href = `/pecas/${criada.id}`;
-        },
-        onError: () => toast.error("Não foi possível criar a peça."),
-      },
-    );
-  };
 
   return (
     <section className="mt-10">
       <div className="flex items-center justify-between gap-3">
         <EyebrowTitle>Peças desta intimação</EyebrowTitle>
-        <button
-          type="button"
-          onClick={handleCriarPeca}
-          disabled={criarPeca.isPending}
-          className="text-primary text-[12.5px] font-medium transition-colors hover:opacity-80 disabled:opacity-50"
+        <Link
+          href={`/pecas/nova?intimation_id=${encodeURIComponent(intimationId)}`}
+          className="text-primary text-[12.5px] font-medium transition-colors hover:opacity-80"
         >
-          {criarPeca.isPending ? "Criando…" : "+ Nova peça"}
-        </button>
+          + Nova peça
+        </Link>
       </div>
 
       {isPending ? (

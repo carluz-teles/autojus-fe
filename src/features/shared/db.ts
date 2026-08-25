@@ -559,5 +559,20 @@ export const EQUIPE = [
 
 export const USUARIO_ATUAL = "Luan Gomes";
 
-/** Data de referência do mock — evita a tela mudar de significado com o tempo. */
-export const HOJE = "2026-08-19";
+/** Data ISO "YYYY-MM-DD" do dia CORRENTE no fuso local do navegador.
+ *  Timezone-safe: usa componentes locais (getFullYear/getMonth/getDate) em
+ *  vez de toISOString(), que retornaria a data UTC — em BR (UTC-3) isso
+ *  pode voltar o dia anterior perto da meia-noite.
+ *
+ *  Antes era `const HOJE = "2026-08-19"` (herança de mock, época em que os
+ *  consumidores desta constante eram só telas com dados fake). Como agora
+ *  Partida/PecaContexto/etc lêem dados reais do BE, congelar a data
+ *  quebrava o cálculo de dias restantes ("em 5 dias" quando o BE já
+ *  reportava "1 dia em atraso"). */
+export function hojeISO(): string {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}

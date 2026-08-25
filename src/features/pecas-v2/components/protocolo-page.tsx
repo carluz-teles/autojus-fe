@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 
 import { useDraft } from "../hooks/use-draft";
 import { useFilePeca } from "../hooks/use-workflow";
+import { AnexosList } from "./anexos-list";
 import { ConstrucaoHeader } from "./construcao-header";
 import { PecaPreview } from "./peca-preview";
 
@@ -53,6 +54,7 @@ export function ProtocoloPage({ pecaId }: { pecaId: string }) {
             title={draft.title}
             preamble={draft.preamble}
             sections={draft.sections}
+            contentHtml={draft.contentHtml}
           />
         </div>
 
@@ -98,6 +100,8 @@ export function ProtocoloPage({ pecaId }: { pecaId: string }) {
               ↓ Baixar peça assinada (PDF)
             </a>
           )}
+
+          <AnexosList attachments={draft.attachments} />
 
           <div className="border-border/60 bg-muted/30 rounded-xl border p-4 text-[11.5px] leading-relaxed">
             <p className="text-muted-foreground">

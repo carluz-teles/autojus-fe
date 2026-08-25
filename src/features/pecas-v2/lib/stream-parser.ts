@@ -1,24 +1,18 @@
-// stream-parser.ts — extrator incremental do campo `draft_html` do output
-// streaming do LLM. O worker-ai publica cada delta bruto do content (JSON
-// que vai ficando: `{"draft_html":"<p>...`). Este parser mantém buffer,
-// procura a abertura do campo, e emite os pedaços de HTML já unescapados
-// à medida que chegam.
+// stream-parser.ts — extrator incremental de um campo string dentro do JSON
+// streaming do LLM. O worker-ai publica deltas brutos do content JSON
+// (`{"draft_markdown":"## I ...`) via SSE; este parser mantém buffer, procura
+// a abertura do campo, e emite os pedaços já unescapados à medida que chegam.
 //
-// Contract:
-//   const p = createHTMLStreamParser();
-//   for each chunk from SSE:
-//     const htmlDelta = p.push(chunk);
-//     if (htmlDelta) appendToEditor(htmlDelta);
-//
-// Suporta os escapes JSON principais: \" \\ \/ \n \r \t \b \f \uXXXX.
-// Não valida o JSON inteiro — é permissivo por design (o BE já fez schema
-// strict; aqui é só extração progressiva do valor).
+// Independente do formato do valor (markdown, HTML, texto). O consumer decide
+// o que fazer com o buffer acumulado (converter markdown → HTML, aplicar no
+// editor, etc). Suporta os escapes JSON principais: \" \\ \/ \n \r \t \b \f
+// \uXXXX. Não valida o JSON inteiro — é permissivo por design (o BE já fez
+// schema strict; aqui é só extração progressiva do valor).
 
-interface HTMLStreamParser {
-  /** Recebe um chunk bruto, devolve o HTML novo (unescapado) a ser
-   *  appended ao editor. "" quando ainda não abriu o campo ou nada novo. */
+interface StreamingFieldParser {
+  /** Consome um chunk bruto do SSE. Devolve o delta novo (só o texto novo). */
   push(chunk: string): string;
-  /** Devolve o HTML completo acumulado (útil pra sync final). */
+  /** Devolve o valor completo acumulado até agora. */
   full(): string;
 }
 
@@ -28,8 +22,12 @@ const enum State {
   Done,
 }
 
-/** Cria um parser stateful. Não é thread-safe (cada request tem o seu). */
-export function createHTMLStreamParser(fieldName = "draft_html"): HTMLStreamParser {
+/** Cria um parser stateful pra extrair o valor de um campo string do JSON
+ *  streaming. Não é thread-safe (cada request tem o seu). O `fieldName`
+ *  default reflete o schema atual da geração (`draft_markdown`, v8+). */
+export function createStreamingJsonFieldParser(
+  fieldName = "draft_markdown",
+): StreamingFieldParser {
   const openMarker = `"${fieldName}":"`; // "draft_html":"
   let state: State = State.BeforeField;
   let buffer = ""; // caracteres brutos ainda não processados

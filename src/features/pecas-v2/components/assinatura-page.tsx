@@ -23,6 +23,7 @@ import { useCertificados } from "@/features/configuracoes/hooks/use-cert-upload"
 
 import { useDraft } from "../hooks/use-draft";
 import { useRevertToConstruction, useSignPeca } from "../hooks/use-workflow";
+import { AnexosList } from "./anexos-list";
 import { ConstrucaoHeader } from "./construcao-header";
 import { PecaPreview } from "./peca-preview";
 
@@ -65,9 +66,7 @@ export function AssinaturaPage({ pecaId }: { pecaId: string }) {
     sign.mutate(selectedId, {
       onError: (e) =>
         toast.error(
-          e instanceof Error
-            ? e.message
-            : "Não foi possível assinar a peça.",
+          e instanceof Error ? e.message : "Não foi possível assinar a peça.",
         ),
     });
   };
@@ -89,14 +88,13 @@ export function AssinaturaPage({ pecaId }: { pecaId: string }) {
             title={draft.title}
             preamble={draft.preamble}
             sections={draft.sections}
+            contentHtml={draft.contentHtml}
           />
         </div>
 
         <aside className="flex flex-col gap-4">
           <div className="border-border rounded-xl border p-5">
-            <h2 className="font-display text-lg font-medium">
-              Assinar peça
-            </h2>
+            <h2 className="font-display text-lg font-medium">Assinar peça</h2>
             <p className="text-muted-foreground mt-2 text-[12.5px] leading-relaxed">
               O PDF é gerado, assinado com seu certificado A1 (ICP-Brasil) e
               armazenado. Após assinar, a peça não pode mais ser editada.
@@ -121,7 +119,19 @@ export function AssinaturaPage({ pecaId }: { pecaId: string }) {
                     disabled={sign.isPending}
                   >
                     <SelectTrigger size="sm" className="w-full">
-                      <SelectValue placeholder="Escolha um certificado" />
+                      {/* Passa o label explicitamente (subject_cn + OAB) — o
+                          SelectValue default do Radix mostraria o `value`
+                          (UUID) quando o SelectItem correspondente não
+                          está montado no ciclo de render inicial. */}
+                      <SelectValue placeholder="Escolha um certificado">
+                        {(() => {
+                          const c = activeCerts.find(
+                            (x) => x.id === selectedId,
+                          );
+                          if (!c) return undefined;
+                          return `${c.subject_cn}${c.oab ? ` · OAB ${c.oab}` : ""}`;
+                        })()}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {activeCerts.map((c) => (
@@ -179,6 +189,8 @@ export function AssinaturaPage({ pecaId }: { pecaId: string }) {
               Voltar para Construção
             </button>
           </div>
+
+          <AnexosList attachments={draft.attachments} />
 
           <div className="border-border/60 bg-muted/30 rounded-xl border p-4 text-[11.5px] leading-relaxed">
             <p className="text-muted-foreground">

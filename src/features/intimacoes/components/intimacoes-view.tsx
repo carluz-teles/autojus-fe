@@ -7,14 +7,11 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/mock-ui/layout";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { type Facet, FacetedFilter } from "@/components/ui/faceted-filter";
 import { ListSearchToolbar } from "@/components/ui/list-search-toolbar";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
-
-import { PartesInline } from "./shared/partes-inline";
 import { cn, formatarData } from "@/lib/utils";
 
 import {
@@ -36,6 +33,7 @@ import {
   nomeExibicao,
 } from "./shared/atribuir-responsavel";
 import { Avatar, initials } from "./shared/avatar";
+import { PartesInline } from "./shared/partes-inline";
 import { PrazoContagemGrande } from "./shared/prazo-contagem-grande";
 import { corUrgencia, prazoUrgenciaInfo } from "./shared/prazo-urgencia";
 import { TeorPublicacao } from "./shared/teor-publicacao";
@@ -74,11 +72,6 @@ const URGENCIA_TABS: {
 ];
 
 type ModoVisao = "triagem" | "prazos";
-
-/** MOCK: peticionamento — ação ainda não implementada. */
-function emBreve() {
-  toast("Em breve.");
-}
 
 /** Rótulo curto do prazo pra coluna direita da linha da lista — wording do design
  * (rotuloPrazo): "N dias em atraso" · "vence hoje" · "vence amanhã" · "em N dias". */
@@ -808,9 +801,12 @@ function PainelDetalhe({ id }: { id: string }) {
         >
           Abrir intimação
         </Link>
-        <Button variant="outline" className="flex-1" onClick={emBreve}>
+        <Link
+          href={`/pecas/nova?intimation_id=${encodeURIComponent(i.id)}`}
+          className="border-border hover:bg-muted/40 flex flex-1 items-center justify-center rounded-lg border px-4 py-2.5 text-center text-[13.5px] font-medium no-underline hover:no-underline"
+        >
           Redigir peça
-        </Button>
+        </Link>
       </div>
     </aside>
   );

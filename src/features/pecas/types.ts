@@ -137,9 +137,20 @@ export interface PecaListItem {
   status: string;
   saga_state: string;
   coverage_summary: PecaCoverageSummary | null;
+  sent_to_signing_at?: string | null;
+  signed_at?: string | null;
   filed_at: string | null;
   observed_result: string | null;
   created_at: string;
+  /** CNJ do processo (join com court_record) — string vazia quando indisponível. */
+  cnj_number?: string;
+  /** Nome do autor da peça (join com app_user via created_by) — vazio pra
+   *  peças pré-migration 0063 ou usuário removido do escritório. */
+  responsible_name?: string;
+  /** Prazo da intimação de origem — nil quando não há deadline derivado.
+   *  end_date: "YYYY-MM-DD"; days_left = end_date - hoje (negativo = atrasado). */
+  deadline_end_date?: string | null;
+  deadline_days_left?: number | null;
 }
 
 /** Coverage summary do review (grounded/chunks/suggestions). */
@@ -256,12 +267,20 @@ export type ThesisConfidence = "alta" | "media" | "baixa";
 /** Tom da peça enviado ao BE no generate — rótulos curtos, fiéis ao mockup. */
 export type PecaTone = "tecnico" | "objetivo" | "enfatico";
 
-/** Uma tese sugerida pela IA — POST /v1/pecas/:id/theses. */
+/** Uma tese sugerida pela IA — POST /v1/pecas/:id/theses.
+ *
+ *  `evidence` são trechos LITERAIS do teor/chunks que sustentam a tese —
+ *  é a justificativa concreta por trás da `confidence`. Prompt v2 força:
+ *    alta  → ≥2 evidências diretas
+ *    media → 1 evidência OU 2+ indiretas
+ *    baixa → 0 evidências (só doutrina/dispositivo puro)
+ *  Sempre array (nunca null, mesmo vazio) — contrato do wire. */
 export interface Thesis {
   label: string;
   confidence: ThesisConfidence;
   reference: string;
   foundation: string;
+  evidence: string[];
 }
 
 /** Resposta do POST /v1/pecas/:id/theses. */
