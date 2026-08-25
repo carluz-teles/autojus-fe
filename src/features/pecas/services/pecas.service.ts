@@ -3,6 +3,8 @@ import type { ApiFetcher } from "@/lib/api/use-api";
 
 import type {
   AttachDocumentInput,
+  EsajCredential,
+  EsajCredentialInput,
   GeneratePecaBody,
   PecaAttachment,
   PecaChatMessage,
@@ -11,6 +13,8 @@ import type {
   PecaDetail,
   PecaExportResult,
   PecaFileResult,
+  PecaFilingApproveResult,
+  PecaFilingStatus,
   PecaListItem,
   PecaPatchResult,
   PecaResultResult,
@@ -172,6 +176,62 @@ export async function updateResult(
     { method: "PATCH", body: { observed_result: observedResult } },
   );
   return res.data;
+}
+
+// ── Fatia 1: peticionamento automático (e-SAJ) ──────────────────────────────
+
+/** Aprova o protocolo automático — POST /v1/pecas/:id/filing/approve.
+ *  NUNCA é automático: exige este clique. 201 na 1ª vez, 200 se já estava
+ *  enfileirado (clique duplo idempotente). */
+export async function approveFiling(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<PecaFilingApproveResult> {
+  const res = await fetcher<DataEnvelope<PecaFilingApproveResult>>(
+    `${ENDPOINT}/${id}/filing/approve`,
+    { method: "POST" },
+  );
+  return res.data;
+}
+
+/** Status do protocolo automático — GET /v1/pecas/:id/filing (null se não iniciado). */
+export async function getFilingStatus(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<PecaFilingStatus | null> {
+  const res = await fetcher<DataEnvelope<PecaFilingStatus | null>>(
+    `${ENDPOINT}/${id}/filing`,
+  );
+  return res.data;
+}
+
+/** Cadastra credencial e-SAJ — POST /v1/esaj-credentials. */
+export async function uploadEsajCredential(
+  fetcher: ApiFetcher,
+  input: EsajCredentialInput,
+): Promise<EsajCredential> {
+  const res = await fetcher<DataEnvelope<EsajCredential>>(
+    `/v1/esaj-credentials`,
+    { method: "POST", body: input },
+  );
+  return res.data;
+}
+
+/** Lista credenciais e-SAJ — GET /v1/esaj-credentials. */
+export async function listEsajCredentials(
+  fetcher: ApiFetcher,
+): Promise<EsajCredential[]> {
+  const res =
+    await fetcher<DataEnvelope<EsajCredential[]>>(`/v1/esaj-credentials`);
+  return res.data;
+}
+
+/** Revoga credencial e-SAJ — DELETE /v1/esaj-credentials/:id. */
+export async function revokeEsajCredential(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<void> {
+  await fetcher<void>(`/v1/esaj-credentials/${id}`, { method: "DELETE" });
 }
 
 /** Exporta a peça — GET /v1/pecas/:id/export?format=docx|pdf. */
