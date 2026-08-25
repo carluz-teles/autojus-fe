@@ -39,9 +39,9 @@ const EMPTY_BUCKETS: IntimacoesBuckets = {
   hoje: 0,
   proximos_dois_dias: 0,
   esta_semana: 0,
-  sem_providencia: 0,
+  este_mes: 0,
   mais_adiante: 0,
-  nao_confirmado: 0,
+  sem_data_definida: 0,
 };
 
 const PAGE_SIZE = 20;
@@ -60,8 +60,10 @@ export interface IntimacoesFilters {
   type?: string;
   user_status?: string;
   court?: string;
-  /** atraso|hoje|proximos_dois_dias|semana|mais_adiante|nao_confirmado|sem_providencia */
+  /** atraso|hoje|proximos_dois_dias|semana|este_mes|mais_adiante|sem_data_definida */
   urgencia?: string;
+  /** Chip "Não confirmadas" (triagem) — filtra prazos sugeridos não confirmados. */
+  naoConfirmado?: boolean;
   /** "me" (toggle "Minhas") ou um uuid; casa contra condutor OU revisor. */
   assignee?: string;
 }
@@ -85,6 +87,7 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     user_status: filters.user_status || undefined,
     court: filters.court || undefined,
     urgencia: filters.urgencia || undefined,
+    nao_confirmado: filters.naoConfirmado || undefined,
     assignee: filters.assignee || undefined,
   };
 

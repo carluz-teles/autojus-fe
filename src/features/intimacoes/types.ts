@@ -181,25 +181,27 @@ export interface IntimacoesSummary {
  * Respeitam os filtros ativos (type/user_status/court/search) mas ignoram `urgencia` E
  * `assignee` (limitação conhecida do BE — ver IntimacaoBucketsView), permitindo que os
  * headers de cada seção mostrem a contagem real mesmo quando um filtro de urgência está
- * ativo. Atraso/Hoje/ProximosDoisDias/EstaSemana/SemProvidencia são as cinco tabs que o
- * master-detail renderiza; MaisAdiante/NaoConfirmado ficam no objeto por compat mas não
- * viram tab. Espelha o IntimacaoBucketsView do BE (internal/acquisition/read.go).
+ * ativo. Os sete buckets são disjuntos e excluem intimações resolvidas/ignoradas. O FE
+ * renderiza seis como tabs (atraso|hoje|proximos_dois_dias|semana|este_mes|
+ * sem_data_definida); mais_adiante é calculado mas não vira tab neste redesign. O chip
+ * "Não confirmadas" (nao_confirmado) é um filtro de lista à parte e NÃO aparece aqui.
+ * Espelha o IntimacaoBucketsView do BE (internal/acquisition/read.go).
  */
 export interface IntimacoesBuckets {
-  /** days_left < 0 + status PENDING|OPEN */
+  /** days_left < 0 + status PENDING|OPEN + user_status != RESOLVED|IGNORED */
   atraso: number;
-  /** days_left = 0 + status PENDING|OPEN */
+  /** days_left = 0 + status PENDING|OPEN + user_status != RESOLVED|IGNORED */
   hoje: number;
-  /** vence em 1-2 dias + status PENDING|OPEN */
+  /** vence em 1-2 dias + status PENDING|OPEN + user_status != RESOLVED|IGNORED */
   proximos_dois_dias: number;
-  /** vence em 3-7 dias + status PENDING|OPEN (?urgencia=semana no BE) */
+  /** vence em 3-7 dias + status PENDING|OPEN (?urgencia=semana no BE) + user_status != RESOLVED|IGNORED */
   esta_semana: number;
-  /** ai_analyzed_at IS NULL e não resolvida/ignorada */
-  sem_providencia: number;
-  /** days_left > 7 + status PENDING|OPEN — não exibido como tab */
+  /** prazo no mês corrente (>7 dias e <= último dia do mês) + status PENDING|OPEN + user_status != RESOLVED|IGNORED */
+  este_mes: number;
+  /** prazo além do mês corrente (> último dia do mês) + status PENDING|OPEN + user_status != RESOLVED|IGNORED — não exibido como tab */
   mais_adiante: number;
-  /** sugerido, ainda não confirmado — não exibido como tab */
-  nao_confirmado: number;
+  /** sem prazo derivado (deadline IS NULL) + user_status != RESOLVED|IGNORED */
+  sem_data_definida: number;
 }
 
 /**

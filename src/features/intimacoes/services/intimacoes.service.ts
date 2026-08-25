@@ -28,11 +28,18 @@ export interface ListIntimacoesParams {
   court?: string;
   /**
    * Filtro server-side de urgência (atraso|hoje|proximos_dois_dias|semana|
-   * mais_adiante|nao_confirmado|sem_providencia). Nota: o valor de wire da tab
+   * este_mes|mais_adiante|sem_data_definida). Nota: o valor de wire da tab
    * "Esta semana" é "semana" (não "esta_semana" — esse é só o nome do campo no
-   * envelope `buckets`).
+   * envelope `buckets`). `sem_providencia` foi removido (redesign); o BE o trata
+   * como "sem filtro" para deep-links legados.
    */
   urgencia?: string;
+  /**
+   * Filtro server-side do chip "Não confirmadas" (toggle de triagem) — restringe a
+   * prazos sugeridos ainda não confirmados (deadline.status = 'PENDING'). Combina com
+   * qualquer tab temporal; é um parâmetro à parte de `urgencia`.
+   */
+  nao_confirmado?: boolean;
   /**
    * Filtro server-side de responsável — "me" (toggle "Minhas") ou um uuid.
    * Casa contra assignee_user_id (0057). NÃO afeta as contagens do envelope
@@ -51,6 +58,7 @@ export async function listIntimacoes(
     user_status,
     court,
     urgencia,
+    nao_confirmado,
     assignee,
   }: ListIntimacoesParams = {},
 ): Promise<IntimacaoBucketsEnvelope> {
@@ -63,6 +71,7 @@ export async function listIntimacoes(
       user_status,
       court,
       urgencia,
+      nao_confirmado,
       assignee,
     },
   });
@@ -213,6 +222,7 @@ export interface BulkAssignParams {
   ids: string[];
   /** filtros ativos — usados só no modo all. */
   urgencia?: string;
+  nao_confirmado?: boolean;
   search?: string;
   type?: string;
   user_status?: string;
@@ -231,6 +241,7 @@ export async function bulkAssignResponsavel(
       all: params.all,
       ids: params.ids,
       urgencia: params.urgencia ?? "",
+      nao_confirmado: params.nao_confirmado ?? false,
       search: params.search ?? "",
       type: params.type ?? "",
       user_status: params.user_status ?? "",

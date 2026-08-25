@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { type Facet, FacetedFilter } from "@/components/ui/faceted-filter";
 import { ListSearchToolbar } from "@/components/ui/list-search-toolbar";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { cn, formatarData } from "@/lib/utils";
 
@@ -50,7 +51,8 @@ import { TeorPublicacao } from "./shared/teor-publicacao";
 
 /** Tabs de urgência: rótulo, valor de wire (?urgencia) e a chave do bucket que
  * traz a contagem real. O valor de wire de "Esta semana" é "semana" — só o
- * NOME do campo no envelope `buckets` é "esta_semana" (ver types.ts). */
+ * NOME do campo no envelope `buckets` é "esta_semana" (ver types.ts). São seis
+ * tabs; mais_adiante fica de fora do master-detail (calculado mas não é tab). */
 const URGENCIA_TABS: {
   value: string;
   label: string;
@@ -64,10 +66,11 @@ const URGENCIA_TABS: {
     bucketKey: "proximos_dois_dias",
   },
   { value: "semana", label: "Esta semana", bucketKey: "esta_semana" },
+  { value: "este_mes", label: "Este mês", bucketKey: "este_mes" },
   {
-    value: "sem_providencia",
-    label: "Sem providência",
-    bucketKey: "sem_providencia",
+    value: "sem_data_definida",
+    label: "Sem data definida",
+    bucketKey: "sem_data_definida",
   },
 ];
 
@@ -134,6 +137,9 @@ const FILTROS_EXTRA_VAZIOS: FiltrosExtra = {
 
 export function IntimacoesView() {
   const [urgencia, setUrgencia] = useState<string>("atraso");
+  // Chip "Não confirmadas" (triagem) — filtro server-side, estado em memória (sem URL).
+  // Persiste ao trocar de tab porque é um estado independente de `urgencia`.
+  const [naoConfirmadas, setNaoConfirmadas] = useState(false);
   const [filtrosExtra, setFiltrosExtra] =
     useState<FiltrosExtra>(FILTROS_EXTRA_VAZIOS);
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null);
@@ -153,6 +159,7 @@ export function IntimacoesView() {
 
   const filters: IntimacoesFilters = {
     urgencia,
+    naoConfirmado: naoConfirmadas || undefined,
     assignee: filtrosExtra.responsavel || undefined,
     type: filtrosExtra.type || undefined,
     user_status: filtrosExtra.user_status || undefined,
@@ -237,6 +244,7 @@ export function IntimacoesView() {
         ids: todosDaFaixa ? [] : [...marcadas],
         // filtros da faixa atual (usados só no modo ALL).
         urgencia,
+        nao_confirmado: naoConfirmadas,
         search,
         type: filtrosExtra.type,
         user_status: filtrosExtra.user_status,
@@ -421,6 +429,25 @@ export function IntimacoesView() {
                   </button>
                 );
               })}
+            </div>
+
+            {/* Chip "Não confirmadas" — toggle de triagem server-side, combina com
+                qualquer tab temporal. Estado em memória (sem URL), persiste ao trocar
+                de tab. Checkbox real + label para acessibilidade por teclado. */}
+            <div className="mt-3">
+              <Tooltip label="Triagem só se aplica a prazos sugeridos">
+                <label
+                  htmlFor="filtro-nao-confirmadas"
+                  className="text-muted-foreground flex w-fit cursor-pointer items-center gap-2 text-[12.5px]"
+                >
+                  <Checkbox
+                    id="filtro-nao-confirmadas"
+                    checked={naoConfirmadas}
+                    onCheckedChange={(v) => setNaoConfirmadas(Boolean(v))}
+                  />
+                  Não confirmadas
+                </label>
+              </Tooltip>
             </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
