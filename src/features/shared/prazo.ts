@@ -1,6 +1,6 @@
 import { parseISO } from "@/lib/utils";
 
-import { HOJE } from "./db";
+import { hojeISO } from "./db";
 import type { Contagem, PrazoDerivacao, TermoInicial } from "./types";
 
 const FERIADO_LOCAL_DIAS = 3;
@@ -34,9 +34,12 @@ export function calcularTermoFinal(derivacao: PrazoDerivacao): string {
   return toISO(cursor);
 }
 
-export function diasRestantes(termoFinal: string, hoje = HOJE): number {
+export function diasRestantes(termoFinal: string, hoje?: string): number {
+  // hoje resolvido a cada chamada — nunca cacheado no módulo (senão volta ao
+  // bug da const congelada). `hoje` opcional só pra testes injetarem valor.
+  const ref = hoje ?? hojeISO();
   return Math.round(
-    (parseISO(termoFinal).getTime() - parseISO(hoje).getTime()) / 86_400_000,
+    (parseISO(termoFinal).getTime() - parseISO(ref).getTime()) / 86_400_000,
   );
 }
 

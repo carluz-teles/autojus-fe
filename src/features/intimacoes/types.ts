@@ -56,13 +56,11 @@ export interface IntimacaoView {
    * Espelha IntimacaoView.ai_analyzed_at do BE.
    */
   ai_analyzed_at: string | null;
-  /** Id interno do condutor do prazo; null = não atribuído. Espelha o BE. */
-  conductor_user_id: string | null;
-  /** Nome do condutor do prazo (joined no BE); null = não atribuído. */
-  conductor_user_name: string | null;
-  /** Id do revisor — exposto na linha só pra preservá-lo ao atribuir o condutor
-   *  (PUT /responsaveis substitui os dois papéis). null = não atribuído. */
-  reviewer_user_id: string | null;
+  /** Id interno do responsável pela intimação (0057, ex-conductor/reviewer);
+   *  null = não atribuído. Espelha o BE. */
+  assignee_user_id: string | null;
+  /** Nome do responsável (joined no BE); null = não atribuído. */
+  assignee_user_name: string | null;
 }
 
 /**
@@ -136,17 +134,14 @@ export interface IntimacaoDetalheView extends IntimacaoView {
   content: string;
   /** Órgão julgador (court_record.judging_body). */
   judging_body: string;
+  /** Data de distribuição/ajuizamento (court_record.filed_at) — "YYYY-MM-DD".
+   *  Vazio quando o processo ainda não foi enriquecido pelo DATAJUD (DJEN não
+   *  carrega). A UI só renderiza a linha "Distribuição" quando não-vazio. */
+  distribution_date?: string;
   /** Destinatários (jsonb) — sempre um array (nunca null); pode vir vazio. */
   recipients: IntimacaoRecipient[];
-  /** Condutor do prazo (id interno do app_user); null = não atribuído. */
-  conductor_user_id: string | null;
-  /** Nome do condutor do prazo; null = não atribuído. */
-  conductor_user_name: string | null;
-  /** Responsável pela revisão e assinatura; null = não atribuído. */
-  reviewer_user_id: string | null;
-  /** Nome do revisor/assinador; null = não atribuído. */
-  reviewer_user_name: string | null;
-  /** Timeline derivada (ASC) — sempre array (nunca null); pode vir vazio. */
+  /** Timeline derivada (ASC) — sempre array (nunca null); pode vir vazio.
+   *  O responsável único (assignee_*) já vem do IntimacaoView embedado (0057). */
   history: IntimacaoHistoryEntry[];
 
   // ── Análise IA (card "Analisar esta intimação") ──
@@ -186,25 +181,27 @@ export interface IntimacoesSummary {
  * Respeitam os filtros ativos (type/user_status/court/search) mas ignoram `urgencia` E
  * `assignee` (limitação conhecida do BE — ver IntimacaoBucketsView), permitindo que os
  * headers de cada seção mostrem a contagem real mesmo quando um filtro de urgência está
- * ativo. Atraso/Hoje/ProximosDoisDias/EstaSemana/SemProvidencia são as cinco tabs que o
- * master-detail renderiza; MaisAdiante/NaoConfirmado ficam no objeto por compat mas não
- * viram tab. Espelha o IntimacaoBucketsView do BE (internal/acquisition/read.go).
+ * ativo. Os sete buckets são disjuntos e excluem intimações resolvidas/ignoradas. O FE
+ * renderiza seis como tabs (atraso|hoje|proximos_dois_dias|semana|este_mes|
+ * sem_data_definida); mais_adiante é calculado mas não vira tab neste redesign. O chip
+ * "Não confirmadas" (nao_confirmado) é um filtro de lista à parte e NÃO aparece aqui.
+ * Espelha o IntimacaoBucketsView do BE (internal/acquisition/read.go).
  */
 export interface IntimacoesBuckets {
-  /** days_left < 0 + status PENDING|OPEN */
+  /** days_left < 0 + status PENDING|OPEN + user_status != RESOLVED|IGNORED */
   atraso: number;
-  /** days_left = 0 + status PENDING|OPEN */
+  /** days_left = 0 + status PENDING|OPEN + user_status != RESOLVED|IGNORED */
   hoje: number;
-  /** vence em 1-2 dias + status PENDING|OPEN */
+  /** vence em 1-2 dias + status PENDING|OPEN + user_status != RESOLVED|IGNORED */
   proximos_dois_dias: number;
-  /** vence em 3-7 dias + status PENDING|OPEN (?urgencia=semana no BE) */
+  /** vence em 3-7 dias + status PENDING|OPEN (?urgencia=semana no BE) + user_status != RESOLVED|IGNORED */
   esta_semana: number;
-  /** ai_analyzed_at IS NULL e não resolvida/ignorada */
-  sem_providencia: number;
-  /** days_left > 7 + status PENDING|OPEN — não exibido como tab */
+  /** prazo no mês corrente (>7 dias e <= último dia do mês) + status PENDING|OPEN + user_status != RESOLVED|IGNORED */
+  este_mes: number;
+  /** prazo além do mês corrente (> último dia do mês) + status PENDING|OPEN + user_status != RESOLVED|IGNORED — não exibido como tab */
   mais_adiante: number;
-  /** sugerido, ainda não confirmado — não exibido como tab */
-  nao_confirmado: number;
+  /** sem prazo derivado (deadline IS NULL) + user_status != RESOLVED|IGNORED */
+  sem_data_definida: number;
 }
 
 /**

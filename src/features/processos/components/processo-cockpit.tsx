@@ -3,12 +3,13 @@
 import { ArrowUpRight, ChevronRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/mock-ui/button";
 import { Avatar } from "@/components/mock-ui/data-display";
 import { Card, SectionTitle, Segmented } from "@/components/mock-ui/layout";
 import { StatusBadge } from "@/components/mock-ui/status-badge";
+import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
 import { AndamentosTimeline } from "@/features/andamentos/components/andamentos-timeline";
 import {
   PrazoCard,
@@ -53,6 +54,17 @@ export function ProcessoCockpit({ numero }: { numero: string }) {
   const [aba, setAba] = useState<Aba>("resumo");
 
   const { data: p, isPending, error } = useProcesso(numero);
+
+  // Trilha semântica no header do shell: "Processos › {número}" (design), em vez
+  // do id cru. Referência estável (deps primitivas) pra não disparar o efeito à toa.
+  const crumbs = useMemo(
+    () => [
+      { label: "Processos", href: "/processos" },
+      { label: p?.cnj_number ?? "Processo" },
+    ],
+    [p?.cnj_number],
+  );
+  useSetBreadcrumb(crumbs);
 
   if (isPending) {
     return (

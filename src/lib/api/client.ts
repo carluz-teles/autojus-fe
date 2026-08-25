@@ -9,6 +9,12 @@ export interface ApiRequest {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   /** Serializado como JSON no corpo (não usar com FormData). */
   body?: unknown;
+  /**
+   * Enviado como multipart/form-data. Exclui `body`.
+   * O browser define o Content-Type + boundary automaticamente — NÃO setar
+   * manualmente. Usar para uploads pequenos diretos ao BE (ex.: certificado A1).
+   */
+  formData?: FormData;
   /** Query string. Valores undefined/null são omitidos. */
   query?: Record<string, string | number | boolean | undefined | null>;
   signal?: AbortSignal;
@@ -38,17 +44,36 @@ export async function apiFetch<T>(
   path: string,
   req: ApiRequest = {},
 ): Promise<T> {
-  const { method = "GET", body, query, signal, headers, getToken } = req;
+  const {
+    method = "GET",
+    body,
+    formData,
+    query,
+    signal,
+    headers,
+    getToken,
+  } = req;
 
   const finalHeaders: Record<string, string> = {
     Accept: "application/json",
     ...headers,
   };
-  if (body !== undefined) finalHeaders["Content-Type"] = "application/json";
+  // Para JSON body: define Content-Type. Para FormData: NÃO definir — o browser
+  // inclui o boundary automaticamente. São mutuamente exclusivos.
+  if (body !== undefined && formData === undefined) {
+    finalHeaders["Content-Type"] = "application/json";
+  }
 
   if (getToken) {
     const token = await getToken();
     if (token) finalHeaders["Authorization"] = `Bearer ${token}`;
+  }
+
+  let fetchBody: BodyInit | undefined;
+  if (formData !== undefined) {
+    fetchBody = formData;
+  } else if (body !== undefined) {
+    fetchBody = JSON.stringify(body);
   }
 
   let res: Response;
@@ -56,7 +81,7 @@ export async function apiFetch<T>(
     res = await fetch(buildUrl(path, query), {
       method,
       headers: finalHeaders,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: fetchBody,
       signal,
     });
   } catch (cause) {

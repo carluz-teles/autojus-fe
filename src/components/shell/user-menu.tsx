@@ -35,7 +35,7 @@ export function UserMenu() {
     <Menu.Root>
       <Menu.Trigger
         aria-label="Menu do usuário"
-        className="ring-offset-background hover:ring-ring focus-visible:ring-ring size-9 overflow-hidden rounded-full ring-1 ring-transparent transition hover:ring-2 focus-visible:ring-2 focus-visible:outline-none"
+        className="border-border ring-offset-background hover:ring-ring focus-visible:ring-ring size-9 overflow-hidden rounded-full border transition hover:ring-2 focus-visible:ring-2 focus-visible:outline-none"
       >
         {user.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element

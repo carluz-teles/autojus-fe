@@ -28,15 +28,22 @@ export interface ListIntimacoesParams {
   court?: string;
   /**
    * Filtro server-side de urgência (atraso|hoje|proximos_dois_dias|semana|
-   * mais_adiante|nao_confirmado|sem_providencia). Nota: o valor de wire da tab
+   * este_mes|mais_adiante|sem_data_definida). Nota: o valor de wire da tab
    * "Esta semana" é "semana" (não "esta_semana" — esse é só o nome do campo no
-   * envelope `buckets`).
+   * envelope `buckets`). `sem_providencia` foi removido (redesign); o BE o trata
+   * como "sem filtro" para deep-links legados.
    */
   urgencia?: string;
   /**
+   * Filtro server-side do chip "Não confirmadas" (toggle de triagem) — restringe a
+   * prazos sugeridos ainda não confirmados (deadline.status = 'PENDING'). Combina com
+   * qualquer tab temporal; é um parâmetro à parte de `urgencia`.
+   */
+  nao_confirmado?: boolean;
+  /**
    * Filtro server-side de responsável — "me" (toggle "Minhas") ou um uuid.
-   * Casa contra conductor_user_id OU reviewer_user_id. NÃO afeta as contagens do
-   * envelope `buckets` (limitação conhecida do BE).
+   * Casa contra assignee_user_id (0057). NÃO afeta as contagens do envelope
+   * `buckets` (limitação conhecida do BE).
    */
   assignee?: string;
 }
@@ -51,6 +58,7 @@ export async function listIntimacoes(
     user_status,
     court,
     urgencia,
+    nao_confirmado,
     assignee,
   }: ListIntimacoesParams = {},
 ): Promise<IntimacaoBucketsEnvelope> {
@@ -63,6 +71,7 @@ export async function listIntimacoes(
       user_status,
       court,
       urgencia,
+      nao_confirmado,
       assignee,
     },
   });
@@ -185,38 +194,35 @@ export async function descartarProvidencia(
   );
 }
 
-export interface AssignResponsaveisParams {
-  conductorUserId: string | null;
-  reviewerUserId: string | null;
+export interface AssignResponsavelParams {
+  assigneeUserId: string | null;
 }
 
 /**
- * Atribui (ou desatribui, com null) o condutor e/ou revisor de uma intimação —
- * PUT /v1/intimacoes/:id/responsaveis. O BE reescreve numa tx e ecoa o
+ * Atribui (ou desatribui, com null) o responsável de uma intimação —
+ * PUT /v1/intimacoes/:id/responsavel. O BE reescreve numa tx e ecoa o
  * IntimacaoDetalheView fresco, então o aside reidrata a partir da linha persistida.
  */
-export async function assignIntimacaoResponsaveis(
+export async function assignIntimacaoResponsavel(
   fetcher: ApiFetcher,
   id: string,
-  { conductorUserId, reviewerUserId }: AssignResponsaveisParams,
+  { assigneeUserId }: AssignResponsavelParams,
 ): Promise<IntimacaoDetalheView> {
-  return fetcher<IntimacaoDetalheView>(`${ENDPOINT}/${id}/responsaveis`, {
+  return fetcher<IntimacaoDetalheView>(`${ENDPOINT}/${id}/responsavel`, {
     method: "PUT",
-    body: {
-      conductor_user_id: conductorUserId,
-      reviewer_user_id: reviewerUserId,
-    },
+    body: { assignee_user_id: assigneeUserId },
   });
 }
 
-/** Atribuição em massa do condutor. `all=true` aplica a toda a faixa/filtro atual
- *  (inclui não paginados) via os filtros; senão aplica aos `ids`. */
+/** Atribuição em massa do responsável. `all=true` aplica a toda a faixa/filtro
+ *  atual (inclui não paginados) via os filtros; senão aplica aos `ids`. */
 export interface BulkAssignParams {
-  conductorUserId: string | null;
+  assigneeUserId: string | null;
   all: boolean;
   ids: string[];
   /** filtros ativos — usados só no modo all. */
   urgencia?: string;
+  nao_confirmado?: boolean;
   search?: string;
   type?: string;
   user_status?: string;
@@ -224,17 +230,18 @@ export interface BulkAssignParams {
   assignee?: string;
 }
 
-export async function bulkAssignResponsaveis(
+export async function bulkAssignResponsavel(
   fetcher: ApiFetcher,
   params: BulkAssignParams,
 ): Promise<{ affected: number }> {
-  return fetcher<{ affected: number }>(`${ENDPOINT}/bulk/responsaveis`, {
+  return fetcher<{ affected: number }>(`${ENDPOINT}/bulk/responsavel`, {
     method: "POST",
     body: {
-      conductor_user_id: params.conductorUserId,
+      assignee_user_id: params.assigneeUserId,
       all: params.all,
       ids: params.ids,
       urgencia: params.urgencia ?? "",
+      nao_confirmado: params.nao_confirmado ?? false,
       search: params.search ?? "",
       type: params.type ?? "",
       user_status: params.user_status ?? "",

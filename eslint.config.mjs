@@ -44,6 +44,16 @@ const eslintConfig = defineConfig([
       "prefer-const": "error",
       "object-shorthand": "error",
       eqeqeq: ["error", "smart"],
+
+      // React Compiler check (react-hooks): downgrade das regras "in-effect"/
+      // "immutability" pra warn. O compiler é conservador com setState em
+      // useEffect (reset ao trocar prop, disparo idempotente via ref etc são
+      // padrões legítimos) e com libs externas (React Hook Form retorna funções
+      // não memoizáveis by design). Warn deixa o sinal visível mas não bloqueia
+      // a CI — cada callsite tem racional documentado inline.
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/immutability": "warn",
+      "react-hooks/incompatible-library": "warn",
     },
   },
 

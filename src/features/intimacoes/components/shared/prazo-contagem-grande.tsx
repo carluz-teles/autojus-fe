@@ -6,10 +6,10 @@
 // compacto do master-detail (que usa a MESMA lógica de urgência via prazoUrgenciaInfo,
 // mas um layout menor — ver painel-lateral.tsx).
 
-import { cn, formatarData } from "@/lib/utils";
+import { formatarData } from "@/lib/utils";
 
 import type { IntimacaoPrazoView } from "../../types";
-import { prazoUrgenciaInfo } from "./prazo-urgencia";
+import { corUrgencia, prazoUrgenciaInfo } from "./prazo-urgencia";
 
 /** O número grande + as linhas de vencimento. Derivado do prazo real (days_left,
  * end_date, status). Sem prazo → estado honesto "Sem prazo".
@@ -37,7 +37,7 @@ export function PrazoContagemGrande({
     );
   }
 
-  const { magnitude, atrasado, hoje, corClass } = info;
+  const { magnitude, atrasado, hoje } = info;
   const legenda = atrasado
     ? magnitude === 1
       ? "dia em atraso"
@@ -51,10 +51,8 @@ export function PrazoContagemGrande({
   return (
     <div className="flex items-center gap-3">
       <span
-        className={cn(
-          "font-display text-[52px] leading-none tabular-nums",
-          corClass,
-        )}
+        className="font-display text-[52px] leading-none tabular-nums"
+        style={{ color: corUrgencia(prazo) }}
       >
         {hoje ? "0" : magnitude}
       </span>

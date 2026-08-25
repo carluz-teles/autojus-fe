@@ -2,16 +2,17 @@
 
 import {
   keepPreviousData,
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { DEFAULT_PAGE_SIZE } from "@/components/ui/list-pagination";
 import { useApi } from "@/lib/api/use-api";
-import { useCursorPagination } from "@/lib/hooks/use-cursor-pagination";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+
+const PAGE_SIZE = 30;
 
 import {
   assignResponsavel,
@@ -47,55 +48,49 @@ export interface ProcessosFiltersAtivos extends ProcessoFilters {
 export function useProcessos(filters: ProcessosFiltersAtivos = {}) {
   const fetcher = useApi();
   const [search, setSearch] = useState("");
-  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const debouncedSearch = useDebounce(search, 400);
-
-  // Resetar paginação quando filtros/busca mudam.
-  const filterKey = JSON.stringify({
-    ...filters,
-    search: debouncedSearch,
-    pageSize,
-  });
-  const pagination = useCursorPagination(filterKey);
 
   const params = {
     search: debouncedSearch || undefined,
-    limit: pageSize,
-    cursor: pagination.activeCursor,
     lifecycle: filters.lifecycle || undefined,
     court: filters.court || undefined,
     degree: filters.degree || undefined,
     assignee: filters.assignee || undefined,
   };
 
-  const query = useQuery({
+  // Leitura por cursor ACUMULADA (useInfiniteQuery) — "Mostrar mais" pede a próxima
+  // página sem derrubar as carregadas; troca de aba/filtro mantém a anterior no ar
+  // via keepPreviousData. Mesmo idioma de useIntimacoes (master-detail).
+  const query = useInfiniteQuery({
     queryKey: processosKeys.list(params),
-    queryFn: () => listProcessos(fetcher, params),
+    queryFn: ({ pageParam }) =>
+      listProcessos(fetcher, {
+        ...params,
+        limit: PAGE_SIZE,
+        cursor: pageParam || undefined,
+      }),
+    initialPageParam: "",
+    getNextPageParam: (lastPage) => lastPage.page.next_cursor,
     placeholderData: keepPreviousData,
   });
 
-  const nextCursor = query.data?.page.next_cursor ?? null;
+  const pages = query.data?.pages ?? [];
+  const first = pages[0];
 
   return {
-    processos: query.data?.data ?? [],
-    filters: query.data?.filters ?? {},
-    totalCount: query.data?.page.total_count ?? 0,
+    processos: pages.flatMap((p) => p.data),
+    filters: first?.filters ?? {},
+    totalCount: first?.page.total_count ?? 0,
     isPending: query.isPending,
     isFetching: query.isFetching,
     error: query.error,
     // busca
     search,
     setSearch,
-    // paginação
-    pageSize,
-    setPageSize,
-    pageNumber: pagination.pageNumber,
-    canPrev: pagination.canPrev,
-    canNext: nextCursor !== null,
-    onPrev: pagination.prev,
-    onNext: () => {
-      if (nextCursor) pagination.next(nextCursor);
-    },
+    // paginação incremental ("Mostrar mais")
+    hasMore: query.hasNextPage,
+    isLoadingMore: query.isFetchingNextPage,
+    loadMore: query.fetchNextPage,
   };
 }
 
@@ -149,6 +144,33 @@ export function useAssignResponsavel(processoId: string) {
       // Atualiza o detalhe na cache com o ProcessoView fresco devolvido pelo BE.
       qc.setQueryData(processosKeys.detail(processoId), processo);
       // Invalida a lista para refletir o novo responsável.
+      qc.invalidateQueries({ queryKey: processosKeys.lists() });
+    },
+  });
+}
+
+/**
+ * Atribuição em massa da lista. NÃO há endpoint de massa no BE ainda — fazemos um
+ * fan-out client-side de PUT /processos/:id/responsavel sobre os ids MARCADOS
+ * (não há modo "toda a faixa" sem endpoint dedicado). Débito: expor um bulk no BE.
+ */
+export function useBulkAssignResponsaveis() {
+  const fetcher = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      ids,
+      conductorUserId,
+    }: {
+      ids: string[];
+      conductorUserId: string | null;
+    }) => {
+      await Promise.all(
+        ids.map((id) => assignResponsavel(fetcher, id, conductorUserId)),
+      );
+      return { affected: ids.length };
+    },
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: processosKeys.lists() });
     },
   });

@@ -1,4 +1,3 @@
-import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { Fragment } from "react";
 
@@ -44,7 +43,8 @@ export function DetailBreadcrumb({
             ) : (
               <span
                 className={cn(
-                  isLast && "text-foreground min-w-0 truncate font-medium",
+                  isLast &&
+                    "text-foreground min-w-0 truncate font-medium tabular-nums",
                 )}
                 aria-current={isLast ? "page" : undefined}
                 title={
@@ -55,10 +55,9 @@ export function DetailBreadcrumb({
               </span>
             )}
             {!isLast ? (
-              <ChevronRight
-                className="size-3.5 shrink-0 opacity-60"
-                aria-hidden
-              />
+              <span aria-hidden className="shrink-0 text-xs opacity-60">
+                ›
+              </span>
             ) : null}
           </Fragment>
         );

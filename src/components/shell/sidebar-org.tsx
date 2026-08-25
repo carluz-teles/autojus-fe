@@ -1,7 +1,6 @@
 "use client";
 
 import { useOrganization } from "@clerk/nextjs";
-import { Building2 } from "lucide-react";
 import Link from "next/link";
 
 import { Tooltip } from "@/components/ui/tooltip";
@@ -9,59 +8,53 @@ import { cn } from "@/lib/utils";
 
 import { useSidebar } from "./sidebar";
 
-// Identidade do tenant no TOPO da sidebar: logo + nome da org, atalho pra
-// /organization. Ocupa o lugar que era da marca (jus·assessoria, agora no rodapé).
+// Identidade no TOPO da sidebar: marca do produto (Atjus — monograma "A" com fio
+// de latão) + nome do escritório (org do Clerk = tenant) como subtítulo. Atalho
+// pra home. A marca sempre aparece; só o subtítulo depende da org carregar.
 export function SidebarOrg() {
-  const { isLoaded, organization } = useOrganization();
+  const { organization } = useOrganization();
   const { collapsed } = useSidebar();
 
-  if (!isLoaded) {
-    return (
-      <div className="flex items-center gap-3 px-2 py-1.5">
-        <div className="bg-muted size-9 shrink-0 animate-pulse rounded-md" />
-        <div className="bg-muted h-4 w-28 animate-pulse rounded" />
-      </div>
-    );
-  }
-  if (!organization) return null;
+  const mark = (
+    <span
+      aria-hidden
+      className="font-display border-gold text-gold grid size-8.5 shrink-0 place-items-center rounded-lg border text-[17px] leading-none select-none"
+    >
+      A
+    </span>
+  );
 
-  const org = (
+  const brand = (
     <Link
-      href="/settings?tab=organizacao"
+      href="/dashboard"
+      aria-label="Atjus — início"
       className={cn(
-        "hover:bg-sidebar-accent flex min-w-0 items-center gap-3 rounded-lg px-2 py-1.5 transition",
-        collapsed && "justify-center px-0",
+        "flex min-w-0 items-center gap-3 rounded-lg transition",
+        collapsed ? "justify-center" : "px-1",
       )}
     >
-      <span className="bg-sidebar-accent ring-sidebar-border flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md ring-1">
-        {organization.hasImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={organization.imageUrl}
-            alt=""
-            className="size-full object-cover"
-          />
-        ) : (
-          <Building2 className="text-muted-foreground size-4.5" />
-        )}
-      </span>
+      {mark}
       {collapsed ? null : (
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium">
-            {organization.name}
+        <span className="min-w-0 leading-tight">
+          <span className="font-display text-foreground block text-lg font-semibold">
+            Atjus
           </span>
-          <span className="text-muted-foreground block text-xs">
-            Escritório
-          </span>
+          {organization ? (
+            <span className="text-muted-foreground block truncate text-[11px]">
+              {organization.name}
+            </span>
+          ) : (
+            <span className="bg-muted mt-1 block h-2.5 w-24 animate-pulse rounded" />
+          )}
         </span>
       )}
     </Link>
   );
 
-  if (!collapsed) return org;
+  if (!collapsed) return brand;
   return (
-    <Tooltip label={organization.name} className="max-w-64">
-      {org}
+    <Tooltip label="Atjus" className="max-w-64">
+      {brand}
     </Tooltip>
   );
 }

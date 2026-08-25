@@ -16,10 +16,10 @@ import { useDebounce } from "@/lib/hooks/use-debounce";
 import {
   analisarIntimacao,
   aprovarProvidencia,
-  assignIntimacaoResponsaveis,
-  type AssignResponsaveisParams,
+  assignIntimacaoResponsavel,
+  type AssignResponsavelParams,
   type BulkAssignParams,
-  bulkAssignResponsaveis,
+  bulkAssignResponsavel,
   descartarProvidencia,
   getIntimacao,
   getIntimacoesSummary,
@@ -39,9 +39,9 @@ const EMPTY_BUCKETS: IntimacoesBuckets = {
   hoje: 0,
   proximos_dois_dias: 0,
   esta_semana: 0,
-  sem_providencia: 0,
+  este_mes: 0,
   mais_adiante: 0,
-  nao_confirmado: 0,
+  sem_data_definida: 0,
 };
 
 const PAGE_SIZE = 20;
@@ -60,8 +60,10 @@ export interface IntimacoesFilters {
   type?: string;
   user_status?: string;
   court?: string;
-  /** atraso|hoje|proximos_dois_dias|semana|mais_adiante|nao_confirmado|sem_providencia */
+  /** atraso|hoje|proximos_dois_dias|semana|este_mes|mais_adiante|sem_data_definida */
   urgencia?: string;
+  /** Chip "Não confirmadas" (triagem) — filtra prazos sugeridos não confirmados. */
+  naoConfirmado?: boolean;
   /** "me" (toggle "Minhas") ou um uuid; casa contra condutor OU revisor. */
   assignee?: string;
 }
@@ -85,6 +87,7 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     user_status: filters.user_status || undefined,
     court: filters.court || undefined,
     urgencia: filters.urgencia || undefined,
+    nao_confirmado: filters.naoConfirmado || undefined,
     assignee: filters.assignee || undefined,
   };
 
@@ -278,15 +281,15 @@ export function useDescartarProvidencia(intimacaoId: string) {
 }
 
 /**
- * Atribui/desatribui condutor e revisor — PUT /v1/intimacoes/:id/responsaveis.
+ * Atribui/desatribui o responsável único (0057) — PUT /v1/intimacoes/:id/responsavel.
  * Atualiza o cache do detalhe com o IntimacaoDetalheView fresco do BE.
  */
-export function useAssignIntimacaoResponsaveis(intimacaoId: string) {
+export function useAssignIntimacaoResponsavel(intimacaoId: string) {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (params: AssignResponsaveisParams) =>
-      assignIntimacaoResponsaveis(fetcher, intimacaoId, params),
+    mutationFn: (params: AssignResponsavelParams) =>
+      assignIntimacaoResponsavel(fetcher, intimacaoId, params),
     onSuccess: (detalhe) => {
       qc.setQueryData(intimacoesKeys.detail(intimacaoId), detalhe);
     },
@@ -294,15 +297,15 @@ export function useAssignIntimacaoResponsaveis(intimacaoId: string) {
 }
 
 /**
- * Atribuição em massa do condutor — POST /v1/intimacoes/bulk/responsaveis. Invalida
+ * Atribuição em massa do responsável — POST /v1/intimacoes/bulk/responsavel. Invalida
  * a lista (e o detalhe, caso a intimação aberta tenha sido afetada) pra reidratar.
  */
-export function useBulkAssignResponsaveis() {
+export function useBulkAssignResponsavel() {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (params: BulkAssignParams) =>
-      bulkAssignResponsaveis(fetcher, params),
+      bulkAssignResponsavel(fetcher, params),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: intimacoesKeys.lists() });
       qc.invalidateQueries({ queryKey: intimacoesKeys.all });

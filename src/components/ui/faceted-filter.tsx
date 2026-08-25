@@ -1,14 +1,16 @@
 "use client";
 
 import { Menu } from "@base-ui/react/menu";
-import { Check, ChevronRight, ListFilter } from "lucide-react";
+import { Check, ChevronRight, ListFilter, type LucideIcon } from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-// Filtro facetado no padrão do design: botão "Filtros" abre um menu com uma
-// categoria por faceta; cada categoria tem um submenu (chevron →) com as opções
-// (radio). Ligado a um estado externo `values` (Record<facetKey, valor|"">).
+// Filtro facetado no padrão do design (Claude Design): botão "Filtros" abre um
+// popover com um campo "Filtrar…" no topo + uma categoria por faceta (ícone +
+// label + chevron →); cada categoria tem um submenu com as opções (radio).
+// Ligado a um estado externo `values` (Record<facetKey, valor|"">).
 
 export interface FacetOption {
   value: string;
@@ -18,6 +20,8 @@ export interface FacetOption {
 export interface Facet {
   key: string;
   label: string;
+  /** Ícone da categoria (à esquerda do label), como no design. */
+  icon?: LucideIcon;
   options: FacetOption[];
 }
 
@@ -45,10 +49,20 @@ export function FacetedFilter({
   iconOnly?: boolean;
   className?: string;
 }) {
+  // Busca das CATEGORIAS (o "Filtrar…" do topo do popover), não das opções.
+  const [busca, setBusca] = useState("");
   const ativos = facets.filter((f) => values[f.key]);
+  const termo = busca.trim().toLowerCase();
+  const visiveis = termo
+    ? facets.filter((f) => f.label.toLowerCase().includes(termo))
+    : facets;
 
   return (
-    <Menu.Root>
+    <Menu.Root
+      onOpenChange={(open) => {
+        if (!open) setBusca("");
+      }}
+    >
       <Menu.Trigger
         render={
           <Button
@@ -62,7 +76,7 @@ export function FacetedFilter({
         <ListFilter data-icon={iconOnly ? undefined : "inline-start"} />
         {iconOnly ? null : label}
         {ativos.length > 0 ? (
-          <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 grid size-4.5 place-items-center rounded-full text-[10px] tabular-nums">
+          <span className="bg-primary text-primary-foreground grid size-4.5 place-items-center rounded-full text-[10px] tabular-nums">
             {ativos.length}
           </span>
         ) : null}
@@ -76,14 +90,28 @@ export function FacetedFilter({
           className="z-50"
         >
           <Menu.Popup className={POPUP_CLASS}>
-            {facets.map((f) => {
+            {/* "Filtrar…" — filtra a lista de categorias (como no design) */}
+            <div className="border-border mb-1 border-b px-2 pt-0.5 pb-1.5">
+              <input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+                placeholder="Filtrar…"
+                aria-label="Filtrar categorias"
+                className="text-foreground placeholder:text-muted-foreground w-full bg-transparent text-[13px] outline-none"
+              />
+            </div>
+
+            {visiveis.map((f) => {
               const valorAtual = values[f.key] ?? "";
               const rotuloAtual = f.options.find(
                 (o) => o.value === valorAtual,
               )?.label;
+              const Icone = f.icon;
               return (
                 <Menu.SubmenuRoot key={f.key}>
                   <Menu.SubmenuTrigger className={ITEM_CLASS}>
+                    {Icone ? <Icone className="text-muted-foreground" /> : null}
                     <span className="flex-1 truncate">{f.label}</span>
                     {rotuloAtual ? (
                       <span className="text-primary max-w-28 truncate text-xs">
@@ -136,6 +164,12 @@ export function FacetedFilter({
                 </Menu.SubmenuRoot>
               );
             })}
+
+            {visiveis.length === 0 ? (
+              <p className="text-muted-foreground px-2 py-1.5 text-[13px]">
+                Nada encontrado.
+              </p>
+            ) : null}
 
             {ativos.length > 0 ? (
               <>

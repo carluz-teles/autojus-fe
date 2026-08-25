@@ -25,7 +25,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <BreadcrumbProvider>
           <div className="flex min-h-0 min-w-0 flex-1 [scrollbar-gutter:stable] flex-col overflow-y-auto">
-            <header className="bg-background/80 sticky top-0 z-20 flex items-center justify-between gap-2 border-b px-6 py-4 backdrop-blur-sm">
+            <header className="bg-background/80 sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between gap-2 border-b px-6 backdrop-blur-sm">
               <div className="min-w-0 flex-1">
                 <BreadcrumbSlot />
               </div>

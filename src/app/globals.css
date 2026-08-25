@@ -41,6 +41,13 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-fraunces);
+  /* Escala tipográfica do design Atjus — ~1px menor que o padrão Tailwind: corpo
+     13.5px (text-sm), secundário 11.5px (text-xs), base 14px. Converge a app toda
+     pro system design. Títulos (font-display) são dimensionados por tela com px
+     explícito. Ver memória atjus-fluxo-v2-design-import. */
+  --text-xs: 0.71875rem;
+  --text-sm: 0.84375rem;
+  --text-base: 0.875rem;
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -220,6 +227,112 @@
   .font-display {
     font-family: var(--font-display), Georgia, "Times New Roman", serif;
     font-optical-sizing: auto;
+  }
+
+  /* Teor bruto de intimação (DJEN/eproc/TJSP). O HTML fonte é bagunçado
+     (whitespace \n\t\t\t\t, <table> aninhada em <b>, <section> aninhado);
+     regras defensivas colapsam o layout pra ficar legível. Cobre a versão
+     grande (página de detalhe da intimação) e a compacta (sidebars 300px). */
+  .prose-intimacao {
+    white-space: normal;
+    word-break: break-word;
+  }
+  .prose-intimacao p {
+    margin: 0 0 0.5em 0;
+  }
+  .prose-intimacao p:last-child {
+    margin-bottom: 0;
+  }
+  /* Section/article/header do wrapper DJEN — servem só como container, viram
+     "spacer" simples. Sem margem própria (o <p> interno já tem). */
+  .prose-intimacao section,
+  .prose-intimacao article,
+  .prose-intimacao header {
+    display: block;
+    margin: 0;
+    padding: 0;
+  }
+  /* Tabela DJEN é sempre chave:valor (EXEQUENTE: X · ADVOGADO(A): Y). Em vez
+     de renderizar como grid, empilhamos linhas — cabe em qualquer largura. */
+  .prose-intimacao table {
+    display: block;
+    width: 100%;
+    margin: 0.5em 0;
+    border-collapse: collapse;
+    font-size: 0.95em;
+  }
+  .prose-intimacao thead,
+  .prose-intimacao tbody {
+    display: block;
+    width: 100%;
+  }
+  .prose-intimacao tr {
+    display: block;
+    margin-bottom: 0.25em;
+  }
+  .prose-intimacao td,
+  .prose-intimacao th {
+    display: inline;
+    padding: 0;
+    border: none;
+    vertical-align: baseline;
+  }
+  /* Espaço entre colunas quando renderizadas inline. */
+  .prose-intimacao td + td::before,
+  .prose-intimacao th + th::before {
+    content: " ";
+  }
+  /* <b> aninhado em <b> (comum no DJEN) — collapse do estilo aninhado. */
+  .prose-intimacao b b,
+  .prose-intimacao strong strong {
+    font-weight: inherit;
+  }
+  /* <b> envolvendo tabela inteira — não faz sentido, ignora o bold. */
+  .prose-intimacao b > table,
+  .prose-intimacao strong > table {
+    font-weight: normal;
+  }
+  .prose-intimacao a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .prose-intimacao hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0.75em 0;
+  }
+  .prose-intimacao ul,
+  .prose-intimacao ol {
+    margin: 0.5em 0;
+    padding-left: 1.5em;
+  }
+
+  /* Editor de peça (pecas-v2): parágrafos com espaçamento generoso e leitura confortável.
+     Aplica a áreas contentEditable e aos blocos de preview inline. */
+  .prose-editor {
+    font-size: var(--text-base);
+    line-height: 1.7;
+    color: var(--foreground);
+  }
+  .prose-editor p {
+    margin-bottom: 0.9em;
+  }
+  .prose-editor p:last-child {
+    margin-bottom: 0;
+  }
+  .prose-editor .diff-ins {
+    background: color-mix(in oklch, var(--success) 18%, transparent);
+    color: color-mix(in oklch, var(--success) 65%, var(--foreground));
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+  .prose-editor .diff-del {
+    background: color-mix(in oklch, var(--destructive) 15%, transparent);
+    color: color-mix(in oklch, var(--destructive) 55%, var(--foreground));
+    text-decoration: line-through;
+    padding: 0 2px;
+    border-radius: 2px;
   }
 }
 

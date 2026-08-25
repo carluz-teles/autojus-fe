@@ -7,56 +7,67 @@ import { Kpi } from "@/components/mock-ui/data-display";
 import { CelulaDupla, DataTable } from "@/components/mock-ui/data-table";
 import { PageHeader } from "@/components/mock-ui/layout";
 import { StatusBadge, type Tom } from "@/components/mock-ui/status-badge";
+import { usePecas } from "@/features/pecas/hooks/use-peca";
 import {
   type EstadoFiltro,
   FilterBar,
   FILTRO_VAZIO,
   passaFiltro,
 } from "@/features/shared/filtros";
-import { useIntimacoes, usePecas } from "@/features/shared/hooks";
-import {
-  corDaUrgencia,
-  diasRestantes,
-  urgenciaDe,
-} from "@/features/shared/prazo";
-import type { PecaStatus } from "@/features/shared/types";
+import type { Urgencia } from "@/features/shared/prazo";
 import { formatarData } from "@/lib/utils";
 
-export const TOM_PECA: Record<PecaStatus, Tom> = {
-  Rascunho: "neutral",
-  Revisada: "info",
-  Assinada: "success",
-  "Aguardando protocolo": "warning",
-  Protocolada: "success",
-  Descartada: "neutral",
+const TOM_PECA: Record<string, Tom> = {
+  DRAFT: "neutral",
+  SIGNED: "success",
+  FILED: "success",
+  DISCARDED: "neutral",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Rascunho",
+  SIGNED: "Assinada",
+  FILED: "Protocolada",
+  DISCARDED: "Descartada",
+};
+
+// Closed set alinhado ao BE (DEFENSE|COMPLAINT|APPEAL|MOTION|OTHER).
+// Legados mantidos como fallback pra rows antigas.
+const PIECE_TYPE_LABEL: Record<string, string> = {
+  DEFENSE: "Defesa",
+  COMPLAINT: "Petição inicial",
+  APPEAL: "Recurso",
+  MOTION: "Petição",
+  OTHER: "Peça",
+  PETITION: "Petição",
+  MANIFESTATION: "Manifestação",
+  COUNTERCLAIM: "Reconvenção",
+  BLANK: "Peça",
 };
 
 export function PecasView() {
-  const { data: pecas, isLoading } = usePecas();
-  const { data: intimacoes } = useIntimacoes();
+  const {
+    items: pecas,
+    isPending,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = usePecas();
   const [filtro, setFiltro] = useState<EstadoFiltro>(FILTRO_VAZIO);
 
-  const linhas = (pecas ?? []).map((p) => {
-    const intimacao = (intimacoes ?? []).find((i) => i.id === p.intimacaoId);
-    const termo = intimacao?.prazo?.termoFinal ?? null;
-    const dias = termo ? diasRestantes(termo) : null;
-    return {
-      peca: p,
-      processo: intimacao?.processo ?? "—",
-      prazo: termo ? formatarData(termo) : "—",
-      urgencia: urgenciaDe(dias),
-      texto: [p.tipo, p.status, p.responsavel, intimacao?.processo].join(" · "),
-    };
-  });
+  const linhas = pecas.map((p) => ({
+    peca: p,
+    urgencia: "sem" as Urgencia,
+    texto: [p.piece_type, p.title, p.status].join(" · "),
+  }));
 
   const visiveis = linhas.filter((l) =>
     passaFiltro({ urgencia: l.urgencia, texto: l.texto }, filtro),
   );
 
-  const conta = (s: PecaStatus) =>
-    linhas.filter((l) => l.peca.status === s).length;
+  const conta = (s: string) => pecas.filter((p) => p.status === s).length;
 
-  if (isLoading) return <div className="p-8">Carregando…</div>;
+  if (isPending) return <div className="p-8">Carregando…</div>;
 
   return (
     <div className="px-8 pt-6 pb-10">
@@ -67,24 +78,24 @@ export function PecasView() {
         <div className="mt-6 grid grid-cols-4 gap-3">
           <Kpi
             rotulo="Rascunhos"
-            valor={conta("Rascunho")}
+            valor={conta("DRAFT")}
             icone={<FileText className="size-4" />}
           />
           <Kpi
-            rotulo="Em revisão"
-            valor={conta("Revisada")}
+            rotulo="Assinadas"
+            valor={conta("SIGNED")}
             tom="info"
             icone={<PenLine className="size-4" />}
           />
           <Kpi
-            rotulo="Aguardando protocolo"
-            valor={conta("Aguardando protocolo")}
+            rotulo="Protocoladas"
+            valor={conta("FILED")}
             tom="warning"
             icone={<Clock className="size-4" />}
           />
           <Kpi
-            rotulo="Protocoladas"
-            valor={conta("Protocolada")}
+            rotulo="Descartadas"
+            valor={conta("DISCARDED")}
             tom="success"
             icone={<CircleCheck className="size-4" />}
           />
@@ -94,7 +105,7 @@ export function PecasView() {
           tela="pecas"
           filtro={filtro}
           onChange={setFiltro}
-          placeholder="Buscar por processo ou tipo de peça…"
+          placeholder="Buscar por tipo ou título da peça…"
         />
       </PageHeader>
 
@@ -102,47 +113,68 @@ export function PecasView() {
         larguraMinima="990px"
         colunas={[
           { label: "Peça", largura: "330px" },
-          { label: "Processo", largura: "196px" },
-          { label: "Prazo", largura: "112px" },
-          { label: "Responsável", largura: "146px" },
-          { label: "Status", largura: "176px" },
+          { label: "Status", largura: "146px" },
+          { label: "Cobertura", largura: "146px" },
+          { label: "Protocolo", largura: "146px" },
+          { label: "Criada em", largura: "146px" },
         ]}
-        rodape={`Mostrando ${visiveis.length} de ${linhas.length}`}
+        rodape={`Mostrando ${visiveis.length} de ${pecas.length}`}
         onLimpar={() => setFiltro(FILTRO_VAZIO)}
         linhas={visiveis.map((l) => ({
           id: l.peca.id,
           href: `/pecas/${l.peca.id}`,
-          tom: corDaUrgencia(l.urgencia),
           celulas: [
             <CelulaDupla
               key="p"
-              principal={`${l.peca.tipo} ${l.peca.versao}`}
+              principal={`${PIECE_TYPE_LABEL[l.peca.piece_type] ?? l.peca.piece_type} — ${l.peca.title}`}
               apoio={
-                l.peca.protocolo ? `Protocolo ${l.peca.protocolo}` : undefined
+                l.peca.saga_state !== "CREATED" ? l.peca.saga_state : undefined
               }
             />,
-            <span
-              key="pr"
-              className="text-muted-foreground block truncate tabular-nums"
+            <StatusBadge
+              key="s"
+              tone={TOM_PECA[l.peca.status] ?? "neutral"}
+              ponto
             >
-              {l.processo}
-            </span>,
-            <span
-              key="d"
-              className="tabular-nums"
-              style={{ color: corDaUrgencia(l.urgencia) }}
-            >
-              {l.prazo}
-            </span>,
-            <span key="r" className="text-muted-foreground block truncate">
-              {l.peca.responsavel}
-            </span>,
-            <StatusBadge key="s" tone={TOM_PECA[l.peca.status]} ponto>
-              {l.peca.status}
+              {STATUS_LABEL[l.peca.status] ?? l.peca.status}
             </StatusBadge>,
+            <span key="cov" className="text-muted-foreground text-[12px]">
+              {l.peca.coverage_summary?.grounded ? (
+                <span className="rounded-full bg-[color-mix(in_oklch,var(--success)_15%,transparent)] px-2 py-0.5 text-[11px] font-medium text-[var(--success-foreground)]">
+                  Fundamentada
+                </span>
+              ) : (
+                "—"
+              )}
+            </span>,
+            <span
+              key="filed"
+              className="text-muted-foreground text-[12px] tabular-nums"
+            >
+              {l.peca.filed_at ? formatarData(l.peca.filed_at) : "—"}
+            </span>,
+            <span
+              key="created"
+              className="text-muted-foreground text-[12px] tabular-nums"
+            >
+              {formatarData(l.peca.created_at)}
+            </span>,
           ],
         }))}
       />
+
+      {hasNextPage && (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+            className="text-primary text-[13px] font-medium hover:opacity-80 disabled:opacity-50"
+          >
+            {isFetchingNextPage ? "Carregando…" : "Mostrar mais"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
