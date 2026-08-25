@@ -2,10 +2,37 @@
 
 import { StatusBadge } from "@/components/mock-ui/status-badge";
 import { Switch } from "@/components/ui/switch";
+import type { WatchedOabLastAction } from "@/features/integrations/types";
 
 export interface TermoCardDiario {
   nome: string;
   fontes: string[];
+}
+
+const rotuloUltimaAcao: Record<WatchedOabLastAction, string> = {
+  ADDED: "Adicionada",
+  DISABLED: "Desativada",
+  REENABLED: "Religada",
+};
+
+const fmtDataHora = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** "Adicionada em 25/08, 14:32" — null quando não há last_action (linha anterior à coluna). */
+function fmtUltimaAcao(
+  lastAction: WatchedOabLastAction | null,
+  lastActionAt: string | null,
+): string | null {
+  if (!lastAction) return null;
+  const acao = rotuloUltimaAcao[lastAction];
+  if (!lastActionAt) return acao;
+  const d = new Date(lastActionAt);
+  if (Number.isNaN(d.getTime())) return acao;
+  return `${acao} em ${fmtDataHora.format(d)}`;
 }
 
 /**
@@ -24,6 +51,8 @@ export function TermoCard({
   enabled,
   onToggleEnabled,
   toggleDisabled = false,
+  lastAction = null,
+  lastActionAt = null,
 }: {
   titular?: string;
   oab: string;
@@ -32,7 +61,11 @@ export function TermoCard({
   enabled: boolean;
   onToggleEnabled?: (enabled: boolean) => void;
   toggleDisabled?: boolean;
+  lastAction?: WatchedOabLastAction | null;
+  lastActionAt?: string | null;
 }) {
+  const ultimaAcao = fmtUltimaAcao(lastAction, lastActionAt);
+
   return (
     <article className="ring-hairline bg-card rounded-xl p-4.5">
       <header className="flex flex-wrap items-center gap-3">
@@ -49,6 +82,11 @@ export function TermoCard({
           <StatusBadge tone="warning" className="text-[10.5px] uppercase">
             sem certificado
           </StatusBadge>
+        )}
+        {ultimaAcao && (
+          <span className="text-muted-foreground text-[11.5px]">
+            {ultimaAcao}
+          </span>
         )}
         <Switch
           className="ml-auto"

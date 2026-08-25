@@ -187,6 +187,8 @@ export function TermosTab() {
                 oab={display}
                 temCertificado={false}
                 enabled={item.enabled}
+                lastAction={item.last_action}
+                lastActionAt={item.last_action_at}
                 toggleDisabled={isToggling}
                 onToggleEnabled={
                   isAdmin

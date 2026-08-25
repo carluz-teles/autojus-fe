@@ -15,6 +15,7 @@ import {
   fmtQuando,
   kindLabel,
   statusTom,
+  triggerLabel,
 } from "./capturas-formatters";
 
 // ─── Filtro de ingestão (exclui ENRICHMENT) ───────────────────────────────────
@@ -96,6 +97,11 @@ function RunRow({
         <span className="text-muted-foreground/60 block text-[11.5px]">
           {kindLabel(run.kind)}
         </span>
+        {triggerLabel(run.trigger_reason, run.trigger_oabs) && (
+          <span className="text-muted-foreground/60 block text-[11.5px]">
+            {triggerLabel(run.trigger_reason, run.trigger_oabs)}
+          </span>
+        )}
       </div>
 
       {/* PROCESSOS */}

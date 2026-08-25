@@ -85,6 +85,8 @@ export interface SyncRunItemsView {
 
 // ——— OABs monitoradas com nome (GET /v1/acquisition/watched-oabs) ———
 /** Uma OAB monitorada com o nome do advogado derivado de party_counsel. */
+export type WatchedOabLastAction = "ADDED" | "DISABLED" | "REENABLED";
+
 export interface WatchedOab {
   /** Chave canônica "UFNUMERO" (ex.: "SP347019"). */
   oab: string;
@@ -92,6 +94,9 @@ export interface WatchedOab {
   name: string | null;
   /** Liga/desliga a captura para esta OAB sem removê-la do scope. */
   enabled: boolean;
+  /** Ação mais recente (adicionar/desligar/religar); null numa linha anterior a essa coluna existir. */
+  last_action: WatchedOabLastAction | null;
+  last_action_at: string | null; // RFC3339
 }
 
 export interface WatchedOabsResponse {
