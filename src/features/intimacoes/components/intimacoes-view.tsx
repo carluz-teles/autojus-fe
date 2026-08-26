@@ -13,6 +13,7 @@ import { ListSearchToolbar } from "@/components/ui/list-search-toolbar";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+import { nomeExibicao } from "@/features/organization/lib/labels";
 import { cn, formatarData } from "@/lib/utils";
 
 import {
@@ -29,10 +30,7 @@ import type {
   IntimacoesBuckets,
 } from "../types";
 import { AnalisarCard } from "./shared/analisar-card";
-import {
-  AtribuirResponsavel,
-  nomeExibicao,
-} from "./shared/atribuir-responsavel";
+import { AtribuirResponsavel } from "./shared/atribuir-responsavel";
 import { Avatar, initials } from "./shared/avatar";
 import { PartesInline } from "./shared/partes-inline";
 import { PrazoContagemGrande } from "./shared/prazo-contagem-grande";

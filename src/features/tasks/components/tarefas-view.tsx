@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { type Facet, FacetedFilter } from "@/components/ui/faceted-filter";
 import { ListSearchToolbar } from "@/components/ui/list-search-toolbar";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+import { nomeExibicao } from "@/features/organization/lib/labels";
 import {
   corDaUrgencia,
   diasRestantes,
@@ -86,12 +87,6 @@ const STATUS_PILL: Record<string, string> = {
 
 interface FiltrosExtra {
   responsavel: string;
-}
-
-function nomeMembro(m: { name: string; email: string }): string {
-  const n = m.name?.trim();
-  if (n) return n;
-  return m.email ? m.email.split("@")[0] : "";
 }
 
 /** Dias até o vencimento contra HOJE real (o BE deriva display_status assim). */
@@ -213,7 +208,7 @@ export function TarefasView() {
         icon: Users,
         options: membros.members.map((m) => ({
           value: m.id,
-          label: nomeMembro(m),
+          label: nomeExibicao(m.name, m.email),
         })),
       });
     }
@@ -413,7 +408,9 @@ function BarraSelecao({
                       onClick={() => onAtribuir(m.id)}
                       className="focus:bg-accent focus:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-[13px] outline-none select-none"
                     >
-                      <span className="flex-1 truncate">{nomeMembro(m)}</span>
+                      <span className="flex-1 truncate">
+                        {nomeExibicao(m.name, m.email)}
+                      </span>
                     </Menu.Item>
                   ))
                 )}
@@ -613,7 +610,7 @@ function AvatarResp({ assigneeId }: { assigneeId?: string }) {
       />
     );
   }
-  const nome = nomeMembro(membro);
+  const nome = nomeExibicao(membro.name, membro.email);
   const iniciais = nome
     .split(/\s+/)
     .filter(Boolean)
@@ -652,7 +649,7 @@ function PainelTarefa({ id }: { id: string }) {
   const membro = t.assignee_user_id
     ? members.find((m) => m.id === t.assignee_user_id)
     : null;
-  const resp = membro ? nomeMembro(membro) : "—";
+  const resp = membro ? nomeExibicao(membro.name, membro.email) : "—";
 
   return (
     <aside className="border-border sticky top-0 flex max-h-full min-w-0 flex-col overflow-y-auto border-l p-6">

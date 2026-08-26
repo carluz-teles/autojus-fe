@@ -12,6 +12,8 @@ import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
 import { AndamentosTimeline } from "@/features/andamentos/components/andamentos-timeline";
 import { ProcessoDocumentos } from "@/features/documentos/components/processo-documentos";
 import { useDocumentosDoProcesso } from "@/features/documentos/hooks/use-documentos-do-processo";
+import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+import { nomeExibicao } from "@/features/organization/lib/labels";
 import { PecaRow } from "@/features/pecas/components/peca-row";
 import { usePecasByProcesso } from "@/features/pecas/hooks/use-peca";
 import {
@@ -111,6 +113,7 @@ function CockpitContent({
 }) {
   const tarefasQuery = useTasksByProcesso(p.id);
   const intimacoesQuery = useIntimacoesByProcesso(p.id);
+  const { members } = useOrgMembersDirectory();
   // Chamadas elevadas ao componente principal para alimentar a contagem do
   // Segmented — React Query cacheia por query key, então a mesma chamada
   // dentro de AbaPecas/ProcessoDocumentos não duplica requisição de rede.
@@ -261,20 +264,30 @@ function CockpitContent({
                 assigneeUserName={p.assigned_user_name}
                 avatarSize={40}
               />
-              {p.assigned_user_name ? (
-                <div>
-                  <p className="text-sm font-semibold">
-                    {p.assigned_user_name}
+              {(() => {
+                // assigned_user_name (join do BE) pode vir vazio mesmo com um
+                // responsável atribuído (conta Clerk de teste sem nome
+                // preenchido) — resolve pelo diretório antes de decidir que
+                // não há responsável, nunca mostra o id cru.
+                const assignee = p.assigned_user_id
+                  ? members.find((m) => m.id === p.assigned_user_id)
+                  : undefined;
+                const nome =
+                  p.assigned_user_name?.trim() ||
+                  (assignee ? nomeExibicao(assignee.name, assignee.email) : "");
+                return nome ? (
+                  <div>
+                    <p className="text-sm font-semibold">{nome}</p>
+                    <p className="text-muted-foreground text-[11.5px]">
+                      condutor do processo
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-[13px]">
+                    Sem responsável
                   </p>
-                  <p className="text-muted-foreground text-[11.5px]">
-                    condutor do processo
-                  </p>
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-[13px]">
-                  Sem responsável
-                </p>
-              )}
+                );
+              })()}
             </div>
           </Card>
         </div>

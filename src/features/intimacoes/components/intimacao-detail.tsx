@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+import { nomeExibicao } from "@/features/organization/lib/labels";
 import { PecaRow } from "@/features/pecas/components/peca-row";
 import { usePecasByProcesso } from "@/features/pecas/hooks/use-peca";
 import type { PecaListItem } from "@/features/pecas/types";
@@ -338,12 +339,26 @@ function ResponsavelCard({
   const assign = useAssignIntimacaoResponsavel(i.id);
 
   const value = i.assignee_user_id ?? "__none__";
-  const currentName = i.assignee_user_name?.trim() || "";
+  // Nome do responsável: o join do BE (assignee_user_name) pode vir vazio
+  // (conta Clerk de teste sem nome preenchido) — resolve pelo diretório
+  // (nome ou e-mail) pra nunca cair no id cru.
+  const assigneeAtual = i.assignee_user_id
+    ? members.find((m) => m.id === i.assignee_user_id)
+    : undefined;
+  const currentName =
+    i.assignee_user_name?.trim() ||
+    (assigneeAtual
+      ? nomeExibicao(assigneeAtual.name, assigneeAtual.email)
+      : "");
   // items resolve value→label pro SelectValue (base-ui exige quando o value
   // sozinho não corresponde ao texto visível — ex.: "__none__" → "A atribuir").
+  // nomeExibicao evita rótulo vazio (e nunca o uuid) quando o membro não tem
+  // nome preenchido no Clerk.
   const items = {
     __none__: "A atribuir",
-    ...Object.fromEntries(members.map((m) => [m.id, m.name])),
+    ...Object.fromEntries(
+      members.map((m) => [m.id, nomeExibicao(m.name, m.email) || "—"]),
+    ),
   };
 
   const onChange = (v: string | null) => {
@@ -377,7 +392,7 @@ function ResponsavelCard({
               <SelectItem value="__none__">A atribuir</SelectItem>
               {members.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
-                  {m.name}
+                  {nomeExibicao(m.name, m.email) || "—"}
                 </SelectItem>
               ))}
             </SelectContent>

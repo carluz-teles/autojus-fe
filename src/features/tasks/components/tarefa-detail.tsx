@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+import { nomeExibicao } from "@/features/organization/lib/labels";
 import {
   useCreateTaskComment,
   useTaskActivity,
@@ -360,12 +361,20 @@ export function TarefaDetail({ id }: { id: string }) {
                 className="w-46"
                 aria-label="Responsável pela tarefa"
               >
-                <SelectValue placeholder="Ninguém" />
+                {/* children explícito — sem isso o Select (base-ui) mostra o
+                    value cru (o uuid) no estado fechado quando não há um
+                    <SelectItem> montado pra resolver o rótulo sozinho. */}
+                <SelectValue>
+                  {(() => {
+                    const m = members.find((m) => m.id === t.assignee_user_id);
+                    return m ? nomeExibicao(m.name, m.email) || "—" : "Ninguém";
+                  })()}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent align="end">
                 {members.map((m) => (
                   <SelectItem key={m.id} value={m.id}>
-                    {m.name?.trim() || m.email?.split("@")[0] || m.id}
+                    {nomeExibicao(m.name, m.email) || "—"}
                   </SelectItem>
                 ))}
               </SelectContent>

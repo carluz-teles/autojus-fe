@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+import { nomeExibicao } from "@/features/organization/lib/labels";
 import { cn } from "@/lib/utils";
 
 import {
@@ -19,18 +20,6 @@ const POPUP_CLASS =
 
 const ITEM_CLASS =
   "focus:bg-accent focus:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-md py-1.5 pr-2 pl-2 text-[13px] outline-none select-none data-disabled:pointer-events-none data-disabled:opacity-50";
-
-/** Nome de exibição de um membro: usa o nome; se vazio (comum em contas Clerk de
- *  teste sem nome preenchido), cai para a parte local do e-mail. */
-export function nomeExibicao(
-  name?: string | null,
-  email?: string | null,
-): string {
-  const n = name?.trim();
-  if (n) return n;
-  const e = email?.trim();
-  return e ? e.split("@")[0] : "";
-}
 
 /** Atribui o responsável da intimação direto da linha da lista. O trigger é o
  *  avatar do responsável (ou um círculo tracejado quando não atribuído); o menu
