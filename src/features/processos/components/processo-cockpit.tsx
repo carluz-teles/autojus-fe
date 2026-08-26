@@ -19,6 +19,7 @@ import {
   rotuloPrazo,
   urgenciaDe,
 } from "@/features/shared/prazo";
+import { NovaTarefaModal } from "@/features/tasks/components/nova-tarefa-modal";
 import type { TaskView } from "@/features/tasks/types";
 import { ApiError } from "@/lib/api/errors";
 import { formatClaimValueBRL, formatDate } from "@/lib/format";
@@ -122,6 +123,8 @@ function CockpitContent({
 
   const totalIntimacoes = intimacoesQuery.data?.length ?? 0;
 
+  const [novaTarefaAberta, setNovaTarefaAberta] = useState(false);
+
   return (
     <div className="px-8 pt-6 pb-10">
       <header className="border-border border-b pb-6">
@@ -144,7 +147,9 @@ function CockpitContent({
               <Sparkles className="size-3.5" />
               Gerar peça
             </Button>
-            <Button variant="outline">Nova tarefa</Button>
+            <Button variant="outline" onClick={() => setNovaTarefaAberta(true)}>
+              Nova tarefa
+            </Button>
             <Button variant="outline" size="icon">
               ···
             </Button>
@@ -210,7 +215,12 @@ function CockpitContent({
             </Card>
           )}
           {aba === "intimacoes" && <AbaIntimacoes processoId={p.id} />}
-          {aba === "tarefas" && <AbaTarefas processoId={p.id} />}
+          {aba === "tarefas" && (
+            <AbaTarefas
+              processoId={p.id}
+              assigneeUserIdSugerido={p.assigned_user_id}
+            />
+          )}
           {aba === "pecas" && <AbaPecas pecasQuery={pecasQuery} />}
           {aba === "documentos" && <ProcessoDocumentos processoId={p.id} />}
         </div>
@@ -269,6 +279,13 @@ function CockpitContent({
           </Card>
         </div>
       </div>
+
+      <NovaTarefaModal
+        aberto={novaTarefaAberta}
+        onFechar={() => setNovaTarefaAberta(false)}
+        courtRecordId={p.id}
+        assigneeUserIdSugerido={p.assigned_user_id}
+      />
     </div>
   );
 }
@@ -400,8 +417,34 @@ function AbaIntimacoes({ processoId }: { processoId: string }) {
 
 // ── Aba Tarefas — agrupada por status (Atrasada primeiro) ─────────────────────
 
-function AbaTarefas({ processoId }: { processoId: string }) {
+function AbaTarefas({
+  processoId,
+  assigneeUserIdSugerido,
+}: {
+  processoId: string;
+  assigneeUserIdSugerido?: string | null;
+}) {
   const { data: tarefas, isPending, isError } = useTasksByProcesso(processoId);
+  const [novaTarefaAberta, setNovaTarefaAberta] = useState(false);
+
+  const botaoNovaTarefa = (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={() => setNovaTarefaAberta(true)}
+    >
+      Nova tarefa
+    </Button>
+  );
+
+  const modal = (
+    <NovaTarefaModal
+      aberto={novaTarefaAberta}
+      onFechar={() => setNovaTarefaAberta(false)}
+      courtRecordId={processoId}
+      assigneeUserIdSugerido={assigneeUserIdSugerido}
+    />
+  );
 
   if (isPending) {
     return (
@@ -431,11 +474,17 @@ function AbaTarefas({ processoId }: { processoId: string }) {
 
   if (!tarefas || tarefas.length === 0) {
     return (
-      <Card className="mt-4 px-5.5 pt-1.5 pb-3.5">
-        <p className="text-muted-foreground py-4 text-[13.5px]">
-          Nenhuma tarefa vinculada.
-        </p>
-      </Card>
+      <>
+        <Card className="mt-4 px-5.5 pt-1.5 pb-3.5">
+          <div className="flex items-center justify-between gap-4 py-4">
+            <p className="text-muted-foreground text-[13.5px]">
+              Nenhuma tarefa vinculada.
+            </p>
+            {botaoNovaTarefa}
+          </div>
+        </Card>
+        {modal}
+      </>
     );
   }
 
@@ -445,19 +494,23 @@ function AbaTarefas({ processoId }: { processoId: string }) {
   const resto = tarefas.filter((t) => t.display_status !== "Atrasada");
 
   return (
-    <Card className="mt-4 px-5.5 pt-1.5 pb-3.5">
-      {atrasadas.length > 0 && (
-        <p className="text-destructive mt-4 text-[11px] font-semibold tracking-[0.1em] uppercase first:mt-0">
-          ● Atrasada
-        </p>
-      )}
-      {atrasadas.map((t) => (
-        <TarefaRow key={t.id} tarefa={t} />
-      ))}
-      {resto.map((t) => (
-        <TarefaRow key={t.id} tarefa={t} />
-      ))}
-    </Card>
+    <>
+      <div className="mt-4 flex justify-end">{botaoNovaTarefa}</div>
+      <Card className="mt-3 px-5.5 pt-1.5 pb-3.5">
+        {atrasadas.length > 0 && (
+          <p className="text-destructive mt-4 text-[11px] font-semibold tracking-[0.1em] uppercase first:mt-0">
+            ● Atrasada
+          </p>
+        )}
+        {atrasadas.map((t) => (
+          <TarefaRow key={t.id} tarefa={t} />
+        ))}
+        {resto.map((t) => (
+          <TarefaRow key={t.id} tarefa={t} />
+        ))}
+      </Card>
+      {modal}
+    </>
   );
 }
 
@@ -544,13 +597,7 @@ function AbaPecas({
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
-function Meta({
-  rotulo,
-  valor,
-}: {
-  rotulo: string;
-  valor: React.ReactNode;
-}) {
+function Meta({ rotulo, valor }: { rotulo: string; valor: React.ReactNode }) {
   return (
     <div>
       <dt className="text-muted-foreground text-[10.5px] tracking-[0.1em] uppercase">

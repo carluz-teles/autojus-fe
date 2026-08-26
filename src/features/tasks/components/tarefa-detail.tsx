@@ -46,12 +46,13 @@ const TOM_STATUS: Record<string, Tom> = {
 };
 
 // Prioridade: rótulo PT ↔ enum do BE, com a cor do dot (mesma paleta do detalhe mock).
-const PRIORIDADE_LABEL: Record<TaskPriority, string> = {
+// Exportados para reuso no NovaTarefaModal (Regra nº1 — fonte única).
+export const PRIORIDADE_LABEL: Record<TaskPriority, string> = {
   HIGH: "Alta",
   MEDIUM: "Média",
   LOW: "Baixa",
 };
-const PRIORIDADE_COR: Record<TaskPriority, string> = {
+export const PRIORIDADE_COR: Record<TaskPriority, string> = {
   HIGH: "var(--destructive)",
   MEDIUM: "var(--gold)",
   LOW: "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
