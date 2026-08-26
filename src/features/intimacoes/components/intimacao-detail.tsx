@@ -2,7 +2,7 @@
 
 import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
@@ -20,6 +20,7 @@ import { usePecasByProcesso } from "@/features/pecas/hooks/use-peca";
 import type { PecaListItem } from "@/features/pecas/types";
 import { ConfirmarPrazo } from "@/features/prazos/components/confirmar-prazo";
 import { usePartes } from "@/features/processos/hooks/use-processos";
+import { NovaTarefaModal } from "@/features/tasks/components/nova-tarefa-modal";
 import { cn, formatarData } from "@/lib/utils";
 
 import {
@@ -56,6 +57,8 @@ export function IntimacaoDetail({ id }: { id: string }) {
     [i],
   );
   useSetBreadcrumb(crumbs);
+
+  const [novaTarefaAberta, setNovaTarefaAberta] = useState(false);
 
   if (isPending) return <Skeleton />;
 
@@ -95,6 +98,9 @@ export function IntimacaoDetail({ id }: { id: string }) {
 
         {/* Ações de peticionamento — inline com o título */}
         <div className="flex shrink-0 items-center gap-2.5">
+          <Button variant="outline" onClick={() => setNovaTarefaAberta(true)}>
+            Nova tarefa
+          </Button>
           <Button variant="outline" onClick={emBreve}>
             Sem providência
           </Button>
@@ -106,6 +112,14 @@ export function IntimacaoDetail({ id }: { id: string }) {
           </Link>
         </div>
       </header>
+
+      <NovaTarefaModal
+        aberto={novaTarefaAberta}
+        onFechar={() => setNovaTarefaAberta(false)}
+        intimationId={i.id}
+        courtRecordId={i.court_record_id}
+        assigneeUserIdSugerido={i.assignee_user_id}
+      />
 
       {/* ── 3. Régua ── */}
       <hr className="border-border/70 mt-8 mb-8 border-t" />

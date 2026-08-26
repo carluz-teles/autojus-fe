@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/mock-ui/layout";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { type Facet, FacetedFilter } from "@/components/ui/faceted-filter";
 import { ListSearchToolbar } from "@/components/ui/list-search-toolbar";
@@ -28,6 +29,7 @@ import {
   useTasksSummary,
 } from "../hooks/use-tasks";
 import type { TasksSummary, TaskStatus, TaskView } from "../types";
+import { NovaTarefaModal } from "./nova-tarefa-modal";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TarefasView — master-detail no padrão de Intimações: lista (abas de status +
@@ -114,6 +116,7 @@ export function TarefasView() {
   const [selecionadaId, setSelecionadaId] = useState<string | null>(deepLinkId);
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [novaTarefaAberta, setNovaTarefaAberta] = useState(false);
 
   const abaAtiva = STATUS_TABS.find((t) => t.value === tab) ?? STATUS_TABS[0];
 
@@ -235,6 +238,11 @@ export function TarefasView() {
           titulo="Tarefas"
           descricao="O que fazer — tarefas derivadas dos prazos e intimações, atribuídas à equipe."
           className="border-b-0 pb-0"
+          acoes={
+            <Button onClick={() => setNovaTarefaAberta(true)}>
+              Nova tarefa
+            </Button>
+          }
         >
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <ListSearchToolbar
@@ -353,6 +361,11 @@ export function TarefasView() {
           onFechar={limparSelecao}
         />
       ) : null}
+
+      <NovaTarefaModal
+        aberto={novaTarefaAberta}
+        onFechar={() => setNovaTarefaAberta(false)}
+      />
     </div>
   );
 }
