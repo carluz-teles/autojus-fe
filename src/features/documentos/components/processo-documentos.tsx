@@ -29,8 +29,8 @@ export function ProcessoDocumentos({ processoId }: { processoId: string }) {
       {/* Cabeçalho + envio */}
       <div className="flex items-center justify-between gap-3">
         <p className="text-muted-foreground text-sm">
-          Autos e peças anexadas — a IA fundamenta as revisões nestes
-          documentos.
+          Autos e anexos do processo — usados como base para revisões e
+          peças.
         </p>
         <label
           className={cn(
@@ -93,7 +93,7 @@ export function ProcessoDocumentos({ processoId }: { processoId: string }) {
         <div className="text-muted-foreground flex min-h-40 flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 text-center text-sm">
           <FileText className="size-5 opacity-60" />
           <span className="max-w-xs">
-            Nenhum documento — envie os autos ou uma peça para a IA fundamentar.
+            Nenhum documento — envie os autos para servir de base às peças.
           </span>
         </div>
       ) : (

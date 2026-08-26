@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, ChevronRight, Sparkles } from "lucide-react";
+import { ChevronRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -8,38 +8,30 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/mock-ui/button";
 import { Avatar } from "@/components/mock-ui/data-display";
 import { Card, SectionTitle, Segmented } from "@/components/mock-ui/layout";
-import { StatusBadge } from "@/components/mock-ui/status-badge";
+import { Badge, StatusBadge } from "@/components/mock-ui/status-badge";
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
 import { AndamentosTimeline } from "@/features/andamentos/components/andamentos-timeline";
-import {
-  PrazoCard,
-  PrazoCardSkeleton,
-} from "@/features/prazos/components/prazo-card";
-import type { PrazoView } from "@/features/prazos/types";
+import { ProcessoDocumentos } from "@/features/documentos/components/processo-documentos";
+import { useDocumentosDoProcesso } from "@/features/documentos/hooks/use-documentos-do-processo";
+import { PecaRow } from "@/features/pecas/components/peca-row";
+import { usePecasByProcesso } from "@/features/pecas/hooks/use-peca";
 import {
   corDaUrgencia,
   rotuloPrazo,
   urgenciaDe,
 } from "@/features/shared/prazo";
+import type { TaskView } from "@/features/tasks/types";
 import { ApiError } from "@/lib/api/errors";
-import { formatClaimValueBRL, formatDate, formatDateTime } from "@/lib/format";
+import { formatClaimValueBRL, formatDate } from "@/lib/format";
 
 import {
   useIntimacoesByProcesso,
-  usePrazosByProcesso,
   useTasksByProcesso,
 } from "../hooks/use-processo-tabs";
-import {
-  useAssignResponsavel,
-  usePartes,
-  useProcesso,
-  useProcessoResumo,
-} from "../hooks/use-processos";
-import { calcularRisco } from "../lib/risco";
+import { useAssignResponsavel, usePartes, useProcesso } from "../hooks/use-processos";
 import type { ProcessoView } from "../types";
 
-type Aba =
-  "resumo" | "andamentos" | "intimacoes" | "prazos" | "tarefas" | "documentos";
+type Aba = "andamentos" | "intimacoes" | "tarefas" | "pecas" | "documentos";
 
 // Mapa lifecycle → rótulo + tom do StatusBadge.
 const LIFECYCLE_LABEL: Record<string, string> = {
@@ -51,7 +43,7 @@ const LIFECYCLE_LABEL: Record<string, string> = {
 
 export function ProcessoCockpit({ numero }: { numero: string }) {
   const router = useRouter();
-  const [aba, setAba] = useState<Aba>("resumo");
+  const [aba, setAba] = useState<Aba>("andamentos");
 
   const { data: p, isPending, error } = useProcesso(numero);
 
@@ -116,14 +108,16 @@ function CockpitContent({
   aba: Aba;
   onAba: (a: Aba) => void;
 }) {
-  const prazosQuery = usePrazosByProcesso(p.id);
   const tarefasQuery = useTasksByProcesso(p.id);
   const intimacoesQuery = useIntimacoesByProcesso(p.id);
-
-  // Prazos OPEN|PENDING para o badge da aba.
-  const prazosAtivos = prazosQuery.prazos.filter(
-    (pr) => pr.status === "OPEN" || pr.status === "PENDING",
-  );
+  // Chamadas elevadas ao componente principal para alimentar a contagem do
+  // Segmented — React Query cacheia por query key, então a mesma chamada
+  // dentro de AbaPecas/ProcessoDocumentos não duplica requisição de rede.
+  const pecasQuery = usePecasByProcesso(p.id);
+  const documentosQuery = useDocumentosDoProcesso(p.id);
+  // Assign de responsável — antes vivia no card "Responsável interno" dentro de
+  // PartesCards (removido); movido pro card homônimo do painel lateral (B4).
+  const assignar = useAssignResponsavel(p.id);
 
   // Tarefas não concluídas para o badge.
   const tarefasAbertas = (tarefasQuery.data ?? []).filter(
@@ -132,47 +126,27 @@ function CockpitContent({
 
   const totalIntimacoes = intimacoesQuery.data?.length ?? 0;
 
-  // Prazo mais próximo (soonest-first) para o cálculo de risco e card "próxima providência".
-  const prazoVivo = prazosQuery.prazos[0] ?? null;
-  const diasVivo = prazoVivo ? prazoVivo.days_left : null;
-  const risco = calcularRisco(p, {
-    dias: diasVivo,
-    providenciasAbertas: tarefasAbertas.length,
-  });
-
   return (
     <div className="px-8 pt-6 pb-10">
       <header className="border-border border-b pb-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-3">
+            <p className="text-muted-foreground text-[11px] tracking-[0.08em] uppercase">
+              {[p.judging_body, p.court, p.degree].filter(Boolean).join(" · ")}
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-3">
               <h1 className="font-display text-3xl leading-none font-normal tracking-tight tabular-nums">
                 {p.cnj_number}
               </h1>
               <StatusBadge>
                 {LIFECYCLE_LABEL[p.lifecycle] ?? p.lifecycle}
               </StatusBadge>
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11.5px] font-medium"
-                style={{ background: risco.fundo, color: risco.cor }}
-              >
-                <span
-                  className="size-1.5 rounded-full"
-                  style={{ background: risco.cor }}
-                />
-                Risco {risco.nivel}
-              </span>
             </div>
-            <p className="text-muted-foreground mt-2 text-[13px]">
-              {[p.class, p.court, p.degree, p.judging_body]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Button>
               <Sparkles className="size-3.5" />
-              Gerar peça com IA
+              Gerar peça
             </Button>
             <Button variant="outline">Nova tarefa</Button>
             <Button variant="outline" size="icon">
@@ -192,26 +166,21 @@ function CockpitContent({
         </dl>
       </header>
 
-      <PartesCards processo={p} risco={risco} prazoVivo={prazoVivo} />
+      <PartesCards processo={p} />
 
       <Segmented
         className="mt-6"
         valor={aba}
         onChange={onAba}
         opcoes={[
-          { valor: "resumo", label: "Resumo" },
-          { valor: "andamentos", label: "Andamentos" },
+          {
+            valor: "andamentos",
+            label: "Linha do tempo",
+          },
           {
             valor: "intimacoes",
             label: "Intimações",
             contagem: totalIntimacoes ? String(totalIntimacoes) : undefined,
-          },
-          {
-            valor: "prazos",
-            label: "Prazos",
-            contagem: prazosAtivos.length
-              ? String(prazosAtivos.length)
-              : undefined,
           },
           {
             valor: "tarefas",
@@ -220,260 +189,136 @@ function CockpitContent({
               ? String(tarefasAbertas.length)
               : undefined,
           },
-          { valor: "documentos", label: "Documentos" },
+          {
+            valor: "pecas",
+            label: "Peças",
+            contagem: pecasQuery.items.length
+              ? String(pecasQuery.items.length)
+              : undefined,
+          },
+          {
+            valor: "documentos",
+            label: "Documentos",
+            contagem: documentosQuery.documentos.length
+              ? String(documentosQuery.documentos.length)
+              : undefined,
+          },
         ]}
       />
 
-      {aba === "resumo" && (
-        <AbaResumo processoId={p.id} processo={p} prazoVivo={prazoVivo} />
-      )}
-      {aba === "andamentos" && (
-        <Card className="mt-4 px-5.5 pt-2 pb-4">
-          <AndamentosTimeline processoId={p.id} />
-        </Card>
-      )}
-      {aba === "intimacoes" && <AbaIntimacoes processoId={p.id} />}
-      {aba === "prazos" && <AbaPrazos processoId={p.id} />}
-      {aba === "tarefas" && <AbaTarefas processoId={p.id} />}
-      {aba === "documentos" && <AbaDocumentos />}
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)_280px] items-start gap-4">
+        <div>
+          {aba === "andamentos" && (
+            <Card className="px-5.5 pt-2 pb-4">
+              <AndamentosTimeline processoId={p.id} />
+            </Card>
+          )}
+          {aba === "intimacoes" && <AbaIntimacoes processoId={p.id} />}
+          {aba === "tarefas" && <AbaTarefas processoId={p.id} />}
+          {aba === "pecas" && <AbaPecas pecasQuery={pecasQuery} />}
+          {aba === "documentos" && <ProcessoDocumentos processoId={p.id} />}
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <Card>
+            <SectionTitle>Dados do processo</SectionTitle>
+            <div className="mt-3">
+              {(
+                [
+                  ["Classe", p.class],
+                  ["Assunto", p.subject],
+                  ["Órgão julgador", p.judging_body],
+                  ["Tribunal", p.court],
+                  ["Grau", p.degree],
+                  ["Sistema", p.court],
+                  ["Distribuição", formatDate(p.filed_at)],
+                  ["Valor da causa", formatClaimValueBRL(p.claim_value)],
+                ] as [string, string][]
+              ).map(([k, v]) => (
+                <div
+                  key={k}
+                  className="border-border flex justify-between gap-3 border-b py-2 text-[13px] last:border-0"
+                >
+                  <span className="text-muted-foreground">{k}</span>
+                  <span className="text-right">{v || "—"}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card>
+            <SectionTitle>Responsável interno</SectionTitle>
+            {p.assigned_user_name ? (
+              <div className="mt-2.5 flex items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2.5">
+                  <Avatar nome={p.assigned_user_name} size={40} />
+                  <div>
+                    <p className="text-sm font-semibold">
+                      {p.assigned_user_name}
+                    </p>
+                    <p className="text-muted-foreground text-[11.5px]">
+                      condutor do processo
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => assignar.mutate(null)}
+                  className="text-muted-foreground hover:text-foreground text-[11.5px]"
+                  title="Remover responsável"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <p className="text-muted-foreground mt-2 text-[13px]">
+                Sem responsável
+              </p>
+            )}
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
 
-// ── Cards de partes + risco + próxima providência ─────────────────────────────
+// ── Partes ──────────────────────────────────────────────────────────────────
 
-function PartesCards({
-  processo: p,
-  risco,
-  prazoVivo,
-}: {
-  processo: ProcessoView;
-  risco: ReturnType<typeof calcularRisco>;
-  prazoVivo: PrazoView | null;
-}) {
+function PartesCards({ processo: p }: { processo: ProcessoView }) {
   const { data: partes } = usePartes(p.id);
-  const assignar = useAssignResponsavel(p.id);
 
   const autor = partes?.autor[0];
   const reu = partes?.reu[0];
-  const dias = prazoVivo ? prazoVivo.days_left : null;
 
   return (
-    <>
-      <section className="mt-6 grid grid-cols-3 gap-4">
-        <Card>
-          <SectionTitle>Autor</SectionTitle>
-          {autor ? (
-            <>
-              <p className="mt-2 text-sm font-medium">{autor.name}</p>
-              {autor.counsels[0] && (
-                <p className="text-muted-foreground mt-1.5 text-[11.5px]">
-                  {autor.counsels[0].name}
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="text-muted-foreground mt-2 text-[13px]">—</p>
-          )}
-        </Card>
-        <Card>
-          <SectionTitle>Réu</SectionTitle>
-          {reu ? (
-            <p className="mt-2 text-sm font-medium">{reu.name}</p>
-          ) : (
-            <p className="text-muted-foreground mt-2 text-[13px]">—</p>
-          )}
-        </Card>
-        <Card>
-          <SectionTitle>Responsável interno</SectionTitle>
-          {p.assigned_user_name ? (
-            <div className="mt-2.5 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <Avatar nome={p.assigned_user_name} size={28} />
-                <span className="text-sm font-medium">
-                  {p.assigned_user_name}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => assignar.mutate(null)}
-                className="text-muted-foreground hover:text-foreground text-[11.5px]"
-                title="Remover responsável"
-              >
-                ✕
-              </button>
-            </div>
-          ) : (
-            <p className="text-muted-foreground mt-2 text-[13px]">
-              Sem responsável
-            </p>
-          )}
-        </Card>
-      </section>
-
-      <section className="mt-4 grid grid-cols-2 gap-4">
-        {/* border-left colorido pelo risco: aplica no wrapper pois Card não aceita style */}
-        <div
-          className="bg-card ring-hairline rounded-xl border-l-[3px] p-5"
-          style={{ borderLeftColor: risco.cor }}
-        >
-          <SectionTitle>Risco</SectionTitle>
-          <p
-            className="font-display mt-2 mb-1.5 text-2xl"
-            style={{ color: risco.cor }}
-          >
-            {risco.nivel}
+    <section className="mt-6">
+      <SectionTitle>Partes</SectionTitle>
+      <div className="mt-3 flex flex-wrap items-start justify-between gap-6">
+        <div>
+          <p className="text-sm font-semibold">
+            {autor?.name || "—"}
+            {false && <Badge>cliente</Badge>}
           </p>
-          {risco.motivos.map((m) => (
-            <p
-              key={m}
-              className="text-muted-foreground text-[12.5px] leading-relaxed"
-            >
-              · {m}
-            </p>
-          ))}
-        </div>
-
-        <Card>
-          <SectionTitle>Próxima providência</SectionTitle>
-          {prazoVivo ? (
-            <>
-              <div className="mt-2.5 flex items-end justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium">{prazoVivo.kind}</p>
-                  <p
-                    className="font-display mt-1 text-[22px] leading-tight"
-                    style={{ color: corDaUrgencia(urgenciaDe(dias)) }}
-                  >
-                    {rotuloPrazo(dias)}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-muted-foreground text-[11.5px]">
-                    Vence em
-                  </p>
-                  <p className="text-[13.5px] font-medium tabular-nums">
-                    {prazoVivo.end_date
-                      .slice(0, 10)
-                      .split("-")
-                      .reverse()
-                      .join("/")}
-                  </p>
-                </div>
-              </div>
-              <Link
-                href={`/intimacoes/${prazoVivo.intimation_id}`}
-                className="mt-3 inline-flex items-center gap-1.5 text-[12.5px]"
-              >
-                Ver intimação de origem
-                <ArrowUpRight className="size-2.5" strokeWidth={2.4} />
-              </Link>
-            </>
-          ) : (
-            <p className="text-muted-foreground mt-2.5 text-[13.5px]">
-              Nada urgente agora — não há prazo em aberto exigindo providência.
-            </p>
-          )}
-        </Card>
-      </section>
-    </>
-  );
-}
-
-// ── Aba Resumo ────────────────────────────────────────────────────────────────
-
-function AbaResumo({
-  processoId,
-  processo: p,
-  prazoVivo,
-}: {
-  processoId: string;
-  processo: ProcessoView;
-  prazoVivo: PrazoView | null;
-}) {
-  const { data: resumo, isPending, error } = useProcessoResumo(processoId);
-
-  return (
-    <section className="mt-4 grid grid-cols-[minmax(0,1fr)_320px] gap-4">
-      <Card>
-        <h2 className="font-display text-lg font-medium">
-          Resumo do processo por IA
-        </h2>
-
-        {isPending && (
-          <div className="mt-3 space-y-2">
-            <div className="bg-muted h-3 w-full animate-pulse rounded" />
-            <div className="bg-muted h-3 w-5/6 animate-pulse rounded" />
-            <div className="bg-muted h-3 w-4/6 animate-pulse rounded" />
-          </div>
-        )}
-
-        {error && (
-          <p role="alert" className="text-destructive mt-3 text-[13px]">
-            Não foi possível carregar o resumo. Tente novamente.
+          <p className="text-muted-foreground mt-1 text-[12.5px]">
+            {reu ? `× ${reu.name}` : "—"}
           </p>
-        )}
-
-        {resumo && (
-          <>
-            {resumo.summary ? (
-              <p className="mt-3 text-sm leading-relaxed text-pretty">
-                {resumo.summary}
-              </p>
-            ) : (
-              <p className="text-muted-foreground mt-3 text-[13.5px]">
-                Resumo ainda sendo gerado…
-              </p>
-            )}
-
-            {prazoVivo && (
-              <div className="mt-4 rounded-xl border border-[color-mix(in_oklch,var(--gold)_25%,transparent)] bg-[color-mix(in_oklch,var(--gold)_8%,transparent)] px-3.5 py-3 text-[13.5px]">
-                <strong className="font-medium">Agora:</strong> {prazoVivo.kind}
-              </div>
-            )}
-
-            {resumo.recommended_actions.length > 0 && (
-              <>
-                <SectionTitle className="mt-5 mb-2">
-                  Próximos passos
-                </SectionTitle>
-                {resumo.recommended_actions.map((a) => (
-                  <p key={a.action} className="flex gap-2 py-1 text-[13.5px]">
-                    <span className="text-gold">·</span>
-                    {a.action}
-                  </p>
-                ))}
-              </>
-            )}
-
-            <p className="text-muted-foreground mt-4 text-[11.5px]">
-              Gerado por IA em {formatDateTime(resumo.generated_at)}.
-            </p>
-          </>
-        )}
-      </Card>
-
-      <Card className="h-fit">
-        <SectionTitle>Dados do processo</SectionTitle>
-        <div className="mt-3">
-          {(
-            [
-              ["Classe", p.class],
-              ["Assunto", p.subject],
-              ["Órgão", p.judging_body],
-              ["Sigilo", p.secrecy === "PUBLIC" ? "Público" : p.secrecy],
-            ] as [string, string][]
-          ).map(([k, v]) => (
-            <div
-              key={k}
-              className="border-border flex justify-between gap-3 border-b py-2 text-[13px] last:border-0"
-            >
-              <span className="text-muted-foreground">{k}</span>
-              <span className="text-right">{v || "—"}</span>
-            </div>
-          ))}
         </div>
-      </Card>
+        <div className="flex gap-6">
+          <Meta
+            rotulo="Situação"
+            valor={
+              <StatusBadge>
+                {LIFECYCLE_LABEL[p.lifecycle] ?? p.lifecycle}
+              </StatusBadge>
+            }
+          />
+          <Meta
+            rotulo="Valor da causa"
+            valor={formatClaimValueBRL(p.claim_value)}
+          />
+          <Meta rotulo="Distribuição" valor={formatDate(p.filed_at)} />
+        </div>
+      </div>
     </section>
   );
 }
@@ -562,69 +407,7 @@ function AbaIntimacoes({ processoId }: { processoId: string }) {
   );
 }
 
-// ── Aba Prazos ────────────────────────────────────────────────────────────────
-
-function AbaPrazos({ processoId }: { processoId: string }) {
-  const {
-    prazos,
-    isPending,
-    isError,
-    hasNextPage,
-    isFetchingNextPage,
-    fetchNextPage,
-  } = usePrazosByProcesso(processoId);
-
-  if (isPending) {
-    return (
-      <div className="mt-4 grid gap-3">
-        <PrazoCardSkeleton />
-        <PrazoCardSkeleton />
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <Card className="mt-4">
-        <p role="alert" className="text-destructive text-[13.5px]">
-          Erro ao carregar prazos.
-        </p>
-      </Card>
-    );
-  }
-
-  if (prazos.length === 0) {
-    return (
-      <Card className="mt-4">
-        <p className="text-muted-foreground text-[13.5px]">
-          Nenhum prazo aberto neste processo.
-        </p>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="mt-4 flex flex-col gap-3">
-      {prazos.map((pr, i) => (
-        <PrazoCard key={pr.id} prazo={pr} featured={i === 0} />
-      ))}
-      {hasNextPage ? (
-        <div className="flex justify-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchNextPage()}
-            disabled={isFetchingNextPage}
-          >
-            {isFetchingNextPage ? "Carregando…" : "Carregar mais"}
-          </Button>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-// ── Aba Tarefas ───────────────────────────────────────────────────────────────
+// ── Aba Tarefas — agrupada por status (Atrasada primeiro) ─────────────────────
 
 function AbaTarefas({ processoId }: { processoId: string }) {
   const { data: tarefas, isPending, isError } = useTasksByProcesso(processoId);
@@ -665,53 +448,118 @@ function AbaTarefas({ processoId }: { processoId: string }) {
     );
   }
 
+  // display_status é DERIVADO pelo BE (Aberta|Em execução|Concluída|Atrasada);
+  // agrupamos por ele em vez de recalcular a data no client (fonte única de verdade).
+  const atrasadas = tarefas.filter((t) => t.display_status === "Atrasada");
+  const resto = tarefas.filter((t) => t.display_status !== "Atrasada");
+
   return (
     <Card className="mt-4 px-5.5 pt-1.5 pb-3.5">
-      {tarefas.map((t) => (
-        <Link
-          key={t.id}
-          href={`/tasks/${t.id}`}
-          className="border-border hover:bg-muted grid grid-cols-[minmax(0,1fr)_140px_110px] items-center gap-4 border-b px-1 py-3.5 no-underline last:border-0 hover:no-underline"
-        >
-          <span className="text-foreground truncate text-sm">{t.title}</span>
-          <span className="text-muted-foreground text-[12.5px]">
-            {t.display_status ?? t.status}
-          </span>
-          <span className="text-muted-foreground text-[12.5px] tabular-nums">
-            {t.due_date
-              ? `vence ${t.due_date.slice(0, 10).split("-").reverse().join("/")}`
-              : "—"}
-          </span>
-        </Link>
+      {atrasadas.length > 0 && (
+        <p className="text-destructive mt-4 text-[11px] font-semibold tracking-[0.1em] uppercase first:mt-0">
+          ● Atrasada
+        </p>
+      )}
+      {atrasadas.map((t) => (
+        <TarefaRow key={t.id} tarefa={t} />
+      ))}
+      {resto.map((t) => (
+        <TarefaRow key={t.id} tarefa={t} />
       ))}
     </Card>
   );
 }
 
-// ── Aba Documentos (permanece mock — decisão travada) ─────────────────────────
-
-function AbaDocumentos() {
+function TarefaRow({ tarefa: t }: { tarefa: TaskView }) {
   return (
-    <section className="mt-4">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-muted-foreground text-[13px]">
-          Autos e peças anexadas — a IA fundamenta as revisões nestes
-          documentos.
-        </p>
-        <Button>Enviar documento</Button>
-      </div>
-      <Card className="mt-3 px-5.5 pt-1.5 pb-3.5">
-        <p className="text-muted-foreground py-4 text-[13.5px]">
-          Nenhum documento enviado.
+    <Link
+      href={`/tasks/${t.id}`}
+      className="border-border hover:bg-muted grid grid-cols-[minmax(0,1fr)_140px_110px] items-center gap-4 border-b px-1 py-3.5 no-underline last:border-0 hover:no-underline"
+    >
+      <span className="text-foreground truncate text-sm">{t.title}</span>
+      <span className="text-muted-foreground text-[12.5px]">
+        {t.display_status ?? t.status}
+      </span>
+      <span className="text-muted-foreground text-[12.5px] tabular-nums">
+        {t.due_date
+          ? `vence ${t.due_date.slice(0, 10).split("-").reverse().join("/")}`
+          : "—"}
+      </span>
+    </Link>
+  );
+}
+
+// ── Aba Peças ─────────────────────────────────────────────────────────────────
+
+function AbaPecas({
+  pecasQuery,
+}: {
+  pecasQuery: ReturnType<typeof usePecasByProcesso>;
+}) {
+  const {
+    items: pecas,
+    isPending,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = pecasQuery;
+
+  if (isPending) {
+    return (
+      <Card className="mt-4 px-5.5 pt-1.5 pb-3.5">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="border-border flex items-center gap-4 border-b py-3.5 last:border-0"
+          >
+            <div className="bg-muted h-4 flex-1 animate-pulse rounded" />
+            <div className="bg-muted h-3 w-24 animate-pulse rounded" />
+          </div>
+        ))}
+      </Card>
+    );
+  }
+
+  if (pecas.length === 0) {
+    return (
+      <Card className="mt-4">
+        <p className="text-muted-foreground text-[13.5px]">
+          Nenhuma peça neste processo.
         </p>
       </Card>
-    </section>
+    );
+  }
+
+  return (
+    <Card className="mt-4 px-5.5 pt-1.5 pb-3.5">
+      {pecas.map((p) => (
+        <PecaRow key={p.id} peca={p} />
+      ))}
+      {hasNextPage ? (
+        <div className="flex justify-center pt-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+          >
+            {isFetchingNextPage ? "Carregando…" : "Carregar mais"}
+          </Button>
+        </div>
+      ) : null}
+    </Card>
   );
 }
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
-function Meta({ rotulo, valor }: { rotulo: string; valor: string }) {
+function Meta({
+  rotulo,
+  valor,
+}: {
+  rotulo: string;
+  valor: React.ReactNode;
+}) {
   return (
     <div>
       <dt className="text-muted-foreground text-[10.5px] tracking-[0.1em] uppercase">
