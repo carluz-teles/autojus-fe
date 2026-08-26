@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { useIntimacoes } from "@/features/intimacoes/hooks/use-intimacoes";
 import type { IntimacaoView } from "@/features/intimacoes/types";
+import { useIntimacoesByProcesso } from "@/features/processos/hooks/use-processo-tabs";
 
 // Closed set espelhando o BE (internal/draft/entity.go).
 type PieceType = "DEFENSE" | "COMPLAINT" | "APPEAL" | "MOTION" | "OTHER";
@@ -39,17 +40,50 @@ interface Props {
   aberto: boolean;
   onFechar: () => void;
   pieceTypeInicial?: PieceType;
+  processoId?: string;
 }
 
 export function NovaPecaModal({
   aberto,
   onFechar,
   pieceTypeInicial = "DEFENSE",
+  processoId,
 }: Props) {
   const router = useRouter();
-  const { intimacoes, search, setSearch, isPending } = useIntimacoes({
-    user_status: "PENDING",
-  });
+
+  // Os dois hooks são SEMPRE chamados incondicionalmente (regra dos hooks) —
+  // cada um só fica relevante conforme `processoId` estar presente ou não.
+  const geral = useIntimacoes(
+    processoId ? { enabled: false } : { user_status: "PENDING" },
+  );
+  const porProcesso = useIntimacoesByProcesso(processoId ?? "");
+
+  const [searchLocal, setSearchLocal] = useState("");
+
+  // GET /v1/processos/:id/intimacoes não aceita filtro `user_status` —
+  // aplicamos PENDING + busca por texto em memória (o limit=100 do hook já
+  // cobre a lista inteira de um processo, sem paginação própria).
+  const intimacoesPorProcessoFiltradas = useMemo(() => {
+    if (!processoId) return [];
+    const termo = searchLocal.trim().toLowerCase();
+    return (porProcesso.data ?? []).filter((i) => {
+      if (i.user_status !== "PENDING") return false;
+      if (!termo) return true;
+      return (
+        i.cnj_number.toLowerCase().includes(termo) ||
+        i.class.toLowerCase().includes(termo) ||
+        i.subject.toLowerCase().includes(termo)
+      );
+    });
+  }, [processoId, porProcesso.data, searchLocal]);
+
+  const intimacoes = processoId
+    ? intimacoesPorProcessoFiltradas
+    : geral.intimacoes;
+  const search = processoId ? searchLocal : geral.search;
+  const setSearch = processoId ? setSearchLocal : geral.setSearch;
+  const isPending = processoId ? porProcesso.isPending : geral.isPending;
+
   const [intimacaoId, setIntimacaoId] = useState<string>("");
   const [pieceType, setPieceType] = useState<PieceType>(pieceTypeInicial);
 

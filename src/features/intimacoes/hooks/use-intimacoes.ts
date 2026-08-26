@@ -66,6 +66,9 @@ export interface IntimacoesFilters {
   naoConfirmado?: boolean;
   /** "me" (toggle "Minhas") ou um uuid; casa contra condutor OU revisor. */
   assignee?: string;
+  /** Default true. false pula o fetch — ex: NovaPecaModal no contexto de um
+   *  processo específico usa useIntimacoesByProcesso em vez desta lista geral. */
+  enabled?: boolean;
 }
 
 /**
@@ -101,6 +104,7 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
       }),
     initialPageParam: "",
     getNextPageParam: (lastPage) => lastPage.page.next_cursor,
+    enabled: filters.enabled ?? true,
     // Mantém os dados da faixa/filtro anterior enquanto a nova query carrega, pra
     // trocar tab/filtro NÃO derrubar a página inteira no skeleton (isPending só é
     // true no 1º load). O loading da troca fica scoped na lista via isFetching.
