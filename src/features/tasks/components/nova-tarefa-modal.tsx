@@ -86,18 +86,23 @@ export function NovaTarefaModal({
 
   const criar = async () => {
     if (!title.trim()) return;
-    await createTaskAsync({
-      title: title.trim(),
-      description: description.trim() || undefined,
-      kind: kind || undefined,
-      priority: priority || undefined,
-      due_date: dueDate || undefined,
-      assignee_user_id: assigneeUserId || undefined,
-      court_record_id: courtRecordId,
-      intimation_id: intimationId,
-      deadline_id: deadlineId,
-    });
-    onFechar();
+    try {
+      await createTaskAsync({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        kind: kind || undefined,
+        priority: priority || undefined,
+        due_date: dueDate || undefined,
+        assignee_user_id: assigneeUserId || undefined,
+        court_record_id: courtRecordId,
+        intimation_id: intimationId,
+        deadline_id: deadlineId,
+      });
+      onFechar();
+    } catch {
+      // Estado de erro pra UI já vem de `error` (useCreateTask) — só evita
+      // "Uncaught (in promise)" no console.
+    }
   };
 
   return (
@@ -210,7 +215,20 @@ export function NovaTarefaModal({
             }}
           >
             <SelectTrigger size="sm" className="mt-2 w-full">
-              <SelectValue placeholder="Ninguém" />
+              <SelectValue>
+                {assigneeUserId
+                  ? (() => {
+                      const selecionado = members.find(
+                        (m) => m.id === assigneeUserId,
+                      );
+                      return (
+                        selecionado?.name?.trim() ||
+                        selecionado?.email?.split("@")[0] ||
+                        assigneeUserId
+                      );
+                    })()
+                  : "Ninguém"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={SEM_RESPONSAVEL}>Ninguém</SelectItem>
