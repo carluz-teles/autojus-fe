@@ -33,10 +33,7 @@ export const onboardingCopy = {
       cnpj: {
         label: "CNPJ",
         placeholder: "00.000.000/0000-00",
-        help: "Preenchemos os dados automaticamente ao sair do campo.",
-        searching: "Buscando dados da empresa…",
         invalid: "CNPJ deve ter 14 dígitos.",
-        lookupFailed: "Não foi possível buscar o CNPJ, preencha manualmente.",
       },
       phone: {
         label: "Telefone",

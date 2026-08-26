@@ -4,11 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { useApi } from "@/lib/api/use-api";
 
-import {
-  lookupCep,
-  lookupCnpj,
-  updateOrgProfile,
-} from "../services/onboarding.service";
+import { lookupCep, updateOrgProfile } from "../services/onboarding.service";
 import type { OrgProfileInput } from "../types";
 import { ME_KEY, useMe } from "./use-me";
 
@@ -22,29 +18,29 @@ function useUpdateOrgProfile() {
   });
 }
 
-// Sub-hook privado (não exportado): lookups sob demanda (blur). São mutations —
+// Sub-hook privado (não exportado): lookup de CEP sob demanda (blur). É mutation —
 // fetch imperativo disparado por evento, não estado de servidor cacheável — e é o
 // React Query quem carrega o estado (isPending/isError), não useState na mão.
+// O lookup de CNPJ (autofetch no onboarding) foi removido — inútil nesse passo;
+// a página /organization ainda usa lookupCnpj diretamente do service, sem passar
+// por aqui (use-org-profile-edit-form.ts).
 function useLookups() {
   const fetcher = useApi();
-  const cnpj = useMutation({
-    mutationFn: (value: string) => lookupCnpj(fetcher, value),
-  });
   const cep = useMutation({
     mutationFn: (value: string) => lookupCep(fetcher, value),
   });
-  return { cnpj, cep };
+  return { cep };
 }
 
 /**
- * Hook público da feature — compõe /identity/me + escrita do perfil + lookups.
+ * Hook público da feature — compõe /identity/me + escrita do perfil + lookup de CEP.
  * `poll` habilita o polling que se auto-desliga em useMe (usado durante o
  * "preparando sua conta" do passo da empresa).
  */
 export function useOnboarding({ poll = false } = {}) {
   const me = useMe(poll);
   const profile = useUpdateOrgProfile();
-  const { cnpj, cep } = useLookups();
+  const { cep } = useLookups();
 
   return {
     me: me.data,
@@ -52,9 +48,6 @@ export function useOnboarding({ poll = false } = {}) {
     updateOrgProfile: profile.mutateAsync,
     isSavingProfile: profile.isPending,
     profileError: profile.error,
-    lookupCnpj: cnpj.mutateAsync,
-    isCnpjLoading: cnpj.isPending,
-    cnpjLookupFailed: cnpj.isError,
     lookupCep: cep.mutateAsync,
     isCepLoading: cep.isPending,
   };

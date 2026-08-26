@@ -1,6 +1,5 @@
 "use client";
 
-import { StatusBadge } from "@/components/mock-ui/status-badge";
 import { Switch } from "@/components/ui/switch";
 import type { WatchedOabLastAction } from "@/features/integrations/types";
 
@@ -36,17 +35,16 @@ function fmtUltimaAcao(
 }
 
 /**
- * Card de OAB monitorada — aba Configurações › Termos: header (nome/OAB, badge
- * "sem certificado", switch liga/desliga) + uma linha por diário (nome + fontes).
- * `titular` é o nome do advogado derivado de party_counsel; quando vazio/undefined
- * o header exibe somente a OAB, sem o "— " duplicado.
+ * Card de OAB monitorada — aba Configurações › Termos: header (nome/OAB, switch
+ * liga/desliga) + uma linha por diário (nome + fontes). `titular` é o nome do
+ * advogado derivado de party_counsel; quando vazio/undefined o header exibe
+ * somente a OAB, sem o "— " duplicado.
  * O switch reflete `enabled` (PATCH /v1/acquisition/watched-oabs/:oab) — não há
  * mais ação de remover, só ligar/desligar a captura.
  */
 export function TermoCard({
   titular,
   oab,
-  temCertificado,
   diarios,
   enabled,
   onToggleEnabled,
@@ -56,7 +54,6 @@ export function TermoCard({
 }: {
   titular?: string;
   oab: string;
-  temCertificado: boolean;
   diarios: TermoCardDiario[];
   enabled: boolean;
   onToggleEnabled?: (enabled: boolean) => void;
@@ -78,11 +75,6 @@ export function TermoCard({
             <span className="tabular-nums">{oab}</span>
           )}
         </span>
-        {!temCertificado && (
-          <StatusBadge tone="warning" className="text-[10.5px] uppercase">
-            sem certificado
-          </StatusBadge>
-        )}
         {ultimaAcao && (
           <span className="text-muted-foreground text-[11.5px]">
             {ultimaAcao}

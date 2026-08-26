@@ -11,7 +11,6 @@ import {
   type OrgProfileFormValues,
   orgProfileToInput,
 } from "@/lib/forms/org-profile";
-import { maskCep } from "@/lib/masks";
 
 import { onboardingCopy } from "../copy";
 import type { OrgProfileInput } from "../types";
@@ -39,9 +38,11 @@ export type CompanyFormValues = OrgProfileFormValues;
 type Phase = "idle" | "creating" | "provisioning" | "saving";
 
 /**
- * Passo da empresa. Concentra toda a lógica: RHF + Zod, autofetch de CNPJ/CEP,
- * logo staged (sobe DEPOIS que a org existe), endereço opcional revelável, criação
- * da Clerk Organization e a espera pelo tenant provisionado antes do PUT.
+ * Passo da empresa. Concentra toda a lógica: RHF + Zod, autofetch de CEP, logo
+ * staged (sobe DEPOIS que a org existe), endereço opcional revelável, criação
+ * da Clerk Organization e a espera pelo tenant provisionado antes do PUT. O
+ * CNPJ é digitado manualmente — o autofetch por CNPJ foi removido (inútil
+ * nesse passo).
  */
 export function useCompanyForm({ onDone }: { onDone: () => void }) {
   const { isLoaded, createOrganization, setActive } = useOrganizationList();
@@ -51,9 +52,6 @@ export function useCompanyForm({ onDone }: { onDone: () => void }) {
     tenantReady,
     updateOrgProfile,
     profileError,
-    lookupCnpj,
-    isCnpjLoading,
-    cnpjLookupFailed,
     lookupCep,
     isCepLoading,
   } = useOnboarding({ poll: phase === "provisioning" });
@@ -94,35 +92,6 @@ export function useCompanyForm({ onDone }: { onDone: () => void }) {
     },
   });
   const { register, handleSubmit, setValue, getValues, formState } = form;
-
-  // Autofetch por CNPJ (blur com 14 dígitos): pré-preenche nome/razão e, quando o
-  // registro traz endereço, REVELA a seção já preenchida (valor visível > seção
-  // escondida). Estado (isPending/isError) é do React Query.
-  const onCnpjBlur = async () => {
-    const cnpj = onlyDigits(getValues("cnpj"));
-    if (cnpj.length !== 14) return;
-    try {
-      const data = await lookupCnpj(cnpj);
-      const opts = { shouldValidate: formState.isSubmitted };
-      setValue("trade_name", data.trade_name || data.legal_name, opts);
-      setValue("legal_name", data.legal_name, opts);
-      const hasAddress = Object.values(data.address ?? {}).some(
-        (v) => (v ?? "").toString().trim() !== "",
-      );
-      if (hasAddress) {
-        setShowAddress(true);
-        setValue("address.cep", maskCep(data.address.cep), opts);
-        setValue("address.logradouro", data.address.logradouro, opts);
-        setValue("address.numero", data.address.numero ?? "", opts);
-        setValue("address.complemento", data.address.complemento ?? "", opts);
-        setValue("address.bairro", data.address.bairro ?? "", opts);
-        setValue("address.cidade", data.address.cidade, opts);
-        setValue("address.uf", data.address.uf, opts);
-      }
-    } catch {
-      // cnpjLookupFailed (isError da mutation) cobre o aviso na UI
-    }
-  };
 
   // Autofetch por CEP (blur com 8 dígitos): completa o endereço; spinner no campo
   // e campos-alvo desabilitados enquanto busca. Falha degrada em silêncio.
@@ -222,11 +191,8 @@ export function useCompanyForm({ onDone }: { onDone: () => void }) {
     register,
     submit,
     errors: formState.errors,
-    onCnpjBlur,
     onCepBlur,
-    isCnpjLoading,
     isCepLoading,
-    lookupFailed: cnpjLookupFailed,
     isPreparing: phase !== "idle",
     isReady: isLoaded,
     orgError,

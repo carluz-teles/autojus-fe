@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, LoaderCircle, Pencil } from "lucide-react";
+import { Building2, Pencil } from "lucide-react";
 import { useRef } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -20,9 +20,6 @@ export function Step2Company({ onDone }: { onDone: () => void }) {
     register,
     submit,
     errors,
-    onCnpjBlur,
-    isCnpjLoading,
-    lookupFailed,
     isPreparing,
     isReady,
     orgError,
@@ -84,7 +81,6 @@ export function Step2Company({ onDone }: { onDone: () => void }) {
         <Label htmlFor="trade_name">{t.fields.name.label}</Label>
         <Input
           id="trade_name"
-          disabled={isCnpjLoading}
           aria-invalid={errors.trade_name ? true : undefined}
           {...register("trade_name")}
         />
@@ -98,44 +94,19 @@ export function Step2Company({ onDone }: { onDone: () => void }) {
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="cnpj">{t.fields.cnpj.label}</Label>
-          <div className="relative">
-            <Input
-              id="cnpj"
-              inputMode="numeric"
-              placeholder={t.fields.cnpj.placeholder}
-              aria-invalid={errors.cnpj ? true : undefined}
-              aria-describedby="cnpj-help"
-              className={isCnpjLoading ? "pr-9" : undefined}
-              {...cnpj}
-              onChange={(e) => {
-                e.target.value = maskCnpj(e.target.value);
-                void cnpj.onChange(e);
-              }}
-              onBlur={(e) => {
-                cnpj.onBlur(e);
-                void onCnpjBlur();
-              }}
-            />
-            {isCnpjLoading ? (
-              <LoaderCircle
-                aria-hidden
-                className="text-muted-foreground absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin"
-              />
-            ) : null}
-          </div>
-          <p id="cnpj-help" className="text-muted-foreground text-xs">
-            {isCnpjLoading ? t.fields.cnpj.searching : t.fields.cnpj.help}
-          </p>
+          <Input
+            id="cnpj"
+            inputMode="numeric"
+            placeholder={t.fields.cnpj.placeholder}
+            aria-invalid={errors.cnpj ? true : undefined}
+            {...cnpj}
+            onChange={(e) => {
+              e.target.value = maskCnpj(e.target.value);
+              void cnpj.onChange(e);
+            }}
+          />
           {errors.cnpj ? (
             <p className="text-destructive text-sm">{errors.cnpj.message}</p>
-          ) : null}
-          {lookupFailed ? (
-            <p
-              className="text-sm text-amber-600 dark:text-amber-500"
-              role="status"
-            >
-              {t.fields.cnpj.lookupFailed}
-            </p>
           ) : null}
         </div>
 
