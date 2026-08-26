@@ -6,16 +6,14 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { Avatar } from "@/components/mock-ui/data-display";
 import { PageHeader } from "@/components/mock-ui/layout";
+import { Badge, StatusBadge } from "@/components/mock-ui/status-badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { type Facet, FacetedFilter } from "@/components/ui/faceted-filter";
 import { ListSearchToolbar } from "@/components/ui/list-search-toolbar";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
-import {
-  corDaUrgencia,
-  rotuloPrazo,
-  urgenciaDe,
-} from "@/features/shared/prazo";
 import { cn, formatarData } from "@/lib/utils";
 
 import {
@@ -35,17 +33,18 @@ import type { ProcessoView } from "../types";
 // filtro no popover FacetedFilter, cor do fio por urgência do prazo.
 // ─────────────────────────────────────────────────────────────────────────────
 
-type LifecycleTab = "todos" | "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+type LifecycleTab = "todos" | "ACTIVE" | "SUSPENDED" | "ARCHIVED" | "CLOSED";
 
 const LIFECYCLE_TABS: {
   value: LifecycleTab;
   label: string;
-  summaryKey: "total" | "em_andamento" | "suspensos" | "arquivados";
+  summaryKey: "total" | "em_andamento" | "suspensos" | "arquivados" | "baixados";
 }[] = [
-  { value: "todos", label: "Total", summaryKey: "total" },
+  { value: "todos", label: "Todos", summaryKey: "total" },
   { value: "ACTIVE", label: "Em andamento", summaryKey: "em_andamento" },
-  { value: "SUSPENDED", label: "Suspensos", summaryKey: "suspensos" },
-  { value: "ARCHIVED", label: "Arquivados", summaryKey: "arquivados" },
+  { value: "SUSPENDED", label: "Suspenso", summaryKey: "suspensos" },
+  { value: "ARCHIVED", label: "Arquivado", summaryKey: "arquivados" },
+  { value: "CLOSED", label: "Baixado", summaryKey: "baixados" },
 ];
 
 const GRAU_LABEL: Record<string, string> = {
@@ -261,6 +260,16 @@ export function ProcessosView() {
               }
               onClear={limparFiltrosExtra}
             />
+
+            <Tooltip label="Processos são importados automaticamente">
+              <button
+                type="button"
+                disabled
+                className="border-border bg-card text-muted-foreground cursor-not-allowed rounded-lg border px-3.5 py-2 text-[12.5px] opacity-60"
+              >
+                Novo processo
+              </button>
+            </Tooltip>
           </div>
         </PageHeader>
       </div>
@@ -512,9 +521,6 @@ function LinhaProcesso({
   marcado: boolean;
   onMarcar: () => void;
 }) {
-  const dias = item.next_deadline?.days_left ?? null;
-  const cor = corDaUrgencia(urgenciaDe(dias));
-
   return (
     <div
       role="button"
@@ -526,7 +532,6 @@ function LinhaProcesso({
           onSelecionar();
         }
       }}
-      style={{ borderLeftColor: cor }}
       className={cn(
         "border-border grid w-full grid-cols-[22px_minmax(0,1fr)_118px_92px] items-center gap-2.5 border-b border-l-[3px] py-2.5 pr-3 pl-[9px] text-left transition-colors",
         "cursor-pointer",
@@ -555,16 +560,18 @@ function LinhaProcesso({
         </span>
       </span>
 
-      {/* col 3 — prazo (cor = urgência) */}
-      <span className="text-[12px] tabular-nums" style={{ color: cor }}>
-        <span className="block">
-          {item.next_deadline ? rotuloPrazo(dias) : "Sem prazo"}
-        </span>
-        {item.next_deadline ? (
-          <span className="text-muted-foreground block text-[11px]">
-            {fmtData(item.next_deadline.end_date)}
-          </span>
-        ) : null}
+      {/* col 3 — responsável */}
+      <span className="flex min-w-0 items-center gap-2">
+        {item.assigned_user_name ? (
+          <>
+            <Avatar nome={item.assigned_user_name} size={22} />
+            <span className="truncate text-[12.5px]">
+              {item.assigned_user_name.split(" ")[0]}
+            </span>
+          </>
+        ) : (
+          <span className="text-muted-foreground text-[12.5px]">—</span>
+        )}
       </span>
 
       {/* col 4 — status */}
@@ -600,70 +607,69 @@ function PainelProcesso({ id }: { id: string }) {
     );
   }
 
-  const dias = p.next_deadline?.days_left ?? null;
-  const cor = corDaUrgencia(urgenciaDe(dias));
   const autor = partes?.autor?.[0]?.name;
   const reu = partes?.reu?.[0]?.name;
 
   return (
     <aside className="border-border sticky top-0 flex max-h-full min-w-0 flex-col overflow-y-auto border-l p-6">
-      <div className="font-display text-[22px] leading-tight tabular-nums">
-        {p.cnj_number}
-      </div>
-      <p className="text-muted-foreground mt-1 text-[12.5px]">
+      <p className="text-muted-foreground text-[10.5px] tracking-[0.1em] uppercase">
         {p.class}
         {p.subject ? ` · ${p.subject}` : ""}
       </p>
-
-      {/* Próximo prazo */}
-      <div
-        className="mt-4 rounded-xl border-l-[3px] p-3.5"
-        style={{
-          borderLeftColor: cor,
-          background: "color-mix(in oklch, var(--gold) 5%, transparent)",
-        }}
-      >
-        <div className="text-muted-foreground text-[10.5px] tracking-[0.1em] uppercase">
-          Próximo prazo
-        </div>
-        <div className="font-display mt-1 text-[18px]" style={{ color: cor }}>
-          {p.next_deadline ? rotuloPrazo(dias) : "Sem prazo"}
-        </div>
-        {p.next_deadline ? (
-          <div className="text-muted-foreground mt-0.5 text-[11.5px] tabular-nums">
-            {fmtData(p.next_deadline.end_date)}
-          </div>
-        ) : null}
+      <div className="font-display mt-1 text-[24px] font-medium leading-tight tabular-nums">
+        {p.cnj_number}
       </div>
+      <StatusBadge className="mt-2">
+        {LIFECYCLE_LABEL[p.lifecycle] ?? p.lifecycle}
+      </StatusBadge>
 
       {/* Ficha */}
       <dl className="mt-4">
-        <Linha label="Órgão">{p.judging_body || "—"}</Linha>
+        <Linha label="Órgão julgador">{p.judging_body || "—"}</Linha>
         <Linha label="Tribunal · grau">
           {p.court} · {GRAU_LABEL[p.degree] ?? "—"}
         </Linha>
         <Linha label="Valor da causa">{fmtValor(p.claim_value)}</Linha>
         <Linha label="Distribuição">{fmtData(p.filed_at)}</Linha>
-        <Linha label="Responsável">{p.assigned_user_name || "—"}</Linha>
-        {/* nº de intimações ainda não exposto no read model — placeholder honesto */}
-        <Linha label="Intimações" ultima>
-          —
+        <Linha label="Sistema" ultima>
+          {p.court || "—"}
         </Linha>
       </dl>
 
       {/* Partes */}
       <div className="mt-4">
         <div className="text-muted-foreground text-[11.5px]">Autor</div>
-        <div className="mt-0.5 text-[13px]">{autor || "—"}</div>
-        <div className="text-muted-foreground mt-2.5 text-[11.5px]">Réu</div>
-        <div className="mt-0.5 text-[13px]">{reu || "—"}</div>
+        <div className="mt-0.5 flex items-center gap-1.5 text-[13px] font-semibold">
+          {autor || "—"}
+          {false && <Badge>cliente</Badge>}
+        </div>
+        <div className="text-muted-foreground mt-2.5 text-[11.5px]">
+          {reu ? `× ${reu}` : "—"}
+        </div>
       </div>
+
+      {/* Responsável */}
+      <div className="mt-4">
+        <div className="text-muted-foreground text-[10.5px] tracking-[0.1em] uppercase">
+          Responsável
+        </div>
+        <div className="mt-1.5 flex items-center gap-2.5">
+          <Avatar nome={p.assigned_user_name || "—"} size={28} />
+          <span className="text-[13px] font-semibold">
+            {p.assigned_user_name || "—"}
+          </span>
+        </div>
+      </div>
+
+      <p className="text-muted-foreground mt-3 text-[12px]">
+        — intim · — tarefas abertas · — peças
+      </p>
 
       <Link
         href={`/processos/${p.id}`}
-        className="bg-primary text-primary-foreground mt-6 flex items-center justify-center rounded-lg px-4 py-2.5 text-center text-[13px] font-medium no-underline hover:no-underline"
+        className="bg-primary text-primary-foreground mt-6 flex w-full items-center justify-center rounded-[10px] px-4 py-2.5 text-center text-[13px] font-medium no-underline hover:no-underline"
       >
-        Abrir cockpit
+        Abrir processo
       </Link>
     </aside>
   );
@@ -681,8 +687,8 @@ function Linha({
   return (
     <div
       className={cn(
-        "border-border flex items-center justify-between gap-3 border-t py-2.5 text-[12.5px]",
-        ultima && "border-b",
+        "flex items-center justify-between gap-3 py-2.5 text-[12.5px]",
+        ultima && "border-border border-b",
       )}
     >
       <dt className="text-muted-foreground shrink-0">{label}</dt>
