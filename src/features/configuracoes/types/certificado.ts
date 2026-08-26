@@ -150,7 +150,10 @@ export function passwordPolicyToApi(
 
 /** `CertificateViewApi` → `CertificateView`: traduz `password_policy` pro FE. */
 export function mapCertificateView(raw: CertificateViewApi): CertificateView {
-  return { ...raw, password_policy: passwordPolicyFromApi(raw.password_policy) };
+  return {
+    ...raw,
+    password_policy: passwordPolicyFromApi(raw.password_policy),
+  };
 }
 
 /** Corpo do PATCH /v1/certificates/:id/password-policy. */

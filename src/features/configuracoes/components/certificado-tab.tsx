@@ -224,7 +224,7 @@ export function CertificadoTab() {
   const [politica, setPolitica] = useState<CertificadoPasswordPolicy>(
     meuCert?.password_policy ?? "sessao",
   );
-   
+
   useEffect(() => {
     if (meuCert) setPolitica(meuCert.password_policy);
     // eslint-disable-next-line react-hooks/exhaustive-deps
