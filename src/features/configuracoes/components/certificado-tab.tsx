@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/mock-ui/button";
@@ -27,6 +27,7 @@ import {
   isCertFile,
   useCertificados,
   useDeleteCertificado,
+  usePatchPasswordPolicy,
   usePreviewCertificado,
   useSignComCertificado,
   useUploadCertificado,
@@ -60,6 +61,11 @@ const POLITICAS: {
     valor: "sessao",
     titulo: "Manter liberado por 30 minutos",
     trade: "equilíbrio para quem assina em lote no mesmo dia",
+  },
+  {
+    valor: "nunca",
+    titulo: "Não pedir senha",
+    trade: "máxima agilidade — assina direto, sem confirmar senha a cada vez",
   },
 ];
 
@@ -199,6 +205,7 @@ export function CertificadoTab() {
   const uploadMutation = useUploadCertificado();
   const previewMutation = usePreviewCertificado();
   const deleteMutation = useDeleteCertificado();
+  const patchPasswordPolicyMutation = usePatchPasswordPolicy();
 
   // Certificado do usuário logado = primeiro com revoked_at null
   // (o BE filtra por tenant; a lista pode ter de outros membros no futuro)
@@ -210,7 +217,18 @@ export function CertificadoTab() {
   const [arquivo, setArquivo] = useState<File | null>(null);
   // A senha NUNCA é guardada além do submit: é limpada em fecharInstalador().
   const [senha, setSenha] = useState("");
-  const [politica, setPolitica] = useState<CertificadoPasswordPolicy>("sessao");
+  // Política de senha: propriedade real do certificado, persistida no BE. O
+  // valor inicial vem do certificado já carregado; ao trocar, se já existe um
+  // certificado ativo, persiste na hora via PATCH — o wizard só guarda a
+  // escolha localmente enquanto não há certificado (id) pra associar.
+  const [politica, setPolitica] = useState<CertificadoPasswordPolicy>(
+    meuCert?.password_policy ?? "sessao",
+  );
+   
+  useEffect(() => {
+    if (meuCert) setPolitica(meuCert.password_policy);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meuCert?.password_policy]);
   const [escopo, setEscopo] = useState<CertificadoScope>({
     assinar: true,
     protocolar: true,
@@ -275,10 +293,49 @@ export function CertificadoTab() {
   async function ativarCertificado() {
     if (!arquivo || !senha) return;
     try {
-      await uploadMutation.mutateAsync({ file: arquivo, password: senha });
+      const novoCert = await uploadMutation.mutateAsync({
+        file: arquivo,
+        password: senha,
+      });
+      // O upload não aceita password_policy no corpo — o certificado nasce com
+      // uma política padrão do BE. Se o usuário escolheu outra no wizard,
+      // aplica agora que já existe um id pra associar via PATCH.
+      if (politica !== novoCert.password_policy) {
+        try {
+          await patchPasswordPolicyMutation.mutateAsync({
+            id: novoCert.id,
+            policy: politica,
+          });
+        } catch (err) {
+          toast.error(
+            `Certificado ativado, mas não foi possível aplicar a política de senha escolhida: ${errorMessage(err)}`,
+          );
+          fecharInstalador();
+          return;
+        }
+      }
       toast.success("Certificado ativado com sucesso.");
       fecharInstalador();
     } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  }
+
+  // Troca a política de senha. Se já existe um certificado ativo, persiste na
+  // hora via PATCH /v1/certificates/:id/password-policy (reverte em erro). Sem
+  // certificado ainda (wizard de 1ª instalação), só guarda a escolha local —
+  // é aplicada depois de ativar (ver ativarCertificado).
+  async function selecionarPolitica(valor: CertificadoPasswordPolicy) {
+    const anterior = politica;
+    setPolitica(valor);
+    if (!meuCert) return;
+    try {
+      await patchPasswordPolicyMutation.mutateAsync({
+        id: meuCert.id,
+        policy: valor,
+      });
+    } catch (err) {
+      setPolitica(anterior);
       toast.error(errorMessage(err));
     }
   }
@@ -290,8 +347,12 @@ export function CertificadoTab() {
     signMutation.reset();
   }
 
+  // Certificado com política "nunca" dispensa a senha: o BE não exige.
+  const exigeSenhaAssinatura = meuCert?.password_policy !== "nunca";
+
   async function assinar() {
-    if (!meuCert || !senhaAssinatura) return;
+    if (!meuCert) return;
+    if (exigeSenhaAssinatura && !senhaAssinatura) return;
     try {
       // O empacotamento real (PDF/peça) é de outra frente; aqui o mecanismo
       // (assinar um digest com a chave do cert) basta — assinamos o SHA-256 de
@@ -301,7 +362,7 @@ export function CertificadoTab() {
       );
       await signMutation.mutateAsync({
         id: meuCert.id,
-        password: senhaAssinatura,
+        password: exigeSenhaAssinatura ? senhaAssinatura : undefined,
         digestSha256: digest,
       });
       setSenhaAssinatura("");
@@ -443,18 +504,21 @@ export function CertificadoTab() {
       >
         <div className="flex flex-col gap-4">
           <p className="text-muted-foreground text-[13px] leading-relaxed">
-            Informe a senha do certificado para gerar uma assinatura. A senha é
-            usada apenas para esta assinatura e não é armazenada.
+            {exigeSenhaAssinatura
+              ? "Informe a senha do certificado para gerar uma assinatura. A senha é usada apenas para esta assinatura e não é armazenada."
+              : 'Este certificado está com a política "Não pedir senha" — a assinatura é gerada sem confirmar senha.'}
           </p>
-          <Field label="Senha do certificado">
-            <Input
-              type="password"
-              placeholder="••••••••"
-              value={senhaAssinatura}
-              onChange={(e) => setSenhaAssinatura(e.target.value)}
-              autoComplete="off"
-            />
-          </Field>
+          {exigeSenhaAssinatura && (
+            <Field label="Senha do certificado">
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={senhaAssinatura}
+                onChange={(e) => setSenhaAssinatura(e.target.value)}
+                autoComplete="off"
+              />
+            </Field>
+          )}
 
           {signMutation.data && (
             <div className="border-border rounded-xl border p-3 text-[12.5px]">
@@ -481,7 +545,10 @@ export function CertificadoTab() {
             </Button>
             <Button
               size="sm"
-              disabled={!senhaAssinatura || signMutation.isPending}
+              disabled={
+                (exigeSenhaAssinatura && !senhaAssinatura) ||
+                signMutation.isPending
+              }
               onClick={assinar}
             >
               {signMutation.isPending ? (
@@ -634,7 +701,7 @@ export function CertificadoTab() {
                     <button
                       key={p.valor}
                       type="button"
-                      onClick={() => setPolitica(p.valor)}
+                      onClick={() => selecionarPolitica(p.valor)}
                       className={cn(
                         "mb-2 block w-full cursor-pointer rounded-xl border p-3.5 text-left",
                         politica === p.valor
