@@ -25,6 +25,7 @@ import {
   useProcessosSummary,
 } from "../hooks/use-processos";
 import type { ProcessoView } from "../types";
+import { AtribuirResponsavelProcesso } from "./atribuir-responsavel";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ProcessosView — master-detail idêntico ao protótipo (Claude Design): lista
@@ -562,15 +563,16 @@ function LinhaProcesso({
 
       {/* col 3 — responsável */}
       <span className="flex min-w-0 items-center gap-2">
-        {item.assigned_user_name ? (
-          <>
-            <Avatar nome={item.assigned_user_name} size={22} />
-            <span className="truncate text-[12.5px]">
-              {item.assigned_user_name.split(" ")[0]}
-            </span>
-          </>
-        ) : (
-          <span className="text-muted-foreground text-[12.5px]">—</span>
+        <AtribuirResponsavelProcesso
+          processoId={item.id}
+          assigneeUserId={item.assigned_user_id}
+          assigneeUserName={item.assigned_user_name}
+          avatarSize={22}
+        />
+        {item.assigned_user_name && (
+          <span className="truncate text-[12.5px]">
+            {item.assigned_user_name.split(" ")[0]}
+          </span>
         )}
       </span>
 
