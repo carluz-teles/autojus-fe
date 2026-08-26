@@ -53,7 +53,9 @@ export function NovaPecaModal({
 
   // Os dois hooks são SEMPRE chamados incondicionalmente (regra dos hooks) —
   // cada um só fica relevante conforme `processoId` estar presente ou não.
-  const geral = useIntimacoes(processoId ? {} : { user_status: "PENDING" });
+  const geral = useIntimacoes(
+    processoId ? { enabled: false } : { user_status: "PENDING" },
+  );
   const porProcesso = useIntimacoesByProcesso(processoId ?? "");
 
   const [searchLocal, setSearchLocal] = useState("");
