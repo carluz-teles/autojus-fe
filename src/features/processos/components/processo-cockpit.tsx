@@ -11,6 +11,7 @@ import { Badge, StatusBadge } from "@/components/mock-ui/status-badge";
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
 import { Tooltip } from "@/components/ui/tooltip";
 import { AndamentosTimeline } from "@/features/andamentos/components/andamentos-timeline";
+import { AtividadeDoEscritorio } from "@/features/andamentos/components/atividade-do-escritorio";
 import { ProcessoDocumentos } from "@/features/documentos/components/processo-documentos";
 import { useDocumentosDoProcesso } from "@/features/documentos/hooks/use-documentos-do-processo";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
@@ -226,6 +227,7 @@ function CockpitContent({
         <div>
           {aba === "andamentos" && (
             <Card className="px-5.5 pt-2 pb-4">
+              <AtividadeDoEscritorio processoId={p.id} />
               <AndamentosTimeline processoId={p.id} />
             </Card>
           )}
