@@ -40,10 +40,10 @@ const LIFECYCLE_TABS: {
   label: string;
   summaryKey: "total" | "em_andamento" | "suspensos" | "arquivados" | "baixados";
 }[] = [
-  { value: "todos", label: "Total", summaryKey: "total" },
+  { value: "todos", label: "Todos", summaryKey: "total" },
   { value: "ACTIVE", label: "Em andamento", summaryKey: "em_andamento" },
-  { value: "SUSPENDED", label: "Suspensos", summaryKey: "suspensos" },
-  { value: "ARCHIVED", label: "Arquivados", summaryKey: "arquivados" },
+  { value: "SUSPENDED", label: "Suspenso", summaryKey: "suspensos" },
+  { value: "ARCHIVED", label: "Arquivado", summaryKey: "arquivados" },
   { value: "CLOSED", label: "Baixado", summaryKey: "baixados" },
 ];
 
