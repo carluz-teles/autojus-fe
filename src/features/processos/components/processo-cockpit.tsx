@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/mock-ui/button";
-import { Avatar } from "@/components/mock-ui/data-display";
 import { Card, SectionTitle, Segmented } from "@/components/mock-ui/layout";
 import { Badge, StatusBadge } from "@/components/mock-ui/status-badge";
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
@@ -28,8 +27,9 @@ import {
   useIntimacoesByProcesso,
   useTasksByProcesso,
 } from "../hooks/use-processo-tabs";
-import { useAssignResponsavel, usePartes, useProcesso } from "../hooks/use-processos";
+import { usePartes, useProcesso } from "../hooks/use-processos";
 import type { ProcessoView } from "../types";
+import { AtribuirResponsavelProcesso } from "./atribuir-responsavel";
 
 type Aba = "andamentos" | "intimacoes" | "tarefas" | "pecas" | "documentos";
 
@@ -115,10 +115,6 @@ function CockpitContent({
   // dentro de AbaPecas/ProcessoDocumentos não duplica requisição de rede.
   const pecasQuery = usePecasByProcesso(p.id);
   const documentosQuery = useDocumentosDoProcesso(p.id);
-  // Assign de responsável — antes vivia no card "Responsável interno" dentro de
-  // PartesCards (removido); movido pro card homônimo do painel lateral (B4).
-  const assignar = useAssignResponsavel(p.id);
-
   // Tarefas não concluídas para o badge.
   const tarefasAbertas = (tarefasQuery.data ?? []).filter(
     (t) => t.status !== "DONE" && t.status !== "DISMISSED",
@@ -248,33 +244,28 @@ function CockpitContent({
 
           <Card>
             <SectionTitle>Responsável interno</SectionTitle>
-            {p.assigned_user_name ? (
-              <div className="mt-2.5 flex items-center justify-between gap-2.5">
-                <div className="flex items-center gap-2.5">
-                  <Avatar nome={p.assigned_user_name} size={40} />
-                  <div>
-                    <p className="text-sm font-semibold">
-                      {p.assigned_user_name}
-                    </p>
-                    <p className="text-muted-foreground text-[11.5px]">
-                      condutor do processo
-                    </p>
-                  </div>
+            <div className="mt-2.5 flex items-center gap-2.5">
+              <AtribuirResponsavelProcesso
+                processoId={p.id}
+                assigneeUserId={p.assigned_user_id}
+                assigneeUserName={p.assigned_user_name}
+                avatarSize={40}
+              />
+              {p.assigned_user_name ? (
+                <div>
+                  <p className="text-sm font-semibold">
+                    {p.assigned_user_name}
+                  </p>
+                  <p className="text-muted-foreground text-[11.5px]">
+                    condutor do processo
+                  </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => assignar.mutate(null)}
-                  className="text-muted-foreground hover:text-foreground text-[11.5px]"
-                  title="Remover responsável"
-                >
-                  ✕
-                </button>
-              </div>
-            ) : (
-              <p className="text-muted-foreground mt-2 text-[13px]">
-                Sem responsável
-              </p>
-            )}
+              ) : (
+                <p className="text-muted-foreground text-[13px]">
+                  Sem responsável
+                </p>
+              )}
+            </div>
           </Card>
         </div>
       </div>
