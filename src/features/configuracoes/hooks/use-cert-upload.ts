@@ -9,9 +9,11 @@ import {
   listCertificados,
   previewCertificado,
   signComCertificado,
+  updatePasswordPolicyCertificado,
   uploadCertificado,
 } from "../services/certificado.service";
 import type {
+  CertificadoPasswordPolicy,
   CertificadoPreviewResult,
   CertificadoSignResult,
   CertificateView,
@@ -88,8 +90,11 @@ export function usePreviewCertificado() {
 
 export interface SignCertificadoArgs {
   id: string;
-  /** Senha de sessão — usada só para o BE decifrar o .pfx e assinar. Não logar. */
-  password: string;
+  /**
+   * Senha de sessão — usada só para o BE decifrar o .pfx e assinar. Não logar.
+   * Omitida quando o certificado tem password_policy "nunca" — o BE não exige.
+   */
+  password?: string;
   /** SHA-256 (base64) do documento a assinar. */
   digestSha256: string;
 }
@@ -114,6 +119,27 @@ export function useDeleteCertificado() {
 
   return useMutation<void, Error, string>({
     mutationFn: (id) => deleteCertificado(fetcher, id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+  });
+}
+
+export interface PatchPasswordPolicyArgs {
+  id: string;
+  policy: CertificadoPasswordPolicy;
+}
+
+/**
+ * Atualiza a política de senha do certificado (PATCH /v1/certificates/:id/password-policy).
+ * Propriedade real e persistida do certificado — não mais preferência local de UI.
+ * Em sucesso invalida a lista para reidratar com o certificado atualizado.
+ */
+export function usePatchPasswordPolicy() {
+  const fetcher = useApi();
+  const queryClient = useQueryClient();
+
+  return useMutation<CertificateView, Error, PatchPasswordPolicyArgs>({
+    mutationFn: ({ id, policy }) =>
+      updatePasswordPolicyCertificado(fetcher, id, policy),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
   });
 }
