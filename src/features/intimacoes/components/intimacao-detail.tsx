@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+import { nomeExibicao } from "@/features/organization/lib/labels";
 import { PecaRow } from "@/features/pecas/components/peca-row";
 import { usePecasByProcesso } from "@/features/pecas/hooks/use-peca";
 import type { PecaListItem } from "@/features/pecas/types";
@@ -338,14 +339,17 @@ function ResponsavelCard({
   const assign = useAssignIntimacaoResponsavel(i.id);
 
   const value = i.assignee_user_id ?? "__none__";
-  const currentName = i.assignee_user_name?.trim() || "";
-  // items resolve value→label pro SelectValue (base-ui exige quando o value
-  // sozinho não corresponde ao texto visível — ex.: "__none__" → "A atribuir").
-  const items = {
-    __none__: "A atribuir",
-    ...Object.fromEntries(members.map((m) => [m.id, m.name])),
-  };
-
+  // Nome do responsável: o join do BE (assignee_user_name) pode vir vazio
+  // (conta Clerk de teste sem nome preenchido) — resolve pelo diretório
+  // (nome ou e-mail) pra nunca cair no id cru.
+  const assigneeAtual = i.assignee_user_id
+    ? members.find((m) => m.id === i.assignee_user_id)
+    : undefined;
+  const currentName =
+    i.assignee_user_name?.trim() ||
+    (assigneeAtual
+      ? nomeExibicao(assigneeAtual.name, assigneeAtual.email)
+      : "");
   const onChange = (v: string | null) => {
     assign.mutate(
       { assigneeUserId: v && v !== "__none__" ? v : null },
@@ -363,7 +367,6 @@ function ResponsavelCard({
         <div className="min-w-0 flex-1">
           <Select
             value={value}
-            items={items}
             onValueChange={onChange}
             disabled={assign.isPending}
           >
@@ -371,13 +374,18 @@ function ResponsavelCard({
               size="sm"
               className="text-foreground h-auto w-full justify-start border-none bg-transparent px-0 py-0 text-[13.5px] font-medium shadow-none focus-visible:ring-0"
             >
-              <SelectValue placeholder="A atribuir" />
+              {/* children explícito — sem isso o Select (base-ui) mostra o
+                  value cru (o uuid) no estado fechado quando não há um
+                  <SelectItem> montado pra resolver o rótulo sozinho. */}
+              <SelectValue placeholder="A atribuir">
+                {value === "__none__" ? "A atribuir" : currentName || "—"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent align="start">
               <SelectItem value="__none__">A atribuir</SelectItem>
               {members.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
-                  {m.name}
+                  {nomeExibicao(m.name, m.email) || "—"}
                 </SelectItem>
               ))}
             </SelectContent>

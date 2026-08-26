@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 
 import { Avatar } from "@/components/mock-ui/data-display";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+import { nomeExibicao } from "@/features/organization/lib/labels";
 import { cn } from "@/lib/utils";
 
 import { useAssignResponsavel } from "../hooks/use-processos";
@@ -14,15 +15,6 @@ const POPUP_CLASS =
 
 const ITEM_CLASS =
   "focus:bg-accent focus:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-md py-1.5 pr-2 pl-2 text-[13px] outline-none select-none data-disabled:pointer-events-none data-disabled:opacity-50";
-
-/** Nome de exibição de um membro: usa o nome; se vazio, cai para a parte local do
- *  e-mail (mesmo critério usado em Intimações, `nomeExibicao`). */
-function nomeExibicao(name?: string | null, email?: string | null): string {
-  const n = name?.trim();
-  if (n) return n;
-  const e = email?.trim();
-  return e ? e.split("@")[0] : "";
-}
 
 /** Atribui o responsável de um processo — mesmo padrão de popover usado em
  *  Intimações (`AtribuirResponsavel`), adaptado ao design system de Processos

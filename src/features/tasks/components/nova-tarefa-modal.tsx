@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+import { nomeExibicao } from "@/features/organization/lib/labels";
 
 import { useCreateTask } from "../hooks/use-create-task";
 import type { TaskPriority } from "../types";
@@ -222,9 +223,8 @@ export function NovaTarefaModal({
                         (m) => m.id === assigneeUserId,
                       );
                       return (
-                        selecionado?.name?.trim() ||
-                        selecionado?.email?.split("@")[0] ||
-                        assigneeUserId
+                        nomeExibicao(selecionado?.name, selecionado?.email) ||
+                        "—"
                       );
                     })()
                   : "Ninguém"}
@@ -234,7 +234,7 @@ export function NovaTarefaModal({
               <SelectItem value={SEM_RESPONSAVEL}>Ninguém</SelectItem>
               {members.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
-                  {m.name?.trim() || m.email?.split("@")[0] || m.id}
+                  {nomeExibicao(m.name, m.email) || "—"}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -14,6 +14,7 @@ import { type Facet, FacetedFilter } from "@/components/ui/faceted-filter";
 import { ListSearchToolbar } from "@/components/ui/list-search-toolbar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+import { nomeExibicao } from "@/features/organization/lib/labels";
 import { cn, formatarData } from "@/lib/utils";
 
 import {
@@ -39,7 +40,8 @@ type LifecycleTab = "todos" | "ACTIVE" | "SUSPENDED" | "ARCHIVED" | "CLOSED";
 const LIFECYCLE_TABS: {
   value: LifecycleTab;
   label: string;
-  summaryKey: "total" | "em_andamento" | "suspensos" | "arquivados" | "baixados";
+  summaryKey:
+    "total" | "em_andamento" | "suspensos" | "arquivados" | "baixados";
 }[] = [
   { value: "todos", label: "Todos", summaryKey: "total" },
   { value: "ACTIVE", label: "Em andamento", summaryKey: "em_andamento" },
@@ -82,12 +84,6 @@ const FILTROS_EXTRA_VAZIOS: FiltrosExtra = {
   degree: "",
   responsavel: "",
 };
-
-function nomeMembro(m: { name: string; email: string }): string {
-  const n = m.name?.trim();
-  if (n) return n;
-  return m.email ? m.email.split("@")[0] : "";
-}
 
 /** Valor da causa (decimal em string) → moeda pt-BR. null/vazio → "—". */
 function fmtValor(v: string | null): string {
@@ -189,7 +185,7 @@ export function ProcessosView() {
         icon: Users,
         options: membros.members.map((m) => ({
           value: m.id,
-          label: nomeMembro(m),
+          label: nomeExibicao(m.name, m.email),
         })),
       });
     }
@@ -411,7 +407,9 @@ function BarraSelecao({
                       onClick={() => onAtribuir(m.id)}
                       className="focus:bg-accent focus:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-[13px] outline-none select-none"
                     >
-                      <span className="flex-1 truncate">{nomeMembro(m)}</span>
+                      <span className="flex-1 truncate">
+                        {nomeExibicao(m.name, m.email)}
+                      </span>
                     </Menu.Item>
                   ))
                 )}
@@ -522,6 +520,17 @@ function LinhaProcesso({
   marcado: boolean;
   onMarcar: () => void;
 }) {
+  const { members } = useOrgMembersDirectory();
+  // assigned_user_name (join do BE) pode vir vazio mesmo com responsável
+  // atribuído (conta Clerk de teste sem nome preenchido) — resolve pelo
+  // diretório antes de esconder a coluna, nunca mostra o id cru.
+  const assignee = item.assigned_user_id
+    ? members.find((m) => m.id === item.assigned_user_id)
+    : undefined;
+  const nomeResponsavel =
+    item.assigned_user_name?.trim() ||
+    (assignee ? nomeExibicao(assignee.name, assignee.email) : "");
+
   return (
     <div
       role="button"
@@ -569,9 +578,9 @@ function LinhaProcesso({
           assigneeUserName={item.assigned_user_name}
           avatarSize={22}
         />
-        {item.assigned_user_name && (
+        {nomeResponsavel && (
           <span className="truncate text-[12.5px]">
-            {item.assigned_user_name.split(" ")[0]}
+            {nomeResponsavel.split(" ")[0]}
           </span>
         )}
       </span>
@@ -596,6 +605,7 @@ function LinhaProcesso({
 function PainelProcesso({ id }: { id: string }) {
   const { data: p, isPending, error } = useProcesso(id);
   const { data: partes } = usePartes(id);
+  const { members } = useOrgMembersDirectory();
 
   if (isPending) return <PainelEsqueleto />;
 
@@ -611,6 +621,15 @@ function PainelProcesso({ id }: { id: string }) {
 
   const autor = partes?.autor?.[0]?.name;
   const reu = partes?.reu?.[0]?.name;
+  // assigned_user_name (join do BE) pode vir vazio mesmo com responsável
+  // atribuído (conta Clerk de teste sem nome preenchido) — resolve pelo
+  // diretório antes de cair no "—", nunca mostra o id cru.
+  const assignee = p.assigned_user_id
+    ? members.find((m) => m.id === p.assigned_user_id)
+    : undefined;
+  const nomeResponsavel =
+    p.assigned_user_name?.trim() ||
+    (assignee ? nomeExibicao(assignee.name, assignee.email) : "");
 
   return (
     <aside className="border-border sticky top-0 flex max-h-full min-w-0 flex-col overflow-y-auto border-l p-6">
@@ -618,7 +637,7 @@ function PainelProcesso({ id }: { id: string }) {
         {p.class}
         {p.subject ? ` · ${p.subject}` : ""}
       </p>
-      <div className="font-display mt-1 text-[24px] font-medium leading-tight tabular-nums">
+      <div className="font-display mt-1 text-[24px] leading-tight font-medium tabular-nums">
         {p.cnj_number}
       </div>
       <StatusBadge className="mt-2">
@@ -656,9 +675,9 @@ function PainelProcesso({ id }: { id: string }) {
           Responsável
         </div>
         <div className="mt-1.5 flex items-center gap-2.5">
-          <Avatar nome={p.assigned_user_name || "—"} size={28} />
+          <Avatar nome={nomeResponsavel || "—"} size={28} />
           <span className="text-[13px] font-semibold">
-            {p.assigned_user_name || "—"}
+            {nomeResponsavel || "—"}
           </span>
         </div>
       </div>
