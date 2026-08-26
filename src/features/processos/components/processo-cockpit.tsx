@@ -9,6 +9,7 @@ import { Button } from "@/components/mock-ui/button";
 import { Card, SectionTitle, Segmented } from "@/components/mock-ui/layout";
 import { Badge, StatusBadge } from "@/components/mock-ui/status-badge";
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
+import { Tooltip } from "@/components/ui/tooltip";
 import { AndamentosTimeline } from "@/features/andamentos/components/andamentos-timeline";
 import { ProcessoDocumentos } from "@/features/documentos/components/processo-documentos";
 import { useDocumentosDoProcesso } from "@/features/documentos/hooks/use-documentos-do-processo";
@@ -16,6 +17,7 @@ import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-me
 import { nomeExibicao } from "@/features/organization/lib/labels";
 import { PecaRow } from "@/features/pecas/components/peca-row";
 import { usePecasByProcesso } from "@/features/pecas/hooks/use-peca";
+import { NovaPecaModal } from "@/features/pecas-v2/components/lista/nova-peca-modal";
 import {
   corDaUrgencia,
   rotuloPrazo,
@@ -127,6 +129,7 @@ function CockpitContent({
   const totalIntimacoes = intimacoesQuery.data?.length ?? 0;
 
   const [novaTarefaAberta, setNovaTarefaAberta] = useState(false);
+  const [novaPecaAberta, setNovaPecaAberta] = useState(false);
 
   return (
     <div className="px-8 pt-6 pb-10">
@@ -146,10 +149,19 @@ function CockpitContent({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Button>
-              <Sparkles className="size-3.5" />
-              Gerar peça
-            </Button>
+            {totalIntimacoes === 0 ? (
+              <Tooltip label="Este processo ainda não tem intimações">
+                <Button disabled>
+                  <Sparkles className="size-3.5" />
+                  Gerar peça
+                </Button>
+              </Tooltip>
+            ) : (
+              <Button onClick={() => setNovaPecaAberta(true)}>
+                <Sparkles className="size-3.5" />
+                Gerar peça
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setNovaTarefaAberta(true)}>
               Nova tarefa
             </Button>
@@ -298,6 +310,12 @@ function CockpitContent({
         onFechar={() => setNovaTarefaAberta(false)}
         courtRecordId={p.id}
         assigneeUserIdSugerido={p.assigned_user_id}
+      />
+
+      <NovaPecaModal
+        aberto={novaPecaAberta}
+        onFechar={() => setNovaPecaAberta(false)}
+        processoId={p.id}
       />
     </div>
   );
