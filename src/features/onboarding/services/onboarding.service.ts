@@ -1,6 +1,6 @@
 import type { ApiFetcher } from "@/lib/api/use-api";
 
-import type { CepLookup, CnpjLookup, Me, OrgProfileInput } from "../types";
+import type { CepLookup, Me, OrgProfileInput } from "../types";
 
 // Camada de rede da feature: funções tipadas que recebem o fetcher (ligado ao
 // Clerk pelo useApi no cliente, ou por auth().getToken no server). Não conhecem
@@ -20,14 +20,6 @@ export async function updateOrgProfile(
     method: "PUT",
     body: input,
   });
-}
-
-/** Consulta cadastral por CNPJ (14 dígitos, sem máscara). */
-export async function lookupCnpj(
-  fetcher: ApiFetcher,
-  cnpj: string,
-): Promise<CnpjLookup> {
-  return fetcher<CnpjLookup>(`/v1/lookup/cnpj/${cnpj}`);
 }
 
 /** Consulta de endereço por CEP (8 dígitos, sem máscara). */
