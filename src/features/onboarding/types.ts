@@ -21,11 +21,15 @@ export interface CepLookup {
   state: string;
 }
 
+/** Papel do usuário no escritório — mesmos literais de `OrgMemberView.role`. */
+export type Role = "ADMIN" | "LAWYER";
+
 /** GET /v1/identity/me — `tenant_id` null enquanto o BE não provisionou o tenant. */
 export interface Me {
   user_id: string;
   tenant_id: string | null;
   onboarding_completed_at: string | null;
+  role: Role;
 }
 
 /** PUT /v1/organization/profile (Auth ADMIN). */

@@ -1,6 +1,7 @@
 import { TrialBanner } from "@/features/billing/components/trial-banner";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
 import { NotificationStream } from "@/features/notifications/notification-stream";
+import { OnboardingWidget } from "@/features/onboarding-widget/components/onboarding-widget";
 
 import { BreadcrumbProvider, BreadcrumbSlot } from "./breadcrumb-context";
 import { EnsureActiveOrg } from "./ensure-active-org";
@@ -19,6 +20,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <NotificationStream />
       {/* Aviso de trial acabando/expirado — full-width, acima de sidebar+conteúdo. */}
       <TrialBanner />
+      {/* Card flutuante "Comece por aqui" — global, canto inferior-direito,
+          sobrepõe qualquer tela do app (não é seção de página). */}
+      <OnboardingWidget />
 
       <div className="flex min-h-0 flex-1">
         <Sidebar />

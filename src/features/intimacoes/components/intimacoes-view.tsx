@@ -3,6 +3,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { Building2, Check, CircleCheck, User, UserPlus, X } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -134,12 +135,17 @@ const FILTROS_EXTRA_VAZIOS: FiltrosExtra = {
 };
 
 export function IntimacoesView() {
+  // Deep-link de entrada (ex.: CTA do widget de onboarding "Comece por aqui")
+  // — só lido na montagem, mesmo padrão de tarefas-view.tsx (?task=).
+  const searchParams = useSearchParams();
   const [urgencia, setUrgencia] = useState<string>("atraso");
   // Chip "Não confirmadas" (triagem) — filtro server-side, estado em memória (sem URL).
   // Persiste ao trocar de tab porque é um estado independente de `urgencia`.
   const [naoConfirmadas, setNaoConfirmadas] = useState(false);
-  const [filtrosExtra, setFiltrosExtra] =
-    useState<FiltrosExtra>(FILTROS_EXTRA_VAZIOS);
+  const [filtrosExtra, setFiltrosExtra] = useState<FiltrosExtra>(() => ({
+    ...FILTROS_EXTRA_VAZIOS,
+    user_status: searchParams.get("user_status") ?? "",
+  }));
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null);
   // Seleção em massa. Dois modos: `todosDaFaixa` (ALL — toda a faixa, inclusive os
   // itens ainda NÃO carregados; a ação manda um flag, não ids) OU `marcadas` (ids
