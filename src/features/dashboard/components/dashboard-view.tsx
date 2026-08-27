@@ -16,7 +16,11 @@ import type {
   IntimacoesBuckets,
 } from "@/features/intimacoes/types";
 import { useProcessosSummary } from "@/features/processos/hooks/use-processos";
-import { corDaUrgencia, rotuloPrazo, urgenciaDe } from "@/features/shared/prazo";
+import {
+  corDaUrgencia,
+  rotuloPrazo,
+  urgenciaDe,
+} from "@/features/shared/prazo";
 import { formatarData } from "@/lib/utils";
 
 // Buckets exibidos em "Próximos prazos" — as mesmas 6 faixas das tabs de
