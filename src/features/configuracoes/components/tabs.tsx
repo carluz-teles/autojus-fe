@@ -371,22 +371,14 @@ function MembrosList({ isAdmin }: { isAdmin: boolean }) {
 }
 
 /**
- * Dialog de edição do perfil — reusa schema/máscaras/lookup do onboarding
- * (fonte única). Localização = só Cidade + UF (endereço postal saiu do produto);
+ * Dialog de edição do perfil — reusa schema/máscaras do onboarding (fonte
+ * única). Localização = só Cidade + UF (endereço postal saiu do produto);
  * rua/CEP/número não são mais coletados — o que já existe no banco fica intocado
  * (preservado pelo defaultValues do form → volta no PUT).
  */
 function EditarPerfilDialog({ onFechar }: { onFechar: () => void }) {
-  const {
-    register,
-    submit,
-    errors,
-    onCnpjBlur,
-    isCnpjLoading,
-    cnpjLookupFailed,
-    isProfileLoading,
-    isSaving,
-  } = useOrgProfileEditForm({ onDone: onFechar });
+  const { register, submit, errors, isProfileLoading, isSaving } =
+    useOrgProfileEditForm({ onDone: onFechar });
 
   const cnpj = register("cnpj");
   const phone = register("phone");
@@ -402,27 +394,13 @@ function EditarPerfilDialog({ onFechar }: { onFechar: () => void }) {
           <Input {...register("trade_name")} />
         </Field>
 
-        <Field
-          label="CNPJ"
-          hint={
-            isCnpjLoading
-              ? "Buscando dados da empresa…"
-              : cnpjLookupFailed
-                ? "Não foi possível buscar o CNPJ, preencha manualmente."
-                : undefined
-          }
-          error={errors.cnpj?.message}
-        >
+        <Field label="CNPJ" error={errors.cnpj?.message}>
           <Input
             inputMode="numeric"
             {...cnpj}
             onChange={(e) => {
               e.target.value = maskCnpj(e.target.value);
               void cnpj.onChange(e);
-            }}
-            onBlur={(e) => {
-              void cnpj.onBlur(e);
-              void onCnpjBlur();
             }}
           />
         </Field>

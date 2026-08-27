@@ -1,4 +1,4 @@
-// Contratos do BE consumidos no onboarding (lookup CNPJ/CEP, identity, org profile).
+// Contratos do BE consumidos no onboarding (lookup CEP, identity, org profile).
 // Snake_case espelha o JSON do backend Go; nunca enviamos tenant_id/org_id (o BE
 // resolve org_id→tenant_id pelo JWT).
 
@@ -10,14 +10,6 @@ export interface Address {
   bairro?: string;
   cidade: string;
   uf: string;
-}
-
-/** GET /v1/lookup/cnpj/:cnpj */
-export interface CnpjLookup {
-  cnpj: string;
-  legal_name: string;
-  trade_name: string;
-  address: Address;
 }
 
 /** GET /v1/lookup/cep/:cep */
@@ -43,7 +35,7 @@ export interface OrgProfileInput {
   phone?: string;
   /** E-mail da organização, opcional (persistência via tenant.email do BE). */
   email?: string;
-  /** Razão social — sem UI própria: vem do lookup de CNPJ (fallback: nome da empresa). */
+  /** Razão social — sem UI própria; fallback: nome da empresa. */
   legal_name: string;
   trade_name: string;
   /** Endereço é opcional no produto ("Adicionar endereço"); ausente = não enviado. */

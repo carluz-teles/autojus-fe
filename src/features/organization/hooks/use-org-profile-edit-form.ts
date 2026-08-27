@@ -1,15 +1,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { onboardingCopy } from "@/features/onboarding/copy";
-import { lookupCnpj } from "@/features/onboarding/services/onboarding.service";
 import { ApiError } from "@/lib/api/errors";
-import { useApi } from "@/lib/api/use-api";
 import {
   EMPTY_ADDRESS,
   makeOrgProfileSchema,
@@ -35,8 +32,6 @@ const schema = makeOrgProfileSchema({
   ufInvalid: t.fields.address.uf.invalid,
 });
 
-const onlyDigits = (value: string) => value.replace(/\D/g, "");
-
 function toFormValues(profile: OrgProfileView): OrgProfileFormValues {
   return {
     trade_name: profile.trade_name,
@@ -60,12 +55,11 @@ function toFormValues(profile: OrgProfileView): OrgProfileFormValues {
 
 /**
  * Form de edição do perfil do escritório na aba Organização (Configurações).
- * Reusa o schema/máscaras/lookup do onboarding (não duplica validação) — só troca
- * o "quando": aqui o perfil já existe, então os campos partem preenchidos (GET via
+ * Reusa o schema/máscaras do onboarding (não duplica validação) — só troca o
+ * "quando": aqui o perfil já existe, então os campos partem preenchidos (GET via
  * useOrgProfile) e o submit é sempre um PUT de atualização.
  */
 export function useOrgProfileEditForm({ onDone }: { onDone: () => void }) {
-  const fetcher = useApi();
   const { profile, isProfileLoading, updateProfile, isSaving } =
     useOrgProfile();
 
@@ -80,31 +74,13 @@ export function useOrgProfileEditForm({ onDone }: { onDone: () => void }) {
       address: { ...EMPTY_ADDRESS },
     },
   });
-  const { register, handleSubmit, setValue, getValues, formState, reset } =
-    form;
+  const { register, handleSubmit, formState, reset } = form;
 
   // Repopula o form assim que o GET chega (ou muda) — evita editar em cima de
   // defaults vazios enquanto a leitura ainda está pendente.
   useEffect(() => {
     if (profile) reset(toFormValues(profile));
   }, [profile, reset]);
-
-  const cnpjLookup = useMutation({
-    mutationFn: (value: string) => lookupCnpj(fetcher, value),
-  });
-
-  const onCnpjBlur = async () => {
-    const cnpj = onlyDigits(getValues("cnpj"));
-    if (cnpj.length !== 14) return;
-    try {
-      const data = await cnpjLookup.mutateAsync(cnpj);
-      const opts = { shouldValidate: formState.isSubmitted };
-      setValue("trade_name", data.trade_name || data.legal_name, opts);
-      setValue("legal_name", data.legal_name, opts);
-    } catch {
-      // cnpjLookup.isError cobre o aviso na UI
-    }
-  };
 
   const submit = handleSubmit(async (values) => {
     try {
@@ -124,9 +100,6 @@ export function useOrgProfileEditForm({ onDone }: { onDone: () => void }) {
     register,
     submit,
     errors: formState.errors,
-    onCnpjBlur,
-    isCnpjLoading: cnpjLookup.isPending,
-    cnpjLookupFailed: cnpjLookup.isError,
     isProfileLoading,
     isSaving,
   };
