@@ -25,7 +25,7 @@ const onlyDigits = (value: string) => value.replace(/\D/g, "");
 // lib/forms/org-profile) — aqui só injetamos as mensagens do onboarding.
 const schema = makeOrgProfileSchema({
   nameRequired: t.fields.name.required,
-  cnpjInvalid: t.fields.cnpj.invalid,
+  cnpjRequired: t.fields.cnpj.required,
   phoneInvalid: t.fields.phone.invalid,
   emailInvalid: t.fields.email.invalid,
   cidadeRequired: t.fields.address.cidade.required,

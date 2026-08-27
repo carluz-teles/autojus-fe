@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api/errors";
-import { maskCnpj, maskPhone } from "@/lib/masks";
+import { maskPhone } from "@/lib/masks";
 
 import { onboardingCopy } from "../copy";
 import { useCompanyForm } from "../hooks/use-company-form";
@@ -101,16 +101,11 @@ export function Step2Company({ onDone }: { onDone: () => void }) {
           <div className="relative">
             <Input
               id="cnpj"
-              inputMode="numeric"
               placeholder={t.fields.cnpj.placeholder}
               aria-invalid={errors.cnpj ? true : undefined}
               aria-describedby="cnpj-help"
               className={isCnpjLoading ? "pr-9" : undefined}
               {...cnpj}
-              onChange={(e) => {
-                e.target.value = maskCnpj(e.target.value);
-                void cnpj.onChange(e);
-              }}
               onBlur={(e) => {
                 cnpj.onBlur(e);
                 void onCnpjBlur();

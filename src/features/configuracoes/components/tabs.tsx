@@ -37,7 +37,7 @@ import type {
   OrgProfileView,
 } from "@/features/organization/types";
 import { ApiError } from "@/lib/api/errors";
-import { maskCnpj, maskPhone } from "@/lib/masks";
+import { maskPhone } from "@/lib/masks";
 import { cn } from "@/lib/utils";
 
 /* ---------- Organização ---------- */
@@ -94,7 +94,7 @@ function LogoEditor({ isAdmin }: { isAdmin: boolean }) {
 function profileRows(p: OrgProfileView): [string, string][] {
   return [
     ["Nome do escritório", p.trade_name],
-    ["CNPJ", maskCnpj(p.cnpj)],
+    ["CNPJ", p.cnpj],
     ["E-mail administrativo", p.email || "—"],
     ["Telefone", p.phone ? maskPhone(p.phone) : "—"],
     ["Cidade", p.address ? `${p.address.cidade} / ${p.address.uf}` : "—"],
@@ -406,12 +406,7 @@ function EditarPerfilDialog({ onFechar }: { onFechar: () => void }) {
           error={errors.cnpj?.message}
         >
           <Input
-            inputMode="numeric"
             {...cnpj}
-            onChange={(e) => {
-              e.target.value = maskCnpj(e.target.value);
-              void cnpj.onChange(e);
-            }}
             onBlur={(e) => {
               void cnpj.onBlur(e);
               void onCnpjBlur();

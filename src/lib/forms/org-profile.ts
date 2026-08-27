@@ -1,6 +1,7 @@
 // Schema e mapeamento do PERFIL FISCAL do escritório — fonte única usada pelo
 // onboarding (passo Sua empresa) e pela página /organization (edição). Mensagens
-// vêm de fora (cada feature injeta as suas), a regra é uma só: CNPJ 14 dígitos,
+// vêm de fora (cada feature injeta as suas), a regra é uma só: CNPJ obrigatório
+// (sem checagem de formato/dígitos — o campo aceita qualquer texto preenchido),
 // telefone 10-11 quando presente, e-mail válido quando presente. Localização do
 // escritório = só CIDADE + UF (endereço postal não é usado pelo produto; rua/CEP
 // deixaram de ser coletados). Vazio como um todo passa; qualquer campo preenchido
@@ -24,7 +25,7 @@ export const EMPTY_ADDRESS = {
 
 export interface OrgProfileMessages {
   nameRequired: string;
-  cnpjInvalid: string;
+  cnpjRequired: string;
   phoneInvalid: string;
   emailInvalid: string;
   cidadeRequired: string;
@@ -66,7 +67,7 @@ export function makeOrgProfileSchema(m: OrgProfileMessages) {
 
   return z.object({
     trade_name: z.string().trim().min(1, m.nameRequired),
-    cnpj: z.string().refine((v) => onlyDigits(v).length === 14, m.cnpjInvalid),
+    cnpj: z.string().trim().min(1, m.cnpjRequired),
     phone: z
       .string()
       .refine((v) => {
@@ -111,7 +112,7 @@ export function orgProfileToInput(
     : undefined;
 
   return {
-    cnpj: onlyDigits(values.cnpj),
+    cnpj: values.cnpj.trim(),
     phone: onlyDigits(values.phone ?? "") || undefined,
     email: values.email?.trim() || undefined,
     legal_name: values.legal_name?.trim() || values.trade_name.trim(),
