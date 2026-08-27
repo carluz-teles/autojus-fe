@@ -16,7 +16,7 @@ import {
   type OrgProfileFormValues,
   orgProfileToInput,
 } from "@/lib/forms/org-profile";
-import { maskCep, maskCnpj, maskPhone } from "@/lib/masks";
+import { maskCep, maskPhone } from "@/lib/masks";
 
 import type { OrgProfileView } from "../types";
 import { useOrgProfile } from "./use-org-profile";
@@ -28,7 +28,7 @@ const t = onboardingCopy.company;
 // já existe, não a criação da org.
 const schema = makeOrgProfileSchema({
   nameRequired: t.fields.name.required,
-  cnpjInvalid: t.fields.cnpj.invalid,
+  cnpjRequired: t.fields.cnpj.required,
   phoneInvalid: t.fields.phone.invalid,
   emailInvalid: t.fields.email.invalid,
   cidadeRequired: t.fields.address.cidade.required,
@@ -40,7 +40,7 @@ const onlyDigits = (value: string) => value.replace(/\D/g, "");
 function toFormValues(profile: OrgProfileView): OrgProfileFormValues {
   return {
     trade_name: profile.trade_name,
-    cnpj: maskCnpj(profile.cnpj),
+    cnpj: profile.cnpj,
     phone: profile.phone ? maskPhone(profile.phone) : "",
     email: profile.email ?? "",
     legal_name: profile.legal_name,
