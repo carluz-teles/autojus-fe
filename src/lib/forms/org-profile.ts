@@ -1,8 +1,9 @@
 // Schema e mapeamento do PERFIL FISCAL do escritório — fonte única usada pelo
 // onboarding (passo Sua empresa) e pela página /organization (edição). Mensagens
-// vêm de fora (cada feature injeta as suas), a regra é uma só: CNPJ obrigatório
-// (sem checagem de formato/dígitos — o campo aceita qualquer texto preenchido),
-// telefone 10-11 quando presente, e-mail válido quando presente. Localização do
+// vêm de fora (cada feature injeta as suas), a regra é uma só: CNPJ obrigatório,
+// com máscara no input (dígitos puros persistidos), mas sem checagem de que tem
+// exatamente 14 dígitos — o campo não bloqueia o submit por formato incompleto.
+// Telefone 10-11 quando presente, e-mail válido quando presente. Localização do
 // escritório = só CIDADE + UF (endereço postal não é usado pelo produto; rua/CEP
 // deixaram de ser coletados). Vazio como um todo passa; qualquer campo preenchido
 // exige cidade+uf — espelho do BE, que agora só exige cidade/uf.
@@ -112,7 +113,7 @@ export function orgProfileToInput(
     : undefined;
 
   return {
-    cnpj: values.cnpj.trim(),
+    cnpj: onlyDigits(values.cnpj),
     phone: onlyDigits(values.phone ?? "") || undefined,
     email: values.email?.trim() || undefined,
     legal_name: values.legal_name?.trim() || values.trade_name.trim(),
