@@ -2,7 +2,14 @@
 
 import { useClerk, useOrganization, useUser } from "@clerk/nextjs";
 import type { OrganizationCustomRoleKey } from "@clerk/shared/types";
-import { Building2, Pencil, Shield, Trash2 } from "lucide-react";
+import {
+  Building2,
+  CreditCard,
+  Landmark,
+  Pencil,
+  Shield,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -11,9 +18,10 @@ import { ConfirmDialog } from "@/components/mock-ui/confirm-dialog";
 import { Avatar } from "@/components/mock-ui/data-display";
 import { Dialog } from "@/components/mock-ui/dialog";
 import { Field, Input, Switch } from "@/components/mock-ui/input";
-import { Card, SectionTitle } from "@/components/mock-ui/layout";
+import { Card } from "@/components/mock-ui/layout";
 import { Skeleton, SkeletonRows } from "@/components/mock-ui/skeleton";
-import { StatusBadge, type Tom } from "@/components/mock-ui/status-badge";
+import { StatusBadge } from "@/components/mock-ui/status-badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   useNotificationPreferences,
   useSetNotificationPreference,
@@ -589,149 +597,30 @@ function ConvidarMembroDialog({ onFechar }: { onFechar: () => void }) {
 
 /* ---------- Tribunais ---------- */
 
-const ACESSOS: {
-  nome: string;
-  desc: string;
-  estado: string;
-  tom: Tom;
-  quando: string;
-  acao: string;
-}[] = [
-  {
-    nome: "Eproc · TJSP",
-    desc: "Peticionamento eletrônico e protocolo direto no sistema do tribunal.",
-    estado: "Credenciamento pendente",
-    tom: "warning",
-    quando: "2 OABs sem habilitação",
-    acao: "Credenciar",
-  },
-  {
-    nome: "Projudi · TJPR",
-    desc: "Necessário apenas se o escritório passar a atuar no Paraná.",
-    estado: "Não conectado",
-    tom: "neutral",
-    quando: "—",
-    acao: "Conectar",
-  },
-];
-
 export function TribunaisTab() {
   return (
-    <div className="mt-7 flex max-w-4xl flex-col gap-4">
-      <p className="rounded-xl border border-[color-mix(in_oklch,var(--success)_25%,transparent)] bg-[color-mix(in_oklch,var(--success)_7%,transparent)] p-3.5 text-[13px] leading-relaxed">
-        A captura de publicações (DJEN) e o enriquecimento dos processos
-        (DATAJUD) rodam sozinhos a partir das OABs monitoradas em{" "}
-        <strong className="font-medium">Termos</strong>. Abaixo ficam só os
-        acessos aos tribunais que exigem credenciamento.
-      </p>
-
-      {ACESSOS.map((a) => (
-        <Card
-          key={a.nome}
-          className="grid grid-cols-[minmax(0,1fr)_180px_120px] items-center gap-4"
-        >
-          <div className="min-w-0">
-            <div className="flex items-center gap-2.5">
-              <span className="text-[14.5px] font-medium">{a.nome}</span>
-              <StatusBadge tone={a.tom}>{a.estado}</StatusBadge>
-            </div>
-            <p className="text-muted-foreground mt-1.5 text-[13px] leading-relaxed">
-              {a.desc}
-            </p>
-          </div>
-          <span className="text-muted-foreground text-xs">{a.quando}</span>
-          <Button variant="outline" size="sm" className="justify-self-end">
-            {a.acao}
-          </Button>
-        </Card>
-      ))}
+    <div className="mt-7 max-w-4xl">
+      <EmptyState
+        icon={Landmark}
+        title="Credenciamento em tribunais"
+        description="A gestão de acessos e credenciamento por tribunal ainda não está disponível."
+        phase="Em breve"
+      />
     </div>
   );
 }
 
 /* ---------- Cobrança ---------- */
 
-const USO = [
-  {
-    rotulo: "Processos monitorados",
-    valor: "6.818",
-    limite: "de 10.000",
-    pct: 68,
-  },
-  { rotulo: "OABs monitoradas", valor: "3", limite: "de 10", pct: 30 },
-  { rotulo: "Peças geradas no mês", valor: "48", limite: "de 200", pct: 24 },
-  { rotulo: "Usuários", valor: "4", limite: "de 10", pct: 40 },
-];
-
-const FATURAS = ["01/08/2026", "01/07/2026", "01/06/2026"];
-
 export function CobrancaTab() {
   return (
-    <div className="mt-7 flex max-w-4xl flex-col gap-4">
-      <Card className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <SectionTitle>Plano atual</SectionTitle>
-          <div className="mt-1.5 flex items-baseline gap-2">
-            <span className="font-display text-[26px]">Escritório</span>
-            <span className="font-display text-[22px] tabular-nums">
-              R$ 890
-            </span>
-            <span className="text-muted-foreground text-[13px]">/mês</span>
-          </div>
-          <p className="text-muted-foreground mt-1.5 text-[12.5px]">
-            Próxima fatura em 01/09/2026 · Mastercard •••• 4471
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline">Trocar cartão</Button>
-          <Button>Mudar de plano</Button>
-        </div>
-      </Card>
-
-      <Card>
-        <h2 className="font-display text-lg font-medium">Uso no ciclo</h2>
-        <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-5">
-          {USO.map((u) => (
-            <div key={u.rotulo}>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-muted-foreground text-[13px]">
-                  {u.rotulo}
-                </span>
-                <span className="text-[13px] tabular-nums">
-                  {u.valor}{" "}
-                  <span className="text-muted-foreground">{u.limite}</span>
-                </span>
-              </div>
-              <div className="bg-muted mt-2 h-[5px] overflow-hidden rounded-sm">
-                <div
-                  className="bg-primary h-[5px]"
-                  style={{ width: `${u.pct}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      <Card>
-        <h2 className="font-display text-lg font-medium">Faturas</h2>
-        {FATURAS.map((f) => (
-          <div
-            key={f}
-            className="border-border grid grid-cols-[140px_minmax(0,1fr)_100px_90px] items-center gap-3.5 border-t py-3 text-[13px]"
-          >
-            <span className="tabular-nums">{f}</span>
-            <span className="text-muted-foreground">Plano Escritório</span>
-            <span className="tabular-nums">R$ 890,00</span>
-            <button
-              type="button"
-              className="text-primary cursor-pointer justify-self-end text-[12.5px]"
-            >
-              Baixar
-            </button>
-          </div>
-        ))}
-      </Card>
+    <div className="mt-7 max-w-4xl">
+      <EmptyState
+        icon={CreditCard}
+        title="Plano e faturas"
+        description="A gestão de plano, uso e faturas ainda não está disponível."
+        phase="Em breve"
+      />
     </div>
   );
 }
