@@ -29,8 +29,7 @@ export function ProcessoDocumentos({ processoId }: { processoId: string }) {
       {/* Cabeçalho + envio */}
       <div className="flex items-center justify-between gap-3">
         <p className="text-muted-foreground text-sm">
-          Autos e anexos do processo — usados como base para revisões e
-          peças.
+          Autos e anexos do processo — usados como base para revisões e peças.
         </p>
         <label
           className={cn(

@@ -30,7 +30,10 @@ export function PecaRow({ peca: p }: { peca: PecaListItem }) {
       <span className="text-muted-foreground ml-auto text-[12px] tabular-nums">
         {formatarData(p.created_at)}
       </span>
-      <ArrowUpRight className="text-muted-foreground size-3.5" strokeWidth={2} />
+      <ArrowUpRight
+        className="text-muted-foreground size-3.5"
+        strokeWidth={2}
+      />
     </Link>
   );
 }

@@ -74,17 +74,31 @@ export function useDraftStream(draftId: string, opts: Options): void {
       const url = `${API}/v1/pecas/${draftId}/generation-stream?stream_token=${encodeURIComponent(streamToken)}`;
       es = new EventSource(url, { withCredentials: false });
 
-      // Throttle via rAF: chunks chegam mais rápido que o browser consegue
-      // re-renderizar o Tiptap. Uma única flush por frame é fluida e barata.
+      // Throttle via setTimeout (~1 flush/frame a 60fps): chunks chegam mais
+      // rápido que o browser consegue re-renderizar o Tiptap. Uma única
+      // flush por "frame" é fluida e barata.
+      //
+      // Por que setTimeout e não requestAnimationFrame: rAF só dispara
+      // quando o browser tem um ciclo de composição/pintura ativo pra essa
+      // aba — em aba em background, minimizada, ou em contexto headless/
+      // automatizado, o browser SUSPENDE rAF indefinidamente (confirmado ao
+      // vivo: 0 disparos em 3s mesmo com document.visibilityState="visible").
+      // Como gerar uma peça leva vários segundos, é comum o usuário trocar
+      // de aba enquanto espera — com rAF, isso zera silenciosamente todo o
+      // progresso visual (o editor só pinta no fallback final, via polling
+      // de useDraft). setTimeout roda em qualquer estado de visibilidade
+      // (no pior caso é limitado a 1x/seg em aba em background pelo spec,
+      // nunca suspenso por completo), garantindo que o streaming progrida
+      // de verdade independente de a aba estar em foco.
       let pending = false;
       es.addEventListener("chunk", (e: MessageEvent) => {
         parserRef.current.push(e.data);
         if (pending) return;
         pending = true;
-        requestAnimationFrame(() => {
+        setTimeout(() => {
           pending = false;
           onProgressRef.current(parserRef.current.full());
-        });
+        }, 16);
       });
 
       es.addEventListener("done", (e: MessageEvent) => {

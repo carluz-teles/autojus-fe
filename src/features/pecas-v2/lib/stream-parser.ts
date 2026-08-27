@@ -28,7 +28,19 @@ const enum State {
 export function createStreamingJsonFieldParser(
   fieldName = "draft_markdown",
 ): StreamingFieldParser {
-  const openMarker = `"${fieldName}":"`; // "draft_html":"
+  // Tolerante a whitespace entre a chave, os dois-pontos e a aspa de abertura
+  // do valor (`"draft_markdown":"` OU `"draft_markdown": "` OU até
+  // `"draft_markdown" :\n  "`). Alguns providers via OpenRouter (ex.:
+  // google/gemini-2.5-flash) fazem pretty-print do JSON estruturado —
+  // emitem `"draft_markdown": "` com espaço/quebra de linha após os
+  // dois-pontos — enquanto outros (ex.: openai/gpt-4o-mini) emitem compacto
+  // (`"draft_markdown":"`, sem espaço). Um match por substring literal (sem
+  // espaço) nunca encontra a chave no primeiro caso: o parser fica preso em
+  // BeforeField pro stream inteiro, `full()` sempre devolve "", e o editor
+  // só recebe o conteúdo real no fallback pós-stream (fetch do content_html
+  // final) — daí o sintoma "folha em branco até o fim, texto aparece tudo
+  // de una vez". Um regex com \s* cobre ambos os formatos.
+  const openMarker = new RegExp(`"${fieldName}"\\s*:\\s*"`);
   let state: State = State.BeforeField;
   let buffer = ""; // caracteres brutos ainda não processados
   let fullHtml = ""; // HTML acumulado (unescapado)
@@ -39,9 +51,9 @@ export function createStreamingJsonFieldParser(
       buffer += chunk;
 
       if (state === State.BeforeField) {
-        const idx = buffer.indexOf(openMarker);
-        if (idx < 0) return ""; // ainda não abriu
-        buffer = buffer.slice(idx + openMarker.length);
+        const match = openMarker.exec(buffer);
+        if (!match) return ""; // ainda não abriu
+        buffer = buffer.slice(match.index + match[0].length);
         state = State.InValue;
       }
 
