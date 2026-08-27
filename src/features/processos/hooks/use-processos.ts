@@ -16,6 +16,7 @@ const PAGE_SIZE = 30;
 
 import {
   assignResponsavel,
+  bulkAssignResponsavel,
   getPartes,
   getProcesso,
   getProcessoResumo,
@@ -150,26 +151,28 @@ export function useAssignResponsavel(processoId: string) {
 }
 
 /**
- * Atribuição em massa da lista. NÃO há endpoint de massa no BE ainda — fazemos um
- * fan-out client-side de PUT /processos/:id/responsavel sobre os ids MARCADOS
- * (não há modo "toda a faixa" sem endpoint dedicado). Débito: expor um bulk no BE.
+ * Atribuição em massa da lista — POST /v1/processos/bulk/responsavel (mesmo padrão
+ * de useBulkAssignResponsavel de Intimações). Uma única requisição, mesmo com N
+ * ids marcados. A UI de Processos hoje só marca ids específicos (sem toggle "toda
+ * a faixa"), então este hook só expõe o modo `ids`; `all` fica pronto no serviço
+ * para quando a UI ganhar esse modo.
  */
 export function useBulkAssignResponsaveis() {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({
+    mutationFn: ({
       ids,
       conductorUserId,
     }: {
       ids: string[];
       conductorUserId: string | null;
-    }) => {
-      await Promise.all(
-        ids.map((id) => assignResponsavel(fetcher, id, conductorUserId)),
-      );
-      return { affected: ids.length };
-    },
+    }) =>
+      bulkAssignResponsavel(fetcher, {
+        userId: conductorUserId,
+        all: false,
+        ids,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: processosKeys.lists() });
     },
