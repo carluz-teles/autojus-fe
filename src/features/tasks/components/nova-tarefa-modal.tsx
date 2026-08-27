@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from "react";
 
+import { DatePicker } from "@/components/mock-ui/date-picker";
 import { Dialog } from "@/components/mock-ui/dialog";
 import { Input, Textarea } from "@/components/mock-ui/input";
 import { Button } from "@/components/ui/button";
@@ -198,12 +199,15 @@ export function NovaTarefaModal({
 
         <div>
           <Rotulo>Vencimento</Rotulo>
-          <Input
-            className="mt-2"
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
+          {/* DatePicker (não <Input type="date">): mesmo componente já usado na
+              edição inline do detalhe (tarefa-detail.tsx), que funciona — o
+              input nativo type="date" é a causa provável do bug de criação
+              (valor pode ficar "" com o campo parcialmente preenchido sem
+              disparar onChange antes do clique em "Criar"). Reuso elimina a
+              classe inteira do problema e unifica a UI de data create/edit. */}
+          <div className="mt-2">
+            <DatePicker valor={dueDate} onChange={setDueDate} />
+          </div>
         </div>
 
         <div>

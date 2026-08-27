@@ -9,7 +9,7 @@
 import { formatarData } from "@/lib/utils";
 
 import type { IntimacaoPrazoView } from "../../types";
-import { corUrgencia, prazoUrgenciaInfo } from "./prazo-urgencia";
+import { corTextoUrgencia, prazoUrgenciaInfo } from "./prazo-urgencia";
 
 /** O número grande + as linhas de vencimento. Derivado do prazo real (days_left,
  * end_date, status). Sem prazo → estado honesto "Sem prazo".
@@ -52,7 +52,7 @@ export function PrazoContagemGrande({
     <div className="flex items-center gap-3">
       <span
         className="font-display text-[52px] leading-none tabular-nums"
-        style={{ color: corUrgencia(prazo) }}
+        style={{ color: corTextoUrgencia(prazo) }}
       >
         {hoje ? "0" : magnitude}
       </span>

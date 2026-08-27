@@ -105,7 +105,12 @@ function profileRows(p: OrgProfileView): [string, string][] {
     ["CNPJ", maskCnpj(p.cnpj)],
     ["E-mail administrativo", p.email || "—"],
     ["Telefone", p.phone ? maskPhone(p.phone) : "—"],
-    ["Cidade", p.address ? `${p.address.cidade} / ${p.address.uf}` : "—"],
+    [
+      "Cidade",
+      p.address?.cidade && p.address.uf
+        ? `${p.address.cidade} / ${p.address.uf}`
+        : "—",
+    ],
   ];
 }
 
@@ -810,7 +815,15 @@ export function PerfilTab() {
               Gerenciado pelo Clerk
             </span>
           </span>
-          <Button variant="outline" size="sm" onClick={() => openUserProfile()}>
+          <Button
+            variant="outline"
+            size="sm"
+            // Abre direto na aba "Security" (não "Account", o default) — API
+            // documentada pelo Clerk, ainda que com prefixo experimental.
+            onClick={() =>
+              openUserProfile({ __experimental_startPath: "/security" })
+            }
+          >
             Alterar senha
           </Button>
         </div>

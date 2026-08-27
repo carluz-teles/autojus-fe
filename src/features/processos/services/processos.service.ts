@@ -107,3 +107,39 @@ export async function assignResponsavel(
     body: { user_id: userId },
   });
 }
+
+/** Atribuição em massa do responsável. `all=true` aplica a toda a
+ *  faixa/filtro atual (inclui não paginados) via os filtros; senão aplica
+ *  aos `ids` (court_record ids). Espelha bulkAssignResponsavel de Intimações —
+ *  mesmo contrato, só o nome do campo de usuário muda (`user_id` no BE deste
+ *  slice, em vez de `assignee_user_id`). */
+export interface BulkAssignResponsavelParams {
+  userId: string | null;
+  all: boolean;
+  ids: string[];
+  /** filtros ativos — usados só no modo all; espelham o GET /processos. */
+  search?: string;
+  court?: string;
+  lifecycle?: string;
+  degree?: string;
+  assignee?: string;
+}
+
+export async function bulkAssignResponsavel(
+  fetcher: ApiFetcher,
+  params: BulkAssignResponsavelParams,
+): Promise<{ affected: number }> {
+  return fetcher<{ affected: number }>(`${ENDPOINT}/bulk/responsavel`, {
+    method: "POST",
+    body: {
+      user_id: params.userId,
+      all: params.all,
+      ids: params.ids,
+      search: params.search ?? "",
+      court: params.court ?? "",
+      lifecycle: params.lifecycle ?? "",
+      degree: params.degree ?? "",
+      assignee: params.assignee ?? "",
+    },
+  });
+}

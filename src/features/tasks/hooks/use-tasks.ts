@@ -164,8 +164,16 @@ export function useBulkAssignTasks() {
       );
       return { affected: ids.length };
     },
-    onSuccess: () => {
+    onSuccess: (_data, { ids }) => {
       qc.invalidateQueries({ queryKey: tasksKeys.lists() });
+      // Sem isso, o painel de preview (useTaskDetalhe) do item atualmente
+      // selecionado fica com cache stale ("Responsável: —") logo após o bulk-
+      // assign, mesmo com os cards da lista já mostrando o avatar certo — só
+      // corrigia com reload manual. lists() não cobre detail() (chaves
+      // hierárquicas distintas em tasksKeys); invalida cada detalhe afetado.
+      for (const id of ids) {
+        qc.invalidateQueries({ queryKey: tasksKeys.detail(id) });
+      }
     },
   });
 }

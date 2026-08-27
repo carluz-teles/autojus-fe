@@ -54,3 +54,20 @@ const COR_URGENCIA: Record<Urgencia, string> = {
 export function corUrgencia(prazo: IntimacaoPrazoView | null): string {
   return COR_URGENCIA[urgenciaDePrazo(prazo)];
 }
+
+// Variante para uso como cor de TEXTO (rótulo "vence hoje"/"em N dias" da lista,
+// número grande do PrazoContagemGrande) — nas faixas hoje/48h, --gold PURO como
+// texto normal dá ~2.4:1 contra o fundo claro (falha WCAG AA 1.4.3, que exige
+// 4,5:1). --gold-foreground é o MESMO token, só mais escuro — já usado como texto
+// em intimacao-detail.tsx/peca-row.tsx/analisar-card.tsx/confirmar-prazo.tsx.
+// corUrgencia() continua valendo para usos decorativos (fio da linha = boundary
+// de UI, exige só 3:1) — não trocar lá, senão perde a cor "latão" do design.
+const COR_TEXTO_URGENCIA: Record<Urgencia, string> = {
+  ...COR_URGENCIA,
+  hoje: "var(--gold-foreground)",
+  "48h": "var(--gold-foreground)",
+};
+
+export function corTextoUrgencia(prazo: IntimacaoPrazoView | null): string {
+  return COR_TEXTO_URGENCIA[urgenciaDePrazo(prazo)];
+}

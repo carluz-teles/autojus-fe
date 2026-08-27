@@ -35,7 +35,11 @@ import { AtribuirResponsavel } from "./shared/atribuir-responsavel";
 import { Avatar, initials } from "./shared/avatar";
 import { PartesInline } from "./shared/partes-inline";
 import { PrazoContagemGrande } from "./shared/prazo-contagem-grande";
-import { corUrgencia, prazoUrgenciaInfo } from "./shared/prazo-urgencia";
+import {
+  corTextoUrgencia,
+  corUrgencia,
+  prazoUrgenciaInfo,
+} from "./shared/prazo-urgencia";
 import { TeorPublicacao } from "./shared/teor-publicacao";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -209,8 +213,11 @@ export function IntimacoesView() {
   const todasMarcadas =
     todosDaFaixa ||
     (idsCarregados.length > 0 && idsCarregados.every((id) => marcadas.has(id)));
-  const alguma = todosDaFaixa || marcadas.size > 0;
   const qtdSelecionada = todosDaFaixa ? totalCount : marcadas.size;
+  // > 0, não só a flag: faixa vazia (totalCount 0) não pode "ligar" a barra de
+  // seleção em massa — bug real de QA (checkbox "Selecionar 0 nesta faixa"
+  // habilitava "Atribuir" clicável sem nenhum item selecionado).
+  const alguma = qtdSelecionada > 0;
   const estaMarcada = (id: string) => todosDaFaixa || marcadas.has(id);
 
   const limparSelecao = () => {
@@ -218,7 +225,9 @@ export function IntimacoesView() {
     setMarcadas(new Set());
   };
   // Master: liga o modo ALL (toda a faixa); desliga tudo se já estava tudo marcado.
+  // Faixa vazia = nada pra marcar, não entra no modo ALL.
   const alternarTodas = () => {
+    if (totalCount === 0) return;
     setMarcadas(new Set());
     setTodosDaFaixa(!todasMarcadas);
   };
@@ -377,7 +386,12 @@ export function IntimacoesView() {
           A linha horizontal (border-t) separa o bloco de cima (título/busca) do
           conjunto abaixo; o painel de detalhe começa na mesma altura da tab bar. */}
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(420px,1fr)_minmax(340px,430px)] border-t">
-        <div className="flex min-h-0 flex-col">
+        {/* min-w-0 é essencial aqui: item de grid sem isso tem min-width:auto e o
+            conteúdo (a tab bar) pode estourar a track e vazar visualmente sobre a
+            coluna do painel (<aside>), cobrindo a última tab e bloqueando clique
+            de mouse. Com min-w-0 + overflow-x-auto na tablist, o excesso vira
+            scroll horizontal PRÓPRIO da coluna — nunca invade o painel. */}
+        <div className="flex min-h-0 min-w-0 flex-col">
           <div className="px-8 pt-4">
             <div
               role="tablist"
@@ -400,7 +414,7 @@ export function IntimacoesView() {
                 next.focus();
                 next.click();
               }}
-              className="flex items-center border-b"
+              className="flex items-center overflow-x-auto border-b"
             >
               {URGENCIA_TABS.map((t) => {
                 const selected = urgencia === t.value;
@@ -413,7 +427,7 @@ export function IntimacoesView() {
                     tabIndex={selected ? 0 : -1}
                     onClick={() => trocarUrgencia(t.value)}
                     className={cn(
-                      "flex cursor-pointer items-center justify-center gap-2 border-b-2 px-4 pb-3 text-[13px] transition-colors",
+                      "flex shrink-0 cursor-pointer items-center justify-center gap-2 border-b-2 px-4 pb-3 text-[13px] whitespace-nowrap transition-colors",
                       selected
                         ? "border-primary text-foreground font-semibold"
                         : "text-muted-foreground hover:text-foreground border-transparent font-medium",
@@ -468,7 +482,7 @@ export function IntimacoesView() {
                 label={`${naoAnalisadasNaFaixa} não analisadas`}
                 tone="warning"
                 dot={false}
-                className="bg-gold/20 text-gold border-transparent"
+                className="bg-gold/20 text-gold-foreground border-transparent"
               />
             </div>
           </div>
@@ -536,7 +550,7 @@ function BarraSelecao({
         </span>
         <Menu.Root>
           <Menu.Trigger
-            disabled={atribuindo}
+            disabled={atribuindo || quantidade === 0}
             className="bg-gold text-foreground hover:bg-gold/90 flex items-center gap-2 rounded-xl px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-60"
           >
             <UserPlus className="size-4" />
@@ -672,6 +686,7 @@ function LinhaIntimacao({
   onMarcar: () => void;
 }) {
   const cor = corUrgencia(item.prazo);
+  const corTexto = corTextoUrgencia(item.prazo);
   const analisada = !!item.ai_analyzed_at;
 
   return (
@@ -716,7 +731,9 @@ function LinhaIntimacao({
           <span
             className={cn(
               "shrink-0 rounded-full px-2 py-px text-[10.5px] whitespace-nowrap",
-              analisada ? "bg-primary/10 text-primary" : "bg-gold/15 text-gold",
+              analisada
+                ? "bg-primary/10 text-primary"
+                : "bg-gold/15 text-gold-foreground",
             )}
           >
             {analisada ? "analisada" : "não analisada"}
@@ -724,8 +741,10 @@ function LinhaIntimacao({
         </span>
       </span>
 
-      {/* col 3 — prazo (cor = urgência) */}
-      <span className="text-[12px] tabular-nums" style={{ color: cor }}>
+      {/* col 3 — prazo (cor = urgência) — corTextoUrgencia (não corUrgencia): como
+          TEXTO, --gold puro fica ~2.4:1 contra o fundo (falha WCAG AA); o fio
+          esquerdo da linha (decorativo, style acima) continua com --gold. */}
+      <span className="text-[12px] tabular-nums" style={{ color: corTexto }}>
         <span className="block">{rotuloPrazo(item.prazo)}</span>
         {item.prazo?.end_date ? (
           <span className="text-muted-foreground block text-[11px]">

@@ -88,7 +88,7 @@ function CollapsedPill({ vm }: { vm: OnboardingWidgetViewModel }) {
 
 function ExpandedCard({ vm }: { vm: OnboardingWidgetViewModel }) {
   return (
-    <div className="bg-card ring-hairline reveal w-full rounded-xl p-5">
+    <div className="bg-card ring-hairline reveal max-h-[calc(100vh-2rem)] w-full overflow-y-auto overscroll-contain rounded-xl p-5">
       <div className="flex items-center justify-between gap-2">
         <span className="text-gold-foreground text-[10.5px] font-semibold tracking-[0.12em] uppercase">
           {onboardingWidgetCopy.eyebrow}
@@ -119,7 +119,21 @@ function ExpandedCard({ vm }: { vm: OnboardingWidgetViewModel }) {
         </span>
       </div>
 
-      <div>
+      {/* Corrige colisão estrutural: o card é `position: fixed` no canto
+          inferior-direito por cima de QUALQUER tela do app — sem um teto de
+          altura, com 5 passos (role ADMIN) ele já ultrapassa ~550px e, em
+          viewports baixas (laptop com devtools aberto, telas curtas, celular
+          em paisagem), cobre controles que ficam perto do topo do conteúdo
+          (ex.: botão "Adicionar" da aba Termos). Limitar só esta lista
+          interna (`max-h-[45vh]`) NÃO basta: header + título + barra de
+          progresso + rodapé continuam sem teto, então a soma ainda estoura a
+          viewport em telas baixas. O teto real está no CONTAINER EXTERNO do
+          card (`max-h-[calc(100vh-2rem)] overflow-y-auto` na div de
+          `ExpandedCard`) — o card inteiro nunca ultrapassa a altura da
+          viewport menos uma margem de segurança. Esta lista mantém seu
+          próprio scroll como limite adicional dentro do card. `-mx-1 px-1`
+          evita que a barra de rolagem invada o padding do card. */}
+      <div className="-mx-1 max-h-[45vh] overflow-y-auto overscroll-contain px-1">
         {vm.steps.map((step, index) => (
           <StepRow key={step.id} step={step} number={index + 1} />
         ))}

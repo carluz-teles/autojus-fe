@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
+import { Button } from "@/components/mock-ui/button";
 import {
   Select,
   SelectContent,
@@ -25,6 +26,7 @@ import {
   useThesesFromIntimation,
 } from "@/features/pecas/hooks/use-peca";
 import { diasRestantes, rotuloPrazo } from "@/features/shared/prazo";
+import { ApiError } from "@/lib/api/errors";
 import { formatDate } from "@/lib/format";
 
 import type { PecaTone } from "../types";
@@ -60,8 +62,11 @@ export function PartidaEphemeral({
   // Tipo é state local: o usuário troca no <Select> inline do título. Quando
   // muda, o queryKey do useThesesFromIntimation muda → refetch automático.
   const [pieceType, setPieceType] = useState(pieceTypeInicial || "OTHER");
-  const { data: intim, isLoading: intimLoading } =
-    useIntimacaoDetalhe(intimationId);
+  const {
+    data: intim,
+    isLoading: intimLoading,
+    error: intimError,
+  } = useIntimacaoDetalhe(intimationId);
   const thesesQuery = useThesesFromIntimation(intimationId, pieceType);
   const criarPeca = useCriarPeca();
 
@@ -135,8 +140,33 @@ export function PartidaEphemeral({
   const isCommitting = criarPeca.isPending;
   const isError = criarPeca.isError;
 
-  if (intimLoading || !intim) {
+  if (intimLoading) {
     return <div className="text-muted-foreground p-8 text-sm">Carregando…</div>;
+  }
+
+  // Mesmo padrão de processo-cockpit.tsx: sem isso, uma intimation_id
+  // inexistente esgota os retries do React Query em silêncio e a tela fica
+  // presa em "Carregando…" para sempre (QA achou isso ao vivo).
+  if (intimError || !intim) {
+    const isNotFound =
+      intimError instanceof ApiError && intimError.kind === "ENTITY_NOT_FOUND";
+    return (
+      <div className="px-8 pt-10 text-center">
+        <p role="alert" className="text-destructive text-sm">
+          {isNotFound
+            ? "Intimação não encontrada."
+            : "Erro ao carregar a intimação. Tente novamente."}
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-4"
+          onClick={() => router.push("/pecas")}
+        >
+          Voltar para Peças
+        </Button>
+      </div>
+    );
   }
 
   const prazo = intim.prazo;

@@ -120,6 +120,23 @@ export function TarefasView() {
     setMarcadas(new Set());
   };
 
+  // Sincroniza a aba ativa com o status REAL da tarefa deep-linkada (?task=) assim
+  // que o detalhe carrega — sem isso a aba fica presa na default "Abertas" mesmo
+  // quando a tarefa deep-linkada é de outra aba (ex.: Concluída). Ajuste síncrono
+  // no render (mesmo padrão de `selecaoValida` abaixo, evita cascading render de
+  // um setState em efeito); a flag garante que só roda uma vez por deep-link, sem
+  // brigar com trocas de aba manuais do usuário depois.
+  const [deepLinkTabSincronizada, setDeepLinkTabSincronizada] =
+    useState(!deepLinkId);
+  const deepLinkDetalhe = useTaskDetalhe(deepLinkId ?? "");
+  if (!deepLinkTabSincronizada && deepLinkDetalhe.data) {
+    const alvo = STATUS_TABS.find(
+      (t) => t.value === deepLinkDetalhe.data.display_status,
+    );
+    if (alvo && alvo.value !== tab) setTab(alvo.value);
+    setDeepLinkTabSincronizada(true);
+  }
+
   const membros = useOrgMembersDirectory();
 
   const filters: TasksFilters = {
