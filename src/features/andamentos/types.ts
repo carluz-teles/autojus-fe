@@ -14,5 +14,16 @@ export interface AndamentoView {
   fidelity: string;
 }
 
+// Espelha o read model do BE: GET /v1/processos/:id/activity → { data, page }.
+// Atividade do escritório (análise de intimação concluída, peça gerada) —
+// texto já vem pronto em PT-BR do servidor, o FE só exibe.
+export interface AtividadeDoEscritorioView {
+  id: string;
+  event_type: "INTIMATION_ANALYSIS_COMPLETED" | "DRAFT_GENERATED";
+  text: string;
+  /** Quando o evento ocorreu (RFC3339). */
+  occurred_at: string;
+}
+
 // Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
 export type { PageEnvelope } from "@/lib/api/types";
