@@ -8,6 +8,8 @@ import {
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { Toaster } from "sonner";
 
+import { ChunkErrorReload } from "@/components/shell/chunk-error-reload";
+
 function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
@@ -34,6 +36,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <ChunkErrorReload />
       {children}
       <Toaster richColors position="top-right" closeButton />
       <ReactQueryDevtools initialIsOpen={false} />
