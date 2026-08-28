@@ -2,14 +2,7 @@
 
 import { useClerk, useOrganization, useUser } from "@clerk/nextjs";
 import type { OrganizationCustomRoleKey } from "@clerk/shared/types";
-import {
-  Building2,
-  CreditCard,
-  Landmark,
-  Pencil,
-  Shield,
-  Trash2,
-} from "lucide-react";
+import { Building2, CreditCard, Pencil, Shield, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -575,21 +568,6 @@ function ConvidarMembroDialog({ onFechar }: { onFechar: () => void }) {
         </div>
       </form>
     </Dialog>
-  );
-}
-
-/* ---------- Tribunais ---------- */
-
-export function TribunaisTab() {
-  return (
-    <div className="mt-7 max-w-4xl">
-      <EmptyState
-        icon={Landmark}
-        title="Credenciamento em tribunais"
-        description="A gestão de acessos e credenciamento por tribunal ainda não está disponível."
-        phase="Em breve"
-      />
-    </div>
   );
 }
 

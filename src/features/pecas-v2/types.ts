@@ -206,3 +206,26 @@ export interface ChatMessage {
 
 export type QuickActionKind =
   "summarize_case" | "suggest_theses" | "check_deadline" | "find_precedents";
+
+// ── Protocolo automático (Fatia 1 — e-SAJ) ──────────────────────────────────
+
+/** Status de uma tentativa de protocolo automático no e-SAJ. */
+export type FilingStatus =
+  "ENFILEIRADO" | "PROTOCOLANDO" | "PROTOCOLADO" | "FALHOU";
+
+/** Resposta do POST /v1/pecas/:id/filing/approve (201 na 1ª vez, 200 idempotente). */
+export interface FilingApproveResult {
+  filingAttemptId: string;
+  status: FilingStatus;
+  isIdempotent: boolean;
+}
+
+/** Tentativa de protocolo — GET /v1/pecas/:id/filing (null se nunca solicitado). */
+export interface FilingAttempt {
+  id: string;
+  status: FilingStatus;
+  requestedAt: string;
+  finishedAt: string | null;
+  failureReason: string | null;
+  filingNumber: string | null;
+}
