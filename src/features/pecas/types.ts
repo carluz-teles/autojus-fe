@@ -19,7 +19,7 @@ export interface PecaIntimation {
   deadline_start_at: string;
 }
 
-/** Contexto do processo (via court_record), incluindo partes e valor da causa
+/** Contexto do processo (via court_record), incluindo partes
  *  (Task 2a). plaintiffs/defendants nunca são null (array vazio quando sem partes). */
 export interface PecaProcess {
   case_id: string;
@@ -30,8 +30,6 @@ export interface PecaProcess {
   class: string;
   subject: string;
   judging_body: string;
-  /** valor da causa como decimal em string (ex. "15000.00"), "" quando ausente. */
-  claim_value: string;
   /** autor / polo ativo. */
   plaintiffs: string[];
   /** réu / polo passivo. */

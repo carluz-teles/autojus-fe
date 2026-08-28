@@ -28,7 +28,7 @@ import {
 import { NovaTarefaModal } from "@/features/tasks/components/nova-tarefa-modal";
 import type { TaskView } from "@/features/tasks/types";
 import { ApiError } from "@/lib/api/errors";
-import { formatClaimValueBRL, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 
 import {
   useIntimacoesByProcesso,
@@ -180,12 +180,8 @@ function CockpitContent({
           </div>
         </div>
 
-        <dl className="mt-5.5 grid grid-cols-4 gap-6">
+        <dl className="mt-5.5 grid grid-cols-3 gap-6">
           <Meta rotulo="Distribuição" valor={formatDate(p.filed_at)} />
-          <Meta
-            rotulo="Valor da causa"
-            valor={formatClaimValueBRL(p.claim_value)}
-          />
           <Meta rotulo="Grau" valor={p.degree} />
           <Meta rotulo="Sistema" valor={p.court} />
         </dl>
@@ -274,7 +270,6 @@ function CockpitContent({
                   ["Grau", p.degree],
                   ["Sistema", p.court],
                   ["Distribuição", formatDate(p.filed_at)],
-                  ["Valor da causa", formatClaimValueBRL(p.claim_value)],
                 ] as [string, string][]
               ).map(([k, v]) => (
                 <div
@@ -371,10 +366,6 @@ function PartesCards({ processo: p }: { processo: ProcessoView }) {
                 {LIFECYCLE_LABEL[p.lifecycle] ?? p.lifecycle}
               </StatusBadge>
             }
-          />
-          <Meta
-            rotulo="Valor da causa"
-            valor={formatClaimValueBRL(p.claim_value)}
           />
           <Meta rotulo="Distribuição" valor={formatDate(p.filed_at)} />
         </div>
