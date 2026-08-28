@@ -12,14 +12,7 @@
 // no read model. "Nova peça" abre o NovaPecaModal — o modal cria via POST
 // /v1/pecas e navega pro fluxo padrão (/pecas/[id]).
 
-import {
-  CircleCheck,
-  Clock,
-  FileEdit,
-  FileText,
-  Search,
-  SlidersHorizontal,
-} from "lucide-react";
+import { CircleCheck, Clock, FileEdit, FileText, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -31,19 +24,19 @@ import { NovaPecaModal } from "./nova-peca-modal";
 import { PecaRecenteCard } from "./peca-recente-card";
 import { PieceTypeCard } from "./piece-type-card";
 
-// Chips com o filtro correspondente que vai pro BE (workflow_state ou urgencia).
-// "minhas" ainda não filtra (débito: BE não expõe created_by no read model);
-// mantido no set pra a UX aparecer.
+// Chips com o filtro correspondente que vai pro BE (workflow_state, urgencia
+// ou assignee).
 interface FiltroChip {
   key: string;
   label: string;
   urgencia?: string;
   workflow_state?: string;
+  assignee?: string;
 }
 const FILTRO_CHIPS: FiltroChip[] = [
   { key: "atraso", label: "Prazo em atraso", urgencia: "atraso" },
   { key: "hoje", label: "Prazo hoje", urgencia: "hoje" },
-  { key: "minhas", label: "Minhas" },
+  { key: "minhas", label: "Minhas", assignee: "me" },
   {
     key: "aguardando",
     label: "Aguardando assinatura",
@@ -61,6 +54,7 @@ export function PecasListPage() {
   const { items: pecas, isPending } = usePecas({
     workflow_state: chipCfg?.workflow_state,
     urgencia: chipCfg?.urgencia,
+    assignee: chipCfg?.assignee,
   });
 
   // KPIs derivados. "Protocoladas (30d)" filtra por filed_at nos últimos 30d.
@@ -143,13 +137,6 @@ export function PecasListPage() {
             {c.label}
           </button>
         ))}
-        <button
-          type="button"
-          className="border-border bg-card text-muted-foreground hover:bg-muted/40 ml-auto inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] font-medium"
-        >
-          <SlidersHorizontal className="size-3.5" />
-          Filtros
-        </button>
       </div>
 
       {/* Começar uma nova peça */}
