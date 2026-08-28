@@ -12,7 +12,7 @@ import {
 } from "@/features/pecas/hooks/use-peca";
 import { rotuloTipoPeca } from "@/features/pecas/lib/labels";
 import { diasRestantes, rotuloPrazo } from "@/features/shared/prazo";
-import { formatClaimValueBRL, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import type { PecaTone, Thesis, ThesisConfidence } from "../types";
@@ -336,7 +336,6 @@ export function PecaPartida({ id, onWorkspace }: PecaPartidaProps) {
   }
 
   // ── Dados de contexto pra o painel "A IA vai usar" ────────────────────────
-  const proc = peca.process;
   const intim = peca.intimation;
   const prazo = peca.deadline;
   const termo = prazo?.end_date ?? null;
@@ -399,9 +398,6 @@ export function PecaPartida({ id, onWorkspace }: PecaPartidaProps) {
                           </span>
                           {" · "}
                           {rotuloPrazo(dias)}
-                          {proc?.claim_value
-                            ? ` · valor ${formatClaimValueBRL(proc.claim_value)}`
-                            : ""}
                         </span>
                       </li>
                     )}

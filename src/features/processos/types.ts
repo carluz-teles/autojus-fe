@@ -19,8 +19,6 @@ export interface ProcessoView {
   completeness: number;
   last_movement_text: string;
   last_movement_at: string | null;
-  /** Valor da causa como decimal em string (ex. "250000.00") ou null. */
-  claim_value: string | null;
   /** Id INTERNO do responsável (assigned user) — nunca org_id/tenant_id. null = sem responsável. */
   assigned_user_id: string | null;
   /** Nome do responsável pelo processo (assigned user) ou null. */

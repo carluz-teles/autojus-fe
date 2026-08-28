@@ -85,14 +85,6 @@ const FILTROS_EXTRA_VAZIOS: FiltrosExtra = {
   responsavel: "",
 };
 
-/** Valor da causa (decimal em string) → moeda pt-BR. null/vazio → "—". */
-function fmtValor(v: string | null): string {
-  if (!v) return "—";
-  const n = Number(v);
-  if (Number.isNaN(n)) return "—";
-  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
 /** DATE do BE serializa à meia-noite UTC — slice(0,10) preserva o dia. */
 function fmtData(iso: string | null): string {
   return iso ? formatarData(iso.slice(0, 10)) : "—";
@@ -650,7 +642,6 @@ function PainelProcesso({ id }: { id: string }) {
         <Linha label="Tribunal · grau">
           {p.court} · {GRAU_LABEL[p.degree] ?? "—"}
         </Linha>
-        <Linha label="Valor da causa">{fmtValor(p.claim_value)}</Linha>
         <Linha label="Distribuição">{fmtData(p.filed_at)}</Linha>
         <Linha label="Sistema" ultima>
           {p.court || "—"}

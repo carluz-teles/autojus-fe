@@ -41,7 +41,7 @@ import {
   urgenciaDe,
 } from "@/features/shared/prazo";
 import { useTasksDaIntimacao } from "@/features/tasks/hooks/use-tasks-da-intimacao";
-import { formatBytes, formatClaimValueBRL, formatDate } from "@/lib/format";
+import { formatBytes, formatDate } from "@/lib/format";
 import { sanitizeContentHtml } from "@/lib/html/sanitize-content";
 import { cn } from "@/lib/utils";
 
@@ -142,7 +142,6 @@ export function PecaContexto({ peca }: { peca: PecaDetail }) {
       orgao={proc?.judging_body ?? ""}
       court={proc?.court ?? ""}
       degree={proc?.degree ?? ""}
-      claimValue={proc?.claim_value ?? ""}
       // Anexos (só quando existe peça)
       pecaId={peca.id}
       attachments={peca.attachments}
@@ -187,7 +186,6 @@ export function PecaContextoFromIntimacao({
       orgao={intim.judging_body}
       court={intim.court}
       degree={intim.degree}
-      claimValue=""
       distributionDateOverride={intim.distribution_date ?? ""}
     />
   );
@@ -212,7 +210,6 @@ interface PecaContextoBodyProps {
   orgao: string;
   court: string;
   degree: string;
-  claimValue: string;
   // Se já sabemos a distribuição (path ephemeral), usa direto — evita
   // segunda chamada a useIntimacaoDetalhe.
   distributionDateOverride?: string;
@@ -238,7 +235,6 @@ function PecaContextoBody({
   orgao,
   court,
   degree,
-  claimValue,
   distributionDateOverride,
   pecaId,
   attachments,
@@ -331,12 +327,6 @@ function PecaContextoBody({
           <Campo rotulo="Assunto" valor={assunto || "—"} />
           <Campo rotulo="Órgão" valor={orgao || "—"} />
           <Campo rotulo="Tribunal · grau" valor={`${court} · ${degree}`} />
-          {claimValue ? (
-            <Campo
-              rotulo="Valor da causa"
-              valor={formatClaimValueBRL(claimValue)}
-            />
-          ) : null}
           {distribuicao && (
             <Campo rotulo="Distribuição" valor={formatDate(distribuicao)} />
           )}
