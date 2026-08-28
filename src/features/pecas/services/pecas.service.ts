@@ -93,6 +93,8 @@ export interface ListPecasParams {
   workflow_state?: string;
   /** Chip do FE: "atraso" | "hoje" (contra deadline da intimação de origem). */
   urgencia?: string;
+  /** Chip "Minhas": "me" (autor = usuário logado) ou um user id. */
+  assignee?: string;
   limit?: number;
   cursor?: string;
 }
@@ -105,12 +107,21 @@ export async function listPecas(
     status,
     workflow_state,
     urgencia,
+    assignee,
     limit = 20,
     cursor,
   }: ListPecasParams = {},
 ): Promise<PageEnvelope<PecaListItem>> {
   return fetcher<PageEnvelope<PecaListItem>>(ENDPOINT, {
-    query: { piece_type, status, workflow_state, urgencia, limit, cursor },
+    query: {
+      piece_type,
+      status,
+      workflow_state,
+      urgencia,
+      assignee,
+      limit,
+      cursor,
+    },
   });
 }
 
