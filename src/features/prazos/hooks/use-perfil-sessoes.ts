@@ -1,7 +1,6 @@
 "use client";
 
 import { useAuth, useUser } from "@clerk/nextjs";
-import type { SessionWithActivities } from "@clerk/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -35,8 +34,10 @@ export function usePerfilSessoes() {
     enabled: !!user,
   });
 
+  // Tipo do elemento derivado do retorno de user.getSessions() — evita depender
+  // de @clerk/types (não instalado); o item já traz .revoke().
   const revogarMut = useMutation({
-    mutationFn: (s: SessionWithActivities) => s.revoke(),
+    mutationFn: (s: NonNullable<typeof query.data>[number]) => s.revoke(),
     onSuccess: () => {
       toast.success("Sessão encerrada.");
       void qc.invalidateQueries({ queryKey: SESSIONS_KEY });
