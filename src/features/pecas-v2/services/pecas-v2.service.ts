@@ -45,6 +45,32 @@ import type {
 
 const ENDPOINT = "/v1/pecas";
 
+// ── Criação (POST /v1/pecas) ─────────────────────────────────────────────────
+
+export interface CreateDraftInput {
+  /** Id da intimação de origem — o BE resolve case_id/court_record_id dela. */
+  intimationId: string;
+  /** Tipo da peça (opcional; o BE infere do tipo da intimação quando ausente). */
+  pieceType?: string;
+}
+
+/** Cria (ou reaproveita) a peça a partir de uma intimação — POST /v1/pecas.
+ *  O BE devolve 201 (nova) ou 200 (já existia) com o draft; retornamos o id. */
+export async function createDraft(
+  fetcher: ApiFetcher,
+  input: CreateDraftInput,
+): Promise<{ id: string }> {
+  const res = await fetcher<DataEnvelope<{ id: string }>>(ENDPOINT, {
+    method: "POST",
+    body: {
+      source: "intimation",
+      intimation_id: input.intimationId,
+      ...(input.pieceType ? { piece_type: input.pieceType } : {}),
+    },
+  });
+  return { id: res.data.id };
+}
+
 // ── Leitura ──────────────────────────────────────────────────────────────────
 
 export async function getDraft(

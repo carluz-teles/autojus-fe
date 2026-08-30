@@ -13,6 +13,7 @@ import {
   initials,
 } from "@/features/intimacoes/components/shared/avatar";
 import { nomeExibicao } from "@/features/organization/lib/labels";
+import { useCriarPecaDaIntimacao } from "@/features/pecas-v2/hooks/use-criar-peca";
 import { cn } from "@/lib/utils";
 
 import { useIntimacaoDetalhe } from "../../hooks/use-intimacao-detalhe";
@@ -29,6 +30,7 @@ const ITEM_CLASS =
 // rodapé de ações (resolver/ignorar/reabrir + responsável).
 export function IntimacaoDetalhe({ id }: { id: string }) {
   const det = useIntimacaoDetalhe(id);
+  const peca = useCriarPecaDaIntimacao();
   const m = det.model;
 
   if (det.isPending) {
@@ -346,6 +348,15 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
             emVoo={det.assignEmVoo}
             onAssign={det.onAssign}
           />
+
+          <button
+            onClick={() => peca.gerarPeca(id)}
+            disabled={peca.gerandoPeca}
+            className="border-line bg-panel text-foreground hover:bg-hover ml-auto inline-flex items-center gap-2 rounded-lg border px-3.5 py-2.5 text-[13px] font-medium disabled:opacity-60"
+          >
+            <Sparkles className="text-primary size-4" strokeWidth={1.8} />
+            {peca.gerandoPeca ? "Abrindo peça…" : "Gerar peça com IA"}
+          </button>
         </div>
       </div>
     </div>
