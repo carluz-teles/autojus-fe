@@ -66,7 +66,7 @@ export function TrialBanner() {
         <span className="hidden sm:inline">{banner.message}</span>
       </p>
       <Link
-        href="/settings?tab=cobranca"
+        href="/prazos/config"
         className={cn(
           buttonVariants({ variant: ctaVariant, size: "sm" }),
           "shrink-0",

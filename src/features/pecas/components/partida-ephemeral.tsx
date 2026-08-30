@@ -85,12 +85,12 @@ export function PartidaEphemeral({
   // Reset da seleção quando o tipo muda — as teses velhas somem, novas chegam.
   // `semeado` volta a false; próximo effect re-selecciona todas as novas.
   const semeado = useRef(false);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+
   useEffect(() => {
     semeado.current = false;
     setSelecionadas(new Set());
   }, [pieceType]);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+
   useEffect(() => {
     if (!semeado.current && theses.length > 0) {
       setSelecionadas(new Set(theses.map((_, i) => i)));

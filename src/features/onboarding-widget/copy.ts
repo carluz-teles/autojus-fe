@@ -39,21 +39,21 @@ export const ONBOARDING_STEPS_COPY: Record<
     description:
       "Suas publicações passam a chegar sozinhas do DJEN e do DATAJUD.",
     ctaLabel: "Configurar termos",
-    href: "/settings?tab=termos",
+    href: "/prazos/config",
   },
   members_invited: {
     id: "members_invited",
     title: "Convide seu time",
     description: onboardingCopy.team.description,
     ctaLabel: "Convidar membros",
-    href: "/settings?tab=organizacao",
+    href: "/prazos/config",
   },
   first_triagem: {
     id: "first_triagem",
     title: "Faça a primeira triagem",
     description: "Organize a inbox e decida o que fazer com cada intimação.",
     ctaLabel: "Triar intimações",
-    href: "/intimacoes?user_status=PENDING",
+    href: "/prazos",
   },
   first_analise: {
     id: "first_analise",
@@ -62,7 +62,7 @@ export const ONBOARDING_STEPS_COPY: Record<
     ctaLabel: "Analisar intimações",
     // Não existe filtro dedicado de "não analisada" na lista hoje (ver
     // Reuse Check) — leva pra inbox geral, não pra um destino inventado.
-    href: "/intimacoes",
+    href: "/prazos",
   },
   first_peca: {
     id: "first_peca",
@@ -70,11 +70,11 @@ export const ONBOARDING_STEPS_COPY: Record<
     description:
       "Transforme a intimação em petição pronta para revisar em minutos.",
     ctaLabel: "Criar peça",
-    // "/pecas" tem o botão "Nova peça" (NovaPecaModal): escolhe a intimação
+    // "/prazos" tem o botão "Nova peça" (NovaPecaModal): escolhe a intimação
     // de origem (já filtrada PENDING) + tipo, e navega pra
     // /pecas/nova?intimation_id=... — é o entry point direto, não precisa
     // passar por /intimacoes primeiro.
-    href: "/pecas",
+    href: "/prazos",
   },
 };
 

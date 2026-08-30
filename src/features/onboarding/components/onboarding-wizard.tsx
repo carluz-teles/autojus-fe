@@ -17,7 +17,7 @@ import { Step2Company } from "./step2-company";
 export function OnboardingWizard() {
   const router = useRouter();
 
-  const finish = useCallback(() => router.push("/dashboard"), [router]);
+  const finish = useCallback(() => router.push("/prazos"), [router]);
 
   return (
     <div className="flex flex-col gap-8">

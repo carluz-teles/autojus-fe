@@ -41,7 +41,7 @@ export function AnexoUploadModal({
     useAttachDocument(draftId);
 
   // Reseta o form ao abrir/fechar
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+
   useEffect(() => {
     if (!aberto) {
       setFile(null);
