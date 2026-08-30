@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { type ResumoCard, useFontes } from "../../hooks/use-fontes";
 import { ConfigToggle } from "./config-toggle";
@@ -233,19 +233,10 @@ export function ConfigFontes() {
 
       {fon.fontesTab === "ingest" ? (
         <>
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <p className="text-fg3 m-0 max-w-[440px] text-[12.5px]">
-              Cada varredura do DJEN — o que foi lido, o que casou com seus
-              termos e o que virou intimação.
-            </p>
-            <button
-              onClick={fon.forcarIngest}
-              className="border-line bg-panel text-foreground hover:bg-hover flex flex-none items-center gap-1.5 rounded-lg border px-3.5 py-2 text-[12.5px] font-medium"
-            >
-              <RefreshCw className="size-3.5" strokeWidth={1.8} />
-              Varrer agora
-            </button>
-          </div>
+          <p className="text-fg3 mt-0 mb-4 max-w-[440px] text-[12.5px]">
+            Cada varredura do DJEN — o que foi lido, o que casou com seus termos
+            e o que virou intimação.
+          </p>
           {fon.ingestError ? (
             <Erro texto="Não foi possível carregar as varreduras." />
           ) : fon.ingestPending ? (

@@ -298,14 +298,6 @@ export function useFontes() {
   }, [addValor, addOab]);
 
   // ---- Ingestões / Varreduras ----
-  const forcarIngest = useCallback(
-    () =>
-      toast(
-        "As varreduras rodam automaticamente pelo BE — disparo manual em breve.",
-      ),
-    [],
-  );
-
   const ingestResumo = useMemo<ResumoCard[]>(() => {
     const s = capturesQuery.data?.summary;
     return [
@@ -374,6 +366,5 @@ export function useFontes() {
     ingestResumo,
     ingestPending: capturesQuery.isPending,
     ingestError: !!capturesQuery.error,
-    forcarIngest,
   };
 }
