@@ -1,14 +1,17 @@
-import { ConviteAccept } from "@/features/convite/components/convite-accept";
+import { redirect } from "next/navigation";
 
 export const metadata = { title: "Convite · Atjus" };
 
-// Rota PÚBLICA (convidado chega deslogado) — fora de (app), sem shell/gate.
+// Aceite de convite = fluxo PADRÃO do Clerk (decisão: sem login custom). O e-mail
+// de convite do Clerk já leva o convidado a /sign-up?__clerk_ticket=…, tratado
+// pelos componentes padrão. Esta rota antiga (mock ATJ-…) só existe pra não quebrar
+// links salvos: redireciona pro cadastro, onde o ticket do Clerk assume.
 // Next 16: params é assíncrono (Promise).
 export default async function ConvitePage({
   params,
 }: {
   params: Promise<{ token: string }>;
 }) {
-  const { token } = await params;
-  return <ConviteAccept token={token} />;
+  await params;
+  redirect("/sign-up");
 }

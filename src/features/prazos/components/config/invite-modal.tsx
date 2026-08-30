@@ -52,34 +52,19 @@ export function InviteModal({ inv }: { inv: ReturnType<typeof useInvite> }) {
               {inv.enviadoTitulo}
             </div>
             <p className="text-fg3 mx-auto mt-1.5 mb-4 max-w-[320px] text-[12px] leading-[1.5]">
-              Eles recebem um e-mail com o link de aceite. Você também pode
-              compartilhar o link direto:
+              {inv.enviadoMsg}
             </p>
-            <div className="border-line bg-bg mb-[18px] flex items-center gap-2 rounded-[9px] border px-3 py-2.5">
-              <span className="text-fg2 min-w-0 flex-1 truncate font-mono text-[12px]">
-                {inv.link}
-              </span>
-              <button
-                onClick={inv.copiar}
-                className="border-primary text-primary flex-none rounded-[7px] border bg-transparent px-2.5 py-1.5 text-[11.5px] font-medium"
-              >
-                {inv.copiarLabel}
-              </button>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={inv.verConvidado}
-                className="border-line bg-panel text-foreground hover:bg-hover flex-1 rounded-lg border px-3 py-2.5 text-[12.5px] font-medium"
-              >
-                Ver a tela do convidado
-              </button>
-              <button
-                onClick={inv.fechar}
-                className="bg-primary text-primary-foreground flex-1 rounded-lg px-3 py-2.5 text-[12.5px] font-medium"
-              >
-                Concluir
-              </button>
-            </div>
+            {inv.erroEnvio ? (
+              <p className="text-destructive mx-auto mb-4 max-w-[320px] text-[11.5px] leading-[1.45]">
+                {inv.erroEnvio}
+              </p>
+            ) : null}
+            <button
+              onClick={inv.fechar}
+              className="bg-primary text-primary-foreground w-full rounded-lg px-3 py-2.5 text-[12.5px] font-medium"
+            >
+              Concluir
+            </button>
           </div>
         ) : (
           <>
@@ -184,6 +169,14 @@ export function InviteModal({ inv }: { inv: ReturnType<typeof useInvite> }) {
                 rows={2}
                 className="border-line bg-bg text-foreground w-full resize-y rounded-[9px] border px-[13px] py-2.5 text-[13px] outline-none"
               />
+              {inv.erroEnvio ? (
+                <p
+                  className="text-destructive mt-3 text-[11.5px] leading-[1.45]"
+                  role="alert"
+                >
+                  {inv.erroEnvio}
+                </p>
+              ) : null}
             </div>
             <div className="border-line2 flex justify-end gap-2 border-t px-[22px] py-3.5">
               <button
@@ -197,7 +190,7 @@ export function InviteModal({ inv }: { inv: ReturnType<typeof useInvite> }) {
                 disabled={!inv.podeEnviar}
                 className="bg-primary text-primary-foreground rounded-lg px-4 py-2 text-[12.5px] font-medium disabled:cursor-not-allowed disabled:opacity-45"
               >
-                Enviar convite
+                {inv.enviando ? "Enviando…" : "Enviar convite"}
               </button>
             </div>
           </>

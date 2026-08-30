@@ -312,6 +312,14 @@ function Done({ f }: { f: F }) {
           Estamos varrendo o DJEN em segundo plano — as primeiras intimações
           aparecem na sua Inbox em instantes. Configure o resto quando quiser.
         </p>
+        {f.erro ? (
+          <p
+            className="text-fg2 border-line bg-panel mx-auto mt-3 max-w-[380px] rounded-[9px] border px-3 py-2 text-[11.5px] leading-[1.45]"
+            role="status"
+          >
+            {f.erro}
+          </p>
+        ) : null}
         <button
           onClick={f.abrirApp}
           className="bg-primary text-primary-foreground mt-[18px] rounded-[9px] px-5 py-[11px] text-[13px] font-medium"

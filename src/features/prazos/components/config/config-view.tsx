@@ -239,8 +239,8 @@ export function ConfigView() {
             </>
           ) : null}
 
-          {cfg.tab === "equipe" ? <ConfigEquipe cfg={cfg} /> : null}
-          {cfg.tab === "fontes" ? <ConfigFontes cfg={cfg} /> : null}
+          {cfg.tab === "equipe" ? <ConfigEquipe /> : null}
+          {cfg.tab === "fontes" ? <ConfigFontes /> : null}
           {cfg.tab === "cert" ? <ConfigCert /> : null}
           {cfg.tab === "notif" ? <ConfigNotif cfg={cfg} /> : null}
         </div>
