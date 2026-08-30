@@ -241,7 +241,7 @@ export function ConfigView() {
 
           {cfg.tab === "equipe" ? <ConfigEquipe cfg={cfg} /> : null}
           {cfg.tab === "fontes" ? <ConfigFontes cfg={cfg} /> : null}
-          {cfg.tab === "cert" ? <ConfigCert cfg={cfg} /> : null}
+          {cfg.tab === "cert" ? <ConfigCert /> : null}
           {cfg.tab === "notif" ? <ConfigNotif cfg={cfg} /> : null}
         </div>
       </div>
