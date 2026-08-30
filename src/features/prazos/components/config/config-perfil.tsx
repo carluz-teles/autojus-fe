@@ -2,7 +2,6 @@
 
 import { useConfigPerfil } from "../../hooks/use-config-perfil";
 import { ConfigAvatarUpload } from "./config-avatar-upload";
-import { ConfigPerfilSenha } from "./config-perfil-senha";
 import { ConfigPerfilSessoes } from "./config-perfil-sessoes";
 import { PerfilEditModal } from "./perfil-edit-modal";
 
@@ -49,7 +48,6 @@ export function ConfigPerfil() {
         ))}
       </div>
 
-      <ConfigPerfilSenha />
       <ConfigPerfilSessoes />
 
       {p.editarAberto ? <PerfilEditModal onFechar={p.fecharEditar} /> : null}
