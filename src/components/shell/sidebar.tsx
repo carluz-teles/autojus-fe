@@ -183,14 +183,14 @@ function OrgSwitcher() {
               })}
             <div className="bg-line2 my-[5px] h-px" />
             <Menu.Item
-              onClick={() => router.push("/prazos/config")}
+              onClick={() => router.push("/configuracoes")}
               className="hover:bg-hover text-foreground flex w-full items-center gap-[9px] rounded-lg px-2.5 py-2 text-left text-[12.5px] outline-none"
             >
               <Building2 className="text-fg3 size-3.5" strokeWidth={1.8} />
               Configurações da organização
             </Menu.Item>
             <Menu.Item
-              onClick={() => router.push("/prazos/config")}
+              onClick={() => router.push("/configuracoes")}
               className="hover:bg-hover text-foreground flex w-full items-center gap-[9px] rounded-lg px-2.5 py-2 text-left text-[12.5px] outline-none"
             >
               <UserPlus className="text-fg3 size-3.5" strokeWidth={1.8} />
@@ -257,14 +257,14 @@ function UserSwitcher() {
               </span>
             </div>
             <Menu.Item
-              render={<Link href="/prazos/config" />}
+              render={<Link href="/configuracoes" />}
               className="hover:bg-hover text-foreground flex items-center gap-[9px] rounded-lg px-2.5 py-2 text-[12.5px] outline-none"
             >
               <User className="text-fg3 size-3.5" strokeWidth={1.8} />
               Meu perfil
             </Menu.Item>
             <Menu.Item
-              render={<Link href="/prazos/config" />}
+              render={<Link href="/configuracoes" />}
               className="hover:bg-hover text-foreground flex items-center gap-[9px] rounded-lg px-2.5 py-2 text-[12.5px] outline-none"
             >
               <Settings2 className="text-fg3 size-3.5" strokeWidth={1.8} />

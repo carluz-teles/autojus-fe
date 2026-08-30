@@ -23,7 +23,7 @@ export default async function OnboardingPage() {
       completed = false;
     }
   }
-  if (completed) redirect("/prazos");
+  if (completed) redirect("/");
 
   return <OnboardingFlow />;
 }

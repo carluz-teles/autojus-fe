@@ -114,7 +114,7 @@ export function IntimacoesFeed() {
           feed.rows.map((r) => (
             <Link
               key={r.id}
-              href={`/prazos/intimacao/${r.id}`}
+              href={`/intimacoes/${r.id}`}
               className="hover:bg-hover border-line2 grid w-full items-center gap-3.5 border-b px-6 py-[11px] text-left"
               style={{ gridTemplateColumns: COLS }}
             >

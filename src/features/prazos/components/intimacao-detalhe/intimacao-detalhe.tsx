@@ -27,7 +27,7 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
         <div className="mx-auto max-w-[1080px] px-8 pt-4 pb-10">
           <div className="mb-3.5 flex items-center gap-2">
             <Link
-              href="/prazos"
+              href="/"
               className="navi text-fg2 hover:bg-hover inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px]"
             >
               <ChevronLeft className="size-3.5" strokeWidth={2} />
@@ -35,7 +35,7 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
             </Link>
             <span className="text-fg3">·</span>
             <Link
-              href={`/prazos/processo/${encodeURIComponent(m.cnj)}`}
+              href={`/processos/${encodeURIComponent(m.cnj)}`}
               className="navi text-primary hover:bg-hover inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px]"
             >
               <FileText className="size-3.5" strokeWidth={1.8} />

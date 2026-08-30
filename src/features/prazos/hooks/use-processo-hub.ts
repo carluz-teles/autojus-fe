@@ -294,6 +294,6 @@ export function useProcessoHub(numero: string) {
     naoEncontrado: !query.isLoading && !raw,
     processo,
     voltarLabel: "Prazos",
-    voltarHref: "/prazos",
+    voltarHref: "/",
   };
 }

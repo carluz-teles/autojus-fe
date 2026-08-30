@@ -195,7 +195,7 @@ export function useOnboardingFlow() {
     // done
     chk: checklist.chk,
     toggleChk: checklist.toggle,
-    abrirApp: () => router.push("/prazos"),
+    abrirApp: () => router.push("/"),
     // topbar
     reiniciar: () => {
       setStep("welcome");

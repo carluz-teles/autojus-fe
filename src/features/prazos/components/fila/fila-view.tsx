@@ -61,7 +61,7 @@ export function FilaView({
               {g.itens.map((it) => (
                 <Link
                   key={it.id}
-                  href={`/prazos/intimacao/${it.id}`}
+                  href={`/intimacoes/${it.id}`}
                   className="hover:bg-hover border-line2 grid w-full grid-cols-[16px_minmax(0,1fr)_160px_96px_22px] items-center gap-3.5 border-b px-2 py-[11px] text-left"
                 >
                   <PrioIcon k={it.urgK} size={13} />

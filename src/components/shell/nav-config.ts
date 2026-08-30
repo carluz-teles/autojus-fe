@@ -30,44 +30,44 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     titulo: "Espaço",
     itens: [
-      { href: "/prazos", label: "Inbox", icon: Inbox },
-      { href: "/prazos/meus", label: "Meus Prazos", icon: Clock },
+      { href: "/", label: "Inbox", icon: Inbox },
+      { href: "/meus-prazos", label: "Meus Prazos", icon: Clock },
     ],
   },
   {
     titulo: "Vistas",
     itens: [
-      { href: "/prazos/pipeline", label: "Pipeline", icon: Columns3 },
-      { href: "/prazos/fila", label: "Fila", icon: ListOrdered },
-      { href: "/prazos/calendario", label: "Calendário", icon: Calendar },
+      { href: "/pipeline", label: "Pipeline", icon: Columns3 },
+      { href: "/fila", label: "Fila", icon: ListOrdered },
+      { href: "/calendario", label: "Calendário", icon: Calendar },
     ],
   },
   {
     titulo: "Acervo",
     itens: [
       {
-        href: "/prazos/acervo/processos",
+        href: "/processos",
         label: "Processos",
         icon: FolderOpen,
       },
-      { href: "/prazos/acervo/intimacoes", label: "Intimações", icon: Mail },
+      { href: "/intimacoes", label: "Intimações", icon: Mail },
     ],
   },
   {
     titulo: "Sistema",
-    itens: [{ href: "/prazos/config", label: "Configurações", icon: Settings }],
+    itens: [{ href: "/configuracoes", label: "Configurações", icon: Settings }],
   },
 ];
 
 // Lista PLANA de todas as rotas conhecidas — fonte dos rótulos do breadcrumb
 // (SEG_LABEL em breadcrumb-context) e dos comandos da paleta ⌘K.
 export const NAV_ITEMS: readonly NavItem[] = [
-  { href: "/prazos", label: "Inbox", icon: Inbox },
-  { href: "/prazos/meus", label: "Meus Prazos", icon: Clock },
-  { href: "/prazos/pipeline", label: "Pipeline", icon: Columns3 },
-  { href: "/prazos/fila", label: "Fila", icon: ListOrdered },
-  { href: "/prazos/calendario", label: "Calendário", icon: Calendar },
-  { href: "/prazos/acervo/processos", label: "Processos", icon: FolderOpen },
-  { href: "/prazos/acervo/intimacoes", label: "Intimações", icon: Mail },
-  { href: "/prazos/config", label: "Configurações", icon: Settings },
+  { href: "/", label: "Inbox", icon: Inbox },
+  { href: "/meus-prazos", label: "Meus Prazos", icon: Clock },
+  { href: "/pipeline", label: "Pipeline", icon: Columns3 },
+  { href: "/fila", label: "Fila", icon: ListOrdered },
+  { href: "/calendario", label: "Calendário", icon: Calendar },
+  { href: "/processos", label: "Processos", icon: FolderOpen },
+  { href: "/intimacoes", label: "Intimações", icon: Mail },
+  { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
