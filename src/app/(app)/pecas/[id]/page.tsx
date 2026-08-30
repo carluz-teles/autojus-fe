@@ -1,4 +1,4 @@
-import { PreGenerationPage } from "@/features/pecas-v2/components/pregen/pre-generation-page";
+import { ConstructionPage } from "@/features/pecas-v2/components/construction/construction-page";
 
 export const metadata = { title: "Peça · Construção · jus·assessoria" };
 
@@ -9,5 +9,5 @@ export default async function PecaPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <PreGenerationPage id={id} />;
+  return <ConstructionPage id={id} />;
 }

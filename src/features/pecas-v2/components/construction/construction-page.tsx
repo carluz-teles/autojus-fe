@@ -1,0 +1,158 @@
+"use client";
+
+// Tela "Construção de peça" (/pecas/[id]) — máquina de estados do CENTRO.
+// A barra do topo e o rail de contexto à esquerda (do fluxo pré-geração)
+// permanecem fixos entre estágios; só o CENTRO muda:
+//
+//   stage="pregen"  → EmptyCenter   (CTA "Gerar minuta")
+//   stage="gerando" → GerandoCenter (a IA redige, streamed em tempo real)
+//   stage="pronta"  → EditorCenter  (WYSIWYG + teses inline) + slot Assistente
+//
+// O painel "Assistente" à direita fica DEFERIDO neste milestone — só um
+// placeholder de largura fixa quando a peça está pronta (pra o layout casar
+// com o design). Componente = JSX + binding; a lógica vive no useConstruction.
+
+import { useConstruction } from "../../hooks/use-construction";
+import { ContextRail } from "../pregen/context-rail";
+import { EmptyCenter } from "../pregen/empty-center";
+import { TesesRail } from "../pregen/teses-rail";
+import { TopBar } from "../pregen/top-bar";
+import { EditorCenter } from "./editor-center";
+import { GerandoCenter } from "./gerando-center";
+
+export function ConstructionPage({ id }: { id: string }) {
+  const {
+    draft,
+    isLoading,
+    isError,
+    stage,
+    theses,
+    highlightedDocId,
+    focusSource,
+    gerarMinuta,
+    isGenerating,
+    voltar,
+  } = useConstruction(id);
+
+  if (isLoading) return <PageSkeleton />;
+  if (isError || !draft) return <PageError onBack={voltar} />;
+
+  const tesesLabel =
+    theses.selectedCount === 1 ? "1 tese" : `${theses.selectedCount} teses`;
+
+  return (
+    <div className="bg-background text-foreground flex h-dvh flex-col text-[13px]">
+      <TopBar
+        title={draft.title}
+        cnjShort={shortCnj(draft.process.cnj)}
+        onBack={voltar}
+      />
+
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <ContextRail
+          draft={draft}
+          highlightedDocId={highlightedDocId}
+          tesesSlot={
+            <TesesRail
+              theses={theses.theses}
+              selectedCount={theses.selectedCount}
+              isLoading={theses.isLoading}
+              isError={theses.isError}
+              onToggle={theses.toggle}
+              onFonte={focusSource}
+              onRegenerate={theses.regenerate}
+              isRegenerating={theses.isRegenerating}
+            />
+          }
+        />
+
+        {/* CENTRO — muda por estágio */}
+        <div className="min-w-0 flex-1 overflow-y-auto bg-[color-mix(in_oklch,var(--foreground)_4%,var(--background))]">
+          {stage === "pregen" && (
+            <EmptyCenter
+              pieceTitle={draft.title}
+              selectedCount={theses.selectedCount}
+              onGerar={gerarMinuta}
+              isGenerating={isGenerating}
+            />
+          )}
+          {stage === "gerando" && (
+            <GerandoCenter
+              draftId={draft.id}
+              tesesLabel={tesesLabel}
+              streamEnabled={draft.sagaState === "EXTRACTING"}
+            />
+          )}
+          {stage === "pronta" && (
+            <EditorCenter
+              draft={draft}
+              direito={theses.direito}
+              onThesisAction={theses.editorAction}
+              pendingThesisId={theses.isTogglingId}
+              onRefazer={gerarMinuta}
+            />
+          )}
+        </div>
+
+        {/* ASSISTENTE — DEFERIDO neste milestone (placeholder p/ o layout). */}
+        {stage === "pronta" && <AssistantPlaceholder />}
+      </div>
+    </div>
+  );
+}
+
+/** Placeholder do painel Assistente (à direita). O painel real fica pra um
+ *  milestone seguinte; aqui só reserva a coluna pra o layout casar com o
+ *  design. */
+function AssistantPlaceholder() {
+  return (
+    <aside className="border-line bg-panel hidden w-80 flex-none flex-col border-l lg:flex">
+      <div className="border-line flex items-center gap-2 border-b px-4 py-3">
+        <span className="text-primary">✦</span>
+        <span className="text-[13px] font-semibold">Assistente</span>
+      </div>
+      <div className="text-fg3 flex flex-1 items-center justify-center px-6 text-center text-[12px] leading-[1.6]">
+        O assistente entra num próximo milestone.
+      </div>
+    </aside>
+  );
+}
+
+/** Último segmento do CNJ (ex.: "…8.26.0100" → "0100") pra o chip da barra. */
+function shortCnj(cnj: string): string {
+  if (!cnj) return "";
+  const parts = cnj.split(".");
+  return parts.length > 1 ? parts.slice(-2).join(".") : cnj;
+}
+
+function PageSkeleton() {
+  return (
+    <div className="bg-background flex h-dvh flex-col">
+      <div className="border-line h-[45px] flex-none border-b" />
+      <div className="flex min-h-0 flex-1">
+        <div className="border-line bg-panel w-72 flex-none border-r p-4">
+          <div className="bg-hover mb-3 h-3 w-32 animate-pulse rounded" />
+          <div className="bg-hover mb-2 h-16 w-full animate-pulse rounded-lg" />
+          <div className="bg-hover mb-2 h-24 w-full animate-pulse rounded-lg" />
+          <div className="bg-hover h-40 w-full animate-pulse rounded-lg" />
+        </div>
+        <div className="flex-1" />
+      </div>
+    </div>
+  );
+}
+
+function PageError({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="bg-background text-foreground flex h-dvh flex-col items-center justify-center gap-3">
+      <p className="text-fg2 text-sm">Não foi possível carregar esta peça.</p>
+      <button
+        type="button"
+        onClick={onBack}
+        className="border-line rounded-md border px-3 py-1.5 text-xs"
+      >
+        Voltar
+      </button>
+    </div>
+  );
+}

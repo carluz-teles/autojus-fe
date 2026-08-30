@@ -62,6 +62,9 @@ interface Props {
    *  o parent congela o sync externo pra que o refetch com content_html
    *  final não sobrescreva os chunks já renderizados via appendHtml. */
   disableExternalSync?: boolean;
+  /** Esconde a toolbar embutida — usado quando o parent já provê uma barra de
+   *  formatação própria (ex.: editor da Construção com barra sticky única). */
+  hideToolbar?: boolean;
 }
 
 export const RichEditor = forwardRef<RichEditorHandle, Props>(
@@ -73,6 +76,7 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
       readOnly = false,
       placeholder,
       disableExternalSync = false,
+      hideToolbar = false,
     },
     ref,
   ) {
@@ -206,7 +210,7 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
 
     return (
       <div className="flex flex-col gap-3">
-        <RichToolbar editor={editor} />
+        {!hideToolbar && <RichToolbar editor={editor} />}
         <div className="tiptap-a4-page">
           <EditorContent editor={editor} />
         </div>

@@ -38,6 +38,44 @@ export function nextRailState(current: ThesisState): ThesisState {
   }
 }
 
+/** Estados que aparecem como bloco na seção "Do direito" (state ≠ off). */
+export function isInDireito(state: ThesisState): boolean {
+  return state !== "off";
+}
+
+/** As três decisões que o EDITOR permite por bloco de tese (aprovação):
+ *   - pending_add:   "Aprovar"=include / "Descartar"=discard
+ *   - pending_remove:"Aprovar remoção"=include(off) / "Manter"=keep(included)
+ *   - included:      "Remover"=remove(pending_remove)
+ *  Cada verbo resolve pro `ThesisState` alvo do PATCH conforme a tese. */
+export type EditorThesisAction =
+  | "approve" // pending_add → included
+  | "discard" // pending_add → off
+  | "approveRemoval" // pending_remove → off
+  | "keep" // pending_remove → included
+  | "remove"; // included → pending_remove
+
+/** Resolve o estado-alvo do PATCH para uma ação do editor sobre uma tese no
+ *  estado atual. Retorna null quando a ação não se aplica ao estado (defensivo;
+ *  a UI só oferece as ações válidas por bloco). */
+export function editorTargetState(
+  action: EditorThesisAction,
+  current: ThesisState,
+): ThesisState | null {
+  switch (action) {
+    case "approve":
+      return current === "pending_add" ? "included" : null;
+    case "discard":
+      return current === "pending_add" ? "off" : null;
+    case "approveRemoval":
+      return current === "pending_remove" ? "off" : null;
+    case "keep":
+      return current === "pending_remove" ? "included" : null;
+    case "remove":
+      return current === "included" ? "pending_remove" : null;
+  }
+}
+
 function useTheses(id: string) {
   const fetcher = useApi();
   return useQuery({
@@ -94,8 +132,14 @@ export interface ThesesController {
   selectedCount: number;
   /** thesisIds a passar pra geração (included ∪ pending_add). */
   selectedIds: string[];
+  /** Teses que compõem a seção "Do direito" (state ≠ off), em ordem de
+   *  `position`. O editor renderiza um bloco por tese com a aprovação inline. */
+  direito: Thesis[];
   /** Clique numa linha do rail — propõe a transição de estado. */
   toggle: (thesis: Thesis) => void;
+  /** Ação de aprovação do editor sobre um bloco de tese (approve/discard/
+   *  approveRemoval/keep/remove). Resolve o estado-alvo e dispara o PATCH. */
+  editorAction: (thesis: Thesis, action: EditorThesisAction) => void;
   /** (Re)gera as sugestões de teses ancoradas nos anexos. */
   regenerate: () => void;
   isRegenerating: boolean;
@@ -111,6 +155,9 @@ export function useThesesController(id: string): ThesesController {
 
   const theses = list.data ?? [];
   const selected = theses.filter((t) => isSelectedForGeneration(t.state));
+  const direito = theses
+    .filter((t) => isInDireito(t.state))
+    .sort((a, b) => a.position - b.position);
 
   return {
     theses,
@@ -118,8 +165,14 @@ export function useThesesController(id: string): ThesesController {
     isError: list.isError,
     selectedCount: selected.length,
     selectedIds: selected.map((t) => t.id),
+    direito,
     toggle: (thesis) =>
       patch.mutate({ thesisId: thesis.id, state: nextRailState(thesis.state) }),
+    editorAction: (thesis, action) => {
+      const target = editorTargetState(action, thesis.state);
+      if (target === null) return;
+      patch.mutate({ thesisId: thesis.id, state: target });
+    },
     regenerate: () => regen.mutate(),
     isRegenerating: regen.isPending,
     isTogglingId: patch.isPending ? (patch.variables?.thesisId ?? null) : null,
