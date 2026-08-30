@@ -54,6 +54,9 @@ export interface PartyAPI {
   role: "PLAINTIFF" | "DEFENDANT" | "THIRD_PARTY";
   name: string;
   counsels: CounselAPI[];
+  // Marca a parte que é o cliente do escritório (destaca no rail PARTES).
+  // Opcional — se o BE não expuser, o mapper cai no fallback (ver api-mapper).
+  is_client?: boolean;
 }
 
 export interface CounselAPI {
@@ -90,6 +93,9 @@ export interface ProcessAPI {
   class: string;
   subject: string;
   judging_body: string;
+  // Valor da causa — string decimal (ex.: "180000.00"). O BE passou a expor no
+  // read model; o mapper formata em BRL. Opcional/vazio pra peças legadas.
+  claim_value?: string | null;
 }
 
 export interface DeadlineAPI {
@@ -124,6 +130,28 @@ export interface ReviewAPI {
   generated_at: string;
   grounded: boolean;
   suggestions: unknown[]; // shape legado — não usamos na v2
+}
+
+// ── Teses (GET/POST /v1/pecas/:id/theses; PATCH …/:thesisId) ─────────────────
+// Wire shape do contrato Teses (snake_case). Provenance obrigatória:
+// source_document_id referencia EXATAMENTE UM attachment da "Fundada em".
+
+export interface ThesisAPI {
+  id: string;
+  draft_id?: string;
+  label: string;
+  foundation: string;
+  legal_ref: string;
+  source_document_id: string;
+  source_label: string;
+  source_excerpt: string;
+  grounded: boolean;
+  state: "off" | "pending_add" | "included" | "pending_remove";
+  position: number;
+}
+
+export interface ThesesListAPI {
+  theses: ThesisAPI[];
 }
 
 // ── Chat (GET/POST /v1/pecas/:id/chat) ──────────────────────────────────────

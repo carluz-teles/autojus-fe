@@ -9,6 +9,7 @@ import type {
   DraftDeadline,
   DraftIntimation,
   DraftParty,
+  DraftPartyGroup,
   DraftPreamble,
   DraftProcess,
   DraftProvidence,
@@ -16,6 +17,8 @@ import type {
   PendingChange,
   SagaState,
   Status,
+  Thesis,
+  ThesisState,
 } from "../types";
 import type {
   AttachmentAPI,
@@ -27,6 +30,7 @@ import type {
   ProvidenceAPI,
   SectionChangeAPI,
   StructuredContentAPI,
+  ThesisAPI,
 } from "./api-types";
 
 // ── Draft ────────────────────────────────────────────────────────────────────
@@ -46,6 +50,7 @@ export function mapPecaDetailToDraft(api: PecaDetailAPI): Draft {
     intimation: mapIntimation(api.intimation),
     process: mapProcess(api.process),
     parties: (api.parties ?? []).flatMap(mapParty),
+    partyGroups: (api.parties ?? []).map(mapPartyGroup),
     providences: (api.providences ?? []).map(mapProvidence),
     attachments: (api.attachments ?? []).map(mapAttachment),
     deadline: mapDeadline(api.deadline),
@@ -136,8 +141,8 @@ function mapProcess(api: ProcessAPI | null): DraftProcess {
     assunto: api.subject,
     orgao: api.judging_body,
     tribunalGrau: `${api.court} · ${api.degree}`,
-    valor: "", // BE não expõe no read model v0
-    distribuicao: "", // idem
+    valor: formatBrl(api.claim_value),
+    distribuicao: "", // BE não expõe no read model v0
   };
 }
 
@@ -191,6 +196,51 @@ function roleFromApi(r: PartyAPI["role"]): "autor" | "reu" | null {
   return null;
 }
 
+// Agrupa uma parte (não explode counsels): uma linha por parte para o rail
+// PARTES da Construção. Os procuradores viram um rótulo único.
+function mapPartyGroup(api: PartyAPI): DraftPartyGroup {
+  const counselLabel = (api.counsels ?? [])
+    .map((c) => {
+      const oab = formatOab(c);
+      return oab
+        ? `${c.name || "(sem nome)"} · ${oab}`
+        : c.name || "(sem nome)";
+    })
+    .join("; ");
+  return {
+    roleLabel: roleLabelFromApi(api.role),
+    name: api.name,
+    counselLabel,
+    // Fallback (BE ainda não confirmou is_client no read model): quando ausente,
+    // o cliente do escritório costuma ser o réu na peça de defesa (contestação).
+    // Ver nota de reconciliação no relatório.
+    isClient: api.is_client ?? api.role === "DEFENDANT",
+  };
+}
+
+function roleLabelFromApi(r: PartyAPI["role"]): string {
+  if (r === "PLAINTIFF") return "Autor";
+  if (r === "DEFENDANT") return "Réu";
+  return "Terceiro";
+}
+
+// ── Teses ────────────────────────────────────────────────────────────────────
+
+export function mapThesisFromApi(api: ThesisAPI): Thesis {
+  return {
+    id: api.id,
+    label: api.label,
+    foundation: api.foundation,
+    legalRef: api.legal_ref,
+    sourceDocumentId: api.source_document_id,
+    sourceLabel: api.source_label,
+    sourceExcerpt: api.source_excerpt,
+    grounded: !!api.grounded,
+    state: (api.state as ThesisState) ?? "off",
+    position: api.position ?? 0,
+  };
+}
+
 function formatOab(c: { oab: string; uf: string }): string | undefined {
   if (!c.oab) return undefined;
   const uf = c.uf || "??";
@@ -235,6 +285,18 @@ function formatDatePt(iso: string): string {
   const [y, m, d] = dateOnly.split("-");
   if (!y || !m || !d) return iso;
   return `${d}/${m}/${y}`;
+}
+
+// Formata um valor decimal em string (ex.: "180000.00") como BRL
+// ("R$ 180.000,00"). Vazio/nulo/inválido → "".
+function formatBrl(value: string | null | undefined): string {
+  if (!value) return "";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  return n.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
 }
 
 function formatBytes(bytes: number): string {

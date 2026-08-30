@@ -1,4 +1,4 @@
-import { PecaWorkspace } from "@/features/prazos/components/peca/peca-workspace";
+import { PreGenerationPage } from "@/features/pecas-v2/components/pregen/pre-generation-page";
 
 export const metadata = { title: "Peça · Construção · jus·assessoria" };
 
@@ -9,5 +9,5 @@ export default async function PecaPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <PecaWorkspace id={id} />;
+  return <PreGenerationPage id={id} />;
 }

@@ -15,6 +15,7 @@ import {
   mapChatMessageFromApi,
   mapPecaDetailToDraft,
   mapSectionChangeFromApi,
+  mapThesisFromApi,
 } from "../lib/api-mapper";
 import type {
   AssumeAuthorshipResultAPI,
@@ -23,6 +24,8 @@ import type {
   DataEnvelope,
   IterateResultAPI,
   PecaDetailAPI,
+  ThesesListAPI,
+  ThesisAPI,
 } from "../lib/api-types";
 import type {
   ChatMessage,
@@ -36,6 +39,8 @@ import type {
   QuickActionKind,
   QuickAdjustKind,
   StructuredContent,
+  Thesis,
+  ThesisState,
 } from "../types";
 
 const ENDPOINT = "/v1/pecas";
@@ -58,6 +63,63 @@ export async function getChatThread(
     `${ENDPOINT}/${id}/chat`,
   );
   return (res.data.messages ?? []).map(mapChatMessageFromApi);
+}
+
+// ── Teses (contrato Teses — provenance obrigatória) ──────────────────────────
+
+/** GET /v1/pecas/:id/theses — todas as teses do rascunho, com estado. */
+export async function getTheses(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<Thesis[]> {
+  const res = await fetcher<DataEnvelope<ThesesListAPI>>(
+    `${ENDPOINT}/${id}/theses`,
+  );
+  return (res.data.theses ?? []).map(mapThesisFromApi);
+}
+
+/** POST /v1/pecas/:id/theses — (re)gera sugestões via IA, ancoradas nos
+ *  attachments; PERSISTE. Novas sugestões nascem em state="off". */
+export async function generateTheses(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<Thesis[]> {
+  const res = await fetcher<DataEnvelope<ThesesListAPI>>(
+    `${ENDPOINT}/${id}/theses`,
+    { method: "POST" },
+  );
+  return (res.data.theses ?? []).map(mapThesisFromApi);
+}
+
+/** PATCH /v1/pecas/:id/theses/:thesisId — muda o estado (transição validada
+ *  pelo BE). Devolve a tese atualizada. */
+export async function updateThesisState(
+  fetcher: ApiFetcher,
+  id: string,
+  thesisId: string,
+  state: ThesisState,
+): Promise<Thesis> {
+  const res = await fetcher<DataEnvelope<ThesisAPI>>(
+    `${ENDPOINT}/${id}/theses/${thesisId}`,
+    { method: "PATCH", body: { state } },
+  );
+  return mapThesisFromApi(res.data);
+}
+
+// ── Geração da minuta (POST /pecas/:id/generate) ─────────────────────────────
+
+/** Dispara a geração da minuta com as teses selecionadas (included ∪
+ *  pending_add). O worker-ai gera; o polling do saga_state acontece no hook
+ *  (useDraft refetch enquanto CREATED/EXTRACTING). */
+export async function generateDraft(
+  fetcher: ApiFetcher,
+  id: string,
+  thesisIds: string[],
+): Promise<void> {
+  await fetcher(`${ENDPOINT}/${id}/generate`, {
+    method: "POST",
+    body: { thesis_ids: thesisIds },
+  });
 }
 
 // ── Autosave (PATCH /pecas/:id — dual write) ─────────────────────────────────

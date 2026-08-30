@@ -64,6 +64,19 @@ export interface DraftParty {
   detail?: string;
 }
 
+/** Parte agrupada para o rail PARTES da tela de Construção: uma linha por parte
+ *  (autor/réu/terceiro) com seus procuradores achatados numa linha e a flag de
+ *  cliente do escritório. Distinto de `DraftParty` (que explode counsels). */
+export interface DraftPartyGroup {
+  /** Papel humanizado ("Autor", "Réu", "Terceiro"). */
+  roleLabel: string;
+  name: string;
+  /** Procuradores da parte, um rótulo por counsel (ex.: "Dra. X · OAB/SP 123"). */
+  counselLabel: string;
+  /** Parte é o cliente do escritório — destaca o card + badge CLIENTE. */
+  isClient: boolean;
+}
+
 export interface DraftProvidence {
   code: string;
   title: string;
@@ -104,6 +117,8 @@ export interface Draft {
   intimation: DraftIntimation;
   process: DraftProcess;
   parties: DraftParty[];
+  /** Partes agrupadas para o rail PARTES (uma linha por parte + procuradores). */
+  partyGroups: DraftPartyGroup[];
   providences: DraftProvidence[];
   attachments: DraftAttachment[];
   deadline: DraftDeadline;
@@ -228,4 +243,34 @@ export interface FilingAttempt {
   finishedAt: string | null;
   failureReason: string | null;
   filingNumber: string | null;
+}
+
+// ── Teses da peça (contrato Teses — provenance obrigatória) ──────────────────
+
+/** Estado propor→aprovar de uma tese, por rascunho. O rail só faz as transições
+ *  de propor (off↔pending_add, included↔pending_remove); o editor aprova. */
+export type ThesisState = "off" | "pending_add" | "included" | "pending_remove";
+
+/** Uma tese sugerida pela IA, SEMPRE ancorada em exatamente um documento de
+ *  origem (`sourceDocumentId` → item da "Fundada em"). Espelha o wire shape
+ *  snake_case do contrato Teses. */
+export interface Thesis {
+  id: string;
+  /** Título curto (ex.: "Prescrição da pretensão"). */
+  label: string;
+  /** Fundamentação curta (o "desc" do design). */
+  foundation: string;
+  /** Artigo/dispositivo (ex.: "art. 206, §5º, do Código Civil"). */
+  legalRef: string;
+  /** FK ao attachment de origem (Fundada em) — provenance obrigatória. */
+  sourceDocumentId: string;
+  /** Rótulo humano da fonte, denormalizado p/ display. */
+  sourceLabel: string;
+  /** Trecho literal do doc que sustenta a tese (evidência). */
+  sourceExcerpt: string;
+  /** A fonte sustenta a tese? true → ✓ verde; false → ? dourado. */
+  grounded: boolean;
+  state: ThesisState;
+  /** Ordem estável. */
+  position: number;
 }
