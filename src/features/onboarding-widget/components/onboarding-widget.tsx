@@ -22,10 +22,16 @@ const EXIT_DURATION_MS = 220;
 
 export function OnboardingWidget() {
   const vm = useOnboardingWidget();
-  const [renderedVm, setRenderedVm] =
-    useState<OnboardingWidgetViewModel | null>(null);
+  // Enquanto o hook retorna vm, renderizamos ELE direto (não uma cópia em
+  // estado) — o hook devolve um objeto novo a cada render, então copiá-lo pra
+  // um useState com `setRenderedVm(vm)` incondicional nunca fazia bail (ref
+  // sempre diferente) e disparava loop de render ("Maximum update depth").
+  // O estado abaixo só SEGURA o último vm quando ele some (vira null), pra
+  // tocar o fade-out por EXIT_DURATION_MS antes de desmontar. Como vm presente
+  // é renderizado direto, os setState aqui só rodam na transição→null.
+  const [heldVm, setHeldVm] = useState<OnboardingWidgetViewModel | null>(null);
   const [exiting, setExiting] = useState(false);
-  const hadVmRef = useRef(false);
+  const lastVmRef = useRef<OnboardingWidgetViewModel | null>(null);
 
   // Sincroniza com o "sistema externo" tempo (setTimeout do fade-out) — não é
   // dado derivável no render, é uma transição temporizada mesmo (mesma classe
@@ -33,19 +39,28 @@ export function OnboardingWidget() {
   // regra rebaixada a "warn" no eslint.config.mjs, não bloqueia o green gate).
   useEffect(() => {
     if (vm) {
-      hadVmRef.current = true;
-      setRenderedVm(vm);
+      lastVmRef.current = vm;
+      // vm presente → cancela qualquer saída em curso. Setar pros MESMOS
+      // valores (false/null) faz o React descartar via Object.is: sem loop.
       setExiting(false);
+      setHeldVm(null);
       return;
     }
-    if (!hadVmRef.current) return;
-    hadVmRef.current = false;
+    // vm sumiu → segura o último por EXIT_DURATION_MS pra animar o fade-out.
+    if (!lastVmRef.current) return;
+    setHeldVm(lastVmRef.current);
     setExiting(true);
-    const timer = setTimeout(() => setRenderedVm(null), EXIT_DURATION_MS);
+    const timer = setTimeout(() => {
+      setHeldVm(null);
+      setExiting(false);
+      lastVmRef.current = null;
+    }, EXIT_DURATION_MS);
     return () => clearTimeout(timer);
   }, [vm]);
 
-  if (!renderedVm) return null;
+  // vm ao vivo tem prioridade; heldVm só aparece durante o fade-out de saída.
+  const shown = vm ?? heldVm;
+  if (!shown) return null;
 
   return (
     <div
@@ -55,10 +70,10 @@ export function OnboardingWidget() {
         exiting ? "pointer-events-none opacity-0" : "opacity-100",
       )}
     >
-      {renderedVm.collapsed ? (
-        <CollapsedPill vm={renderedVm} />
+      {shown.collapsed ? (
+        <CollapsedPill vm={shown} />
       ) : (
-        <ExpandedCard vm={renderedVm} />
+        <ExpandedCard vm={shown} />
       )}
     </div>
   );
