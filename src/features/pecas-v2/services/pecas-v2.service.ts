@@ -52,10 +52,14 @@ export interface CreateDraftInput {
   intimationId: string;
   /** Tipo da peça (opcional; o BE infere do tipo da intimação quando ausente). */
   pieceType?: string;
+  /** Teses (intimation-scoped) selecionadas na PARTIDA — o BE semeia draft_thesis
+   *  como `included`. É o "Gerar minuta": só aqui a peça materializa. */
+  thesisIds?: string[];
 }
 
-/** Cria (ou reaproveita) a peça a partir de uma intimação — POST /v1/pecas.
- *  O BE devolve 201 (nova) ou 200 (já existia) com o draft; retornamos o id. */
+/** Materializa a peça a partir de uma intimação — POST /v1/pecas. Chamado SÓ no
+ *  "Gerar minuta" (a peça não existe antes). O BE devolve 201 (nova) ou 200 (já
+ *  existia) com o draft; retornamos o id. */
 export async function createDraft(
   fetcher: ApiFetcher,
   input: CreateDraftInput,
@@ -66,9 +70,38 @@ export async function createDraft(
       source: "intimation",
       intimation_id: input.intimationId,
       ...(input.pieceType ? { piece_type: input.pieceType } : {}),
+      ...(input.thesisIds && input.thesisIds.length
+        ? { thesis_ids: input.thesisIds }
+        : {}),
     },
   });
   return { id: res.data.id };
+}
+
+// ── Teses da PARTIDA (intimation-scoped, sem draft) ──────────────────────────
+
+/** GET /v1/intimacoes/:id/theses — teses persistidas da intimação (state "off"). */
+export async function getIntimationTheses(
+  fetcher: ApiFetcher,
+  intimationId: string,
+): Promise<Thesis[]> {
+  const res = await fetcher<DataEnvelope<ThesesListAPI>>(
+    `/v1/intimacoes/${intimationId}/theses`,
+  );
+  return (res.data.theses ?? []).map(mapThesisFromApi);
+}
+
+/** POST /v1/intimacoes/:id/theses — (re)gera+persiste teses da intimação via IA,
+ *  ancoradas nos autos do processo. Nascem em state "off". */
+export async function generateIntimationTheses(
+  fetcher: ApiFetcher,
+  intimationId: string,
+): Promise<Thesis[]> {
+  const res = await fetcher<DataEnvelope<ThesesListAPI>>(
+    `/v1/intimacoes/${intimationId}/theses`,
+    { method: "POST" },
+  );
+  return (res.data.theses ?? []).map(mapThesisFromApi);
 }
 
 // ── Leitura ──────────────────────────────────────────────────────────────────

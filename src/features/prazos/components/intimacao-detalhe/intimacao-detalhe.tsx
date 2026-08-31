@@ -350,12 +350,11 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
           />
 
           <button
-            onClick={() => peca.gerarPeca(id)}
-            disabled={peca.gerandoPeca}
-            className="border-line bg-panel text-foreground hover:bg-hover ml-auto inline-flex items-center gap-2 rounded-lg border px-3.5 py-2.5 text-[13px] font-medium disabled:opacity-60"
+            onClick={() => peca.abrirConstrucao(id)}
+            className="border-line bg-panel text-foreground hover:bg-hover ml-auto inline-flex items-center gap-2 rounded-lg border px-3.5 py-2.5 text-[13px] font-medium"
           >
             <Sparkles className="text-primary size-4" strokeWidth={1.8} />
-            {peca.gerandoPeca ? "Abrindo peça…" : "Gerar peça com IA"}
+            Gerar peça com IA
           </button>
         </div>
       </div>
