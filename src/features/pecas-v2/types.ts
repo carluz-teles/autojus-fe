@@ -64,6 +64,19 @@ export interface DraftParty {
   detail?: string;
 }
 
+/** Parte agrupada para o rail PARTES da tela de Construção: uma linha por parte
+ *  (autor/réu/terceiro) com seus procuradores achatados numa linha e a flag de
+ *  cliente do escritório. Distinto de `DraftParty` (que explode counsels). */
+export interface DraftPartyGroup {
+  /** Papel humanizado ("Autor", "Réu", "Terceiro"). */
+  roleLabel: string;
+  name: string;
+  /** Procuradores da parte, um rótulo por counsel (ex.: "Dra. X · OAB/SP 123"). */
+  counselLabel: string;
+  /** Parte é o cliente do escritório — destaca o card + badge CLIENTE. */
+  isClient: boolean;
+}
+
 export interface DraftProvidence {
   code: string;
   title: string;
@@ -104,6 +117,8 @@ export interface Draft {
   intimation: DraftIntimation;
   process: DraftProcess;
   parties: DraftParty[];
+  /** Partes agrupadas para o rail PARTES (uma linha por parte + procuradores). */
+  partyGroups: DraftPartyGroup[];
   providences: DraftProvidence[];
   attachments: DraftAttachment[];
   deadline: DraftDeadline;
@@ -151,7 +166,8 @@ export function deriveStep(
 // ── Iteração / ajustes rápidos ───────────────────────────────────────────────
 
 /** Escopo de uma iteração: "peça toda" ou o id de uma seção específica. */
-export type IterateScope = { kind: "whole" } | { kind: "section"; id: string };
+export type IterateScope =
+  { kind: "whole" } | { kind: "section"; roman: string };
 
 export type QuickAdjustKind =
   "emphatic" | "concise" | "reinforce_thesis" | "add_grounds";
@@ -206,3 +222,56 @@ export interface ChatMessage {
 
 export type QuickActionKind =
   "summarize_case" | "suggest_theses" | "check_deadline" | "find_precedents";
+
+// ── Protocolo automático (Fatia 1 — e-SAJ) ──────────────────────────────────
+
+/** Status de uma tentativa de protocolo automático no e-SAJ. */
+export type FilingStatus =
+  "ENFILEIRADO" | "PROTOCOLANDO" | "PROTOCOLADO" | "FALHOU";
+
+/** Resposta do POST /v1/pecas/:id/filing/approve (201 na 1ª vez, 200 idempotente). */
+export interface FilingApproveResult {
+  filingAttemptId: string;
+  status: FilingStatus;
+  isIdempotent: boolean;
+}
+
+/** Tentativa de protocolo — GET /v1/pecas/:id/filing (null se nunca solicitado). */
+export interface FilingAttempt {
+  id: string;
+  status: FilingStatus;
+  requestedAt: string;
+  finishedAt: string | null;
+  failureReason: string | null;
+  filingNumber: string | null;
+}
+
+// ── Teses da peça (contrato Teses — provenance obrigatória) ──────────────────
+
+/** Estado propor→aprovar de uma tese, por rascunho. O rail só faz as transições
+ *  de propor (off↔pending_add, included↔pending_remove); o editor aprova. */
+export type ThesisState = "off" | "pending_add" | "included" | "pending_remove";
+
+/** Uma tese sugerida pela IA, SEMPRE ancorada em exatamente um documento de
+ *  origem (`sourceDocumentId` → item da "Fundada em"). Espelha o wire shape
+ *  snake_case do contrato Teses. */
+export interface Thesis {
+  id: string;
+  /** Título curto (ex.: "Prescrição da pretensão"). */
+  label: string;
+  /** Fundamentação curta (o "desc" do design). */
+  foundation: string;
+  /** Artigo/dispositivo (ex.: "art. 206, §5º, do Código Civil"). */
+  legalRef: string;
+  /** FK ao attachment de origem (Fundada em) — provenance obrigatória. */
+  sourceDocumentId: string;
+  /** Rótulo humano da fonte, denormalizado p/ display. */
+  sourceLabel: string;
+  /** Trecho literal do doc que sustenta a tese (evidência). */
+  sourceExcerpt: string;
+  /** A fonte sustenta a tese? true → ✓ verde; false → ? dourado. */
+  grounded: boolean;
+  state: ThesisState;
+  /** Ordem estável. */
+  position: number;
+}

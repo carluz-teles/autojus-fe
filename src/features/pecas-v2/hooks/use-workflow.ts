@@ -2,7 +2,7 @@
 // assinar, marcar-protocolada. Todos invalidam o draft pra o router refetch e
 // re-derivar o step atual (o page.tsx roteia por step).
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useApi } from "@/lib/api/use-api";
 
@@ -44,6 +44,40 @@ export function useFilePeca(id: string) {
     mutationFn: (filingNumber: string) =>
       svc.filePeca(fetcher, id, filingNumber),
     onSuccess: () => qc.invalidateQueries({ queryKey: draftKeys.detail(id) }),
+  });
+}
+
+// ── Protocolo automático (Fatia 1 — e-SAJ) ──────────────────────────────────
+
+const filingStatusKey = (id: string) => ["pecas-v2", id, "filing"] as const;
+
+/** Aprova o protocolo automático — POST /v1/pecas/:id/filing/approve. NUNCA
+ *  dispara sozinho, exige o clique explícito. Invalida o status pra o
+ *  polling (useFilingStatus) pegar o ENFILEIRADO imediatamente. */
+export function useApproveFiling(id: string) {
+  const fetcher = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => svc.approveFiling(fetcher, id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: filingStatusKey(id) }),
+  });
+}
+
+/** Status da tentativa de protocolo automático — GET /v1/pecas/:id/filing.
+ *  Faz polling curto enquanto a tentativa está ativa (ENFILEIRADO/
+ *  PROTOCOLANDO); para sozinho ao chegar num estado terminal
+ *  (PROTOCOLADO/FALHOU) ou quando nunca foi solicitado (null). */
+export function useFilingStatus(id: string) {
+  const fetcher = useApi();
+  return useQuery({
+    queryKey: filingStatusKey(id),
+    queryFn: () => svc.getFilingStatus(fetcher, id),
+    enabled: !!id,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      const ativo = status === "ENFILEIRADO" || status === "PROTOCOLANDO";
+      return ativo ? 3000 : false;
+    },
   });
 }
 

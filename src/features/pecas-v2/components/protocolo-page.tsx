@@ -1,22 +1,116 @@
 "use client";
 
-// Step Protocolo (Fatia 2a v0 — manual).
-// O advogado protocola no PJe/e-SAJ FORA do sistema e volta aqui pra marcar.
-// Input opcional: número/protocolo do tribunal. Ao confirmar, o BE grava
-// filed_at + filing_number no draft; o router redireciona pra tela Concluída.
+// Step Protocolo (Fatia 2a v0 — manual + Fatia 1 — protocolo automático e-SAJ).
+// Com credencial e-SAJ cadastrada (Configurações → Tribunais), o advogado pode
+// clicar "Protocolar automaticamente" — dispara o RPA (worker-filing) que
+// preenche e envia a peça no e-SAJ. SEM credencial, ou se o RPA falhar (ainda
+// em calibração contra o e-SAJ real — docs/erd-execucao-judicial-tjsp.md §16),
+// o fluxo manual sempre funciona: protocola fora do sistema e volta aqui pra
+// marcar. Input opcional: número/protocolo do tribunal.
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useEsajCredentials } from "@/features/configuracoes/hooks/use-esaj-credential";
 
 import { useDraft } from "../hooks/use-draft";
-import { useFilePeca } from "../hooks/use-workflow";
+import {
+  useApproveFiling,
+  useFilePeca,
+  useFilingStatus,
+} from "../hooks/use-workflow";
 import { AnexosList } from "./anexos-list";
 import { ConstrucaoHeader } from "./construcao-header";
 import { PecaPreview } from "./peca-preview";
+
+const FILING_STATUS_LABEL: Record<string, string> = {
+  ENFILEIRADO: "Enfileirado…",
+  PROTOCOLANDO: "Protocolando no e-SAJ…",
+  PROTOCOLADO: "Protocolada",
+  FALHOU: "Falhou",
+};
+
+function AutomaticFiling({ pecaId }: { pecaId: string }) {
+  const { data: credenciais, isLoading: isLoadingCred } = useEsajCredentials();
+  const { data: status } = useFilingStatus(pecaId);
+  const approve = useApproveFiling(pecaId);
+
+  if (isLoadingCred) return null;
+
+  if (!credenciais || credenciais.length === 0) {
+    return (
+      <div className="border-border/60 bg-muted/30 rounded-xl border p-4 text-[11.5px] leading-relaxed">
+        <p className="text-muted-foreground">
+          Cadastre uma{" "}
+          <Link href="/settings?tab=tribunais" className="underline">
+            credencial e-SAJ
+          </Link>{" "}
+          para protocolar automaticamente.
+        </p>
+      </div>
+    );
+  }
+
+  const ativo =
+    status?.status === "ENFILEIRADO" || status?.status === "PROTOCOLANDO";
+  const falhou = status?.status === "FALHOU";
+  const protocolada = status?.status === "PROTOCOLADO";
+
+  return (
+    <div className="border-border rounded-xl border p-5">
+      <h2 className="font-display text-lg font-medium">
+        Protocolar automaticamente
+      </h2>
+      <p className="text-muted-foreground mt-2 text-[12.5px] leading-relaxed">
+        Envia a peça assinada diretamente ao e-SAJ com a credencial cadastrada.
+        Se falhar, protocole manualmente ao lado.
+      </p>
+
+      {status && (
+        <p
+          className={
+            "mt-3 text-[12.5px] font-medium " +
+            (falhou
+              ? "text-destructive"
+              : protocolada
+                ? "text-success"
+                : "text-muted-foreground")
+          }
+        >
+          {FILING_STATUS_LABEL[status.status]}
+          {protocolada && status.filingNumber
+            ? ` — nº ${status.filingNumber}`
+            : null}
+          {falhou && status.failureReason ? ` — ${status.failureReason}` : null}
+        </p>
+      )}
+
+      <Button
+        variant="outline"
+        className="mt-4 w-full"
+        disabled={ativo || protocolada || approve.isPending}
+        onClick={() =>
+          approve.mutate(undefined, {
+            onError: () =>
+              toast.error("Não foi possível iniciar o protocolo automático."),
+          })
+        }
+      >
+        {ativo || approve.isPending
+          ? "Protocolando…"
+          : protocolada
+            ? "Protocolada automaticamente"
+            : falhou
+              ? "Tentar novamente"
+              : "Protocolar automaticamente"}
+      </Button>
+    </div>
+  );
+}
 
 export function ProtocoloPage({ pecaId }: { pecaId: string }) {
   const { data: draft, isLoading } = useDraft(pecaId);
@@ -59,6 +153,8 @@ export function ProtocoloPage({ pecaId }: { pecaId: string }) {
         </div>
 
         <aside className="flex flex-col gap-4">
+          <AutomaticFiling pecaId={pecaId} />
+
           <div className="border-border rounded-xl border p-5">
             <h2 className="font-display text-lg font-medium">
               Marcar como protocolada
@@ -105,9 +201,10 @@ export function ProtocoloPage({ pecaId }: { pecaId: string }) {
 
           <div className="border-border/60 bg-muted/30 rounded-xl border p-4 text-[11.5px] leading-relaxed">
             <p className="text-muted-foreground">
-              <strong className="text-foreground">Débito:</strong> integração
-              automática com PJe/e-SAJ (protocolar direto daqui) fica pra fatia
-              futura. Por ora, o fluxo é manual.
+              <strong className="text-foreground">Débito:</strong> o protocolo
+              automático (e-SAJ) ainda está em calibração contra o portal real
+              (docs/erd-execucao-judicial-tjsp.md §16) — use o registro manual
+              se a tentativa automática falhar.
             </p>
           </div>
         </aside>

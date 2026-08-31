@@ -15,6 +15,7 @@ import {
   mapChatMessageFromApi,
   mapPecaDetailToDraft,
   mapSectionChangeFromApi,
+  mapThesisFromApi,
 } from "../lib/api-mapper";
 import type {
   AssumeAuthorshipResultAPI,
@@ -23,19 +24,85 @@ import type {
   DataEnvelope,
   IterateResultAPI,
   PecaDetailAPI,
+  ThesesListAPI,
+  ThesisAPI,
 } from "../lib/api-types";
 import type {
   ChatMessage,
   Draft,
+  FilingApproveResult,
+  FilingAttempt,
+  FilingStatus,
   IterateScope,
   IterationResult,
   PendingChange,
   QuickActionKind,
   QuickAdjustKind,
   StructuredContent,
+  Thesis,
+  ThesisState,
 } from "../types";
 
 const ENDPOINT = "/v1/pecas";
+
+// ── Criação (POST /v1/pecas) ─────────────────────────────────────────────────
+
+export interface CreateDraftInput {
+  /** Id da intimação de origem — o BE resolve case_id/court_record_id dela. */
+  intimationId: string;
+  /** Tipo da peça (opcional; o BE infere do tipo da intimação quando ausente). */
+  pieceType?: string;
+  /** Teses (intimation-scoped) selecionadas na PARTIDA — o BE semeia draft_thesis
+   *  como `included`. É o "Gerar minuta": só aqui a peça materializa. */
+  thesisIds?: string[];
+}
+
+/** Materializa a peça a partir de uma intimação — POST /v1/pecas. Chamado SÓ no
+ *  "Gerar minuta" (a peça não existe antes). O BE devolve 201 (nova) ou 200 (já
+ *  existia) com o draft; retornamos o id. */
+export async function createDraft(
+  fetcher: ApiFetcher,
+  input: CreateDraftInput,
+): Promise<{ id: string }> {
+  const res = await fetcher<DataEnvelope<{ id: string }>>(ENDPOINT, {
+    method: "POST",
+    body: {
+      source: "intimation",
+      intimation_id: input.intimationId,
+      ...(input.pieceType ? { piece_type: input.pieceType } : {}),
+      ...(input.thesisIds && input.thesisIds.length
+        ? { thesis_ids: input.thesisIds }
+        : {}),
+    },
+  });
+  return { id: res.data.id };
+}
+
+// ── Teses da PARTIDA (intimation-scoped, sem draft) ──────────────────────────
+
+/** GET /v1/intimacoes/:id/theses — teses persistidas da intimação (state "off"). */
+export async function getIntimationTheses(
+  fetcher: ApiFetcher,
+  intimationId: string,
+): Promise<Thesis[]> {
+  const res = await fetcher<DataEnvelope<ThesesListAPI>>(
+    `/v1/intimacoes/${intimationId}/theses`,
+  );
+  return (res.data.theses ?? []).map(mapThesisFromApi);
+}
+
+/** POST /v1/intimacoes/:id/theses — (re)gera+persiste teses da intimação via IA,
+ *  ancoradas nos autos do processo. Nascem em state "off". */
+export async function generateIntimationTheses(
+  fetcher: ApiFetcher,
+  intimationId: string,
+): Promise<Thesis[]> {
+  const res = await fetcher<DataEnvelope<ThesesListAPI>>(
+    `/v1/intimacoes/${intimationId}/theses`,
+    { method: "POST" },
+  );
+  return (res.data.theses ?? []).map(mapThesisFromApi);
+}
 
 // ── Leitura ──────────────────────────────────────────────────────────────────
 
@@ -55,6 +122,63 @@ export async function getChatThread(
     `${ENDPOINT}/${id}/chat`,
   );
   return (res.data.messages ?? []).map(mapChatMessageFromApi);
+}
+
+// ── Teses (contrato Teses — provenance obrigatória) ──────────────────────────
+
+/** GET /v1/pecas/:id/theses — todas as teses do rascunho, com estado. */
+export async function getTheses(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<Thesis[]> {
+  const res = await fetcher<DataEnvelope<ThesesListAPI>>(
+    `${ENDPOINT}/${id}/theses`,
+  );
+  return (res.data.theses ?? []).map(mapThesisFromApi);
+}
+
+/** POST /v1/pecas/:id/theses — (re)gera sugestões via IA, ancoradas nos
+ *  attachments; PERSISTE. Novas sugestões nascem em state="off". */
+export async function generateTheses(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<Thesis[]> {
+  const res = await fetcher<DataEnvelope<ThesesListAPI>>(
+    `${ENDPOINT}/${id}/theses`,
+    { method: "POST" },
+  );
+  return (res.data.theses ?? []).map(mapThesisFromApi);
+}
+
+/** PATCH /v1/pecas/:id/theses/:thesisId — muda o estado (transição validada
+ *  pelo BE). Devolve a tese atualizada. */
+export async function updateThesisState(
+  fetcher: ApiFetcher,
+  id: string,
+  thesisId: string,
+  state: ThesisState,
+): Promise<Thesis> {
+  const res = await fetcher<DataEnvelope<ThesisAPI>>(
+    `${ENDPOINT}/${id}/theses/${thesisId}`,
+    { method: "PATCH", body: { state } },
+  );
+  return mapThesisFromApi(res.data);
+}
+
+// ── Geração da minuta (POST /pecas/:id/generate) ─────────────────────────────
+
+/** Dispara a geração da minuta com as teses selecionadas (included ∪
+ *  pending_add). O worker-ai gera; o polling do saga_state acontece no hook
+ *  (useDraft refetch enquanto CREATED/EXTRACTING). */
+export async function generateDraft(
+  fetcher: ApiFetcher,
+  id: string,
+  thesisIds: string[],
+): Promise<void> {
+  await fetcher(`${ENDPOINT}/${id}/generate`, {
+    method: "POST",
+    body: { thesis_ids: thesisIds },
+  });
 }
 
 // ── Autosave (PATCH /pecas/:id — dual write) ─────────────────────────────────
@@ -316,6 +440,63 @@ export async function filePeca(
   });
 }
 
+// ── Protocolo automático (Fatia 1 — e-SAJ) ──────────────────────────────────
+// NUNCA dispara sozinho: exige o clique explícito de "Protocolar automaticamente"
+// (ver docs/erd-execucao-judicial-tjsp.md §16 — o RPA em si ainda está em
+// calibração contra o e-SAJ real; o fallback manual do step Protocolo continua
+// disponível se a credencial não estiver cadastrada ou a tentativa falhar).
+
+interface FilingApproveResultAPI {
+  filing_attempt_id: string;
+  status: FilingStatus;
+  is_idempotent: boolean;
+}
+
+interface FilingAttemptAPI {
+  id: string;
+  status: FilingStatus;
+  requested_at: string;
+  finished_at?: string | null;
+  failure_reason?: string | null;
+  filing_number?: string | null;
+}
+
+/** Aprova o protocolo automático — POST /v1/pecas/:id/filing/approve. */
+export async function approveFiling(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<FilingApproveResult> {
+  const res = await fetcher<DataEnvelope<FilingApproveResultAPI>>(
+    `${ENDPOINT}/${id}/filing/approve`,
+    { method: "POST" },
+  );
+  return {
+    filingAttemptId: res.data.filing_attempt_id,
+    status: res.data.status,
+    isIdempotent: res.data.is_idempotent,
+  };
+}
+
+/** Status da tentativa de protocolo automático — GET /v1/pecas/:id/filing
+ *  (null quando nunca foi solicitado). */
+export async function getFilingStatus(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<FilingAttempt | null> {
+  const res = await fetcher<DataEnvelope<FilingAttemptAPI | null>>(
+    `${ENDPOINT}/${id}/filing`,
+  );
+  if (!res.data) return null;
+  return {
+    id: res.data.id,
+    status: res.data.status,
+    requestedAt: res.data.requested_at,
+    finishedAt: res.data.finished_at ?? null,
+    failureReason: res.data.failure_reason ?? null,
+    filingNumber: res.data.filing_number ?? null,
+  };
+}
+
 // ── Anexos (POST/DELETE /pecas/:id/anexos) ────────────────────────────────────
 
 /** Categorias de anexo — casadas com o CHECK do BE (migração 0043) e o enum
@@ -365,10 +546,10 @@ export async function removeAttachment(
 
 function mapScopeToApi(scope: IterateScope): {
   kind: string;
-  section_id?: string;
+  section_roman?: string;
 } {
   if (scope.kind === "section") {
-    return { kind: "section", section_id: scope.id };
+    return { kind: "section", section_roman: scope.roman };
   }
   return { kind: "whole" };
 }

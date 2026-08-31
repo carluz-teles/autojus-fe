@@ -1,4 +1,6 @@
-import { ProcessoCockpit } from "@/features/processos/components/processo-cockpit";
+import { ProcessoHub } from "@/features/prazos/components/processo/processo-hub";
+
+export const metadata = { title: "Processo · Prazos · jus·assessoria" };
 
 export default async function ProcessoPage({
   params,
@@ -6,5 +8,5 @@ export default async function ProcessoPage({
   params: Promise<{ numero: string }>;
 }) {
   const { numero } = await params;
-  return <ProcessoCockpit numero={decodeURIComponent(numero)} />;
+  return <ProcessoHub numero={decodeURIComponent(numero)} />;
 }

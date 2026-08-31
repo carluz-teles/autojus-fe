@@ -1,12 +1,13 @@
-import { IntimacaoDetail } from "@/features/intimacoes/components/intimacao-detail";
+import { IntimacaoDetalhe } from "@/features/prazos/components/intimacao-detalhe/intimacao-detalhe";
 
-// Rota de detalhe da intimação (deep-link próprio). Shell = Server Component:
-// resolve o id da rota e delega para a feature (Client Component, dado mockado).
-export default async function IntimacaoDetailRoute({
+export const metadata = { title: "Intimação · Prazos · jus·assessoria" };
+
+// Next.js 16: params é assíncrono (Promise).
+export default async function IntimacaoDetalhePage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <IntimacaoDetail id={id} />;
+  return <IntimacaoDetalhe id={id} />;
 }

@@ -1,7 +1,7 @@
-import { ProcessosView } from "@/features/processos/components/processos-view";
+import { ProcessosLista } from "@/features/prazos/components/acervo/processos-lista";
 
-export const metadata = { title: "Processos · jus·assessoria" };
+export const metadata = { title: "Processos · Acervo · jus·assessoria" };
 
-export default function ProcessosPage() {
-  return <ProcessosView />;
+export default function AcervoProcessosPage() {
+  return <ProcessosLista />;
 }
