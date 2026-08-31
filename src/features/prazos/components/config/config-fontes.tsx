@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 
 import { type ResumoCard, useFontes } from "../../hooks/use-fontes";
 import { ConfigToggle } from "./config-toggle";
+import { ConfigTribunais } from "./config-tribunais";
 
 // Cards de resumo (rótulo / valor grande / sublinha) usados em Termos e Ingestões.
 function ResumoCards({ cards }: { cards: ResumoCard[] }) {
@@ -127,6 +128,8 @@ export function ConfigFontes() {
           )}
         </>
       ) : null}
+
+      {fon.fontesTab === "tribunais" ? <ConfigTribunais /> : null}
 
       {fon.fontesTab === "termos" ? (
         <>

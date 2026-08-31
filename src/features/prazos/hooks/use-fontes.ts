@@ -17,7 +17,7 @@ import {
 //  · Termos       → GET/POST/PATCH /v1/acquisition/watched-oabs (lista + ligar/add)
 //  · Ingestões    → GET /v1/acquisition/captures (runs + resumo; auto-poll se rodando)
 // Componente = JSX + binding; toda a lógica/derivação vive aqui.
-export type FontesTab = "integr" | "termos" | "ingest";
+export type FontesTab = "integr" | "tribunais" | "termos" | "ingest";
 
 export interface FontesTabItem {
   key: FontesTab;
@@ -183,6 +183,7 @@ export function useFontes() {
   const fontesTabs = useMemo<FontesTabItem[]>(() => {
     const items: { key: FontesTab; label: string }[] = [
       { key: "integr", label: "Integrações" },
+      { key: "tribunais", label: "Tribunais" },
       { key: "termos", label: "Termos" },
       { key: "ingest", label: "Ingestões" },
     ];
