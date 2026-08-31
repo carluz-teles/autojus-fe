@@ -72,7 +72,6 @@ export function ConstructionPage({ id }: { id: string }) {
               isError={theses.isError}
               onToggle={theses.toggle}
               onFonte={focusSource}
-              onRegenerate={theses.regenerate}
               isRegenerating={theses.isRegenerating}
             />
           }

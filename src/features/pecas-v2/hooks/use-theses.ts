@@ -9,6 +9,7 @@
 // A geração usa as teses em `included` ∪ `pending_add`.
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 
 import { useApi } from "@/lib/api/use-api";
 
@@ -152,6 +153,22 @@ export function useThesesController(id: string): ThesesController {
   const list = useTheses(id);
   const regen = useGenerateTheses(id);
   const patch = useUpdateThesisState(id);
+  const autoGenRef = useRef(false);
+
+  // Gera as teses no LOAD quando ainda não há nenhuma (sem botão manual — a geração
+  // acontece sozinha na primeira vez; depois persistem e o GET as devolve).
+  useEffect(() => {
+    if (
+      !list.isLoading &&
+      !list.isError &&
+      (list.data?.length ?? 0) === 0 &&
+      !regen.isPending &&
+      !autoGenRef.current
+    ) {
+      autoGenRef.current = true;
+      regen.mutate();
+    }
+  }, [list.isLoading, list.isError, list.data, regen]);
 
   const theses = list.data ?? [];
   const selected = theses.filter((t) => isSelectedForGeneration(t.state));

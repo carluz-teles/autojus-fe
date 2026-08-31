@@ -23,7 +23,6 @@ export function PartidaPage({ intimacaoId }: { intimacaoId: string }) {
     toggle,
     onFonte,
     highlightedDocId,
-    regenerate,
     isRegenerating,
     gerarMinuta,
     isGenerating,
@@ -52,7 +51,6 @@ export function PartidaPage({ intimacaoId }: { intimacaoId: string }) {
               isError={isError}
               onToggle={toggle}
               onFonte={onFonte}
-              onRegenerate={regenerate}
               isRegenerating={isRegenerating}
             />
           }

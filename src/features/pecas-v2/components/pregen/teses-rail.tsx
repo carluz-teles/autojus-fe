@@ -20,7 +20,7 @@ interface Props {
   isError: boolean;
   onToggle: (thesis: Thesis) => void;
   onFonte: (sourceDocumentId: string) => void;
-  onRegenerate: () => void;
+  /** true enquanto a IA gera as teses — a geração é AUTOMÁTICA (no load), sem botão. */
   isRegenerating: boolean;
 }
 
@@ -31,33 +31,33 @@ export function TesesRail({
   isError,
   onToggle,
   onFonte,
-  onRegenerate,
   isRegenerating,
 }: Props) {
+  const gerando = isLoading || isRegenerating;
   return (
     <>
       <div className="text-fg3 mt-5 mb-2 flex items-center gap-2 text-[10.5px] font-medium tracking-[0.05em] uppercase">
         <span className="flex-1">
           Teses a incluir <span className="text-primary">{selectedCount}</span>
         </span>
-        <button
-          type="button"
-          onClick={onRegenerate}
-          disabled={isRegenerating}
-          className="text-primary hover:bg-hover rounded px-1.5 py-0.5 text-[10px] font-medium tracking-normal normal-case disabled:opacity-60"
-        >
-          {isRegenerating ? "Gerando…" : theses.length ? "Regerar" : "Gerar"}
-        </button>
+        {gerando && (
+          <span className="text-fg3 flex items-center gap-1 tracking-normal normal-case">
+            <span className="border-fg3/40 border-t-primary size-3 animate-spin rounded-full border" />
+            Gerando…
+          </span>
+        )}
       </div>
 
-      {isLoading && <RailNote>Carregando teses…</RailNote>}
-      {isError && (
-        <RailNote>Não foi possível carregar as teses. Tente regerar.</RailNote>
+      {gerando && theses.length === 0 && (
+        <RailNote>Gerando teses ancoradas no teor e nos autos…</RailNote>
       )}
-      {!isLoading && !isError && theses.length === 0 && (
+      {!gerando && isError && (
         <RailNote>
-          Nenhuma tese ainda. Gere sugestões ancoradas nos documentos da peça.
+          Não foi possível gerar as teses. Recarregue a página.
         </RailNote>
+      )}
+      {!gerando && !isError && theses.length === 0 && (
+        <RailNote>Nenhuma tese ancorável no material disponível.</RailNote>
       )}
 
       <div className="flex flex-col gap-[7px]">
