@@ -4,7 +4,10 @@ import { useCallback, useMemo } from "react";
 
 import { useAndamentosDoProcesso } from "@/features/andamentos/hooks/use-andamentos-do-processo";
 import { useDocumentosDoProcesso } from "@/features/documentos/hooks/use-documentos-do-processo";
-import { rotuloTipoAuto } from "@/features/documentos/lib/tipo-autos";
+import {
+  rotuloTipoAuto,
+  visualDoAuto,
+} from "@/features/documentos/lib/tipo-autos";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { usePecasByProcesso } from "@/features/pecas/hooks/use-peca";
 import { rotuloTipoPeca } from "@/features/pecas/lib/labels";
@@ -133,6 +136,25 @@ function pecaStatusInfo(status: string): PecaStatusVM {
   }
 }
 
+// Cor de token do ícone da peça, por tipo (piece_type do BE). Defesa/Petição azul,
+// Petição inicial verde, Recurso/Reconvenção âmbar; desconhecido neutro.
+function corDaPeca(pieceType: string): string {
+  switch (pieceType) {
+    case "COMPLAINT":
+      return "var(--green)";
+    case "APPEAL":
+    case "COUNTERCLAIM":
+      return "var(--gold)";
+    case "DEFENSE":
+    case "MOTION":
+    case "PETITION":
+    case "MANIFESTATION":
+      return "var(--blue)";
+    default:
+      return "var(--fg3)";
+  }
+}
+
 // ── Tipos da VM ────────────────────────────────────────────────────────────────
 
 export interface TagChip {
@@ -213,10 +235,12 @@ export interface PrazoItemVM {
 
 export interface AutoItemVM {
   id: string;
-  /** Rótulo pt-BR do tipo (Petição, Sentença, Despacho…). */
+  /** Nome do auto (rico: "Petição inicial", "Despacho saneador"…). */
   titulo: string;
-  /** Sublinha: origem ("dos autos" | "enviado") + formato. */
+  /** Sublinha "Categoria · Origem" (ex.: "Petição · Parte", "Decisão · Juízo"). */
   sub: string;
+  /** Cor de token do ícone, por categoria (Petição/Decisão azul, Documento verde…). */
+  cor: string;
   /** "12 fls." (contagem de páginas) ou "" quando desconhecida. */
   fls: string;
   /** true enquanto o doc ainda está sendo extraído/indexado. */
@@ -237,6 +261,10 @@ export interface AutosVM {
 export interface PecaItemVM {
   id: string;
   titulo: string;
+  /** Descrição: o tipo da peça (Defesa, Petição inicial, Recurso…) — o "nome + descrição". */
+  sub: string;
+  /** Cor de token do ícone, por tipo de peça. */
+  cor: string;
   data: string;
   statusLabel: string;
   statusCor: string;
@@ -453,19 +481,21 @@ function useAutos_private(id: string): AutosVM {
       // O fetch novo já grava um título amigável (e o código cru em document_type);
       // aí exibimos o título direto. Docs legados vinham com o código no title e
       // document_type vazio — nesses, o mapa do FE traduz. (fallback compatível)
+      const codigo = d.document_type || d.title;
       const titulo = d.document_type
         ? d.title
         : rotuloTipoAuto(d.title || d.document_type);
-      const formato = (d.mime_type || "").includes("pdf")
-        ? "PDF"
-        : (d.mime_type || "").includes("html")
-          ? "HTML"
-          : "";
-      const origem = d.origin === "UPLOAD" ? "enviado" : "dos autos";
+      // Uploads avulsos: "Documento · Enviado" (verde). Autos: categoria+origem+cor
+      // derivados do código do tipo (visualDoAuto).
+      const vis = visualDoAuto(codigo);
+      const enviado = d.origin === "UPLOAD";
       return {
         id: d.id,
         titulo,
-        sub: formato ? `${origem} · ${formato}` : origem,
+        sub: enviado
+          ? "Documento · Enviado"
+          : `${vis.categoria} · ${vis.origem}`,
+        cor: enviado ? "var(--green)" : vis.cor,
         fls: d.pages ? `${d.pages} fls.` : "",
         processando: d.status !== "READY" && d.status !== "FAILED",
       };
@@ -494,6 +524,8 @@ function usePecas_private(id: string): PecasVM {
       return {
         id: p.id,
         titulo,
+        sub: rotulo,
+        cor: corDaPeca(p.piece_type),
         data: formatDate(p.created_at),
         statusLabel: st.label,
         statusCor: st.cor,

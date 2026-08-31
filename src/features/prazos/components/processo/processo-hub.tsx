@@ -125,7 +125,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                     <div className="text-fg3 font-mono text-xs">
                       {identity.cnj}
                     </div>
-                    <h1 className="font-display mt-[5px] mb-[9px] text-[28px] leading-[1.1] font-medium tracking-[-0.01em]">
+                    <h1 className="font-display mt-[5px] mb-[9px] text-[22px] leading-[1.15] font-medium tracking-[-0.01em]">
                       {identity.titulo}
                     </h1>
                     <div className="flex flex-wrap gap-1.5">
@@ -157,14 +157,14 @@ export function ProcessoHub({ numero }: { numero: string }) {
                             if (e.key === "Escape") setValorEditando(false);
                           }}
                           placeholder="0,00"
-                          className="border-line bg-bg text-foreground mt-1 w-[120px] rounded-md border px-1.5 py-0.5 text-[13.5px] font-medium outline-none"
+                          className="border-line bg-bg text-foreground mt-1 w-[120px] rounded-md border px-1.5 py-0.5 text-[13px] font-normal outline-none"
                         />
                       ) : (
                         <button
                           type="button"
                           onClick={abrirEdicaoValor}
                           disabled={salvandoManual}
-                          className="hover:bg-hover mt-1 -ml-1 block rounded-md px-1 text-[13.5px] font-medium disabled:opacity-60"
+                          className="hover:bg-hover mt-1 -ml-1 block rounded-md px-1 text-[13px] font-normal disabled:opacity-60"
                           style={{
                             color: identity.valor ? undefined : "var(--fg3)",
                           }}
@@ -177,7 +177,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                       <div className="text-fg3 text-[10px] tracking-[.04em] uppercase">
                         Fase
                       </div>
-                      <div className="mt-1 text-[13.5px] font-medium">
+                      <div className="mt-1 text-[13px] font-normal">
                         {faseLabel}
                       </div>
                     </div>
@@ -186,7 +186,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                         Ativas
                       </div>
                       <div
-                        className="mt-1 text-[13.5px] font-medium"
+                        className="mt-1 text-[13px] font-normal"
                         style={{ color: "var(--primary)" }}
                       >
                         {intimacoes.length}{" "}
@@ -260,8 +260,10 @@ export function ProcessoHub({ numero }: { numero: string }) {
                       className="hover:bg-hover flex flex-none items-center gap-2 rounded-md px-1.5 py-0.5 disabled:opacity-60"
                     >
                       <span
-                        className="grid size-[15px] flex-none place-items-center rounded-full border"
+                        className="size-[12px] flex-none rounded-full"
                         style={{
+                          borderWidth: s.estado === "current" ? 2 : 1.5,
+                          borderStyle: "solid",
                           borderColor:
                             s.estado === "todo"
                               ? "var(--line)"
@@ -271,20 +273,13 @@ export function ProcessoHub({ numero }: { numero: string }) {
                               ? "var(--primary)"
                               : "transparent",
                         }}
-                      >
-                        {s.estado === "current" && (
-                          <span
-                            className="size-[7px] rounded-full"
-                            style={{ background: "var(--primary)" }}
-                          />
-                        )}
-                      </span>
+                      />
                       <span
-                        className="text-[12.5px] whitespace-nowrap"
+                        className="text-[11px] whitespace-nowrap"
                         style={{
                           color:
                             s.estado === "current"
-                              ? "var(--fg)"
+                              ? "var(--primary)"
                               : s.estado === "done"
                                 ? "var(--fg2)"
                                 : "var(--fg3)",
@@ -416,7 +411,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                   {/* AUTOS */}
                   <div className="border-line bg-panel overflow-hidden rounded-xl border">
                     <div className="border-line2 flex items-center justify-between border-b px-3.5 py-[11px]">
-                      <span className="text-fg2 text-[11px] font-semibold tracking-[.03em] uppercase">
+                      <span className="text-fg2 text-[10px] font-medium tracking-[.02em] uppercase">
                         Autos
                       </span>
                       <span className="text-fg3 font-mono text-[10.5px]">
@@ -445,11 +440,12 @@ export function ProcessoHub({ numero }: { numero: string }) {
                             className="border-line2 hover:bg-hover flex w-full items-center gap-2.5 border-b px-3.5 py-[9px] text-left transition-colors last:border-b-0"
                           >
                             <FileText
-                              className="text-fg3 size-[15px] flex-none"
+                              className="size-[14px] flex-none"
                               strokeWidth={1.6}
+                              style={{ color: a.cor }}
                             />
                             <span className="min-w-0 flex-1">
-                              <span className="text-primary block truncate text-xs font-medium">
+                              <span className="block truncate text-[12px]">
                                 {a.titulo}
                               </span>
                               <span className="text-fg3 block text-[10.5px]">
@@ -458,7 +454,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                               </span>
                             </span>
                             {a.fls && (
-                              <span className="text-fg3 flex-none font-mono text-[10.5px]">
+                              <span className="text-fg3 flex-none font-mono text-[10px]">
                                 {a.fls}
                               </span>
                             )}
@@ -471,7 +467,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                   {/* PEÇAS */}
                   <div className="border-line bg-panel overflow-hidden rounded-xl border">
                     <div className="border-line2 flex items-center justify-between border-b px-3.5 py-[11px]">
-                      <span className="text-fg2 text-[11px] font-semibold tracking-[.03em] uppercase">
+                      <span className="text-fg2 text-[10px] font-medium tracking-[.02em] uppercase">
                         Peças
                       </span>
                       <span className="text-fg3 font-mono text-[10.5px]">
@@ -493,12 +489,17 @@ export function ProcessoHub({ numero }: { numero: string }) {
                         key={p.id}
                         className="border-line2 flex items-center gap-2.5 border-b px-3.5 py-[10px] last:border-b-0"
                       >
+                        <FileText
+                          className="size-[14px] flex-none"
+                          strokeWidth={1.6}
+                          style={{ color: p.cor }}
+                        />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-medium">
+                          <span className="block truncate text-[12px]">
                             {p.titulo}
                           </span>
                           <span className="text-fg3 block text-[10.5px]">
-                            {p.data}
+                            {p.sub} · {p.data}
                           </span>
                         </span>
                         <span
@@ -517,7 +518,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                   {/* PARTES */}
                   <div className="border-line bg-panel overflow-hidden rounded-xl border">
                     <div className="border-line2 border-b px-3.5 py-[11px]">
-                      <span className="text-fg2 text-[11px] font-semibold tracking-[.03em] uppercase">
+                      <span className="text-fg2 text-[10px] font-medium tracking-[.02em] uppercase">
                         Partes
                       </span>
                     </div>
@@ -554,7 +555,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                   {/* ANDAMENTOS */}
                   <div className="border-line bg-panel overflow-hidden rounded-xl border">
                     <div className="border-line2 flex items-center justify-between border-b px-3.5 py-[11px]">
-                      <span className="text-fg2 text-[11px] font-semibold tracking-[.03em] uppercase">
+                      <span className="text-fg2 text-[10px] font-medium tracking-[.02em] uppercase">
                         Andamentos
                       </span>
                       <span className="text-fg3 font-mono text-[10.5px]">
