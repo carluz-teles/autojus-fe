@@ -6,7 +6,6 @@ import { PageHeader, UnderlineTabs } from "@/components/mock-ui/layout";
 import { CapturasTab } from "@/features/captures/components/capturas-tab";
 
 import { CertificadoTab } from "./certificado-tab";
-import { EsajCredentialTab } from "./esaj-credential-tab";
 import {
   CobrancaTab,
   NotificacoesTab,
@@ -14,6 +13,7 @@ import {
   PerfilTab,
 } from "./tabs";
 import { TermosTab } from "./termos-tab";
+import { TribunaisTab } from "./tribunais-tab";
 
 type Aba =
   | "organizacao"
@@ -53,7 +53,7 @@ export function ConfiguracoesView({ inicial }: { inicial?: string }) {
       </div>
 
       {aba === "organizacao" && <OrganizacaoTab />}
-      {aba === "tribunais" && <EsajCredentialTab />}
+      {aba === "tribunais" && <TribunaisTab />}
       {aba === "capturas" && <CapturasTab />}
       {aba === "termos" && <TermosTab />}
       {aba === "certificado" && <CertificadoTab />}
