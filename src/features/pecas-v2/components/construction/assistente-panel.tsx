@@ -9,7 +9,6 @@ import { MessageSquare, Send, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 import { type Proposta, useAssistente } from "../../hooks/use-assistente";
-import { DiffView } from "../editor/diff-view";
 
 export function AssistentePanel({ draftId }: { draftId: string }) {
   const { propostas, pensando, chips, enviar, usarChip, aceitar, rejeitar } =
@@ -106,27 +105,46 @@ function PropostaCard({
   onAceitar: () => void;
   onRejeitar: () => void;
 }) {
-  const alvo =
+  const rotulo =
+    proposta.pedido ||
     [proposta.sectionRoman, proposta.sectionTitle]
       .filter(Boolean)
-      .join(" — ") || "peça";
+      .join(" — ") ||
+    "peça";
   return (
     <div className="border-primary/30 mb-2.5 overflow-hidden rounded-[10px] border">
       <div className="border-line2 bg-primary/[0.05] flex items-center gap-1.5 border-b px-3 py-[9px]">
         <Sparkles className="text-primary size-3 flex-none" strokeWidth={1.9} />
         <span className="text-primary text-[11px] font-semibold">Proposta</span>
-        <span className="text-fg3 min-w-0 truncate text-[11px]">· {alvo}</span>
+        <span className="text-fg3 min-w-0 truncate text-[11px]">
+          · {rotulo}
+        </span>
       </div>
-      <div className="prose-editor px-3 py-2.5 text-[12px] leading-[1.55]">
+      <div className="px-3 py-2.5">
         {proposta.explanation && (
-          <p className="text-fg3 mb-1.5 text-[11px] leading-[1.5]">
+          <p className="text-fg3 mb-2 text-[11px] leading-[1.5]">
             {proposta.explanation}
           </p>
         )}
-        <DiffView
-          oldParagraphs={proposta.oldParagraphs}
-          newParagraphs={proposta.newParagraphs}
-        />
+        {/* Antigo (riscado) sobre Proposto (verde) — em blocos separados, mais
+            legível que o diff intercalado. */}
+        <div className="mb-2">
+          {proposta.oldParagraphs.map((p, i) => (
+            <p
+              key={`old-${i}`}
+              className="text-fg3 mb-1 text-[12px] leading-[1.5] line-through"
+            >
+              {p}
+            </p>
+          ))}
+        </div>
+        <div className="text-green">
+          {proposta.newParagraphs.map((p, i) => (
+            <p key={`new-${i}`} className="mb-1 text-[12.5px] leading-[1.55]">
+              {p}
+            </p>
+          ))}
+        </div>
       </div>
       <div className="flex gap-1.5 px-3 pb-3">
         <button

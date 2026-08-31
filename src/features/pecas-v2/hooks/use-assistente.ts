@@ -28,9 +28,11 @@ export const ASSISTENTE_CHIPS: AssistenteChip[] = [
   { label: "Mais fundamentos", kind: "add_grounds" },
 ];
 
-/** Proposta = um PendingChange + um id de cliente estável (pra key/aceite). */
+/** Proposta = um PendingChange + id de cliente estável + o pedido que a originou
+ *  (instrução livre ou rótulo do chip), ecoado no cabeçalho do card. */
 export interface Proposta extends PendingChange {
   key: string;
+  pedido: string;
 }
 
 let propostaSeq = 0;
@@ -65,7 +67,7 @@ export function useAssistente(id: string) {
     });
   };
 
-  const onResult = (changes: PendingChange[]) => {
+  const onResult = (changes: PendingChange[], pedido: string) => {
     if (changes.length === 0) {
       toast("Nenhuma mudança sugerida — o texto já está adequado.");
       return;
@@ -73,6 +75,7 @@ export function useAssistente(id: string) {
     const novas: Proposta[] = changes.map((c) => ({
       ...c,
       key: `p${++propostaSeq}`,
+      pedido,
     }));
     // Mais nova no topo.
     setPropostas((prev) => [...novas, ...prev]);
@@ -84,7 +87,7 @@ export function useAssistente(id: string) {
     iterate.mutate(
       { scope: { kind: "whole" }, instruction: t },
       {
-        onSuccess: (r) => onResult(r.changes),
+        onSuccess: (r) => onResult(r.changes, t),
         onError: () =>
           toast.error("Não foi possível gerar a proposta. Tente de novo."),
       },
@@ -93,10 +96,11 @@ export function useAssistente(id: string) {
 
   const usarChip = (kind: QuickAdjustKind) => {
     if (pensando) return;
+    const label = ASSISTENTE_CHIPS.find((c) => c.kind === kind)?.label ?? "";
     quick.mutate(
       { scope: { kind: "whole" }, kind },
       {
-        onSuccess: (r) => onResult(r.changes),
+        onSuccess: (r) => onResult(r.changes, label),
         onError: () =>
           toast.error("Não foi possível gerar a proposta. Tente de novo."),
       },
