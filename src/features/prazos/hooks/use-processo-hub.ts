@@ -16,8 +16,13 @@ import {
   useAssignResponsavel,
   usePartes,
   useProcesso,
+  useUpdateProcessoManual,
 } from "@/features/processos/hooks/use-processos";
-import type { Party, ProcessoDegree } from "@/features/processos/types";
+import type {
+  Party,
+  ProcessoDegree,
+  ProcessoPhase,
+} from "@/features/processos/types";
 import { formatDate } from "@/lib/format";
 
 import { iniciais } from "../lib/derivar";
@@ -35,6 +40,21 @@ const DEGREE_LABEL: Record<ProcessoDegree, string> = {
   SUPERIOR: "Superior",
   UNKNOWN: "—",
 };
+
+// As 5 fases do stepper, em ordem, com rótulo pt-BR — fonte única do stepper e do label.
+const FASE_STEPS: { key: ProcessoPhase; label: string }[] = [
+  { key: "CONHECIMENTO", label: "Conhecimento" },
+  { key: "INSTRUCAO", label: "Instrução" },
+  { key: "SENTENCA", label: "Sentença" },
+  { key: "RECURSO", label: "Recurso" },
+  { key: "EXECUCAO", label: "Execução" },
+];
+
+// Formata um valor da causa em reais ("R$ 128.400,00"); null quando não preenchido.
+function formatBRL(v: number | null): string | null {
+  if (v == null) return null;
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
 
 interface LifecycleInfo {
   label: string;
@@ -91,13 +111,25 @@ interface PecaStatusVM {
 function pecaStatusInfo(status: string): PecaStatusVM {
   switch (status) {
     case "FILED":
-      return { label: "Protocolada", cor: "var(--green)", fundo: mix("var(--green)", 14) };
+      return {
+        label: "Protocolada",
+        cor: "var(--green)",
+        fundo: mix("var(--green)", 14),
+      };
     case "SIGNED":
-      return { label: "Assinada", cor: "var(--blue)", fundo: mix("var(--blue)", 14) };
+      return {
+        label: "Assinada",
+        cor: "var(--blue)",
+        fundo: mix("var(--blue)", 14),
+      };
     case "DISCARDED":
       return { label: "Descartada", cor: "var(--fg3)", fundo: "var(--hover)" };
     default:
-      return { label: "Rascunho", cor: "var(--gold)", fundo: mix("var(--gold)", 16) };
+      return {
+        label: "Rascunho",
+        cor: "var(--gold)",
+        fundo: mix("var(--gold)", 16),
+      };
   }
 }
 
@@ -123,6 +155,21 @@ export interface IdentityVM {
   judgingBody: string;
   distribuido: string;
   completeness: number;
+  /** Fase efetiva do processo (pro stepper); null quando ainda não derivada/definida. */
+  phase: ProcessoPhase | null;
+  /** Valor da causa formatado ("R$ 128.400,00") ou null quando não preenchido. */
+  valor: string | null;
+  /** Valor da causa cru (pra edição inline); null quando não preenchido. */
+  valorRaw: number | null;
+}
+
+// Um passo do stepper de fase (Conhecimento→…→Execução).
+export interface FaseStepVM {
+  key: ProcessoPhase;
+  label: string;
+  /** "done" (passado), "current" (fase atual) ou "todo" (futuro). */
+  estado: "done" | "current" | "todo";
+  onClick: () => void;
 }
 
 export interface ResponsavelVM {
@@ -141,6 +188,8 @@ export interface IntimacaoItemVM {
   titulo: string;
   /** "A confirmar" | "Intimação recebida" — situação de triagem do prazo. */
   status: string;
+  /** Nome do responsável desta intimação ("resp. Fulano") ou null. */
+  resp: string | null;
   /** Data fatal do prazo derivado ("04/09") ou "" quando não há prazo. */
   fatal: string;
   /** Contagem regressiva curta ("1d atraso" | "hoje" | "11d") ou null. */
@@ -246,6 +295,9 @@ function useIdentidade_private(id: string) {
       judgingBody: p.judging_body,
       distribuido: formatDate(p.filed_at),
       completeness: p.completeness,
+      phase: p.phase,
+      valor: formatBRL(p.claim_value),
+      valorRaw: p.claim_value,
     };
   }, [p]);
 
@@ -353,7 +405,9 @@ function useReferencias_private(id: string) {
         return {
           id: i.id,
           titulo: i.class || i.subject || i.type,
-          status: prazo && !prazo.confirmed ? "A confirmar" : "Intimação recebida",
+          status:
+            prazo && !prazo.confirmed ? "A confirmar" : "Intimação recebida",
+          resp: i.assignee_user_name,
           fatal: prazo ? formatDate(prazo.end_date) : "",
           prazoCurto: prazo ? prazoCurto(prazo.days_left) : null,
           urgNivel: prazo ? urgNivelPorDias(prazo.days_left) : 0,
@@ -478,6 +532,36 @@ export function useProcessoHub(id: string) {
     return cliente ? { ...base, titulo: cliente } : base;
   }, [identidade.identity, partes.partes]);
 
+  // Edição manual da fase (override) e do valor da causa — PATCH parcial.
+  const updateMut = useUpdateProcessoManual(id);
+  const salvarFase = useCallback(
+    (phase: ProcessoPhase) => updateMut.mutate({ phase }),
+    [updateMut],
+  );
+  const salvarValor = useCallback(
+    (claimValue: number) => updateMut.mutate({ claim_value: claimValue }),
+    [updateMut],
+  );
+
+  // Stepper: 5 passos; done/current/todo pela fase efetiva; clicar seta a fase (override manual).
+  const fase = identity?.phase ?? null;
+  const stepper: FaseStepVM[] = useMemo(() => {
+    const atual = fase ? FASE_STEPS.findIndex((s) => s.key === fase) : -1;
+    return FASE_STEPS.map((s, i) => ({
+      key: s.key,
+      label: s.label,
+      estado:
+        atual < 0
+          ? "todo"
+          : i < atual
+            ? "done"
+            : i === atual
+              ? "current"
+              : "todo",
+      onClick: () => salvarFase(s.key),
+    }));
+  }, [fase, salvarFase]);
+
   // O nome do responsável pode vir já anexado pelo BE (assigned_user_name); nesse
   // caso preferimos ele ao resolvido pelo diretório.
   const responsavelVM: ResponsavelVM = useMemo(() => {
@@ -502,6 +586,12 @@ export function useProcessoHub(id: string) {
     naoEncontrado: identidade.naoEncontrado,
 
     identity,
+
+    // fase (stepper) + valor da causa, editáveis à mão
+    stepper,
+    salvarFase,
+    salvarValor,
+    salvandoManual: updateMut.isPending,
 
     responsavel: responsavelVM,
     members: responsavel.members,

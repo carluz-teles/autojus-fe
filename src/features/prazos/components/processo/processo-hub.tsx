@@ -39,6 +39,9 @@ export function ProcessoHub({ numero }: { numero: string }) {
     isError,
     naoEncontrado,
     identity,
+    stepper,
+    salvarValor,
+    salvandoManual,
     responsavel,
     members,
     assign,
@@ -61,6 +64,21 @@ export function ProcessoHub({ numero }: { numero: string }) {
   } = hub;
 
   const [menuAberto, setMenuAberto] = useState(false);
+  const [valorEditando, setValorEditando] = useState(false);
+  const [valorInput, setValorInput] = useState("");
+
+  // Rótulo da fase atual = o passo "current" do stepper (ou "—" quando não há fase).
+  const faseLabel = stepper.find((s) => s.estado === "current")?.label ?? "—";
+
+  function abrirEdicaoValor() {
+    setValorInput(identity?.valorRaw != null ? String(identity.valorRaw) : "");
+    setValorEditando(true);
+  }
+  function confirmarValor() {
+    const v = Number(valorInput.replace(/\./g, "").replace(",", "."));
+    if (!Number.isNaN(v) && v >= 0) salvarValor(v);
+    setValorEditando(false);
+  }
 
   return (
     <div className="bg-bg flex min-h-0 flex-1 flex-col">
@@ -120,33 +138,57 @@ export function ProcessoHub({ numero }: { numero: string }) {
                       ))}
                     </div>
                   </div>
-                  {/* fatos-chave, densos e horizontais */}
+                  {/* fatos-chave, densos e horizontais (VALOR editável · FASE · ATIVAS) */}
                   <div className="border-line2 grid flex-none grid-cols-[repeat(3,auto)] gap-x-[26px] gap-y-3 border-l pl-6">
                     <div>
                       <div className="text-fg3 text-[10px] tracking-[.04em] uppercase">
-                        Grau
+                        Valor
+                      </div>
+                      {valorEditando ? (
+                        <input
+                          autoFocus
+                          value={valorInput}
+                          onChange={(e) => setValorInput(e.target.value)}
+                          onBlur={confirmarValor}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") confirmarValor();
+                            if (e.key === "Escape") setValorEditando(false);
+                          }}
+                          placeholder="0,00"
+                          className="border-line bg-bg text-foreground mt-1 w-[120px] rounded-md border px-1.5 py-0.5 text-[13.5px] font-medium outline-none"
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={abrirEdicaoValor}
+                          disabled={salvandoManual}
+                          className="hover:bg-hover mt-1 -ml-1 block rounded-md px-1 text-[13.5px] font-medium disabled:opacity-60"
+                          style={{
+                            color: identity.valor ? undefined : "var(--fg3)",
+                          }}
+                        >
+                          {identity.valor ?? "Definir"}
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-fg3 text-[10px] tracking-[.04em] uppercase">
+                        Fase
                       </div>
                       <div className="mt-1 text-[13.5px] font-medium">
-                        {identity.degreeLabel}
+                        {faseLabel}
                       </div>
                     </div>
                     <div>
                       <div className="text-fg3 text-[10px] tracking-[.04em] uppercase">
-                        Situação
+                        Ativas
                       </div>
                       <div
                         className="mt-1 text-[13.5px] font-medium"
-                        style={{ color: identity.lifecycleCor }}
+                        style={{ color: "var(--primary)" }}
                       >
-                        {identity.lifecycleLabel}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-fg3 text-[10px] tracking-[.04em] uppercase">
-                        Órgão
-                      </div>
-                      <div className="mt-1 max-w-[180px] truncate text-[13.5px] font-medium">
-                        {identity.judgingBody || "—"}
+                        {intimacoes.length}{" "}
+                        {intimacoes.length === 1 ? "intimação" : "intimações"}
                       </div>
                     </div>
                     <div className="border-line2 relative col-span-full flex items-center gap-2 border-t pt-2.5">
@@ -201,6 +243,65 @@ export function ProcessoHub({ numero }: { numero: string }) {
                 </div>
               </div>
 
+              {/* STEPPER DE FASE — clicável (define o override manual) */}
+              <div className="border-line bg-panel mt-2.5 flex items-center overflow-hidden rounded-[14px] border px-[22px] py-[13px]">
+                {stepper.map((s, i) => (
+                  <div
+                    key={s.key}
+                    className="flex items-center last:flex-none"
+                    style={{ flex: i < stepper.length - 1 ? 1 : "none" }}
+                  >
+                    <button
+                      type="button"
+                      onClick={s.onClick}
+                      disabled={salvandoManual}
+                      className="hover:bg-hover flex flex-none items-center gap-2 rounded-md px-1.5 py-0.5 disabled:opacity-60"
+                    >
+                      <span
+                        className="grid size-[15px] flex-none place-items-center rounded-full border"
+                        style={{
+                          borderColor:
+                            s.estado === "todo"
+                              ? "var(--line)"
+                              : "var(--primary)",
+                          background:
+                            s.estado === "done"
+                              ? "var(--primary)"
+                              : "transparent",
+                        }}
+                      >
+                        {s.estado === "current" && (
+                          <span
+                            className="size-[7px] rounded-full"
+                            style={{ background: "var(--primary)" }}
+                          />
+                        )}
+                      </span>
+                      <span
+                        className="text-[12.5px] whitespace-nowrap"
+                        style={{
+                          color:
+                            s.estado === "current"
+                              ? "var(--fg)"
+                              : s.estado === "done"
+                                ? "var(--fg2)"
+                                : "var(--fg3)",
+                          fontWeight: s.estado === "current" ? 500 : 400,
+                        }}
+                      >
+                        {s.label}
+                      </span>
+                    </button>
+                    {i < stepper.length - 1 && (
+                      <span
+                        className="mx-2 h-px flex-1"
+                        style={{ background: "var(--line2)" }}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+
               {/* CORPO EM 2 COLUNAS */}
               <div className="mt-5 grid grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] items-start gap-5">
                 {/* COLUNA PRIMÁRIA — ação */}
@@ -240,6 +341,11 @@ export function ProcessoHub({ numero }: { numero: string }) {
                             <span className="text-fg3 mt-1 flex items-center gap-1.5 text-[11.5px]">
                               <Circle className="size-[9px]" strokeWidth={2} />
                               {i.status}
+                              {i.resp && (
+                                <span className="text-fg3">
+                                  · resp. {i.resp}
+                                </span>
+                              )}
                             </span>
                           </span>
                           <span className="text-right">
@@ -395,7 +501,10 @@ export function ProcessoHub({ numero }: { numero: string }) {
                         </span>
                         <span
                           className="flex-none rounded-full px-2 py-[2px] text-[9.5px] font-medium"
-                          style={{ background: p.statusFundo, color: p.statusCor }}
+                          style={{
+                            background: p.statusFundo,
+                            color: p.statusCor,
+                          }}
                         >
                           {p.statusLabel}
                         </span>
