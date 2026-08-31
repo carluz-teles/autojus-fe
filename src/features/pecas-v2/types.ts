@@ -166,7 +166,8 @@ export function deriveStep(
 // ── Iteração / ajustes rápidos ───────────────────────────────────────────────
 
 /** Escopo de uma iteração: "peça toda" ou o id de uma seção específica. */
-export type IterateScope = { kind: "whole" } | { kind: "section"; id: string };
+export type IterateScope =
+  { kind: "whole" } | { kind: "section"; roman: string };
 
 export type QuickAdjustKind =
   "emphatic" | "concise" | "reinforce_thesis" | "add_grounds";

@@ -546,10 +546,10 @@ export async function removeAttachment(
 
 function mapScopeToApi(scope: IterateScope): {
   kind: string;
-  section_id?: string;
+  section_roman?: string;
 } {
   if (scope.kind === "section") {
-    return { kind: "section", section_id: scope.id };
+    return { kind: "section", section_roman: scope.roman };
   }
   return { kind: "whole" };
 }
