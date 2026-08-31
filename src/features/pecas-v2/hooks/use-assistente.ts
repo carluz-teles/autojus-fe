@@ -11,9 +11,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { structuredToHtml } from "../components/rich-editor/html-adapter";
+import { applyParagraphChangeToHtml } from "../lib/apply-change-html";
 import type { Draft, PendingChange, QuickAdjustKind } from "../types";
-import { draftKeys, useSaveDraft } from "./use-draft";
+import { draftKeys } from "./use-draft";
 import { useIterate, useQuickAdjust } from "./use-iterate";
+import { useSaveContentHtml } from "./use-workflow";
 
 export interface AssistenteChip {
   label: string;
@@ -39,7 +41,7 @@ let propostaSeq = 0;
 
 export function useAssistente(id: string) {
   const qc = useQueryClient();
-  const save = useSaveDraft(id);
+  const saveHtml = useSaveContentHtml(id);
   const iterate = useIterate(id);
   const quick = useQuickAdjust(id);
 
@@ -47,24 +49,38 @@ export function useAssistente(id: string) {
 
   const pensando = iterate.isPending || quick.isPending;
 
-  // Aplica uma mudança aceita: update otimista (rebuild content_html a partir do
-  // structured com a seção trocada) + PATCH persistindo. O editor prefere
-  // content_html, então a mudança reflete na hora.
+  // Aplica uma mudança aceita SOBRE O content_html (a mesma base do iterate e do
+  // editor — evita o descolamento structured×content_html que fazia o "Antigo"
+  // virar fantasma). Substitui o run de parágrafos old→new no HTML, faz update
+  // otimista do cache e persiste via content_html. Se o run não for encontrado
+  // (base divergente), o helper devolve o HTML intacto — não corrompe.
   const applyChange = (c: PendingChange) => {
-    qc.setQueryData<Draft>(draftKeys.detail(id), (prev) => {
-      if (!prev) return prev;
-      const nextSections = prev.sections.map((s) =>
-        s.id === c.sectionId ? { ...s, paragraphs: c.newParagraphs } : s,
+    const prev = qc.getQueryData<Draft>(draftKeys.detail(id));
+    const baseHtml =
+      prev?.contentHtml && prev.contentHtml.trim() !== ""
+        ? prev.contentHtml
+        : prev
+          ? structuredToHtml({
+              preamble: prev.preamble,
+              sections: prev.sections,
+            })
+          : "";
+    const nextHtml = applyParagraphChangeToHtml(
+      baseHtml,
+      c.oldParagraphs,
+      c.newParagraphs,
+    );
+    if (nextHtml === baseHtml) {
+      toast.error(
+        "Não encontrei esse trecho no texto atual — recarregue a peça.",
       );
-      const nextHtml = structuredToHtml({
-        preamble: prev.preamble,
-        sections: nextSections,
-      });
-      return { ...prev, sections: nextSections, contentHtml: nextHtml };
-    });
-    save.mutate({
-      sections: [{ id: c.sectionId, paragraphs: c.newParagraphs }],
-    });
+      return false;
+    }
+    qc.setQueryData<Draft>(draftKeys.detail(id), (d) =>
+      d ? { ...d, contentHtml: nextHtml } : d,
+    );
+    saveHtml.mutate(nextHtml);
+    return true;
   };
 
   const onResult = (changes: PendingChange[], pedido: string) => {
@@ -108,7 +124,7 @@ export function useAssistente(id: string) {
   };
 
   const aceitar = (p: Proposta) => {
-    applyChange(p);
+    if (!applyChange(p)) return; // trecho não encontrado → mantém o card (já avisou)
     setPropostas((prev) => prev.filter((x) => x.key !== p.key));
     toast.success("Ajuste aplicado à peça.");
   };
