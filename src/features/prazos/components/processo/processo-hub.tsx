@@ -66,6 +66,8 @@ export function ProcessoHub({ numero }: { numero: string }) {
   const [menuAberto, setMenuAberto] = useState(false);
   const [valorEditando, setValorEditando] = useState(false);
   const [valorInput, setValorInput] = useState("");
+  // Andamentos: mostra 4 por padrão; "Ver mais" expande (e aí paginação normal segue).
+  const [andamentosExpandido, setAndamentosExpandido] = useState(false);
 
   // Rótulo da fase atual = o passo "current" do stepper (ou "—" quando não há fase).
   const faseLabel = stepper.find((s) => s.estado === "current")?.label ?? "—";
@@ -570,7 +572,10 @@ export function ProcessoHub({ numero }: { numero: string }) {
                           Sem andamentos.
                         </div>
                       )}
-                      {andamentos.map((a) => (
+                      {(andamentosExpandido
+                        ? andamentos
+                        : andamentos.slice(0, 4)
+                      ).map((a) => (
                         <div
                           key={a.id}
                           className="border-line2 grid grid-cols-[64px_1fr] gap-2.5 border-t py-[7px]"
@@ -584,7 +589,16 @@ export function ProcessoHub({ numero }: { numero: string }) {
                         </div>
                       ))}
                     </div>
-                    {andamentosHasMore && (
+                    {!andamentosExpandido && andamentos.length > 4 && (
+                      <button
+                        type="button"
+                        onClick={() => setAndamentosExpandido(true)}
+                        className="border-line2 text-fg2 hover:bg-hover w-full border-t px-3.5 py-2 text-[11px]"
+                      >
+                        Ver mais ({andamentosTotal - 4})
+                      </button>
+                    )}
+                    {andamentosExpandido && andamentosHasMore && (
                       <button
                         type="button"
                         onClick={andamentosLoadMore}
