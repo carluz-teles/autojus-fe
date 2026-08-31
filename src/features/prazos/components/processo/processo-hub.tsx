@@ -1,16 +1,37 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Circle, FileText } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 import { useProcessoHub } from "../../hooks/use-processo-hub";
 
+// Barrinhas de sinal de urgência (0 tranquilo → 3 vencido) ao lado dos cards de
+// intimação/prazo, como no design. Três colunas de altura crescente; as acesas usam
+// a cor de urgência, as apagadas ficam esmaecidas.
+function SinalUrgencia({ nivel, cor }: { nivel: number; cor: string }) {
+  const alturas = [5, 8, 11];
+  return (
+    <span className="flex h-3 items-end gap-[2px]" aria-hidden>
+      {alturas.map((h, i) => (
+        <span
+          key={i}
+          className="w-[3px] rounded-[1px]"
+          style={{
+            height: h,
+            background: cor,
+            opacity: i < nivel ? 1 : 0.22,
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
 // PROCESSO · HUB — cockpit do caso ligado ao BACKEND REAL. Faixa de identidade
-// (CNJ/classe/tags + fatos-chave + responsável) e 2 colunas: à esquerda a ação
-// (resumo IA, intimações e prazos); à direita a referência (tarefas, partes,
-// andamentos). Componente = JSX + binding (regra do CLAUDE.md): toda derivação
-// mora no hook useProcessoHub.
+// (cliente/CNJ/tags + fatos-chave + responsável) e 2 colunas: à esquerda a ação
+// (intimações e prazos); à direita a referência (AUTOS, PEÇAS, PARTES, ANDAMENTOS).
+// Componente = JSX + binding (regra do CLAUDE.md): toda derivação mora no hook.
 export function ProcessoHub({ numero }: { numero: string }) {
   const hub = useProcessoHub(numero);
   const {
@@ -22,9 +43,10 @@ export function ProcessoHub({ numero }: { numero: string }) {
     members,
     assign,
     isAssigning,
-    resumo,
     partes,
     partesPending,
+    autos,
+    pecas,
     andamentos,
     andamentosTotal,
     andamentosPending,
@@ -33,7 +55,6 @@ export function ProcessoHub({ numero }: { numero: string }) {
     andamentosLoadMore,
     intimacoes,
     prazos,
-    tasks,
     referenciasPending,
     voltarLabel,
     voltarHref,
@@ -183,100 +204,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
               {/* CORPO EM 2 COLUNAS */}
               <div className="mt-5 grid grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] items-start gap-5">
                 {/* COLUNA PRIMÁRIA — ação */}
-                <div className="flex flex-col gap-4">
-                  {/* Resumo IA */}
-                  <div className="border-line bg-panel overflow-hidden rounded-xl border">
-                    <div className="border-line2 flex items-center justify-between border-b px-4 py-3">
-                      <span className="text-[12.5px] font-semibold">
-                        Resumo do processo
-                      </span>
-                      <span className="text-fg3 font-mono text-[11px]">IA</span>
-                    </div>
-                    <div className="px-4 py-3.5">
-                      {resumo.isPending && (
-                        <div className="text-fg3 py-3 text-center text-xs">
-                          Gerando resumo…
-                        </div>
-                      )}
-                      {!resumo.isPending && !resumo.disponivel && (
-                        <div className="text-fg3 py-3 text-center text-xs">
-                          Resumo indisponível.
-                        </div>
-                      )}
-                      {!resumo.isPending && resumo.disponivel && (
-                        <div className="flex flex-col gap-3.5">
-                          {resumo.currentStatus && (
-                            <div className="text-fg2 text-[12.5px] leading-relaxed">
-                              <span className="text-fg3 mr-1.5 text-[10px] tracking-[.04em] uppercase">
-                                Situação
-                              </span>
-                              {resumo.currentStatus}
-                            </div>
-                          )}
-                          {resumo.summary && (
-                            <p className="text-fg text-[13px] leading-[1.55]">
-                              {resumo.summary}
-                            </p>
-                          )}
-                          {resumo.keyDates.length > 0 && (
-                            <div className="flex flex-col gap-1.5">
-                              <div className="text-fg3 text-[10px] tracking-[.04em] uppercase">
-                                Prazos-chave
-                              </div>
-                              {resumo.keyDates.map((k, i) => (
-                                <div
-                                  key={i}
-                                  className="flex items-center gap-2 text-[12px]"
-                                >
-                                  <span className="text-fg2 min-w-0 flex-1 truncate">
-                                    {k.kind} · {k.end}
-                                  </span>
-                                  <span
-                                    className="font-mono text-[11px]"
-                                    style={{ color: k.cor }}
-                                  >
-                                    {k.daysLabel}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {resumo.risks.length > 0 && (
-                            <div className="flex flex-col gap-1.5">
-                              <div className="text-fg3 text-[10px] tracking-[.04em] uppercase">
-                                Riscos
-                              </div>
-                              {resumo.risks.map((r, i) => (
-                                <div
-                                  key={i}
-                                  className="text-[12px] leading-snug"
-                                  style={{ color: "var(--red)" }}
-                                >
-                                  {r.descricao}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {resumo.recommendedActions.length > 0 && (
-                            <div className="flex flex-col gap-1.5">
-                              <div className="text-fg3 text-[10px] tracking-[.04em] uppercase">
-                                Ações recomendadas
-                              </div>
-                              {resumo.recommendedActions.map((a, i) => (
-                                <div
-                                  key={i}
-                                  className="text-fg2 text-[12px] leading-snug"
-                                >
-                                  {a.acao}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
+                <div className="flex flex-col gap-5">
                   {/* Intimações do processo */}
                   <div>
                     <div className="mb-2.5 flex items-baseline justify-between">
@@ -301,25 +229,34 @@ export function ProcessoHub({ numero }: { numero: string }) {
                       {intimacoes.map((i) => (
                         <div
                           key={i.id}
-                          className="border-line bg-panel grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[10px] border px-[15px] py-[13px] text-left"
+                          className="border-line bg-panel grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-[10px] border py-[13px] pr-[15px] pl-3 text-left"
                           style={{ borderLeft: `3px solid ${i.urgCor}` }}
                         >
+                          <SinalUrgencia nivel={i.urgNivel} cor={i.urgCor} />
                           <span className="min-w-0">
                             <span className="block truncate text-sm font-medium">
                               {i.titulo}
                             </span>
-                            <span className="text-fg3 mt-1 block text-[11.5px]">
-                              {i.meta}
+                            <span className="text-fg3 mt-1 flex items-center gap-1.5 text-[11.5px]">
+                              <Circle className="size-[9px]" strokeWidth={2} />
+                              {i.status}
                             </span>
                           </span>
-                          {i.prazoCurto && (
-                            <span
-                              className="block font-mono text-[13px] font-medium"
-                              style={{ color: i.urgCor }}
-                            >
-                              {i.prazoCurto}
-                            </span>
-                          )}
+                          <span className="text-right">
+                            {i.prazoCurto && (
+                              <span
+                                className="block font-mono text-[13px] font-medium"
+                                style={{ color: i.urgCor }}
+                              >
+                                {i.prazoCurto}
+                              </span>
+                            )}
+                            {i.fatal && (
+                              <span className="text-fg3 mt-0.5 block text-[11px]">
+                                fatal {i.fatal}
+                              </span>
+                            )}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -343,18 +280,20 @@ export function ProcessoHub({ numero }: { numero: string }) {
                     {prazos.map((p) => (
                       <div
                         key={p.id}
-                        className="border-line2 hover:bg-hover flex items-center gap-2.5 border-b px-4 py-[11px] transition-colors"
+                        className="border-line2 hover:bg-hover flex items-center gap-3 border-b px-4 py-[11px] transition-colors"
                       >
-                        <span className="min-w-0">
+                        <SinalUrgencia nivel={p.urgNivel} cor={p.urgCor} />
+                        <span className="min-w-0 flex-1">
                           <span className="block text-[12.5px] font-medium">
                             {p.kind}
                           </span>
                           <span className="text-fg3 mt-px block text-[11px]">
-                            fatal {p.end}
+                            {p.interno ? `interno ${p.interno} · ` : ""}fatal{" "}
+                            {p.fatal}
                           </span>
                         </span>
                         <span
-                          className="ml-auto font-mono text-[11px]"
+                          className="ml-auto font-mono text-[12px] font-medium"
                           style={{ color: p.urgCor }}
                         >
                           {p.prazoCurto}
@@ -366,44 +305,105 @@ export function ProcessoHub({ numero }: { numero: string }) {
 
                 {/* COLUNA SECUNDÁRIA — referência */}
                 <div className="flex flex-col gap-3.5">
-                  {/* tarefas */}
+                  {/* AUTOS */}
                   <div className="border-line bg-panel overflow-hidden rounded-xl border">
                     <div className="border-line2 flex items-center justify-between border-b px-3.5 py-[11px]">
                       <span className="text-fg2 text-[11px] font-semibold tracking-[.03em] uppercase">
-                        Tarefas
+                        Autos
                       </span>
                       <span className="text-fg3 font-mono text-[10.5px]">
-                        {tasks.length}
+                        {autos.total}
+                        {autos.folhas > 0 ? ` · ${autos.folhas} fls.` : ""}
                       </span>
                     </div>
-                    {!referenciasPending && tasks.length === 0 && (
+                    {autos.isPending && (
                       <div className="text-fg3 px-3.5 py-5 text-center text-[11px]">
-                        Sem tarefas.
+                        Carregando autos…
                       </div>
                     )}
-                    {tasks.map((t) => (
+                    {!autos.isPending && autos.isEmpty && (
+                      <div className="text-fg3 px-3.5 py-5 text-center text-[11px]">
+                        Autos ainda não baixados.
+                      </div>
+                    )}
+                    {!autos.isEmpty && (
+                      <div className="max-h-[228px] overflow-y-auto">
+                        {autos.itens.map((a) => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => autos.abrir(a.id)}
+                            title="Abrir documento"
+                            className="border-line2 hover:bg-hover flex w-full items-center gap-2.5 border-b px-3.5 py-[9px] text-left transition-colors last:border-b-0"
+                          >
+                            <FileText
+                              className="text-fg3 size-[15px] flex-none"
+                              strokeWidth={1.6}
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="text-primary block truncate text-xs font-medium">
+                                {a.titulo}
+                              </span>
+                              <span className="text-fg3 block text-[10.5px]">
+                                {a.sub}
+                                {a.processando ? " · processando…" : ""}
+                              </span>
+                            </span>
+                            {a.fls && (
+                              <span className="text-fg3 flex-none font-mono text-[10.5px]">
+                                {a.fls}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* PEÇAS */}
+                  <div className="border-line bg-panel overflow-hidden rounded-xl border">
+                    <div className="border-line2 flex items-center justify-between border-b px-3.5 py-[11px]">
+                      <span className="text-fg2 text-[11px] font-semibold tracking-[.03em] uppercase">
+                        Peças
+                      </span>
+                      <span className="text-fg3 font-mono text-[10.5px]">
+                        {pecas.total}
+                      </span>
+                    </div>
+                    {pecas.isPending && (
+                      <div className="text-fg3 px-3.5 py-5 text-center text-[11px]">
+                        Carregando peças…
+                      </div>
+                    )}
+                    {!pecas.isPending && pecas.isEmpty && (
+                      <div className="text-fg3 px-3.5 py-5 text-center text-[11px]">
+                        Nenhuma peça neste processo.
+                      </div>
+                    )}
+                    {pecas.itens.map((p) => (
                       <div
-                        key={t.id}
-                        className="border-line2 hover:bg-hover flex items-center gap-2.5 border-b px-3.5 py-[9px] transition-colors"
+                        key={p.id}
+                        className="border-line2 flex items-center gap-2.5 border-b px-3.5 py-[10px] last:border-b-0"
                       >
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-xs font-medium">
-                            {t.titulo}
+                            {p.titulo}
                           </span>
                           <span className="text-fg3 block text-[10.5px]">
-                            {t.due}
+                            {p.data}
                           </span>
                         </span>
-                        {t.status && (
-                          <span className="text-fg3 flex-none text-[9.5px] font-medium">
-                            {t.status}
-                          </span>
-                        )}
+                        <span
+                          className="flex-none rounded-full px-2 py-[2px] text-[9.5px] font-medium"
+                          style={{ background: p.statusFundo, color: p.statusCor }}
+                        >
+                          {p.statusLabel}
+                        </span>
                       </div>
                     ))}
                   </div>
 
-                  {/* partes */}
+                  {/* PARTES */}
                   <div className="border-line bg-panel overflow-hidden rounded-xl border">
                     <div className="border-line2 border-b px-3.5 py-[11px]">
                       <span className="text-fg2 text-[11px] font-semibold tracking-[.03em] uppercase">
@@ -418,7 +418,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                     {partes.map((pt, i) => (
                       <div
                         key={i}
-                        className="border-line2 border-b px-3.5 py-[9px]"
+                        className="border-line2 border-b px-3.5 py-[9px] last:border-b-0"
                       >
                         <div className="text-fg3 text-[10px] tracking-[.04em] uppercase">
                           {pt.papel}
@@ -440,7 +440,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                     ))}
                   </div>
 
-                  {/* andamentos */}
+                  {/* ANDAMENTOS */}
                   <div className="border-line bg-panel overflow-hidden rounded-xl border">
                     <div className="border-line2 flex items-center justify-between border-b px-3.5 py-[11px]">
                       <span className="text-fg2 text-[11px] font-semibold tracking-[.03em] uppercase">
