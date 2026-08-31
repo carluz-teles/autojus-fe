@@ -12,7 +12,7 @@
 // placeholder de largura fixa quando a peça está pronta (pra o layout casar
 // com o design). Componente = JSX + binding; a lógica vive no useConstruction.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { useConstruction } from "../../hooks/use-construction";
 import { draftToPecaContexto } from "../../lib/peca-contexto";
@@ -20,6 +20,7 @@ import { ContextRail } from "../pregen/context-rail";
 import { EmptyCenter } from "../pregen/empty-center";
 import { TesesRail } from "../pregen/teses-rail";
 import { TopBar } from "../pregen/top-bar";
+import type { RichEditorHandle } from "../rich-editor/rich-editor";
 import { AssistentePanel } from "./assistente-panel";
 import { EditorCenter } from "./editor-center";
 import { GerandoCenter } from "./gerando-center";
@@ -41,6 +42,9 @@ export function ConstructionPage({ id }: { id: string }) {
 
   // Drawer lateral do teor/autos (UI local efêmera).
   const [teorAberto, setTeorAberto] = useState(false);
+  // Ref pro editor — compartilhado com o Assistente pra aplicar propostas no
+  // content_html vivo (fonte-única).
+  const editorRef = useRef<RichEditorHandle | null>(null);
 
   if (isLoading) return <PageSkeleton />;
   if (isError || !draft) return <PageError onBack={voltar} />;
@@ -99,16 +103,21 @@ export function ConstructionPage({ id }: { id: string }) {
           {stage === "pronta" && (
             <EditorCenter
               draft={draft}
-              direito={theses.direito}
-              onThesisAction={theses.editorAction}
-              pendingThesisId={theses.isTogglingId}
+              editorRef={editorRef}
               onRefazer={gerarMinuta}
             />
           )}
         </div>
 
-        {/* ASSISTENTE — dirige o /iterate (propostas com diff + Aceitar/Rejeitar). */}
-        {stage === "pronta" && <AssistentePanel draftId={draft.id} />}
+        {/* ASSISTENTE — dirige o /iterate; Aceitar aplica no editor vivo (editorRef). */}
+        {stage === "pronta" && (
+          <AssistentePanel
+            draftId={draft.id}
+            applyToEditor={(roman, novos) =>
+              editorRef.current?.applySectionChange(roman, novos) ?? false
+            }
+          />
+        )}
       </div>
 
       <TeorDrawer

@@ -1,21 +1,15 @@
 "use client";
 
 // Assistente da peça — dirige o /iterate do BE: o advogado pede um ajuste (texto
-// livre ou um chip de ajuste rápido) e a IA devolve PROPOSTAS (diff por seção).
-// Aceitar aplica a mudança no editor (update otimista do cache reconstruindo o
-// content_html via structuredToHtml — o mesmo mecanismo do ConstrucaoPage antigo —
-// + PATCH persistindo). Rejeitar só descarta o card.
+// livre ou chip) e a IA devolve PROPOSTAS (diff antigo/proposto). Aceitar aplica a
+// mudança DIRETO NO EDITOR VIVO (content_html, a fonte-única) via `applyToEditor` —
+// que reflete na hora e dispara o autosave. Sem cache/estruturado paralelo.
 
-import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { structuredToHtml } from "../components/rich-editor/html-adapter";
-import { applyParagraphChangeToHtml } from "../lib/apply-change-html";
-import type { Draft, PendingChange, QuickAdjustKind } from "../types";
-import { draftKeys } from "./use-draft";
+import type { PendingChange, QuickAdjustKind } from "../types";
 import { useIterate, useQuickAdjust } from "./use-iterate";
-import { useSaveContentHtml } from "./use-workflow";
 
 export interface AssistenteChip {
   label: string;
@@ -30,8 +24,7 @@ export const ASSISTENTE_CHIPS: AssistenteChip[] = [
   { label: "Mais fundamentos", kind: "add_grounds" },
 ];
 
-/** Proposta = um PendingChange + id de cliente estável + o pedido que a originou
- *  (instrução livre ou rótulo do chip), ecoado no cabeçalho do card. */
+/** Proposta = um PendingChange + id de cliente estável + o pedido que a originou. */
 export interface Proposta extends PendingChange {
   key: string;
   pedido: string;
@@ -39,49 +32,18 @@ export interface Proposta extends PendingChange {
 
 let propostaSeq = 0;
 
-export function useAssistente(id: string) {
-  const qc = useQueryClient();
-  const saveHtml = useSaveContentHtml(id);
+/** `applyToEditor` aplica a mudança (old→new) no editor vivo; devolve false quando
+ *  o trecho não foi encontrado (não corrompe). Vem da construction-page (editorRef). */
+export function useAssistente(
+  id: string,
+  applyToEditor: (sectionRoman: string, newParagraphs: string[]) => boolean,
+) {
   const iterate = useIterate(id);
   const quick = useQuickAdjust(id);
 
   const [propostas, setPropostas] = useState<Proposta[]>([]);
 
   const pensando = iterate.isPending || quick.isPending;
-
-  // Aplica uma mudança aceita SOBRE O content_html (a mesma base do iterate e do
-  // editor — evita o descolamento structured×content_html que fazia o "Antigo"
-  // virar fantasma). Substitui o run de parágrafos old→new no HTML, faz update
-  // otimista do cache e persiste via content_html. Se o run não for encontrado
-  // (base divergente), o helper devolve o HTML intacto — não corrompe.
-  const applyChange = (c: PendingChange) => {
-    const prev = qc.getQueryData<Draft>(draftKeys.detail(id));
-    const baseHtml =
-      prev?.contentHtml && prev.contentHtml.trim() !== ""
-        ? prev.contentHtml
-        : prev
-          ? structuredToHtml({
-              preamble: prev.preamble,
-              sections: prev.sections,
-            })
-          : "";
-    const nextHtml = applyParagraphChangeToHtml(
-      baseHtml,
-      c.oldParagraphs,
-      c.newParagraphs,
-    );
-    if (nextHtml === baseHtml) {
-      toast.error(
-        "Não encontrei esse trecho no texto atual — recarregue a peça.",
-      );
-      return false;
-    }
-    qc.setQueryData<Draft>(draftKeys.detail(id), (d) =>
-      d ? { ...d, contentHtml: nextHtml } : d,
-    );
-    saveHtml.mutate(nextHtml);
-    return true;
-  };
 
   const onResult = (changes: PendingChange[], pedido: string) => {
     if (changes.length === 0) {
@@ -124,7 +86,13 @@ export function useAssistente(id: string) {
   };
 
   const aceitar = (p: Proposta) => {
-    if (!applyChange(p)) return; // trecho não encontrado → mantém o card (já avisou)
+    const aplicou = applyToEditor(p.sectionRoman, p.newParagraphs);
+    if (!aplicou) {
+      toast.error(
+        "Não encontrei essa seção no texto atual — recarregue a peça.",
+      );
+      return; // mantém o card
+    }
     setPropostas((prev) => prev.filter((x) => x.key !== p.key));
     toast.success("Ajuste aplicado à peça.");
   };

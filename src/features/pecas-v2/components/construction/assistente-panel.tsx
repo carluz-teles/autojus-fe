@@ -10,9 +10,16 @@ import { useState } from "react";
 
 import { type Proposta, useAssistente } from "../../hooks/use-assistente";
 
-export function AssistentePanel({ draftId }: { draftId: string }) {
+export function AssistentePanel({
+  draftId,
+  applyToEditor,
+}: {
+  draftId: string;
+  /** Aplica a proposta (troca o corpo da seção) no editor vivo; false se não achar. */
+  applyToEditor: (sectionRoman: string, newParagraphs: string[]) => boolean;
+}) {
   const { propostas, pensando, chips, enviar, usarChip, aceitar, rejeitar } =
-    useAssistente(draftId);
+    useAssistente(draftId, applyToEditor);
   const [msg, setMsg] = useState("");
 
   const submit = () => {

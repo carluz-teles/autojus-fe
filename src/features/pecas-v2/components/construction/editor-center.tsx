@@ -1,63 +1,42 @@
 "use client";
 
-// Estágio PRONTA da Construção — editor WYSIWYG com a seção "Do direito"
-// composta pelas teses aprovadas inline.
+// Estágio PRONTA da Construção — editor WYSIWYG ÚNICO sobre o content_html.
 //
-// Layout (conforme o design):
-//   • strip "Rascunho da IA — edite livremente, a autoria é sua"
-//   • RichEditor topo   → preâmbulo + seção I (Dos fatos), editável
-//   • DireitoTeses      → seção II, blocos de tese com aprovação inline
-//   • RichEditor base   → seção III+ (Dos pedidos), editável
+// content_html é a FONTE-ÚNICA do texto da peça (o Tiptap é HTML-nativo; o PDF é
+// gerado do mesmo HTML via chromedp → WYSIWYG real). Não há mais split em 3 nem
+// duas representações a sincronizar: um RichEditor, um autosave (PUT /content-html).
 //
-// Persistência: autosave debounced grava o content_html RECOMBINADO (topo +
-// heading "II — DO DIREITO" + base) via PUT /content-html. Os blocos de tese
-// NÃO entram no HTML persistido — a fonte da verdade das teses é o contrato
-// Teses (estado por tese); o texto redigido da seção II é regenerado a partir
-// das teses included quando a peça for consolidada no BE.
-//
-// Fonte do HTML inicial: contentHtml (Fase B) quando disponível; senão deriva
-// de structured_content. O split em torno do heading "II" é refeito só quando
-// o shape muda (não a cada tecla — cada RichEditor mantém seu próprio state).
+// O Assistente aplica propostas direto no editor VIVO via editorRef (compartilhado
+// pela construction-page) — reflete na hora e dispara o autosave.
 
 import { Sparkles } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
-import type { EditorThesisAction } from "../../hooks/use-theses";
 import { useSaveContentHtml } from "../../hooks/use-workflow";
-import type { Draft, Thesis } from "../../types";
+import type { Draft } from "../../types";
 import { structuredToHtml } from "../rich-editor/html-adapter";
-import { RichEditor } from "../rich-editor/rich-editor";
-import { DireitoTeses } from "./direito-teses";
-import { splitAroundDireito } from "./split-content";
+import { RichEditor, type RichEditorHandle } from "../rich-editor/rich-editor";
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
 
 interface Props {
   draft: Draft;
-  /** Teses da seção "Do direito" (state ≠ off), ordenadas. */
-  direito: Thesis[];
-  onThesisAction: (thesis: Thesis, action: EditorThesisAction) => void;
-  /** thesisId com PATCH em voo. */
-  pendingThesisId: string | null;
+  /** Ref pro RichEditor — compartilhado com o Assistente (aplicar propostas). */
+  editorRef: RefObject<RichEditorHandle | null>;
   /** Refazer a minuta do zero (volta pro CTA "Gerar minuta"). */
   onRefazer: () => void;
 }
 
-export function EditorCenter({
-  draft,
-  direito,
-  onThesisAction,
-  pendingThesisId,
-  onRefazer,
-}: Props) {
+export function EditorCenter({ draft, editorRef, onRefazer }: Props) {
   const saveHtml = useSaveContentHtml(draft.id);
-  // Container do header pra onde a toolbar do RichEditor de topo é portalizada
-  // (barra fixa full-width — a formatação NÃO vive dentro da folha).
+  // Container do header pra onde a toolbar do RichEditor é portalizada (barra fixa
+  // full-width — a formatação NÃO vive dentro da folha).
   const [toolbarEl, setToolbarEl] = useState<HTMLDivElement | null>(null);
 
-  // HTML inicial: contentHtml (Fase B) senão deriva de structured_content.
-  const shapeKey = draftShapeKey(draft);
-  const fullHtml = useMemo(
+  // HTML inicial = content_html (fonte-única). Fallback pro structured só quando
+  // ainda vazio (peça recém-gerada). Memo por draft.id: depois do mount o editor é
+  // a fonte VIVA — refetches não sobrescrevem o que o advogado está editando.
+  const initialHtml = useMemo(
     () => {
       if (draft.contentHtml && draft.contentHtml.trim() !== "")
         return draft.contentHtml;
@@ -67,18 +46,8 @@ export function EditorCenter({
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draft.id, draft.contentHtml, shapeKey],
+    [draft.id],
   );
-
-  const split = useMemo(() => splitAroundDireito(fullHtml), [fullHtml]);
-
-  // Guarda o HTML editável de cada região pra recombinar no autosave.
-  const topRef = useRef(split.top);
-  const bottomRef = useRef(split.bottom);
-  useEffect(() => {
-    topRef.current = split.top;
-    bottomRef.current = split.bottom;
-  }, [split.top, split.bottom]);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -88,22 +57,17 @@ export function EditorCenter({
     [],
   );
 
-  const scheduleSave = () => {
+  const scheduleSave = (html: string) => {
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      const parts = [topRef.current];
-      if (split.hasDireito)
-        parts.push('<h2 data-roman="II">II — DO DIREITO</h2>');
-      if (bottomRef.current) parts.push(bottomRef.current);
-      saveHtml.mutate(parts.join("\n"));
-    }, AUTOSAVE_DEBOUNCE_MS);
+    timer.current = setTimeout(
+      () => saveHtml.mutate(html),
+      AUTOSAVE_DEBOUNCE_MS,
+    );
   };
 
   return (
     <div className="pb-10">
-      {/* Barra de formatação FIXA no header (full-width) — a toolbar do RichEditor
-          de topo é portalizada pra cá; nunca dentro da folha. "Refazer com IA"
-          à direita. */}
+      {/* Barra de formatação FIXA no header (full-width) — toolbar portalizada. */}
       <div className="border-line sticky top-0 z-10 flex items-center gap-2 border-b bg-[color-mix(in_oklch,var(--panel)_94%,transparent)] px-4 py-1.5 backdrop-blur">
         <div ref={setToolbarEl} className="min-w-0 flex-1" />
         <button
@@ -124,51 +88,16 @@ export function EditorCenter({
             Rascunho da IA — edite livremente, a autoria é sua
           </div>
 
-          {/* topo editável (preâmbulo + fatos) — mantém a toolbar do RichEditor */}
-          <div className="construction-editor px-10 pt-4 pb-2">
+          <div className="construction-editor px-10 pt-4 pb-6">
             <RichEditor
-              html={split.top}
+              ref={editorRef}
+              html={initialHtml}
               toolbarContainer={toolbarEl}
-              onChange={(html) => {
-                topRef.current = html;
-                scheduleSave();
-              }}
+              onChange={(html) => scheduleSave(html)}
             />
           </div>
-
-          {/* seção II — teses com aprovação inline */}
-          {split.hasDireito && (
-            <DireitoTeses
-              direito={direito}
-              onAction={onThesisAction}
-              pendingId={pendingThesisId}
-            />
-          )}
-
-          {/* base editável (pedidos etc.) — toolbar escondida (uma barra basta) */}
-          {split.bottom && (
-            <div className="construction-editor px-10 pt-2 pb-6">
-              <RichEditor
-                html={split.bottom}
-                hideToolbar
-                onChange={(html) => {
-                  bottomRef.current = html;
-                  scheduleSave();
-                }}
-              />
-            </div>
-          )}
         </div>
       </div>
     </div>
   );
-}
-
-/** Chave que muda quando o SHAPE de structured_content muda — usada como dep
- *  do memo do HTML inicial (evita re-split a cada tecla). */
-function draftShapeKey(d: Draft): string {
-  const secs = d.sections
-    .map((s) => `${s.id}:${s.paragraphs.length}`)
-    .join("|");
-  return `p${d.preamble.paragraphs.length}|s${secs}`;
 }

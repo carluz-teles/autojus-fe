@@ -30,6 +30,7 @@ import { StarterKit } from "@tiptap/starter-kit";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { createPortal } from "react-dom";
 
+import { applySectionChangeToHtml } from "../../lib/apply-change-html";
 import { RichToolbar } from "./rich-toolbar";
 
 export interface RichEditorHandle {
@@ -46,6 +47,10 @@ export interface RichEditorHandle {
    *  desaparece sozinho via animação CSS (~2.5s). Chamado pelo EditorArea
    *  logo após aceitar uma iteração pra sinalizar onde a mudança caiu. */
   highlightSection(roman: string): void;
+  /** Aplica uma proposta do Assistente NO EDITOR VIVO: troca o corpo da SEÇÃO
+   *  (ancorada pelo heading do romano) pelos novos parágrafos, e emite update
+   *  (→ autosave). Devolve false quando a seção não foi encontrada — não corrompe. */
+  applySectionChange(sectionRoman: string, newParagraphs: string[]): boolean;
 }
 
 interface Props {
@@ -166,6 +171,20 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
               top: (el as HTMLElement).scrollHeight,
               behavior: "smooth",
             });
+        },
+        applySectionChange(sectionRoman, newParagraphs) {
+          if (!editor) return false;
+          const current = editor.getHTML();
+          const next = applySectionChangeToHtml(
+            current,
+            sectionRoman,
+            newParagraphs,
+          );
+          if (next === current) return false;
+          // emitUpdate → onUpdate → onChange do parent → autosave do content_html.
+          editor.commands.setContent(next, { emitUpdate: true });
+          lastAppliedHtml.current = next;
+          return true;
         },
         highlightSection(roman: string) {
           if (!roman) return;
