@@ -1,18 +1,23 @@
 "use client";
 
-// Rail de contexto da Construção (pré-geração): CONTEXTO DO PROCESSO, card
-// INTIMAÇÃO, PARTES e FUNDADA EM (anexos). O bloco TESES A INCLUIR é montado
-// à parte (TesesRail) e injetado via `tesesSlot` pra manter este arquivo focado
-// no contexto imutável do processo.
+// Rail de contexto da Construção — ÚNICO, usado com ou sem draft (a partida
+// alimenta com o contexto da intimação; a construção, com o do draft). Seções:
+// CONTEXTO DO PROCESSO, card INTIMAÇÃO (+ "ver inteiro teor"), PARTES e FUNDADA EM
+// (o Teor da intimação de origem é o 1º item — fundamentação — seguido dos autos).
+// O bloco TESES A INCLUIR entra via `tesesSlot`.
 
 import { FileText, Mail, User } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { Draft, DraftPartyGroup } from "../../types";
+import type {
+  PecaContexto,
+  PecaContextoDoc,
+  PecaContextoParte,
+} from "../../lib/peca-contexto";
 
 interface Props {
-  draft: Draft;
-  /** Attachment em destaque por um clique de "ver fonte" numa tese. */
+  contexto: PecaContexto;
+  /** Fonte em destaque por um clique de "ver fonte" numa tese. */
   highlightedDocId: string | null;
   /** Abre o drawer lateral com o teor/autos completo da intimação de origem. */
   onVerTeor: () => void;
@@ -20,12 +25,12 @@ interface Props {
 }
 
 export function ContextRail({
-  draft,
+  contexto,
   highlightedDocId,
   onVerTeor,
   tesesSlot,
 }: Props) {
-  const { process, intimation, deadline, partyGroups, attachments } = draft;
+  const { processo, intimacao, partes, autos } = contexto;
   return (
     <div className="border-line bg-panel w-72 flex-none overflow-y-auto border-r p-4">
       <SectionLabel>Contexto do processo</SectionLabel>
@@ -34,16 +39,19 @@ export function ContextRail({
         <FileText className="text-fg3 mt-0.5 size-[15px] flex-none" />
         <div className="min-w-0 flex-1">
           <div className="text-fg2 font-mono text-[11.5px]">
-            {process.cnj || "—"}
+            {processo.cnj || "—"}
           </div>
-          <div className="text-fg3 mt-px text-[11px]">{process.classe}</div>
+          <div className="text-fg3 mt-px text-[11px]">{processo.classe}</div>
         </div>
       </div>
 
       <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-[5px]">
-        <Meta rot="Assunto" val={process.assunto} />
-        <Meta rot="Órgão" val={process.orgao} />
-        <Meta rot="Valor" val={process.valor} />
+        <Meta rot="Assunto" val={processo.assunto} />
+        <Meta rot="Órgão" val={processo.orgao} />
+        {processo.tribunalGrau && (
+          <Meta rot="Tribunal" val={processo.tribunalGrau} />
+        )}
+        <Meta rot="Valor" val={processo.valor} />
       </dl>
 
       {/* Card INTIMAÇÃO */}
@@ -55,14 +63,14 @@ export function ContextRail({
           </span>
         </div>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-[5px] px-3 py-[11px]">
-          <Meta rot="Tipo" val={intimation.title} />
-          <Meta rot="Publicação" val={intimation.publishedAt} />
-          <Meta rot="Prazo" val={deadline.endDate} strong />
+          <Meta rot="Tipo" val={intimacao.tipoLabel} />
+          <Meta rot="Publicação" val={intimacao.publishedAt} />
+          <Meta rot="Prazo" val={intimacao.prazoLabel} strong />
         </dl>
         <div className="px-3 pb-[11px]">
           <p className="text-fg2 m-0 line-clamp-3 text-[11px] leading-[1.5]">
             <span className="text-fg3">Teor · </span>
-            {intimation.teor}
+            {intimacao.teor}
           </p>
           <button
             type="button"
@@ -75,12 +83,16 @@ export function ContextRail({
       </div>
 
       {/* PARTES */}
-      <SectionLabel className="mt-5">Partes</SectionLabel>
-      <div className="mt-2 flex flex-col gap-1.5">
-        {partyGroups.map((pt, i) => (
-          <PartyCard key={`${pt.roleLabel}-${i}`} party={pt} />
-        ))}
-      </div>
+      {partes.length > 0 && (
+        <>
+          <SectionLabel className="mt-5">Partes</SectionLabel>
+          <div className="mt-2 flex flex-col gap-1.5">
+            {partes.map((pt, i) => (
+              <PartyCard key={`${pt.roleLabel}-${i}`} party={pt} />
+            ))}
+          </div>
+        </>
+      )}
 
       {/* FUNDADA EM — o Teor da intimação de origem TAMBÉM é fundamentação, então
           entra como o 1º item (badge Teor), seguido dos autos/anexos. */}
@@ -88,46 +100,21 @@ export function ContextRail({
       <div className="flex items-center gap-[7px]">
         <SectionLabel className="flex-1">Fundada em</SectionLabel>
         <span className="text-fg3 font-mono text-[10.5px]">
-          {attachments.length + 1}
+          {autos.length + 1}
         </span>
       </div>
       <div className="mt-2 flex flex-col gap-1.5">
         <TeorSource
-          id={`fundada-em-${intimation.id}`}
-          publishedAt={intimation.publishedAt}
-          teor={intimation.teor}
-          highlight={intimation.id === highlightedDocId}
+          id={`fundada-em-${intimacao.id}`}
+          publishedAt={intimacao.publishedAt}
+          teor={intimacao.teor}
+          highlight={intimacao.id === highlightedDocId}
           onClick={onVerTeor}
         />
-        {attachments.map((a) => {
-          const highlight = a.id === highlightedDocId;
-          return (
-            <div
-              key={a.id}
-              id={`fundada-em-${a.id}`}
-              className={
-                "border-line bg-background grid grid-cols-[15px_1fr_auto] items-center gap-[9px] rounded-[9px] border border-l-[3px] px-2.5 py-[9px] transition-colors " +
-                (highlight
-                  ? "border-l-primary bg-selected"
-                  : "border-l-primary/40")
-              }
-            >
-              <FileText className="text-primary size-[14px] flex-none" />
-              <span className="min-w-0">
-                <span className="block truncate text-[12px] font-medium">
-                  {a.name}
-                </span>
-                <span className="text-fg3 mt-px block text-[10.5px]">
-                  {a.sizeLabel}
-                </span>
-              </span>
-              <span className="bg-primary/10 text-primary flex-none rounded-full px-[7px] py-0.5 text-[9px] font-medium">
-                {a.category}
-              </span>
-            </div>
-          );
-        })}
-        {attachments.length === 0 && (
+        {autos.map((a) => (
+          <DocSource key={a.id} doc={a} highlight={a.id === highlightedDocId} />
+        ))}
+        {autos.length === 0 && (
           <p className="text-fg3 text-[11px] leading-[1.5]">
             Sem autos anexados — a peça se funda no teor da intimação. Anexe
             documentos do processo para ancorar mais teses.
@@ -230,7 +217,37 @@ function TeorSource({
   );
 }
 
-function PartyCard({ party }: { party: DraftPartyGroup }) {
+/** Item de documento do caso (autos) na FUNDADA EM. */
+function DocSource({
+  doc,
+  highlight,
+}: {
+  doc: PecaContextoDoc;
+  highlight: boolean;
+}) {
+  return (
+    <div
+      id={`fundada-em-${doc.id}`}
+      className={
+        "border-line bg-background grid grid-cols-[15px_1fr_auto] items-center gap-[9px] rounded-[9px] border border-l-[3px] px-2.5 py-[9px] transition-colors " +
+        (highlight ? "border-l-primary bg-selected" : "border-l-primary/40")
+      }
+    >
+      <FileText className="text-primary size-[14px] flex-none" />
+      <span className="min-w-0">
+        <span className="block truncate text-[12px] font-medium">
+          {doc.name}
+        </span>
+        <span className="text-fg3 mt-px block text-[10.5px]">{doc.meta}</span>
+      </span>
+      <span className="bg-primary/10 text-primary flex-none rounded-full px-[7px] py-0.5 text-[9px] font-medium">
+        {doc.category}
+      </span>
+    </div>
+  );
+}
+
+function PartyCard({ party }: { party: PecaContextoParte }) {
   return (
     <div
       className={

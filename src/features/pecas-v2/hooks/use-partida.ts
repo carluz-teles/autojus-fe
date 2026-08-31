@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useIntimacaoDetalhe } from "@/features/prazos/hooks/use-intimacao-detalhe";
 import { useApi } from "@/lib/api/use-api";
 
+import type { PecaContexto } from "../lib/peca-contexto";
 import {
   createDraft,
   generateDraft,
@@ -21,6 +22,37 @@ import {
   getIntimationTheses,
 } from "../services/pecas-v2.service";
 import type { Thesis } from "../types";
+
+/** Detalhe da intimação (model do useIntimacaoDetalhe) → contexto do rail. Na partida
+ *  ainda não há draft: valor da causa desconhecido ("") e sem anexos (só o Teor). */
+function intimacaoToPecaContexto(
+  m: NonNullable<ReturnType<typeof useIntimacaoDetalhe>["model"]>,
+): PecaContexto {
+  return {
+    processo: {
+      cnj: m.cnj,
+      classe: m.classe,
+      assunto: m.assunto,
+      orgao: m.orgao,
+      tribunalGrau: m.tribunalGrau,
+      valor: "",
+    },
+    intimacao: {
+      id: m.id,
+      tipoLabel: m.tipoLabel,
+      publishedAt: m.publicadoEm,
+      prazoLabel: `${m.prazoNum} ${m.prazoFrase}`.trim(),
+      teor: m.teor,
+    },
+    partes: m.destinatarios.map((d) => ({
+      roleLabel: "Advogado(a)",
+      name: d.nome,
+      counselLabel: d.oab ? `OAB ${d.oab}` : "",
+      isClient: d.matched,
+    })),
+    autos: [],
+  };
+}
 
 const thesesKey = (intimacaoId: string) =>
   ["intimacao", intimacaoId, "theses"] as const;
@@ -133,8 +165,9 @@ export function usePartida(intimacaoId: string) {
   const voltar = () => router.push(`/intimacoes/${intimacaoId}`);
 
   return {
-    contexto: detalhe.model,
+    contexto: detalhe.model ? intimacaoToPecaContexto(detalhe.model) : null,
     contextoLoading: detalhe.isPending,
+    teor: detalhe.model?.teor ?? "",
     theses: railTheses,
     selectedCount: selected.size,
     isLoading: thesesQuery.isLoading,

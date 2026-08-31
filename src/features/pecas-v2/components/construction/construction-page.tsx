@@ -15,6 +15,7 @@
 import { useState } from "react";
 
 import { useConstruction } from "../../hooks/use-construction";
+import { draftToPecaContexto } from "../../lib/peca-contexto";
 import { ContextRail } from "../pregen/context-rail";
 import { EmptyCenter } from "../pregen/empty-center";
 import { TesesRail } from "../pregen/teses-rail";
@@ -61,7 +62,7 @@ export function ConstructionPage({ id }: { id: string }) {
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <ContextRail
-          draft={draft}
+          contexto={draftToPecaContexto(draft)}
           highlightedDocId={highlightedDocId}
           onVerTeor={() => setTeorAberto(true)}
           tesesSlot={
