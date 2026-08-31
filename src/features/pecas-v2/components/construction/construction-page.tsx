@@ -12,6 +12,8 @@
 // placeholder de largura fixa quando a peça está pronta (pra o layout casar
 // com o design). Componente = JSX + binding; a lógica vive no useConstruction.
 
+import { useState } from "react";
+
 import { useConstruction } from "../../hooks/use-construction";
 import { ContextRail } from "../pregen/context-rail";
 import { EmptyCenter } from "../pregen/empty-center";
@@ -19,6 +21,7 @@ import { TesesRail } from "../pregen/teses-rail";
 import { TopBar } from "../pregen/top-bar";
 import { EditorCenter } from "./editor-center";
 import { GerandoCenter } from "./gerando-center";
+import { TeorDrawer } from "./teor-drawer";
 
 export function ConstructionPage({ id }: { id: string }) {
   const {
@@ -34,8 +37,16 @@ export function ConstructionPage({ id }: { id: string }) {
     voltar,
   } = useConstruction(id);
 
+  // Drawer lateral do teor/autos (UI local efêmera).
+  const [teorAberto, setTeorAberto] = useState(false);
+
   if (isLoading) return <PageSkeleton />;
   if (isError || !draft) return <PageError onBack={voltar} />;
+
+  const teorLaudas = Math.max(
+    1,
+    Math.round((draft.intimation.teor?.length ?? 0) / 2100),
+  );
 
   const tesesLabel =
     theses.selectedCount === 1 ? "1 tese" : `${theses.selectedCount} teses`;
@@ -52,6 +63,7 @@ export function ConstructionPage({ id }: { id: string }) {
         <ContextRail
           draft={draft}
           highlightedDocId={highlightedDocId}
+          onVerTeor={() => setTeorAberto(true)}
           tesesSlot={
             <TesesRail
               theses={theses.theses}
@@ -97,6 +109,15 @@ export function ConstructionPage({ id }: { id: string }) {
         {/* ASSISTENTE — DEFERIDO neste milestone (placeholder p/ o layout). */}
         {stage === "pronta" && <AssistantPlaceholder />}
       </div>
+
+      <TeorDrawer
+        open={teorAberto}
+        onClose={() => setTeorAberto(false)}
+        titulo="Intimação de origem"
+        tipo="Teor"
+        meta={`Publicado ${draft.intimation.publishedAt} · DJEN · ~${teorLaudas} lauda${teorLaudas > 1 ? "s" : ""}`}
+        conteudo={draft.intimation.teor}
+      />
     </div>
   );
 }

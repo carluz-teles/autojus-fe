@@ -142,7 +142,10 @@ export interface ThesisAPI {
   label: string;
   foundation: string;
   legal_ref: string;
+  /** FK ao documento do caso (autos) — vazio quando a fonte é o teor. */
   source_document_id: string;
+  /** FK à intimação quando a fonte é o TEOR — vazio quando é um doc. */
+  source_intimation_id?: string;
   source_label: string;
   source_excerpt: string;
   grounded: boolean;

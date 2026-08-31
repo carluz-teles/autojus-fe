@@ -11,10 +11,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { useIntimacaoDetalhe } from "@/features/prazos/hooks/use-intimacao-detalhe";
 import { useApi } from "@/lib/api/use-api";
 
 import {
   createDraft,
+  generateDraft,
   generateIntimationTheses,
   getIntimationTheses,
 } from "../services/pecas-v2.service";
@@ -27,6 +29,10 @@ export function usePartida(intimacaoId: string) {
   const fetcher = useApi();
   const router = useRouter();
   const qc = useQueryClient();
+
+  // Contexto rico da origem (processo/intimação/teor/partes/prazo/providências),
+  // reusando o detalhe da intimação — mesma fonte da tela de Intimação.
+  const detalhe = useIntimacaoDetalhe(intimacaoId);
 
   // Seleção EFÊMERA (client-side) — quais teses entram na peça. Só vira estado
   // persistido (draft_thesis) no "Gerar minuta".
@@ -101,12 +107,19 @@ export function usePartida(intimacaoId: string) {
     state: selected.has(t.id) ? "included" : "off",
   }));
 
+  // "Gerar minuta": materializa o draft (com as teses selecionadas semeadas como
+  // included) E dispara a geração numa tacada — o usuário cai já no estado "gerando"
+  // (streaming) da Construção, sem um segundo clique.
   const create = useMutation({
-    mutationFn: () =>
-      createDraft(fetcher, {
+    mutationFn: async () => {
+      const ids = [...selected];
+      const { id } = await createDraft(fetcher, {
         intimationId: intimacaoId,
-        thesisIds: [...selected],
-      }),
+        thesisIds: ids,
+      });
+      await generateDraft(fetcher, id, ids);
+      return { id };
+    },
     onSuccess: ({ id }) => router.replace(`/pecas/${id}`),
     onError: () =>
       toast.error("Não foi possível gerar a minuta. Tente novamente."),
@@ -117,9 +130,11 @@ export function usePartida(intimacaoId: string) {
     create.mutate();
   };
 
-  const voltar = () => router.push("/prazos");
+  const voltar = () => router.push(`/intimacoes/${intimacaoId}`);
 
   return {
+    contexto: detalhe.model,
+    contextoLoading: detalhe.isPending,
     theses: railTheses,
     selectedCount: selected.size,
     isLoading: thesesQuery.isLoading,

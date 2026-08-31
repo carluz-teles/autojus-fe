@@ -20,7 +20,7 @@
 // o shape muda (não a cada tecla — cada RichEditor mantém seu próprio state).
 
 import { Sparkles } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { EditorThesisAction } from "../../hooks/use-theses";
 import { useSaveContentHtml } from "../../hooks/use-workflow";
@@ -51,6 +51,9 @@ export function EditorCenter({
   onRefazer,
 }: Props) {
   const saveHtml = useSaveContentHtml(draft.id);
+  // Container do header pra onde a toolbar do RichEditor de topo é portalizada
+  // (barra fixa full-width — a formatação NÃO vive dentro da folha).
+  const [toolbarEl, setToolbarEl] = useState<HTMLDivElement | null>(null);
 
   // HTML inicial: contentHtml (Fase B) senão deriva de structured_content.
   const shapeKey = draftShapeKey(draft);
@@ -98,17 +101,15 @@ export function EditorCenter({
 
   return (
     <div className="pb-10">
-      {/* barra de formatação sticky (o design) — ação "Refazer com IA" à direita.
-          A formatação inline por região vem da toolbar sticky do RichEditor de
-          topo (a base esconde a sua pra não duplicar). */}
-      <div className="border-line sticky top-0 z-10 flex items-center gap-3 border-b bg-[color-mix(in_oklch,var(--panel)_94%,transparent)] px-4 py-2 backdrop-blur">
-        <span className="text-fg3 text-[11.5px]">
-          Formatação: selecione um trecho no rascunho de cima.
-        </span>
+      {/* Barra de formatação FIXA no header (full-width) — a toolbar do RichEditor
+          de topo é portalizada pra cá; nunca dentro da folha. "Refazer com IA"
+          à direita. */}
+      <div className="border-line sticky top-0 z-10 flex items-center gap-2 border-b bg-[color-mix(in_oklch,var(--panel)_94%,transparent)] px-4 py-1.5 backdrop-blur">
+        <div ref={setToolbarEl} className="min-w-0 flex-1" />
         <button
           type="button"
           onClick={onRefazer}
-          className="border-primary/35 bg-primary/[0.07] text-primary hover:bg-primary/10 ml-auto inline-flex items-center gap-1.5 rounded-[7px] border px-2.5 py-1.5 text-[11.5px] font-medium"
+          className="border-primary/35 bg-primary/[0.07] text-primary hover:bg-primary/10 ml-auto inline-flex flex-none items-center gap-1.5 rounded-[7px] border px-2.5 py-1.5 text-[11.5px] font-medium"
         >
           <Sparkles className="size-[13px]" />
           Refazer com IA
@@ -127,6 +128,7 @@ export function EditorCenter({
           <div className="construction-editor px-10 pt-4 pb-2">
             <RichEditor
               html={split.top}
+              toolbarContainer={toolbarEl}
               onChange={(html) => {
                 topRef.current = html;
                 scheduleSave();

@@ -130,6 +130,18 @@ function useModel(i: IntimacaoDetalheView | undefined) {
       orgao: i.judging_body || i.court,
       publicadoEm: i.published_at ? formatarData(i.published_at) : "—",
 
+      // Contexto do processo (usado no rail da Construção/partida da peça).
+      classe: i.class,
+      assunto: i.subject,
+      tribunal: i.court,
+      tribunalGrau: [i.court, i.degree].filter(Boolean).join(" · "),
+      // Destinatários (advogados endereçados) — "Partes/Procuradores" no rail.
+      destinatarios: i.recipients.map((r) => ({
+        nome: r.name,
+        oab: [r.oab_number, r.oab_uf].filter(Boolean).join("/"),
+        matched: r.matched,
+      })),
+
       // ciclo de vida (badge de situação + stepper)
       statusLabel: status.label,
       statusCor: status.cor,

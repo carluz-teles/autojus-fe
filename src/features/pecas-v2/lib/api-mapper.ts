@@ -232,7 +232,10 @@ export function mapThesisFromApi(api: ThesisAPI): Thesis {
     label: api.label,
     foundation: api.foundation,
     legalRef: api.legal_ref,
-    sourceDocumentId: api.source_document_id,
+    // Proveniência: doc do caso OU teor da intimação. Colapsamos numa única
+    // referência (sourceDocumentId) — pra teor, é o intimation id, que casa com
+    // o id do item "Intimação de origem" na Fundada em ("ver fonte" destaca ele).
+    sourceDocumentId: api.source_document_id || api.source_intimation_id || "",
     sourceLabel: api.source_label,
     sourceExcerpt: api.source_excerpt,
     grounded: !!api.grounded,

@@ -14,6 +14,8 @@ import { TopBar } from "./top-bar";
 
 export function PartidaPage({ intimacaoId }: { intimacaoId: string }) {
   const {
+    contexto,
+    contextoLoading,
     theses,
     selectedCount,
     isLoading,
@@ -30,11 +32,16 @@ export function PartidaPage({ intimacaoId }: { intimacaoId: string }) {
 
   return (
     <div className="bg-background text-foreground flex h-dvh flex-col text-[13px]">
-      <TopBar title="Nova peça" cnjShort="" onBack={voltar} />
+      <TopBar
+        title="Nova peça"
+        cnjShort={contexto?.cnj ?? ""}
+        onBack={voltar}
+      />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <PartidaRail
-          intimacaoId={intimacaoId}
+          contexto={contexto}
+          contextoLoading={contextoLoading}
           theses={theses}
           highlightedDocId={highlightedDocId}
           tesesSlot={
