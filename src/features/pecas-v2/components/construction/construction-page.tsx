@@ -20,6 +20,7 @@ import { ContextRail } from "../pregen/context-rail";
 import { EmptyCenter } from "../pregen/empty-center";
 import { TesesRail } from "../pregen/teses-rail";
 import { TopBar } from "../pregen/top-bar";
+import { AssistentePanel } from "./assistente-panel";
 import { EditorCenter } from "./editor-center";
 import { GerandoCenter } from "./gerando-center";
 import { TeorDrawer } from "./teor-drawer";
@@ -106,8 +107,8 @@ export function ConstructionPage({ id }: { id: string }) {
           )}
         </div>
 
-        {/* ASSISTENTE — DEFERIDO neste milestone (placeholder p/ o layout). */}
-        {stage === "pronta" && <AssistantPlaceholder />}
+        {/* ASSISTENTE — dirige o /iterate (propostas com diff + Aceitar/Rejeitar). */}
+        {stage === "pronta" && <AssistentePanel draftId={draft.id} />}
       </div>
 
       <TeorDrawer
@@ -119,23 +120,6 @@ export function ConstructionPage({ id }: { id: string }) {
         conteudo={draft.intimation.teor}
       />
     </div>
-  );
-}
-
-/** Placeholder do painel Assistente (à direita). O painel real fica pra um
- *  milestone seguinte; aqui só reserva a coluna pra o layout casar com o
- *  design. */
-function AssistantPlaceholder() {
-  return (
-    <aside className="border-line bg-panel hidden w-80 flex-none flex-col border-l lg:flex">
-      <div className="border-line flex items-center gap-2 border-b px-4 py-3">
-        <span className="text-primary">✦</span>
-        <span className="text-[13px] font-semibold">Assistente</span>
-      </div>
-      <div className="text-fg3 flex flex-1 items-center justify-center px-6 text-center text-[12px] leading-[1.6]">
-        O assistente entra num próximo milestone.
-      </div>
-    </aside>
   );
 }
 
