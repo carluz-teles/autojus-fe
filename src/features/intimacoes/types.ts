@@ -61,6 +61,9 @@ export interface IntimacaoView {
   assignee_user_id: string | null;
   /** Nome do responsável (joined no BE); null = não atribuído. */
   assignee_user_name: string | null;
+  /** Estágio do ciclo de trabalho (Status) — derivado no BE (prazo + peça).
+   *  Alimenta o filtro/pill de Status da inbox e o stepper do detalhe. */
+  work_stage: IntimacaoWorkStage;
 }
 
 /**
@@ -97,9 +100,15 @@ export type IntimacaoProvidenciaStatus = "SUGGESTED" | "APPROVED" | "DISCARDED";
  * a UI mostra "—") + status. Só as SUGGESTED trazem os botões de ação na UI. Espelha o
  * IntimacaoProvidenciaView do BE.
  */
+/** Natureza da providência (chip do card), classificada pela IA. "" em análises
+ *  antigas. PECA = exige redigir peça; CIENCIA = comunicação/apoio (fluxo curto). */
+export type IntimacaoProvidenciaKind = "PECA" | "CIENCIA" | "";
+
 export interface IntimacaoProvidencia {
   title: string;
   description: string;
+  /** Natureza classificada pela IA (PECA|CIENCIA); "" quando não classificada. */
+  kind: IntimacaoProvidenciaKind;
   /** Id INTERNO do responsável sugerido pela IA (app_user); null quando não sugerido. */
   suggested_assignee_user_id: string | null;
   /** Nome do responsável sugerido (resolvido no BE); null quando não sugerido. */
@@ -129,9 +138,27 @@ export interface IntimacaoAnalise {
  * o órgão julgador, a lista de destinatários, os responsáveis e o histórico derivado.
  * Espelha o IntimacaoDetailView do BE.
  */
+/**
+ * Estágio da intimação no ciclo da unidade de trabalho (recebida → protocolada) —
+ * fonte ÚNICA que o stepper do detalhe consome. Projeção derivada no BE (prazo +
+ * peça); espelha os WorkStage* de internal/acquisition/read.go.
+ */
+export type IntimacaoWorkStage =
+  | "RECEIVED"
+  | "AWAITING_CONFIRMATION"
+  | "CONFIRMED"
+  | "DRAFTING"
+  | "PARTNER_REVIEW"
+  | "FILED";
+
 export interface IntimacaoDetalheView extends IntimacaoView {
   /** Teor COMPLETO da publicação (não truncado como content_preview). */
   content: string;
+  /** Estágio do ciclo de trabalho (stepper) — derivado no BE. */
+  work_stage: IntimacaoWorkStage;
+  /** Ato principal classificado pela IA (ex.: "Contestação") — título do detalhe
+   *  (fallback classe+assunto) e pill "Ato". "" pré-análise. */
+  ai_act: string;
   /** Órgão julgador (court_record.judging_body). */
   judging_body: string;
   /** Data de distribuição/ajuizamento (court_record.filed_at) — "YYYY-MM-DD".

@@ -16,6 +16,7 @@ import { tituloIntimacao } from "@/features/intimacoes/lib/titulo";
 import type {
   IntimacaoDetalheView,
   IntimacaoUserStatus,
+  IntimacaoWorkStage,
 } from "@/features/intimacoes/types";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { nomeExibicao } from "@/features/organization/lib/labels";
@@ -72,12 +73,63 @@ function dataCurta(iso: string): string {
   return `${dd}/${mm}`;
 }
 
-// Etapas do ciclo de vida da triagem (stepper). PENDING → RESOLVED; IGNORED é
-// um estado terminal alternativo. O stepper marca até onde a intimação chegou.
-const CICLO: { key: IntimacaoUserStatus; label: string }[] = [
-  { key: "PENDING", label: "Pendente" },
-  { key: "RESOLVED", label: "Resolvida" },
-];
+// Etapas do ciclo de vida da UNIDADE DE TRABALHO (stepper do design), da captura
+// ao protocolo. O passo atual é derivado do estado REAL (prazo confirmado + status
+// da peça mais recente) — ver passoDoCiclo. "estado" pinta o marcador/rótulo.
+const CICLO_STEPS = [
+  "Intimação recebida",
+  "A confirmar",
+  "Confirmado",
+  "Em elaboração",
+  "Revisão do sócio",
+  "Protocolado",
+] as const;
+
+type EstadoPasso = "done" | "current" | "todo";
+
+// work_stage (fonte única do BE) → índice do passo no stepper. Ordem 1:1 com
+// CICLO_STEPS. Fallback 0 (recebida) para um valor desconhecido.
+const PASSO_POR_WORK_STAGE: Record<IntimacaoWorkStage, number> = {
+  RECEIVED: 0,
+  AWAITING_CONFIRMATION: 1,
+  CONFIRMED: 2,
+  DRAFTING: 3,
+  PARTNER_REVIEW: 4,
+  FILED: 5,
+};
+
+// Rótulo da peça (minuta) para o rodapé das Providências, derivado do work_stage:
+// existe peça a partir de DRAFTING; antes disso, "Ainda não gerada".
+const PECA_LABEL_POR_WORK_STAGE: Record<IntimacaoWorkStage, string> = {
+  RECEIVED: "Ainda não gerada",
+  AWAITING_CONFIRMATION: "Ainda não gerada",
+  CONFIRMED: "Ainda não gerada",
+  DRAFTING: "Em elaboração",
+  PARTNER_REVIEW: "Revisão do sócio",
+  FILED: "Protocolada",
+};
+
+/** Urgência da FAIXA (badge "Urgente"), derivada de days_left — dimensão separada
+ *  da triagem (user_status). Atraso = vermelho; vence hoje/≤2d = latão; senão sem
+ *  badge (não-urgente não polui a faixa). null = sem prazo. */
+function urgenciaFaixa(
+  daysLeft: number | null,
+): { label: string; cor: string; fundo: string } | null {
+  if (daysLeft === null) return null;
+  if (daysLeft < 0)
+    return {
+      label: "Urgente",
+      cor: "var(--red)",
+      fundo: "color-mix(in oklch, var(--red) 12%, transparent)",
+    };
+  if (daysLeft <= 2)
+    return {
+      label: "Urgente",
+      cor: "var(--gold)",
+      fundo: "color-mix(in oklch, var(--gold) 14%, transparent)",
+    };
+  return null;
+}
 
 // ── modelo derivado (VM que o componente consome) ────────────────────────────
 
@@ -89,20 +141,23 @@ function useModel(i: IntimacaoDetalheView | undefined) {
 
     const status = userStatusInfo(i.user_status);
     const prazo = prazoInfo(i.prazo?.days_left ?? null);
-    const ignorada = i.user_status === "IGNORED";
+    const urgencia = urgenciaFaixa(i.prazo?.days_left ?? null);
 
-    // Ciclo de vida: o índice "atual" é a etapa alcançada. IGNORED fica só na
-    // primeira etapa (não passou por RESOLVED) e a marca como terminal.
-    const atual = i.user_status === "RESOLVED" ? 1 : 0;
-    const stepper = CICLO.map((s, idx) => ({
-      key: s.key,
-      label: idx === 0 && ignorada ? "Ignorada" : s.label,
-      cor:
-        idx === atual ? "var(--fg)" : idx < atual ? "var(--fg2)" : "var(--fg3)",
-      temLinha: idx < CICLO.length - 1,
-      linhaCor: idx < atual ? "var(--primary)" : "var(--line)",
-      flex: idx < CICLO.length - 1 ? 1 : 0,
-    }));
+    // Stepper do ciclo de trabalho (6 passos): o passo atual é o work_stage do BE
+    // (fonte única). done/current/todo pinta marcador+rótulo.
+    const atual = PASSO_POR_WORK_STAGE[i.work_stage] ?? 0;
+    const stepper = CICLO_STEPS.map((label, idx) => {
+      const estado: EstadoPasso =
+        idx < atual ? "done" : idx === atual ? "current" : "todo";
+      return {
+        key: label,
+        label,
+        estado,
+        temLinha: idx < CICLO_STEPS.length - 1,
+        linhaFeita: idx < atual,
+        flex: idx < CICLO_STEPS.length - 1 ? 1 : 0,
+      };
+    });
 
     // Responsável: nome resolvido pelo join do BE ou pelo diretório (nunca id cru).
     const membro = i.assignee_user_id
@@ -125,7 +180,10 @@ function useModel(i: IntimacaoDetalheView | undefined) {
       id: i.id,
       cnj: i.cnj_number,
       courtRecordId: i.court_record_id,
-      titulo: tituloIntimacao(i),
+      // Título = o ATO classificado pela IA (pós-análise); fallback classe+assunto
+      // pré-análise. `ato` também alimenta o pill "Ato" da derivação.
+      titulo: i.ai_act?.trim() || tituloIntimacao(i),
+      ato: i.ai_act?.trim() ?? "",
       tipoLabel: TYPE_LABEL[i.type],
       orgao: i.judging_body || i.court,
       publicadoEm: i.published_at ? formatarData(i.published_at) : "—",
@@ -148,11 +206,16 @@ function useModel(i: IntimacaoDetalheView | undefined) {
       statusFundo: status.fundo,
       stepper,
 
-      // prazo (contador grande)
+      // faixa: badge de urgência (dimensão do relógio, ≠ triagem)
+      urgencia,
+
+      // prazo (contador grande). `fatalData` = data fatal real (end_date). O prazo
+      // "interno" (folga de segurança) vem do motor de prazos — ainda 💀 (esqueleto).
       prazoNum: prazo.num,
       prazoFrase: prazo.frase,
       prazoCor: prazo.cor,
       prazoConfirmado: i.prazo?.confirmed ?? false,
+      fatalData: i.prazo?.end_date ? formatarData(i.prazo.end_date) : "",
 
       // IA (pré vs pós-análise)
       analisada,
@@ -161,6 +224,14 @@ function useModel(i: IntimacaoDetalheView | undefined) {
       analisadaEm: i.ai_analyzed_at ? formatarData(i.ai_analyzed_at) : "",
       providencias,
       nProvidencias: providencias.length,
+
+      // peça (minuta) — rótulo de status derivado do work_stage, p/ o rodapé das
+      // Providências. pecaExiste = já há minuta (DRAFTING+).
+      pecaLabel: PECA_LABEL_POR_WORK_STAGE[i.work_stage] ?? "Ainda não gerada",
+      pecaExiste:
+        i.work_stage === "DRAFTING" ||
+        i.work_stage === "PARTNER_REVIEW" ||
+        i.work_stage === "FILED",
 
       // teor completo + trilha
       teor: i.content?.trim() ?? "",

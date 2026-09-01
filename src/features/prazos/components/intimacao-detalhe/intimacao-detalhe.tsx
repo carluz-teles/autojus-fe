@@ -1,19 +1,27 @@
 "use client";
 
 import { Menu } from "@base-ui/react/menu";
-import { Check, ChevronLeft, FileText, Sparkles } from "lucide-react";
-import Link from "next/link";
-
 import {
-  AnalisarLoading,
-  ProvidenciaRow,
-} from "@/features/intimacoes/components/shared/analisar-card";
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Plus,
+  Sparkles,
+} from "lucide-react";
+import Link from "next/link";
+import { toast } from "sonner";
+
+import { AnalisarLoading } from "@/features/intimacoes/components/shared/analisar-card";
 import {
   Avatar,
   initials,
 } from "@/features/intimacoes/components/shared/avatar";
+import { useAprovarProvidencia } from "@/features/intimacoes/hooks/use-intimacoes";
+import type { IntimacaoProvidencia } from "@/features/intimacoes/types";
 import { nomeExibicao } from "@/features/organization/lib/labels";
 import { useCriarPecaDaIntimacao } from "@/features/pecas-v2/hooks/use-criar-peca";
+import { sanitizeContentHtml } from "@/lib/html/sanitize-content";
 import { cn } from "@/lib/utils";
 
 import { useIntimacaoDetalhe } from "../../hooks/use-intimacao-detalhe";
@@ -79,14 +87,35 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
             <div className="flex items-start gap-6 px-[22px] py-5">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
+                  {m.urgencia ? (
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-md px-[9px] py-[3px] text-[11.5px] font-medium"
+                      style={{
+                        background: m.urgencia.fundo,
+                        color: m.urgencia.cor,
+                      }}
+                    >
+                      {m.urgencia.label}
+                    </span>
+                  ) : null}
+                  {/* 💀 Divergente + selo — dimensões do motor de prazos (memória
+                      de cálculo). Placeholders estáticos até o motor existir. */}
                   <span
                     className="inline-flex items-center gap-1.5 rounded-md px-[9px] py-[3px] text-[11.5px] font-medium"
-                    style={{ background: m.statusFundo, color: m.statusCor }}
+                    style={{
+                      background:
+                        "color-mix(in oklch, var(--gold) 12%, transparent)",
+                      color: "var(--gold)",
+                    }}
+                    title="Divergência declarado × calculado — em reformulação"
                   >
-                    {m.statusLabel}
+                    Divergente
                   </span>
-                  <span className="bg-hover text-fg2 inline-flex items-center gap-1.5 rounded-md px-[9px] py-[3px] text-[11.5px] font-medium">
-                    {m.tipoLabel}
+                  <span
+                    className="border-line text-fg3 inline-flex items-center gap-1.5 rounded-md border border-dashed px-[9px] py-[3px] text-[11px] font-medium"
+                    title="Selo de confiança — em reformulação"
+                  >
+                    selo · a apurar
                   </span>
                   <span className="text-fg3 text-[11.5px]">{m.orgao}</span>
                 </div>
@@ -106,42 +135,54 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
                 </span>
                 <span className="text-fg3 text-[12px] leading-[1.5]">
                   {m.prazoFrase}
-                  <br />
-                  prazo{" "}
-                  <strong className="text-foreground font-medium">
-                    {m.prazoConfirmado ? "confirmado" : "sugerido"}
-                  </strong>
+                  {m.fatalData ? (
+                    <>
+                      <br />
+                      fatal{" "}
+                      <strong className="text-foreground font-medium">
+                        {m.fatalData}
+                      </strong>
+                    </>
+                  ) : null}
                 </span>
               </div>
             </div>
-            {/* stepper de ciclo de vida */}
+            {/* stepper do ciclo de trabalho (recebida → protocolado) */}
             <div className="border-line2 bg-bg flex items-center border-t px-[22px] py-3.5">
-              {m.stepper.map((s) => (
-                <div
-                  key={s.key}
-                  className="flex items-center"
-                  style={{ flex: s.flex }}
-                >
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <span
-                      className="size-2.5 rounded-full"
-                      style={{ background: s.cor }}
-                    />
-                    <span
-                      className="text-[10.5px] leading-[1.2]"
-                      style={{ color: s.cor }}
-                    >
-                      {s.label}
-                    </span>
+              {m.stepper.map((s) => {
+                const cor =
+                  s.estado === "todo" ? "var(--fg3)" : "var(--foreground)";
+                return (
+                  <div
+                    key={s.key}
+                    className="flex items-center"
+                    style={{ flex: s.flex }}
+                  >
+                    <div className="flex shrink-0 items-center gap-2">
+                      <StepMarcador estado={s.estado} />
+                      <span
+                        className="text-[10.5px] leading-[1.2]"
+                        style={{
+                          color: cor,
+                          fontWeight: s.estado === "current" ? 500 : 400,
+                        }}
+                      >
+                        {s.label}
+                      </span>
+                    </div>
+                    {s.temLinha ? (
+                      <span
+                        className="mx-2 h-0.5 flex-1"
+                        style={{
+                          background: s.linhaFeita
+                            ? "var(--primary)"
+                            : "var(--line)",
+                        }}
+                      />
+                    ) : null}
                   </div>
-                  {s.temLinha ? (
-                    <span
-                      className="mx-2 h-0.5 flex-1"
-                      style={{ background: s.linhaCor }}
-                    />
-                  ) : null}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -219,17 +260,33 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
                       Nenhuma providência sugerida para esta intimação.
                     </p>
                   ) : (
-                    <ul className="px-4">
-                      {m.providencias.map(({ p, idx }) => (
-                        <ProvidenciaRow
-                          key={`${p.title}-${idx}`}
-                          intimacaoId={m.id}
-                          providencia={p}
-                          idx={idx}
-                        />
-                      ))}
-                    </ul>
+                    <ProvidenciasLista
+                      intimacaoId={m.id}
+                      providencias={m.providencias}
+                      ato={m.ato}
+                    />
                   )}
+                  {/* rodapé da peça (minuta): status vem do work_stage; abre o editor */}
+                  <div className="border-line2 bg-bg flex items-center gap-3 border-t px-4 py-3">
+                    <FileText
+                      className="text-fg3 size-[17px] shrink-0"
+                      strokeWidth={1.7}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[12.5px] font-medium">
+                        Minuta — {m.titulo}
+                      </span>
+                      <span className="text-fg3 block text-[11px]">
+                        {m.pecaLabel}
+                      </span>
+                    </span>
+                    <button
+                      onClick={() => peca.abrirConstrucao(id)}
+                      className="border-line bg-panel text-foreground hover:bg-hover shrink-0 rounded-md border px-3 py-1.5 text-[12px] font-medium"
+                    >
+                      {m.pecaExiste ? "Abrir editor" : "Gerar peça"}
+                    </button>
+                  </div>
                   <div className="border-line2 text-fg3 flex items-center justify-between gap-3 border-t px-4 py-3 text-[11.5px]">
                     <span>Gerado em {m.analisadaEm}</span>
                     <button
@@ -257,7 +314,7 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-primary text-[11px] font-semibold tracking-[0.03em] uppercase">
-                      Como a IA leu
+                      Análise
                     </span>
                   </div>
                   <p className="text-fg2 mt-2 text-[12.5px] leading-[1.55]">
@@ -272,10 +329,21 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
                     Teor da intimação
                   </span>
                 </div>
-                <p className="text-fg2 px-3.5 py-3 text-[12.5px] leading-[1.6]">
-                  {m.teor ||
-                    "Teor integral indisponível — publicação capturada do DJEN."}
-                </p>
+                {m.teor ? (
+                  // O teor vem em HTML (DJEN). sanitizeContentHtml remove
+                  // scripts/handlers/URIs perigosas antes de renderizar — sem
+                  // isso apareciam as tags cruas (<html><head>…).
+                  <div
+                    className="prose-intimacao text-fg2 px-3.5 py-3 text-[12.5px] leading-[1.6]"
+                    dangerouslySetInnerHTML={{
+                      __html: sanitizeContentHtml(m.teor),
+                    }}
+                  />
+                ) : (
+                  <p className="text-fg3 px-3.5 py-3 text-[12.5px] leading-[1.6]">
+                    Teor integral indisponível — publicação capturada do DJEN.
+                  </p>
+                )}
               </div>
 
               <div className="border-line bg-panel overflow-hidden rounded-xl border">
@@ -314,32 +382,24 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
       {/* rodapé de ações */}
       <div className="border-line bg-panel flex shrink-0 items-center gap-2 border-t px-8 py-3">
         <div className="mx-auto flex w-full max-w-[1080px] items-center gap-2">
-          {m.podeReabrir ? (
-            <button
-              onClick={det.onReabrir}
-              disabled={det.triagemEmVoo}
-              className="bg-primary text-primary-foreground rounded-lg px-4 py-2.5 text-[13px] font-medium disabled:opacity-60"
-            >
-              Reabrir
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={det.onResolver}
-                disabled={det.triagemEmVoo}
-                className="bg-primary text-primary-foreground rounded-lg px-4 py-2.5 text-[13px] font-medium disabled:opacity-60"
-              >
-                Resolver
-              </button>
-              <button
-                onClick={det.onIgnorar}
-                disabled={det.triagemEmVoo}
-                className="border-line bg-panel text-foreground hover:bg-hover rounded-lg border px-3.5 py-2.5 text-[13px] disabled:opacity-60"
-              >
-                Ignorar
-              </button>
-            </>
-          )}
+          {/* 💀 Confirmar prazo / Ajustar — ações do motor de prazos (em
+              reformulação). Placeholders desabilitados até o motor existir. */}
+          <button
+            type="button"
+            disabled
+            title="Em reformulação"
+            className="bg-primary text-primary-foreground cursor-not-allowed rounded-lg px-4 py-2.5 text-[13px] font-medium opacity-50"
+          >
+            Confirmar prazo
+          </button>
+          <button
+            type="button"
+            disabled
+            title="Em reformulação"
+            className="border-line bg-panel text-foreground cursor-not-allowed rounded-lg border px-3.5 py-2.5 text-[13px] opacity-50"
+          >
+            Ajustar
+          </button>
 
           <ResponsavelMenu
             value={m.responsavelId}
@@ -359,6 +419,221 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Lista de providências no layout do design: banner de herança + "Criar todas"
+ *  + linhas (Criar tarefa / Tarefa criada). Chips (tipo/fluxo/selo) ficam de fora
+ *  por ora — dependem de dado do BE ainda inexistente. */
+function ProvidenciasLista({
+  intimacaoId,
+  providencias,
+  ato,
+}: {
+  intimacaoId: string;
+  providencias: { p: IntimacaoProvidencia; idx: number }[];
+  ato: string;
+}) {
+  const aprovar = useAprovarProvidencia(intimacaoId);
+  const pendentes = providencias.filter(({ p }) => p.status === "SUGGESTED");
+
+  const criarTodas = async () => {
+    for (const { p, idx } of pendentes) {
+      try {
+        await aprovar.mutateAsync({ idx, providencia: p });
+      } catch {
+        toast.error("Não foi possível criar todas as tarefas.");
+        return;
+      }
+    }
+    toast.success("Tarefas criadas e atribuídas.");
+  };
+
+  return (
+    <>
+      {/* derivação: Ato (do BE) → Prazo (💀 motor) → Providências */}
+      <div className="border-line2 flex flex-wrap items-center gap-1.5 border-b px-4 py-3">
+        <span
+          className="inline-flex items-center rounded-full px-2.5 py-1 text-[10.5px] font-medium"
+          style={{
+            background: "var(--primary)",
+            color: "var(--primary-foreground)",
+          }}
+        >
+          1 · Ato: {ato || "—"}
+        </span>
+        <ChevronRight className="text-fg3 size-3" strokeWidth={2.2} />
+        <span
+          className="bg-hover text-fg3 inline-flex items-center rounded-full px-2.5 py-1 text-[10.5px] font-medium"
+          title="Prazo — em reformulação (motor de prazos)"
+        >
+          2 · Prazo
+        </span>
+        <ChevronRight className="text-fg3 size-3" strokeWidth={2.2} />
+        <span className="bg-hover text-fg2 inline-flex items-center rounded-full px-2.5 py-1 text-[10.5px] font-medium">
+          3 · Providências
+        </span>
+      </div>
+
+      {/* banner de herança + criar todas */}
+      <div className="border-line2 bg-bg flex items-center gap-3 border-b px-4 py-2.5">
+        <span className="text-fg3 min-w-0 flex-1 text-[11px] leading-[1.45]">
+          Cada providência vira uma{" "}
+          <strong className="text-foreground font-medium">tarefa</strong>,
+          vinculada ao prazo desta intimação — nasce em triagem.
+        </span>
+        {pendentes.length > 0 ? (
+          <button
+            type="button"
+            onClick={criarTodas}
+            disabled={aprovar.isPending}
+            className="bg-primary text-primary-foreground shrink-0 rounded-md px-3 py-1.5 text-[12px] font-medium disabled:opacity-60"
+          >
+            Criar todas
+          </button>
+        ) : null}
+      </div>
+
+      {providencias.map(({ p, idx }) => (
+        <ProvidenciaLinha
+          key={`${p.title}-${idx}`}
+          intimacaoId={intimacaoId}
+          providencia={p}
+          idx={idx}
+        />
+      ))}
+    </>
+  );
+}
+
+/** Uma linha de providência no design: título + descrição + ação Criar tarefa
+ *  (SUGGESTED → aprova = cria a tarefa real) ou selo "Tarefa criada" (APPROVED). */
+function ProvidenciaLinha({
+  intimacaoId,
+  providencia: p,
+  idx,
+}: {
+  intimacaoId: string;
+  providencia: IntimacaoProvidencia;
+  idx: number;
+}) {
+  const aprovar = useAprovarProvidencia(intimacaoId);
+  const criada = p.status === "APPROVED";
+
+  const criar = () =>
+    aprovar.mutate(
+      { idx, providencia: p },
+      {
+        onSuccess: () => toast.success("Tarefa criada e atribuída."),
+        onError: () => toast.error("Não foi possível criar a tarefa."),
+      },
+    );
+
+  return (
+    <div className="border-line2 grid grid-cols-[1fr_auto] items-start gap-3 border-b px-4 py-3">
+      <div className="min-w-0">
+        <div className="text-[13px] font-medium">{p.title}</div>
+        {p.description ? (
+          <div className="text-fg3 mt-0.5 text-[11.5px] leading-[1.45]">
+            {p.description}
+          </div>
+        ) : null}
+        <ProvidenciaChips kind={p.kind} />
+      </div>
+      {criada ? (
+        <span
+          className="inline-flex shrink-0 items-center gap-1.5 text-[11.5px] font-medium"
+          style={{ color: "var(--green)" }}
+        >
+          <Check className="size-3.5" strokeWidth={2.2} />
+          Tarefa criada
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={criar}
+          disabled={aprovar.isPending}
+          className="border-line bg-panel text-foreground hover:bg-hover inline-flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] font-medium disabled:opacity-60"
+        >
+          <Plus className="size-3.5" strokeWidth={2.2} />
+          Criar tarefa
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Chips de uma providência: tipo (Peça/Ciência, do BE), "fluxo curto" (derivado
+ *  de Ciência) e o selo de confiança ("A apurar" — 💀 placeholder do motor de
+ *  prazos). Tipo desconhecido ("") não renderiza o chip de tipo. */
+function ProvidenciaChips({ kind }: { kind: string }) {
+  const ehCiencia = kind === "CIENCIA";
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {kind === "PECA" ? (
+        <span
+          className="inline-flex items-center rounded-full px-2 py-[2px] text-[9.5px] font-medium"
+          style={{
+            background: "color-mix(in oklch, var(--primary) 12%, transparent)",
+            color: "var(--primary)",
+          }}
+        >
+          Peça
+        </span>
+      ) : null}
+      {ehCiencia ? (
+        <span className="bg-hover text-fg2 inline-flex items-center rounded-full px-2 py-[2px] text-[9.5px] font-medium">
+          Ciência
+        </span>
+      ) : null}
+      {ehCiencia ? (
+        <span className="bg-hover text-fg3 inline-flex items-center rounded-full px-2 py-[2px] text-[9.5px] font-medium">
+          fluxo curto
+        </span>
+      ) : null}
+      {/* 💀 selo de confiança — dimensão do motor de prazos. Placeholder estático. */}
+      <span
+        className="inline-flex items-center gap-1 rounded-full px-2 py-[2px] text-[9.5px] font-medium"
+        style={{ color: "var(--gold)" }}
+      >
+        <span
+          className="inline-block size-[5px] rounded-full"
+          style={{ background: "var(--gold)" }}
+        />
+        A apurar
+      </span>
+    </div>
+  );
+}
+
+/** Marcador de um passo do stepper: concluído (círculo cheio + check), atual
+ *  (anel vazado destacado) ou pendente (círculo tracejado). */
+function StepMarcador({ estado }: { estado: "done" | "current" | "todo" }) {
+  if (estado === "done") {
+    return (
+      <span
+        className="grid size-[15px] place-items-center rounded-full"
+        style={{ background: "var(--primary)" }}
+      >
+        <Check
+          className="size-[9px]"
+          strokeWidth={3}
+          style={{ color: "var(--primary-foreground)" }}
+        />
+      </span>
+    );
+  }
+  return (
+    <span
+      className="size-[15px] rounded-full"
+      style={{
+        border:
+          estado === "current"
+            ? "2px solid var(--primary)"
+            : "1.5px dashed var(--line)",
+        background: "transparent",
+      }}
+    />
   );
 }
 
