@@ -5,6 +5,7 @@ import { useMemo } from "react";
 
 import { useApi } from "@/lib/api/use-api";
 
+import { nomeExibicao } from "../lib/labels";
 import { listOrgMembers } from "../services/organization.service";
 import type { OrgMemberView } from "../types";
 
@@ -35,8 +36,11 @@ export function useOrgMembersDirectory() {
     members: query.data ?? [],
     isPending: query.isPending,
     error: query.error,
-    /** Nome do membro pelo id interno; null quando desconhecido/ausente. */
-    nameFor: (id: string | undefined | null): string | null =>
-      (id && byId.get(id)?.name) || null,
+    /** Rótulo do membro pelo id interno: nome, ou o e-mail (parte local) quando
+     *  o nome está vazio — via `nomeExibicao`. null quando desconhecido/ausente. */
+    nameFor: (id: string | undefined | null): string | null => {
+      const m = id ? byId.get(id) : undefined;
+      return m ? nomeExibicao(m.name, m.email) || null : null;
+    },
   };
 }

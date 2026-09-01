@@ -9,6 +9,7 @@ import {
   visualDoAuto,
 } from "@/features/documentos/lib/tipo-autos";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+import { nomeExibicao } from "@/features/organization/lib/labels";
 import { usePecasByProcesso } from "@/features/pecas/hooks/use-peca";
 import { rotuloTipoPeca } from "@/features/pecas/lib/labels";
 import {
@@ -202,7 +203,8 @@ export interface ResponsavelVM {
 
 export interface MemberOption {
   id: string;
-  name: string;
+  /** Rótulo pronto pra exibir: nome, ou e-mail quando o nome está vazio. */
+  label: string;
 }
 
 export interface IntimacaoItemVM {
@@ -358,7 +360,7 @@ function useResponsavel_private(
 
   const members: MemberOption[] = dir.members.map((m) => ({
     id: m.id,
-    name: m.name,
+    label: nomeExibicao(m.name, m.email),
   }));
 
   return {

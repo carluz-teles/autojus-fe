@@ -1,5 +1,6 @@
 "use client";
 
+import { Menu } from "@base-ui/react/menu";
 import { ChevronLeft, Circle, FileText } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -63,7 +64,6 @@ export function ProcessoHub({ numero }: { numero: string }) {
     voltarHref,
   } = hub;
 
-  const [menuAberto, setMenuAberto] = useState(false);
   const [valorEditando, setValorEditando] = useState(false);
   const [valorInput, setValorInput] = useState("");
   // Andamentos: mostra 4 por padrão; "Ver mais" expande (e aí paginação normal segue).
@@ -193,53 +193,55 @@ export function ProcessoHub({ numero }: { numero: string }) {
                         {intimacoes.length === 1 ? "intimação" : "intimações"}
                       </div>
                     </div>
-                    <div className="border-line2 relative col-span-full flex items-center gap-2 border-t pt-2.5">
+                    <div className="border-line2 col-span-full flex items-center gap-2 border-t pt-2.5">
                       <span className="border-line text-fg3 grid size-[22px] place-items-center rounded-full border text-[9px]">
                         {responsavel.iniciais}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setMenuAberto((v) => !v)}
-                        disabled={isAssigning}
-                        className="hover:bg-hover text-fg2 rounded-md px-1.5 py-0.5 text-xs disabled:opacity-60"
-                      >
-                        Responsável · {responsavel.nome}
-                      </button>
+                      <Menu.Root>
+                        <Menu.Trigger
+                          disabled={isAssigning}
+                          className="hover:bg-hover text-fg2 rounded-md px-1.5 py-0.5 text-xs disabled:opacity-60"
+                        >
+                          Responsável · {responsavel.nome}
+                        </Menu.Trigger>
+                        <Menu.Portal>
+                          {/* Portaled: escapa o `overflow-hidden` da faixa de
+                              identidade (senão o menu ficava cortado dentro do card)
+                              e sobe pra z-50, acima de todo o conteúdo. */}
+                          <Menu.Positioner
+                            side="bottom"
+                            align="start"
+                            sideOffset={6}
+                            className="z-50"
+                          >
+                            <Menu.Popup className="border-line bg-panel z-50 max-h-[240px] w-[240px] overflow-y-auto rounded-lg border py-1 shadow-lg outline-none">
+                              <Menu.Item
+                                onClick={() => assign(null)}
+                                className="hover:bg-hover data-highlighted:bg-hover text-fg3 block w-full cursor-default px-3 py-1.5 text-left text-xs outline-none select-none"
+                              >
+                                Remover responsável
+                              </Menu.Item>
+                              {members.map((m) => (
+                                <Menu.Item
+                                  key={m.id}
+                                  onClick={() => assign(m.id)}
+                                  className="hover:bg-hover data-highlighted:bg-hover block w-full cursor-default px-3 py-1.5 text-left text-xs outline-none select-none"
+                                >
+                                  {m.label}
+                                </Menu.Item>
+                              ))}
+                              {members.length === 0 && (
+                                <div className="text-fg3 px-3 py-1.5 text-xs">
+                                  Sem membros no escritório.
+                                </div>
+                              )}
+                            </Menu.Popup>
+                          </Menu.Positioner>
+                        </Menu.Portal>
+                      </Menu.Root>
                       <span className="text-fg3 ml-auto text-[11.5px]">
                         Distribuído {identity.distribuido}
                       </span>
-                      {menuAberto && (
-                        <div className="border-line bg-panel absolute top-full left-0 z-10 mt-1 max-h-[240px] w-[240px] overflow-y-auto rounded-lg border py-1 shadow-lg">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              assign(null);
-                              setMenuAberto(false);
-                            }}
-                            className="hover:bg-hover text-fg3 block w-full px-3 py-1.5 text-left text-xs"
-                          >
-                            Remover responsável
-                          </button>
-                          {members.map((m) => (
-                            <button
-                              key={m.id}
-                              type="button"
-                              onClick={() => {
-                                assign(m.id);
-                                setMenuAberto(false);
-                              }}
-                              className="hover:bg-hover block w-full px-3 py-1.5 text-left text-xs"
-                            >
-                              {m.name}
-                            </button>
-                          ))}
-                          {members.length === 0 && (
-                            <div className="text-fg3 px-3 py-1.5 text-xs">
-                              Sem membros no escritório.
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -325,9 +327,10 @@ export function ProcessoHub({ numero }: { numero: string }) {
                     )}
                     <div className="flex flex-col gap-[9px]">
                       {intimacoes.map((i) => (
-                        <div
+                        <Link
                           key={i.id}
-                          className="border-line bg-panel grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-[10px] border py-[13px] pr-[15px] pl-3 text-left"
+                          href={`/intimacoes/${i.id}`}
+                          className="border-line bg-panel hover:bg-hover grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-[10px] border py-[13px] pr-[15px] pl-3 text-left transition-colors"
                           style={{ borderLeft: `3px solid ${i.urgCor}` }}
                         >
                           <SinalUrgencia nivel={i.urgNivel} cor={i.urgCor} />
@@ -360,7 +363,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                               </span>
                             )}
                           </span>
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   </div>
