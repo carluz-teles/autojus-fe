@@ -60,6 +60,9 @@ export interface IntimacoesFilters {
   court?: string;
   /** atraso|hoje|proximos_dois_dias|semana|este_mes|mais_adiante|sem_data_definida */
   urgencia?: string;
+  /** Status = work_stage (RECEIVED|AWAITING_CONFIRMATION|CONFIRMED|DRAFTING|
+   *  PARTNER_REVIEW|FILED). Estágio derivado no BE. */
+  workStage?: string;
   /** Chip "Não confirmadas" (triagem) — filtra prazos sugeridos não confirmados. */
   naoConfirmado?: boolean;
   /** "me" (toggle "Minhas") ou um uuid; casa contra condutor OU revisor. */
@@ -88,6 +91,7 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     user_status: filters.user_status || undefined,
     court: filters.court || undefined,
     urgencia: filters.urgencia || undefined,
+    work_stage: filters.workStage || undefined,
     nao_confirmado: filters.naoConfirmado || undefined,
     assignee: filters.assignee || undefined,
   };

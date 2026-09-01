@@ -1,27 +1,31 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import { useAndamentosDoProcesso } from "@/features/andamentos/hooks/use-andamentos-do-processo";
+import { useDocumentosDoProcesso } from "@/features/documentos/hooks/use-documentos-do-processo";
+import {
+  rotuloTipoAuto,
+  visualDoAuto,
+} from "@/features/documentos/lib/tipo-autos";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+import { nomeExibicao } from "@/features/organization/lib/labels";
+import { usePecasByProcesso } from "@/features/pecas/hooks/use-peca";
+import { rotuloTipoPeca } from "@/features/pecas/lib/labels";
 import {
   useIntimacoesByProcesso,
   usePrazosByProcesso,
-  useTasksByProcesso,
 } from "@/features/processos/hooks/use-processo-tabs";
 import {
   useAssignResponsavel,
   usePartes,
   useProcesso,
-  useProcessoResumo,
+  useUpdateProcessoManual,
 } from "@/features/processos/hooks/use-processos";
 import type {
   Party,
   ProcessoDegree,
-  ResumoAction,
-  ResumoKeyDate,
-  ResumoMovement,
-  ResumoRisk,
+  ProcessoPhase,
 } from "@/features/processos/types";
 import { formatDate } from "@/lib/format";
 
@@ -40,6 +44,21 @@ const DEGREE_LABEL: Record<ProcessoDegree, string> = {
   SUPERIOR: "Superior",
   UNKNOWN: "—",
 };
+
+// As 5 fases do stepper, em ordem, com rótulo pt-BR — fonte única do stepper e do label.
+const FASE_STEPS: { key: ProcessoPhase; label: string }[] = [
+  { key: "CONHECIMENTO", label: "Conhecimento" },
+  { key: "INSTRUCAO", label: "Instrução" },
+  { key: "SENTENCA", label: "Sentença" },
+  { key: "RECURSO", label: "Recurso" },
+  { key: "EXECUCAO", label: "Execução" },
+];
+
+// Formata um valor da causa em reais ("R$ 128.400,00"); null quando não preenchido.
+function formatBRL(v: number | null): string | null {
+  if (v == null) return null;
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
 
 interface LifecycleInfo {
   label: string;
@@ -61,18 +80,6 @@ function lifecycleInfo(lifecycle: string): LifecycleInfo {
   }
 }
 
-// Urgência do resumo IA → cor de token. OVERDUE→red, DUE_SOON→gold, OK→fg2.
-function urgencyCor(urgency: ResumoKeyDate["urgency"]): string {
-  switch (urgency) {
-    case "OVERDUE":
-      return "var(--red)";
-    case "DUE_SOON":
-      return "var(--gold)";
-    default:
-      return "var(--fg2)";
-  }
-}
-
 const mix = (cor: string, pct: number) =>
   `color-mix(in oklch, ${cor} ${pct}%, transparent)`;
 
@@ -81,6 +88,72 @@ function prazoCurto(dias: number): string {
   if (dias < 0) return `${Math.abs(dias)}d atraso`;
   if (dias === 0) return "hoje";
   return `${dias}d`;
+}
+
+// Cor de token do prazo por dias restantes (vencido/hoje = red, ≤3 = gold, resto = green).
+function urgCorPorDias(dias: number): string {
+  if (dias <= 0) return "var(--red)";
+  if (dias <= 3) return "var(--gold)";
+  return "var(--green)";
+}
+
+// Nível 0-3 das barrinhas de sinal ao lado do card (3 = vencido, 0 = tranquilo).
+function urgNivelPorDias(dias: number): number {
+  if (dias < 0) return 3;
+  if (dias <= 3) return 2;
+  if (dias <= 7) return 1;
+  return 0;
+}
+
+interface PecaStatusVM {
+  label: string;
+  cor: string;
+  fundo: string;
+}
+
+// Status da peça (DRAFT|SIGNED|FILED|DISCARDED) → rótulo + cores do badge.
+function pecaStatusInfo(status: string): PecaStatusVM {
+  switch (status) {
+    case "FILED":
+      return {
+        label: "Protocolada",
+        cor: "var(--green)",
+        fundo: mix("var(--green)", 14),
+      };
+    case "SIGNED":
+      return {
+        label: "Assinada",
+        cor: "var(--blue)",
+        fundo: mix("var(--blue)", 14),
+      };
+    case "DISCARDED":
+      return { label: "Descartada", cor: "var(--fg3)", fundo: "var(--hover)" };
+    default:
+      return {
+        label: "Rascunho",
+        cor: "var(--gold)",
+        fundo: mix("var(--gold)", 16),
+      };
+  }
+}
+
+// Cor de token do ícone da peça, por tipo (piece_type do BE). Defesa/Petição azul,
+// Petição inicial verde, Recurso/Reconvenção âmbar; desconhecido neutro.
+function corDaPeca(pieceType: string): string {
+  switch (pieceType) {
+    case "COMPLAINT":
+      return "var(--green)";
+    case "APPEAL":
+    case "COUNTERCLAIM":
+      return "var(--gold)";
+    case "DEFENSE":
+    case "MOTION":
+    case "PETITION":
+    case "MANIFESTATION":
+      return "var(--blue)";
+    default:
+      return "var(--fg3)";
+  }
 }
 
 // ── Tipos da VM ────────────────────────────────────────────────────────────────
@@ -105,6 +178,21 @@ export interface IdentityVM {
   judgingBody: string;
   distribuido: string;
   completeness: number;
+  /** Fase efetiva do processo (pro stepper); null quando ainda não derivada/definida. */
+  phase: ProcessoPhase | null;
+  /** Valor da causa formatado ("R$ 128.400,00") ou null quando não preenchido. */
+  valor: string | null;
+  /** Valor da causa cru (pra edição inline); null quando não preenchido. */
+  valorRaw: number | null;
+}
+
+// Um passo do stepper de fase (Conhecimento→…→Execução).
+export interface FaseStepVM {
+  key: ProcessoPhase;
+  label: string;
+  /** "done" (passado), "current" (fase atual) ou "todo" (futuro). */
+  estado: "done" | "current" | "todo";
+  onClick: () => void;
 }
 
 export interface ResponsavelVM {
@@ -115,61 +203,81 @@ export interface ResponsavelVM {
 
 export interface MemberOption {
   id: string;
-  name: string;
-}
-
-export interface ResumoKeyDateVM {
-  kind: string;
-  end: string;
-  daysLabel: string;
-  cor: string;
-}
-
-export interface ResumoMovementVM {
-  data: string;
-  texto: string;
-}
-
-export interface ResumoRiskVM {
-  descricao: string;
-}
-
-export interface ResumoActionVM {
-  acao: string;
-}
-
-export interface ResumoVM {
-  disponivel: boolean;
-  summary: string;
-  currentStatus: string;
-  keyDates: ResumoKeyDateVM[];
-  recentMovements: ResumoMovementVM[];
-  risks: ResumoRiskVM[];
-  recommendedActions: ResumoActionVM[];
-  isPending: boolean;
+  /** Rótulo pronto pra exibir: nome, ou e-mail quando o nome está vazio. */
+  label: string;
 }
 
 export interface IntimacaoItemVM {
   id: string;
   titulo: string;
-  meta: string;
+  /** "A confirmar" | "Intimação recebida" — situação de triagem do prazo. */
+  status: string;
+  /** Nome do responsável desta intimação ("resp. Fulano") ou null. */
+  resp: string | null;
+  /** Data fatal do prazo derivado ("04/09") ou "" quando não há prazo. */
+  fatal: string;
+  /** Contagem regressiva curta ("1d atraso" | "hoje" | "11d") ou null. */
   prazoCurto: string | null;
+  /** Nível de urgência 0-3 para as barrinhas de sinal (0 ok → 3 vencido). */
+  urgNivel: number;
   urgCor: string;
 }
 
 export interface PrazoItemVM {
   id: string;
   kind: string;
-  end: string;
+  /** Data de início ("interno 02/09") — start_date do prazo. */
+  interno: string;
+  /** Data fatal ("fatal 04/09") — end_date do prazo. */
+  fatal: string;
   prazoCurto: string;
+  urgNivel: number;
   urgCor: string;
 }
 
-export interface TaskItemVM {
+export interface AutoItemVM {
+  id: string;
+  /** Nome do auto (rico: "Petição inicial", "Despacho saneador"…). */
+  titulo: string;
+  /** Sublinha "Categoria · Origem" (ex.: "Petição · Parte", "Decisão · Juízo"). */
+  sub: string;
+  /** Cor de token do ícone, por categoria (Petição/Decisão azul, Documento verde…). */
+  cor: string;
+  /** "12 fls." (contagem de páginas) ou "" quando desconhecida. */
+  fls: string;
+  /** true enquanto o doc ainda está sendo extraído/indexado. */
+  processando: boolean;
+}
+
+export interface AutosVM {
+  itens: AutoItemVM[];
+  total: number;
+  /** Total de folhas (soma das páginas) — "530 fls." no cabeçalho. */
+  folhas: number;
+  isPending: boolean;
+  isEmpty: boolean;
+  /** Abre o documento numa nova aba (presigned GET de curta duração). */
+  abrir: (documentoId: string) => void;
+}
+
+export interface PecaItemVM {
   id: string;
   titulo: string;
-  status: string;
-  due: string;
+  /** Descrição: o tipo da peça (Defesa, Petição inicial, Recurso…) — o "nome + descrição". */
+  sub: string;
+  /** Cor de token do ícone, por tipo de peça. */
+  cor: string;
+  data: string;
+  statusLabel: string;
+  statusCor: string;
+  statusFundo: string;
+}
+
+export interface PecasVM {
+  itens: PecaItemVM[];
+  total: number;
+  isPending: boolean;
+  isEmpty: boolean;
 }
 
 export interface ParteItemVM {
@@ -217,6 +325,9 @@ function useIdentidade_private(id: string) {
       judgingBody: p.judging_body,
       distribuido: formatDate(p.filed_at),
       completeness: p.completeness,
+      phase: p.phase,
+      valor: formatBRL(p.claim_value),
+      valorRaw: p.claim_value,
     };
   }, [p]);
 
@@ -249,7 +360,7 @@ function useResponsavel_private(
 
   const members: MemberOption[] = dir.members.map((m) => ({
     id: m.id,
-    name: m.name,
+    label: nomeExibicao(m.name, m.email),
   }));
 
   return {
@@ -258,55 +369,6 @@ function useResponsavel_private(
     assign: (userId: string | null) => assign.mutate(userId),
     isAssigning: assign.isPending,
   };
-}
-
-// Resumo IA (write-once no primeiro GET). Deriva as slices já com cor/urgência.
-function useResumo_private(id: string): ResumoVM {
-  const q = useProcessoResumo(id);
-  const r = q.data;
-
-  return useMemo(() => {
-    const keyDates: ResumoKeyDateVM[] = (r?.key_dates_and_deadlines ?? []).map(
-      (k: ResumoKeyDate) => ({
-        kind: k.kind,
-        end: formatDate(k.end_date),
-        daysLabel: prazoCurto(k.days_remaining),
-        cor: urgencyCor(k.urgency),
-      }),
-    );
-    const recentMovements: ResumoMovementVM[] = (r?.recent_movements ?? []).map(
-      (m: ResumoMovement) => ({
-        data: formatDate(m.occurred_at),
-        texto: m.text,
-      }),
-    );
-    const risks: ResumoRiskVM[] = (r?.risks ?? []).map((x: ResumoRisk) => ({
-      descricao: x.description,
-    }));
-    const recommendedActions: ResumoActionVM[] = (
-      r?.recommended_actions ?? []
-    ).map((a: ResumoAction) => ({ acao: a.action }));
-
-    const disponivel = !!(
-      r &&
-      (r.summary ||
-        keyDates.length ||
-        recentMovements.length ||
-        risks.length ||
-        recommendedActions.length)
-    );
-
-    return {
-      disponivel,
-      summary: r?.summary ?? "",
-      currentStatus: r?.current_status ?? "",
-      keyDates,
-      recentMovements,
-      risks,
-      recommendedActions,
-      isPending: q.isPending,
-    };
-  }, [r, q.isPending]);
 }
 
 // Partes agrupadas por polo → lista plana pronta pra bindar (Autor/Réu/Terceiro).
@@ -361,27 +423,27 @@ function useAndamentos_private(id: string) {
   };
 }
 
-// Abas de referência: intimações, prazos e tarefas do processo.
+// Referência: intimações e prazos do processo (as tarefas saíram do cockpit).
 function useReferencias_private(id: string) {
   const intimacoesQ = useIntimacoesByProcesso(id);
   const prazosQ = usePrazosByProcesso(id);
-  const tasksQ = useTasksByProcesso(id);
 
   const intimacoes: IntimacaoItemVM[] = useMemo(
     () =>
-      (intimacoesQ.data ?? []).map((i) => ({
-        id: i.id,
-        titulo: i.class || i.subject || i.type,
-        meta: `${formatDate(i.published_at)} · ${i.court}`,
-        prazoCurto: i.prazo ? prazoCurto(i.prazo.days_left) : null,
-        urgCor: i.prazo
-          ? i.prazo.days_left < 0
-            ? "var(--red)"
-            : i.prazo.days_left <= 3
-              ? "var(--gold)"
-              : "var(--green)"
-          : "var(--fg3)",
-      })),
+      (intimacoesQ.data ?? []).map((i) => {
+        const prazo = i.prazo;
+        return {
+          id: i.id,
+          titulo: i.class || i.subject || i.type,
+          status:
+            prazo && !prazo.confirmed ? "A confirmar" : "Intimação recebida",
+          resp: i.assignee_user_name,
+          fatal: prazo ? formatDate(prazo.end_date) : "",
+          prazoCurto: prazo ? prazoCurto(prazo.days_left) : null,
+          urgNivel: prazo ? urgNivelPorDias(prazo.days_left) : 0,
+          urgCor: prazo ? urgCorPorDias(prazo.days_left) : "var(--fg3)",
+        };
+      }),
     [intimacoesQ.data],
   );
 
@@ -390,35 +452,95 @@ function useReferencias_private(id: string) {
       prazosQ.prazos.map((p) => ({
         id: p.id,
         kind: p.kind,
-        end: formatDate(p.end_date),
+        interno: p.start_date ? formatDate(p.start_date) : "",
+        fatal: formatDate(p.end_date),
         prazoCurto: prazoCurto(p.days_left),
-        urgCor:
-          p.days_left < 0
-            ? "var(--red)"
-            : p.days_left <= 3
-              ? "var(--gold)"
-              : "var(--green)",
+        urgNivel: urgNivelPorDias(p.days_left),
+        urgCor: urgCorPorDias(p.days_left),
       })),
     [prazosQ.prazos],
-  );
-
-  const tasks: TaskItemVM[] = useMemo(
-    () =>
-      (tasksQ.data ?? []).map((t) => ({
-        id: t.id,
-        titulo: t.title,
-        status: t.display_status || "",
-        due: formatDate(t.due_date),
-      })),
-    [tasksQ.data],
   );
 
   return {
     intimacoes,
     prazos,
-    tasks,
-    isPending: intimacoesQ.isPending || prazosQ.isPending || tasksQ.isPending,
+    isPending: intimacoesQ.isPending || prazosQ.isPending,
   };
+}
+
+// Autos do processo (documentos) → itens do card AUTOS. O código eproc do tipo vem
+// hoje no `title` do DocumentView; traduzimos para rótulo pt-BR e somamos as páginas
+// para as folhas do cabeçalho.
+function useAutos_private(id: string): AutosVM {
+  const q = useDocumentosDoProcesso(id);
+  const abrir = useCallback(
+    (documentoId: string) => q.baixar.mutate(documentoId),
+    [q.baixar],
+  );
+
+  return useMemo(() => {
+    const itens: AutoItemVM[] = q.documentos.map((d) => {
+      // O fetch novo já grava um título amigável (e o código cru em document_type);
+      // aí exibimos o título direto. Docs legados vinham com o código no title e
+      // document_type vazio — nesses, o mapa do FE traduz. (fallback compatível)
+      const codigo = d.document_type || d.title;
+      const titulo = d.document_type
+        ? d.title
+        : rotuloTipoAuto(d.title || d.document_type);
+      // Uploads avulsos: "Documento · Enviado" (verde). Autos: categoria+origem+cor
+      // derivados do código do tipo (visualDoAuto).
+      const vis = visualDoAuto(codigo);
+      const enviado = d.origin === "UPLOAD";
+      return {
+        id: d.id,
+        titulo,
+        sub: enviado
+          ? "Documento · Enviado"
+          : `${vis.categoria} · ${vis.origem}`,
+        cor: enviado ? "var(--green)" : vis.cor,
+        fls: d.pages ? `${d.pages} fls.` : "",
+        processando: d.status !== "READY" && d.status !== "FAILED",
+      };
+    });
+    const folhas = q.documentos.reduce((acc, d) => acc + (d.pages ?? 0), 0);
+    return {
+      itens,
+      total: q.documentos.length,
+      folhas,
+      isPending: q.isPending,
+      isEmpty: q.documentos.length === 0,
+      abrir,
+    };
+  }, [q.documentos, q.isPending, abrir]);
+}
+
+// Peças do processo → itens do card PEÇAS (título, data, badge de status).
+function usePecas_private(id: string): PecasVM {
+  const q = usePecasByProcesso(id);
+
+  return useMemo(() => {
+    const itens: PecaItemVM[] = q.items.map((p) => {
+      const st = pecaStatusInfo(p.status);
+      const rotulo = rotuloTipoPeca(p.piece_type);
+      const titulo = p.title || rotulo;
+      return {
+        id: p.id,
+        titulo,
+        sub: rotulo,
+        cor: corDaPeca(p.piece_type),
+        data: formatDate(p.created_at),
+        statusLabel: st.label,
+        statusCor: st.cor,
+        statusFundo: st.fundo,
+      };
+    });
+    return {
+      itens,
+      total: itens.length,
+      isPending: q.isPending,
+      isEmpty: itens.length === 0,
+    };
+  }, [q.items, q.isPending]);
 }
 
 // ── Hook público — compõe os sub-hooks e monta a VM ─────────────────────────────
@@ -429,10 +551,50 @@ export function useProcessoHub(id: string) {
     id,
     identidade.processo?.assigned_user_id ?? null,
   );
-  const resumo = useResumo_private(id);
   const partes = usePartes_private(id);
   const andamentos = useAndamentos_private(id);
   const referencias = useReferencias_private(id);
+  const autos = useAutos_private(id);
+  const pecas = usePecas_private(id);
+
+  // Título grande do cockpit = o CLIENTE (parte do polo ativo), como no design;
+  // cai na classe processual enquanto as partes não carregaram.
+  const identity = useMemo(() => {
+    const base = identidade.identity;
+    if (!base) return base;
+    const cliente = partes.partes.find((p) => p.papel === "Autor")?.nome;
+    return cliente ? { ...base, titulo: cliente } : base;
+  }, [identidade.identity, partes.partes]);
+
+  // Edição manual da fase (override) e do valor da causa — PATCH parcial.
+  const updateMut = useUpdateProcessoManual(id);
+  const salvarFase = useCallback(
+    (phase: ProcessoPhase) => updateMut.mutate({ phase }),
+    [updateMut],
+  );
+  const salvarValor = useCallback(
+    (claimValue: number) => updateMut.mutate({ claim_value: claimValue }),
+    [updateMut],
+  );
+
+  // Stepper: 5 passos; done/current/todo pela fase efetiva; clicar seta a fase (override manual).
+  const fase = identity?.phase ?? null;
+  const stepper: FaseStepVM[] = useMemo(() => {
+    const atual = fase ? FASE_STEPS.findIndex((s) => s.key === fase) : -1;
+    return FASE_STEPS.map((s, i) => ({
+      key: s.key,
+      label: s.label,
+      estado:
+        atual < 0
+          ? "todo"
+          : i < atual
+            ? "done"
+            : i === atual
+              ? "current"
+              : "todo",
+      onClick: () => salvarFase(s.key),
+    }));
+  }, [fase, salvarFase]);
 
   // O nome do responsável pode vir já anexado pelo BE (assigned_user_name); nesse
   // caso preferimos ele ao resolvido pelo diretório.
@@ -457,16 +619,24 @@ export function useProcessoHub(id: string) {
     isError: identidade.isError,
     naoEncontrado: identidade.naoEncontrado,
 
-    identity: identidade.identity,
+    identity,
+
+    // fase (stepper) + valor da causa, editáveis à mão
+    stepper,
+    salvarFase,
+    salvarValor,
+    salvandoManual: updateMut.isPending,
 
     responsavel: responsavelVM,
     members: responsavel.members,
     assign: responsavel.assign,
     isAssigning: responsavel.isAssigning,
 
-    resumo,
     partes: partes.partes,
     partesPending: partes.isPending,
+
+    autos,
+    pecas,
 
     andamentos: andamentos.andamentos,
     andamentosTotal: andamentos.total,
@@ -477,7 +647,6 @@ export function useProcessoHub(id: string) {
 
     intimacoes: referencias.intimacoes,
     prazos: referencias.prazos,
-    tasks: referencias.tasks,
     referenciasPending: referencias.isPending,
 
     voltarLabel: "Processos",

@@ -4,6 +4,10 @@
 export type ProcessoDegree = "UNKNOWN" | "G1" | "G2" | "JE" | "SUPERIOR";
 export type ProcessoSecrecy = "PUBLIC" | "RESTRICTED" | "SECRET";
 
+/** Fase processual — o stepper do cockpit. Conjunto fechado, alinhado ao BE (court_record.phase). */
+export type ProcessoPhase =
+  "CONHECIMENTO" | "INSTRUCAO" | "SENTENCA" | "RECURSO" | "EXECUCAO";
+
 export interface ProcessoView {
   id: string;
   case_id: string;
@@ -17,6 +21,10 @@ export interface ProcessoView {
   secrecy: ProcessoSecrecy;
   lifecycle: string;
   completeness: number;
+  /** Fase EFETIVA do processo (override manual vence a derivada); null até derivar/definir. */
+  phase: ProcessoPhase | null;
+  /** Valor da causa, em reais — preenchido à mão (sem fonte automática); null quando vazio. */
+  claim_value: number | null;
   last_movement_text: string;
   last_movement_at: string | null;
   /** Id INTERNO do responsável (assigned user) — nunca org_id/tenant_id. null = sem responsável. */

@@ -43,8 +43,10 @@ function useOabs() {
   const [oabs, setOabs] = useState<string[]>([]);
   const add = useCallback(() => {
     setOab((atual) => {
-      const v = atual.trim();
-      if (v) setOabs((lista) => lista.concat(v));
+      const v = normalizeOab(atual);
+      if (v && v.length > 2) {
+        setOabs((lista) => (lista.includes(v) ? lista : lista.concat(v)));
+      }
       return "";
     });
   }, []);
@@ -90,7 +92,7 @@ export function useOnboardingFlow() {
   const salvarPerfil = useCallback(() => {
     const nome = dados.nome.trim() || "Meu escritório";
     const doc = digits(dados.doc) || digits(oabs.oabs[0] ?? "") || "0";
-    const paraVigiar = oabs.oabs.map(normalizeOab).filter(Boolean);
+    const paraVigiar = oabs.oabs.filter(Boolean);
     setPhase("saving");
     updateOrgProfile({ cnpj: doc, legal_name: nome, trade_name: nome })
       .then(async () => {

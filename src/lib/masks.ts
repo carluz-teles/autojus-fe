@@ -34,3 +34,28 @@ export function maskPhone(value: string): string {
     .replace(/^(\d{2})(\d)/, "($1) $2")
     .replace(/(\d{5})(\d{4})$/, "$1-$2");
 }
+
+/**
+ * Máscara progressiva para OAB — formata APENAS a parte numérica como
+ * "000.000" (até 6 dígitos). Preserva o prefixo de UF que o usuário já digitou
+ * (ex.: "SP", "OAB/SP"), inserindo um espaço entre UF e número. O resultado é
+ * apresentacional; a normalização para chave canônica ("UFNUMERO") é feita em
+ * separado antes de enviar ao BE.
+ *
+ * Exemplos:
+ *   "2"              → "2"
+ *   "214"            → "214"
+ *   "21488"          → "214.88"
+ *   "214885"         → "214.885"
+ *   "SP214885"       → "SP 214.885"
+ *   "OAB/SP214885"   → "OAB/SP 214.885"
+ */
+export function maskOab(value: string): string {
+  const ufMatch = value.match(/^([A-Za-z/]+)?/);
+  const uf = ufMatch?.[1] ?? "";
+  const numPart = value.slice(uf.length);
+  const digits = onlyDigits(numPart).slice(0, 6);
+  const sep = uf && digits ? " " : "";
+  if (digits.length <= 3) return uf + sep + digits;
+  return uf + sep + digits.slice(0, 3) + "." + digits.slice(3);
+}

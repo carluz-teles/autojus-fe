@@ -42,6 +42,9 @@ export interface ListIntimacoesParams {
    * como "sem filtro" para deep-links legados.
    */
   urgencia?: string;
+  /** Filtro server-side de Status = work_stage (RECEIVED|AWAITING_CONFIRMATION|
+   *  CONFIRMED|DRAFTING|PARTNER_REVIEW|FILED). Estágio derivado no BE. */
+  work_stage?: string;
   /**
    * Filtro server-side do chip "Não confirmadas" (toggle de triagem) — restringe a
    * prazos sugeridos ainda não confirmados (deadline.status = 'PENDING'). Combina com
@@ -66,6 +69,7 @@ export async function listIntimacoes(
     user_status,
     court,
     urgencia,
+    work_stage,
     nao_confirmado,
     assignee,
   }: ListIntimacoesParams = {},
@@ -79,6 +83,7 @@ export async function listIntimacoes(
       user_status,
       court,
       urgencia,
+      work_stage,
       nao_confirmado,
       assignee,
     },

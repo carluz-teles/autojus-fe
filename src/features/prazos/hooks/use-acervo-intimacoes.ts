@@ -8,6 +8,8 @@ import type {
   IntimacaoUserStatus,
   IntimacaoView,
 } from "@/features/intimacoes/types";
+import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+import { nomeExibicao } from "@/features/organization/lib/labels";
 import type { FilterOption } from "@/lib/api/types";
 
 // ── Chave de bucket de urgência (nomes do IntimacoesBuckets; "" = Todas). ──
@@ -76,36 +78,20 @@ const STATUS_COR: Record<IntimacaoUserStatus, string> = {
   IGNORED: "var(--fg3)",
 };
 
-// Rótulo humano das facetas emitidas pelo envelope (só rendemos as presentes).
-const FACET_LABEL: Record<string, string> = {
-  type: "Tipo",
-  court: "Tribunal",
-  user_status: "Situação",
+// Rótulos pt-BR do Status = work_stage (estágio derivado no BE). Ordem = progressão
+// do ciclo; o filtro usa este enum fixo (o envelope não expõe opções de work_stage).
+const WORK_STAGE_LABEL: Record<string, string> = {
+  RECEIVED: "Recebida",
+  AWAITING_CONFIRMATION: "A confirmar",
+  CONFIRMED: "Confirmado",
+  DRAFTING: "Em elaboração",
+  PARTNER_REVIEW: "Revisão do sócio",
+  FILED: "Protocolado",
 };
 
-// Ícone (chave lida pelo TableFilter) de cada faceta.
-const FACET_ICON: Record<string, string> = {
-  type: "tipo",
-  court: "tribunal",
-  user_status: "situacao",
-};
-
-const FACET_ORDER = ["type", "court", "user_status"] as const;
-
-// Reetiqueta opções com rótulo pt-BR quando conhecemos o enum (type/user_status).
-function rotulaOpcoes(key: string, facet: FilterOption[]): FilterOption[] {
-  if (key === "type")
-    return facet.map((o) => ({
-      value: o.value,
-      label: TIPO_LABEL[o.value as IntimacaoType] ?? o.label,
-    }));
-  if (key === "user_status")
-    return facet.map((o) => ({
-      value: o.value,
-      label: STATUS_LABEL[o.value as IntimacaoUserStatus] ?? o.label,
-    }));
-  return facet;
-}
+const WORK_STAGE_OPTIONS: FilterOption[] = Object.entries(WORK_STAGE_LABEL).map(
+  ([value, label]) => ({ value, label }),
+);
 
 // Ordem + rótulo das tabs de urgência (Todas primeiro).
 const TAB_DEFS: { key: BucketKey; label: string }[] = [
@@ -183,15 +169,17 @@ function toRow(i: IntimacaoView): AcervoIntimacaoRow {
  */
 export function useAcervoIntimacoes() {
   const [urgencia, setUrgencia] = useState<BucketKey>("");
-  const [type, setType] = useState("");
   const [court, setCourt] = useState("");
-  const [userStatus, setUserStatus] = useState("");
+  const [workStage, setWorkStage] = useState("");
+  const [responsavel, setResponsavel] = useState("");
+
+  const membros = useOrgMembersDirectory();
 
   const q = useIntimacoes({
     urgencia: urgenciaWire(urgencia),
-    type: type || undefined,
     court: court || undefined,
-    user_status: userStatus || undefined,
+    workStage: workStage || undefined,
+    assignee: responsavel || undefined,
   });
 
   const rows = useMemo(() => q.intimacoes.map(toRow), [q.intimacoes]);
@@ -214,25 +202,46 @@ export function useAcervoIntimacoes() {
     }));
   }, [q.buckets, urgencia]);
 
+  // 3 facetas do design: Responsável · Status (work_stage) · Órgão (Tribunal).
   const filtros = useMemo<AcervoFiltro[]>(() => {
-    const setters: Record<string, [string, (v: string) => void]> = {
-      type: [type, setType],
-      court: [court, setCourt],
-      user_status: [userStatus, setUserStatus],
-    };
-    return FACET_ORDER.filter((k) => q.filters[k]?.length).map((k) => {
-      const [value, onChange] = setters[k];
-      const options = q.filters[k] ?? [];
-      return {
-        key: k,
-        label: FACET_LABEL[k] ?? k,
-        icon: FACET_ICON[k] ?? "situacao",
-        value,
-        options: [{ label: "Todos", value: "" }, ...rotulaOpcoes(k, options)],
-        onChange,
-      };
+    const fs: AcervoFiltro[] = [];
+    if (membros.members.length > 0) {
+      fs.push({
+        key: "responsavel",
+        label: "Responsável",
+        icon: "responsavel",
+        value: responsavel,
+        options: [
+          { label: "Todos", value: "" },
+          ...membros.members.map((m) => ({
+            value: m.id,
+            label: nomeExibicao(m.name, m.email),
+          })),
+        ],
+        onChange: setResponsavel,
+      });
+    }
+    fs.push({
+      key: "work_stage",
+      label: "Status",
+      icon: "situacao",
+      value: workStage,
+      options: [{ label: "Todos", value: "" }, ...WORK_STAGE_OPTIONS],
+      onChange: setWorkStage,
     });
-  }, [q.filters, type, court, userStatus]);
+    const courts = q.filters["court"] ?? [];
+    if (courts.length > 0) {
+      fs.push({
+        key: "court",
+        label: "Órgão",
+        icon: "tribunal",
+        value: court,
+        options: [{ label: "Todos", value: "" }, ...courts],
+        onChange: setCourt,
+      });
+    }
+    return fs;
+  }, [q.filters, membros.members, responsavel, workStage, court]);
 
   return {
     rows,
