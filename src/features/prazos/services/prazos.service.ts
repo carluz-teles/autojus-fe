@@ -3,6 +3,10 @@ import type { ApiFetcher } from "@/lib/api/use-api";
 import type {
   PageEnvelope,
   PrazoAgendaView,
+  PrazoApurarDivergenciaInput,
+  PrazoApurarDivergenciaResult,
+  PrazoApurarTipoInput,
+  PrazoApurarTipoResult,
   PrazoConfirmInput,
   PrazoConfirmResult,
   PrazoDetalheView,
@@ -149,5 +153,35 @@ export async function reopenPrazo(
 ): Promise<void> {
   return fetcher<void>(`${ENDPOINT}/${prazoId}/reopen`, {
     method: "POST",
+  });
+}
+
+/**
+ * V1 — resolve a divergência declarado × calculado (memória de cálculo).
+ * POST /v1/prazos/:id/apurar-divergencia → selo vira "confiavel".
+ */
+export async function apurarDivergenciaPrazo(
+  fetcher: ApiFetcher,
+  prazoId: string,
+  body: PrazoApurarDivergenciaInput,
+): Promise<PrazoApurarDivergenciaResult> {
+  return fetcher<PrazoApurarDivergenciaResult>(
+    `${ENDPOINT}/${prazoId}/apurar-divergencia`,
+    { method: "POST", body },
+  );
+}
+
+/**
+ * V1 — confirma ou reclassifica o tipo inferido por IA (memória de cálculo).
+ * POST /v1/prazos/:id/apurar-tipo → selo vira "confiavel".
+ */
+export async function apurarTipoPrazo(
+  fetcher: ApiFetcher,
+  prazoId: string,
+  body: PrazoApurarTipoInput,
+): Promise<PrazoApurarTipoResult> {
+  return fetcher<PrazoApurarTipoResult>(`${ENDPOINT}/${prazoId}/apurar-tipo`, {
+    method: "POST",
+    body,
   });
 }

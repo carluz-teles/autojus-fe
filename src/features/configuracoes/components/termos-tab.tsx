@@ -14,6 +14,7 @@ import { useIsOrgAdmin } from "@/features/organization/hooks/use-org-role";
 import { TermoCard } from "@/features/shared/components/termo-card";
 import { diarioLabelPorUf } from "@/features/shared/lib/diario";
 import { ApiError } from "@/lib/api/errors";
+import { maskOab } from "@/lib/masks";
 
 // ——— helpers ———
 
@@ -24,7 +25,7 @@ import { ApiError } from "@/lib/api/errors";
  * adição usam esta chave. A exibição é reformatada por formatOab (ver abaixo).
  */
 function parseOabInput(raw: string): { chave: string; uf: string } | null {
-  const bruto = raw.trim().toUpperCase();
+  const bruto = raw.trim().toUpperCase().replace(/\./g, "");
   const m =
     /^([A-Z]{2})\s*([0-9]{1,6})$/.exec(bruto) ??
     /^([0-9]{1,6})\/?([A-Z]{2})$/.exec(bruto);
@@ -142,7 +143,7 @@ export function TermosTab() {
           <div className="mt-4.5 flex gap-2">
             <Input
               value={rascunho}
-              onChange={(e) => setRascunho(e.target.value)}
+              onChange={(e) => setRascunho(maskOab(e.target.value))}
               onKeyDown={(e) => {
                 if (e.key === "Enter") void adicionar();
               }}

@@ -2,6 +2,8 @@
 
 import { Plus } from "lucide-react";
 
+import { maskOab } from "@/lib/masks";
+
 import { type ResumoCard, useFontes } from "../../hooks/use-fontes";
 import { ConfigToggle } from "./config-toggle";
 import { ConfigTribunais } from "./config-tribunais";
@@ -58,7 +60,7 @@ function Erro({ texto }: { texto: string }) {
 }
 
 // Aba Fontes de dados — port do template 1369-1453, ligada ao BE (ingestão):
-// Integrações (read-only) / Termos (watched-oabs) / Ingestões (captures).
+// Tribunais (court connections) / Termos (watched-oabs) / Ingestões (captures).
 export function ConfigFontes() {
   const fon = useFontes();
 
@@ -90,45 +92,6 @@ export function ConfigFontes() {
         ))}
       </div>
 
-      {fon.fontesTab === "integr" ? (
-        <>
-          <p className="text-fg3 mt-0 mb-3.5 text-[12.5px]">
-            Tribunais e serviços conectados à plataforma.
-          </p>
-          {fon.integrError ? (
-            <Erro texto="Não foi possível carregar as integrações." />
-          ) : fon.integrPending ? (
-            <Skeleton linhas={2} />
-          ) : fon.integracoes.length === 0 ? (
-            <Vazio texto="Nenhuma integração conectada ainda." />
-          ) : (
-            <div className="border-line bg-panel overflow-hidden rounded-xl border">
-              {fon.integracoes.map((i) => (
-                <div
-                  key={i.id}
-                  className="border-line2 flex items-center gap-3.5 border-b px-4 py-[13px] last:border-b-0"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] font-medium">
-                      {i.nome}
-                    </span>
-                    <span className="text-fg3 block text-[11.5px]">
-                      {i.desc}
-                    </span>
-                  </span>
-                  <span
-                    className="flex-none rounded-full px-2.5 py-[3px] text-[10.5px] font-medium"
-                    style={{ background: i.statusBg, color: i.statusFg }}
-                  >
-                    {i.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      ) : null}
-
       {fon.fontesTab === "tribunais" ? <ConfigTribunais /> : null}
 
       {fon.fontesTab === "termos" ? (
@@ -152,7 +115,7 @@ export function ConfigFontes() {
               <input
                 autoFocus
                 value={fon.addValor}
-                onChange={(e) => fon.setAddValor(e.target.value)}
+                onChange={(e) => fon.setAddValor(maskOab(e.target.value))}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") fon.addTermoSubmit();
                 }}

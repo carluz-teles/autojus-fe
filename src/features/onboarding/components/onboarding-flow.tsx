@@ -9,6 +9,9 @@ import {
   X,
 } from "lucide-react";
 
+import { maskOab } from "@/lib/masks";
+import { formatOabDisplay } from "@/features/shared/lib/diario";
+
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
 
 // Onboarding "Linear" full-screen (port de Atjus - Onboarding.dc.html): 4 passos
@@ -122,18 +125,20 @@ function Campo({
   value,
   onChange,
   placeholder,
+  mask,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
+  mask?: (v: string) => string;
 }) {
   return (
     <>
       <label className="text-fg3 mb-1.5 block text-[11.5px]">{label}</label>
       <input
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(mask ? mask(e.target.value) : e.target.value)}
         placeholder={placeholder}
         className="border-line bg-panel text-foreground placeholder:text-fg3 w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
       />
@@ -169,6 +174,7 @@ function Org({ f, solo }: { f: F; solo: boolean }) {
         value={f.doc}
         onChange={f.setDoc}
         placeholder={solo ? "OAB/SP 000.000" : "00.000.000/0000-00"}
+        mask={solo ? maskOab : undefined}
       />
       <div className="mt-[26px] flex gap-2.5">
         <button
@@ -201,7 +207,7 @@ function Oab({ f }: { f: F }) {
       <div className="mb-3.5 flex gap-2">
         <input
           value={f.oab}
-          onChange={(e) => f.setOab(e.target.value)}
+          onChange={(e) => f.setOab(maskOab(e.target.value))}
           onKeyDown={(e) => {
             if (e.key === "Enter") f.addOab();
           }}
@@ -225,7 +231,9 @@ function Oab({ f }: { f: F }) {
               className="text-primary size-[15px] flex-none"
               strokeWidth={1.8}
             />
-            <span className="flex-1 font-mono text-[13px]">{o}</span>
+            <span className="flex-1 font-mono text-[13px]">
+              {formatOabDisplay(o)}
+            </span>
             <button
               onClick={() => f.removeOab(i)}
               className="text-fg3 hover:bg-hover grid size-[22px] place-items-center rounded-md"

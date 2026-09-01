@@ -2,21 +2,22 @@
 
 import { Menu } from "@base-ui/react/menu";
 import {
+  ArrowRight,
   Check,
   ChevronLeft,
   ChevronRight,
   FileText,
   Plus,
   Sparkles,
+  TriangleAlert,
 } from "lucide-react";
 import Link from "next/link";
+import { Fragment, useState } from "react";
 import { toast } from "sonner";
 
+import { Avatar } from "@/components/mock-ui/data-display";
+import { Input } from "@/components/ui/input";
 import { AnalisarLoading } from "@/features/intimacoes/components/shared/analisar-card";
-import {
-  Avatar,
-  initials,
-} from "@/features/intimacoes/components/shared/avatar";
 import { useAprovarProvidencia } from "@/features/intimacoes/hooks/use-intimacoes";
 import type { IntimacaoProvidencia } from "@/features/intimacoes/types";
 import { nomeExibicao } from "@/features/organization/lib/labels";
@@ -24,7 +25,10 @@ import { useCriarPecaDaIntimacao } from "@/features/pecas-v2/hooks/use-criar-pec
 import { sanitizeContentHtml } from "@/lib/html/sanitize-content";
 import { cn } from "@/lib/utils";
 
-import { useIntimacaoDetalhe } from "../../hooks/use-intimacao-detalhe";
+import {
+  type MemoriaCalculoVM,
+  useIntimacaoDetalhe,
+} from "../../hooks/use-intimacao-detalhe";
 
 const POPUP_CLASS =
   "bg-popover text-popover-foreground ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 z-50 max-h-72 min-w-48 origin-(--transform-origin) overflow-y-auto rounded-lg p-1 shadow-md ring-1 duration-100 outline-none";
@@ -33,9 +37,9 @@ const ITEM_CLASS =
   "focus:bg-accent focus:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-md py-1.5 pr-2 pl-2 text-[13px] outline-none select-none data-disabled:pointer-events-none data-disabled:opacity-50";
 
 // Detalhe da intimação (unidade de trabalho), ligado ao backend real via
-// useIntimacaoDetalhe. Faixa de identidade + stepper de ciclo de vida; 2 colunas:
-// providências geradas por IA (sob demanda) à esquerda, teor + trilha à direita;
-// rodapé de ações (resolver/ignorar/reabrir + responsável).
+// useIntimacaoDetalhe. Faixa de identidade + stepper de ciclo de vida + ação
+// rápida (responsável); 2 colunas: providências geradas por IA (sob demanda)
+// à esquerda, teor + trilha à direita.
 export function IntimacaoDetalhe({ id }: { id: string }) {
   const det = useIntimacaoDetalhe(id);
   const peca = useCriarPecaDaIntimacao();
@@ -98,53 +102,77 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
                       {m.urgencia.label}
                     </span>
                   ) : null}
-                  {/* 💀 Divergente + selo — dimensões do motor de prazos (memória
-                      de cálculo). Placeholders estáticos até o motor existir. */}
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-md px-[9px] py-[3px] text-[11.5px] font-medium"
-                    style={{
-                      background:
-                        "color-mix(in oklch, var(--gold) 12%, transparent)",
-                      color: "var(--gold)",
-                    }}
-                    title="Divergência declarado × calculado — em reformulação"
-                  >
-                    Divergente
-                  </span>
-                  <span
-                    className="border-line text-fg3 inline-flex items-center gap-1.5 rounded-md border border-dashed px-[9px] py-[3px] text-[11px] font-medium"
-                    title="Selo de confiança — em reformulação"
-                  >
-                    selo · a apurar
-                  </span>
+                  {/* origem + selo — dimensões do motor de prazos (memória de
+                      cálculo). Só aparecem quando há prazo derivado. */}
+                  {det.memoria?.origem ? (
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-md px-[9px] py-[3px] text-[11.5px] font-medium"
+                      style={{
+                        background: det.memoria.origem.fundo,
+                        color: det.memoria.origem.cor,
+                      }}
+                      title="Origem — de onde veio a data"
+                      aria-label={`Origem da data: ${det.memoria.origem.label}`}
+                    >
+                      {det.memoria.origem.label}
+                    </span>
+                  ) : null}
+                  {det.memoria?.selo ? (
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-md border border-dashed px-[9px] py-[3px] text-[11px] font-medium"
+                      style={{
+                        borderColor: det.memoria.selo.cor,
+                        color: det.memoria.selo.cor,
+                        background: det.memoria.selo.fundo,
+                      }}
+                      title={det.memoria.selo.descricao}
+                      aria-label={`Selo de confiança: ${det.memoria.selo.label} — ${det.memoria.selo.descricao}`}
+                    >
+                      {det.memoria.selo.label}
+                    </span>
+                  ) : null}
                   <span className="text-fg3 text-[11.5px]">{m.orgao}</span>
                 </div>
                 <h1 className="font-display mt-2.5 text-[27px] leading-[1.1] tracking-[-0.01em]">
                   {m.titulo}
                 </h1>
-                <p className="text-fg3 mt-2 text-[12px]">
-                  publicado em {m.publicadoEm}
-                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <p className="text-fg3 text-[12px]">
+                    publicado em {m.publicadoEm}
+                  </p>
+                </div>
               </div>
-              <div className="border-line2 flex shrink-0 items-baseline gap-2.5 border-l pl-[22px]">
-                <span
-                  className="text-[40px] leading-none font-semibold tabular-nums"
-                  style={{ color: m.prazoCor }}
-                >
-                  {m.prazoNum}
-                </span>
-                <span className="text-fg3 text-[12px] leading-[1.5]">
-                  {m.prazoFrase}
-                  {m.fatalData ? (
-                    <>
-                      <br />
-                      fatal{" "}
-                      <strong className="text-foreground font-medium">
-                        {m.fatalData}
-                      </strong>
-                    </>
-                  ) : null}
-                </span>
+              <div className="border-line2 flex shrink-0 flex-col items-start gap-2 border-l pl-[22px]">
+                <div className="flex items-baseline gap-2.5">
+                  <span
+                    className="text-[40px] leading-none font-semibold tabular-nums"
+                    style={{ color: m.prazoCor }}
+                  >
+                    {m.prazoNum}
+                  </span>
+                  <span className="text-fg3 text-[12px] leading-[1.5]">
+                    {m.prazoFrase}
+                    {m.fatalData ? (
+                      <>
+                        <br />
+                        fatal{" "}
+                        <strong className="text-foreground font-medium">
+                          {m.fatalData}
+                        </strong>
+                      </>
+                    ) : null}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-fg3 text-[12px]">Responsável:</span>
+                  <ResponsavelMenu
+                    value={m.responsavelId}
+                    nome={m.responsavelNome}
+                    membros={det.membros}
+                    emVoo={det.assignEmVoo}
+                    onAssign={det.onAssign}
+                  />
+                </div>
               </div>
             </div>
             {/* stepper do ciclo de trabalho (recebida → protocolado) */}
@@ -185,6 +213,19 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
               })}
             </div>
           </div>
+
+          {/* memória de cálculo ("por que essa data?") */}
+          <MemoriaCalculoCard
+            memoria={det.memoria}
+            pending={det.memoriaPending}
+            erro={det.memoriaErro}
+            emVoo={det.memoriaEmVoo}
+            onAceitarDeclarado={det.onAceitarDeclarado}
+            onAceitarCalculado={det.onAceitarCalculado}
+            onAjusteManual={det.onAjusteManual}
+            onConfirmarTipo={det.onConfirmarTipo}
+            onReclassificarTipo={det.onReclassificarTipo}
+          />
 
           {/* 2 colunas */}
           <div className="mt-5 grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] items-start gap-5">
@@ -378,46 +419,6 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
           </div>
         </div>
       </div>
-
-      {/* rodapé de ações */}
-      <div className="border-line bg-panel flex shrink-0 items-center gap-2 border-t px-8 py-3">
-        <div className="mx-auto flex w-full max-w-[1080px] items-center gap-2">
-          {/* 💀 Confirmar prazo / Ajustar — ações do motor de prazos (em
-              reformulação). Placeholders desabilitados até o motor existir. */}
-          <button
-            type="button"
-            disabled
-            title="Em reformulação"
-            className="bg-primary text-primary-foreground cursor-not-allowed rounded-lg px-4 py-2.5 text-[13px] font-medium opacity-50"
-          >
-            Confirmar prazo
-          </button>
-          <button
-            type="button"
-            disabled
-            title="Em reformulação"
-            className="border-line bg-panel text-foreground cursor-not-allowed rounded-lg border px-3.5 py-2.5 text-[13px] opacity-50"
-          >
-            Ajustar
-          </button>
-
-          <ResponsavelMenu
-            value={m.responsavelId}
-            nome={m.responsavelNome}
-            membros={det.membros}
-            emVoo={det.assignEmVoo}
-            onAssign={det.onAssign}
-          />
-
-          <button
-            onClick={() => peca.abrirConstrucao(id)}
-            className="border-line bg-panel text-foreground hover:bg-hover ml-auto inline-flex items-center gap-2 rounded-lg border px-3.5 py-2.5 text-[13px] font-medium"
-          >
-            <Sparkles className="text-primary size-4" strokeWidth={1.8} />
-            Gerar peça com IA
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -606,6 +607,429 @@ function ProvidenciaChips({ kind }: { kind: string }) {
   );
 }
 
+/** Card "Por que essa data?" — memória de cálculo (proveniência auditável).
+ *  Some enquanto não houver prazo derivado da intimação (pending=erro=false
+ *  e memoria=null); degrada pra mensagem simples quando o prazo é pré-V1
+ *  (memoria.temCalcMemory=false, mas badges de origem/selo continuam na faixa
+ *  de identidade acima). */
+function MemoriaCalculoCard({
+  memoria,
+  pending,
+  erro,
+  emVoo,
+  onAceitarDeclarado,
+  onAceitarCalculado,
+  onAjusteManual,
+  onConfirmarTipo,
+  onReclassificarTipo,
+}: {
+  memoria: MemoriaCalculoVM | null;
+  pending: boolean;
+  erro: boolean;
+  emVoo: boolean;
+  onAceitarDeclarado: () => void;
+  onAceitarCalculado: () => void;
+  onAjusteManual: (manualExtraDays: number) => void;
+  onConfirmarTipo: () => void;
+  onReclassificarTipo: (tipo: string) => void;
+}) {
+  const [ajustando, setAjustando] = useState(false);
+  const [diasAjuste, setDiasAjuste] = useState("");
+  const [reclassificando, setReclassificando] = useState(false);
+  const [novoTipo, setNovoTipo] = useState("");
+
+  if (!pending && !erro && !memoria) return null;
+
+  return (
+    <div className="border-line bg-panel mt-5 overflow-hidden rounded-[14px] border">
+      <div className="border-line2 flex items-center gap-2.5 border-b px-[18px] py-3.5">
+        <Sparkles
+          className="text-primary size-[17px] shrink-0"
+          strokeWidth={1.7}
+        />
+        <div className="min-w-0">
+          <div className="text-[13.5px] font-semibold">Por que essa data?</div>
+          <div className="text-fg3 text-[11px]">
+            Memória de cálculo · proveniência auditável e defensável
+          </div>
+        </div>
+      </div>
+
+      {pending ? (
+        <p className="text-fg3 px-[18px] py-6 text-[12.5px]">
+          Carregando memória de cálculo…
+        </p>
+      ) : null}
+
+      {erro ? (
+        <p
+          role="alert"
+          className="text-destructive px-[18px] py-6 text-[12.5px]"
+        >
+          Não foi possível carregar a memória de cálculo.
+        </p>
+      ) : null}
+
+      {memoria ? (
+        <>
+          {/* APURAÇÃO: divergência (declarado × calculado) */}
+          {memoria.divergencia?.pendente ? (
+            <div
+              className="border-line2 border-b px-[18px] py-[15px]"
+              style={{
+                background: "color-mix(in oklch, var(--gold) 6%, transparent)",
+              }}
+            >
+              <div className="mb-3 flex items-center gap-2">
+                <TriangleAlert
+                  className="size-[15px]"
+                  style={{ color: "var(--gold)" }}
+                  strokeWidth={1.8}
+                />
+                <span
+                  className="text-[12.5px] font-semibold"
+                  style={{ color: "var(--gold)" }}
+                >
+                  Divergência — declarado ≠ calculado
+                </span>
+                <span
+                  className="ml-auto font-mono text-[11px]"
+                  style={{ color: "var(--gold)" }}
+                >
+                  Δ {memoria.divergencia.difDias} dias
+                </span>
+              </div>
+              <div className="mb-[11px] grid grid-cols-2 gap-2.5">
+                <div className="border-line bg-panel rounded-[9px] border px-3 py-2.5">
+                  <div className="text-fg3 text-[10px] tracking-[0.04em] uppercase">
+                    Declarado na intimação
+                  </div>
+                  <div className="mt-[3px] font-mono text-[18px] font-medium">
+                    {memoria.divergencia.declarada}
+                  </div>
+                </div>
+                <div className="border-line bg-panel rounded-[9px] border px-3 py-2.5">
+                  <div className="text-fg3 text-[10px] tracking-[0.04em] uppercase">
+                    Calculado por regra
+                  </div>
+                  <div className="mt-[3px] font-mono text-[18px] font-medium">
+                    {memoria.divergencia.calculada}
+                  </div>
+                </div>
+              </div>
+              <p className="text-fg2 mb-3 text-[12px] leading-[1.55]">
+                <strong className="font-semibold">Causa provável:</strong>{" "}
+                {memoria.divergencia.causa}
+              </p>
+
+              {!ajustando ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={onAceitarDeclarado}
+                    disabled={emVoo}
+                    className="border-line bg-panel text-foreground hover:bg-hover rounded-lg border px-[13px] py-2 text-[12.5px] font-medium disabled:opacity-60"
+                  >
+                    Aceitar declarado · {memoria.divergencia.declarada}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onAceitarCalculado}
+                    disabled={emVoo}
+                    className="bg-primary text-primary-foreground rounded-lg px-[13px] py-2 text-[12.5px] font-medium disabled:opacity-60"
+                  >
+                    Aceitar calculado · {memoria.divergencia.calculada}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAjustando(true)}
+                    disabled={emVoo}
+                    className="text-fg2 hover:bg-hover rounded-lg border border-transparent px-[13px] py-2 text-[12.5px] disabled:opacity-60"
+                  >
+                    Ajuste manual
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-fg3 text-[11px]">
+                      Dias extras (ajuste manual)
+                    </span>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={diasAjuste}
+                      onChange={(e) => setDiasAjuste(e.target.value)}
+                      aria-label="Dias extras do ajuste manual"
+                      className="h-8 w-28 text-[12.5px]"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={emVoo || diasAjuste.trim() === ""}
+                    onClick={() => {
+                      onAjusteManual(Number(diasAjuste));
+                      setAjustando(false);
+                      setDiasAjuste("");
+                    }}
+                    className="bg-primary text-primary-foreground rounded-lg px-[13px] py-2 text-[12.5px] font-medium disabled:opacity-60"
+                  >
+                    Confirmar ajuste
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAjustando(false)}
+                    disabled={emVoo}
+                    className="text-fg3 hover:bg-hover rounded-lg px-[13px] py-2 text-[12.5px] disabled:opacity-60"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {memoria.divergencia?.resolvida ? (
+            <div className="border-line2 border-b px-[18px] py-[15px]">
+              <div
+                role="status"
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px]"
+                style={{
+                  background:
+                    "color-mix(in oklch, var(--green) 10%, transparent)",
+                  color: "var(--green)",
+                }}
+              >
+                <Check className="size-3.5 shrink-0" strokeWidth={2.2} />
+                Apurado — {memoria.divergencia.decisaoLabel}. Selo agora
+                Confiável; decisão registrada na trilha.
+              </div>
+            </div>
+          ) : null}
+
+          {/* APURAÇÃO: tipo inferido por IA */}
+          {memoria.tipoIa?.pendente ? (
+            <div
+              className="border-line2 border-b px-[18px] py-[15px]"
+              style={{
+                background:
+                  "color-mix(in oklch, var(--primary) 5%, transparent)",
+              }}
+            >
+              <div className="mb-[11px] flex items-center gap-2">
+                <Sparkles
+                  className="text-primary size-[15px]"
+                  strokeWidth={1.8}
+                />
+                <span className="text-primary text-[12.5px] font-semibold">
+                  Tipo inferido por IA — confirme antes de assumir
+                </span>
+                <span className="text-fg3 ml-auto font-mono text-[11px]">
+                  confiança {memoria.tipoIa.confPct}%
+                </span>
+              </div>
+              <div className="border-line bg-panel mb-[11px] rounded-[9px] border px-[13px] py-[11px]">
+                <div className="text-fg3 text-[10px] tracking-[0.04em] uppercase">
+                  Ato classificado
+                </div>
+                <div className="font-display my-2 text-[17px]">
+                  {memoria.tipoIa.tipo}
+                </div>
+                <div
+                  role="progressbar"
+                  aria-valuenow={memoria.tipoIa.confPct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`Confiança da classificação: ${memoria.tipoIa.confPct}%`}
+                  className="bg-line2 h-[5px] overflow-hidden rounded-full"
+                >
+                  <div
+                    className="bg-primary h-full"
+                    style={{ width: `${memoria.tipoIa.confPct}%` }}
+                  />
+                </div>
+              </div>
+
+              {!reclassificando ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={onConfirmarTipo}
+                    disabled={emVoo}
+                    className="bg-primary text-primary-foreground rounded-lg px-[13px] py-2 text-[12.5px] font-medium disabled:opacity-60"
+                  >
+                    Confirmar tipo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReclassificando(true)}
+                    disabled={emVoo}
+                    className="border-line bg-panel text-foreground hover:bg-hover rounded-lg border px-[13px] py-2 text-[12.5px] disabled:opacity-60"
+                  >
+                    Reclassificar
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-fg3 text-[11px]">Novo tipo</span>
+                    <Input
+                      value={novoTipo}
+                      onChange={(e) => setNovoTipo(e.target.value)}
+                      placeholder="Ex.: Embargos de declaração"
+                      aria-label="Novo tipo do ato"
+                      className="h-8 w-56 text-[12.5px]"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={emVoo || novoTipo.trim() === ""}
+                    onClick={() => {
+                      onReclassificarTipo(novoTipo);
+                      setReclassificando(false);
+                      setNovoTipo("");
+                    }}
+                    className="bg-primary text-primary-foreground rounded-lg px-[13px] py-2 text-[12.5px] font-medium disabled:opacity-60"
+                  >
+                    Confirmar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReclassificando(false)}
+                    disabled={emVoo}
+                    className="text-fg3 hover:bg-hover rounded-lg px-[13px] py-2 text-[12.5px] disabled:opacity-60"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {memoria.tipoIa?.resolvida ? (
+            <div className="border-line2 border-b px-[18px] py-[15px]">
+              <div
+                role="status"
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px]"
+                style={{
+                  background:
+                    "color-mix(in oklch, var(--green) 10%, transparent)",
+                  color: "var(--green)",
+                }}
+              >
+                <Check className="size-3.5 shrink-0" strokeWidth={2.2} />
+                Tipo confirmado — selo agora Confiável; registrado na trilha.
+              </div>
+            </div>
+          ) : null}
+
+          {/* CADEIA DE CÁLCULO */}
+          {memoria.temCalcMemory ? (
+            <>
+              <div className="flex flex-nowrap items-stretch gap-1 overflow-x-auto px-[18px] py-[17px]">
+                {memoria.cadeia.map((c, idx) => (
+                  <Fragment key={c.kicker}>
+                    {idx > 0 ? (
+                      <div className="text-fg3 flex items-center px-0.5">
+                        <ChevronRight
+                          className="size-[15px]"
+                          strokeWidth={1.8}
+                        />
+                      </div>
+                    ) : null}
+                    <div className="border-line2 bg-bg min-w-[140px] flex-1 rounded-[10px] border px-3 py-[11px]">
+                      <div className="text-fg3 text-[10px] tracking-[0.05em] uppercase">
+                        {c.kicker}
+                      </div>
+                      <div className="my-1 font-mono text-[16px] font-medium">
+                        {c.valor}
+                      </div>
+                      <div className="text-fg3 text-[10.5px] leading-[1.45]">
+                        {c.sub}
+                      </div>
+                    </div>
+                  </Fragment>
+                ))}
+                <div className="text-fg3 flex items-center px-0.5">
+                  <ArrowRight className="size-4" strokeWidth={2} />
+                </div>
+                <div
+                  className="min-w-[160px] flex-1 rounded-[10px] border px-[13px] py-[11px]"
+                  style={{
+                    borderColor:
+                      "color-mix(in oklch, var(--red) 35%, transparent)",
+                    background:
+                      "color-mix(in oklch, var(--red) 6%, transparent)",
+                  }}
+                >
+                  <div
+                    className="text-[10px] tracking-[0.05em] uppercase"
+                    style={{ color: "var(--red)" }}
+                  >
+                    Resultado
+                  </div>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span
+                      className="font-mono text-[20px] font-semibold"
+                      style={{ color: "var(--red)" }}
+                    >
+                      {memoria.resultadoFatal}
+                    </span>
+                    <span className="text-fg3 text-[11px]">fatal</span>
+                  </div>
+                  {memoria.notaInterna ? (
+                    <div className="text-fg2 mt-[5px] text-[11px]">
+                      {memoria.notaInterna}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* FERIADOS APLICADOS (snapshot congelado) */}
+              <div className="px-[18px] pb-[15px]">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="text-fg2 text-[10.5px] font-semibold tracking-[0.04em] uppercase">
+                    Feriados e suspensões aplicados
+                  </span>
+                  <span className="text-fg3 text-[10.5px]">
+                    snapshot congelado
+                  </span>
+                </div>
+                {memoria.feriados.length === 0 ? (
+                  <p className="text-fg3 border-line2 rounded-[10px] border px-[13px] py-2.5 text-[11.5px]">
+                    Nenhum feriado ou suspensão aplicado neste cálculo.
+                  </p>
+                ) : (
+                  <div className="border-line2 overflow-hidden rounded-[10px] border">
+                    {memoria.feriados.map((f, idx) => (
+                      <div
+                        key={`${f.data}-${idx}`}
+                        className="border-line2 grid grid-cols-[88px_1fr_auto] items-center gap-3 border-b px-[13px] py-2.5 last:border-b-0"
+                      >
+                        <span className="text-fg2 font-mono text-[12px]">
+                          {f.data}
+                        </span>
+                        <span className="text-[12.5px]">{f.nome}</span>
+                        <span className="bg-hover text-fg3 rounded-full px-2 py-0.5 text-[10px] font-medium">
+                          {f.ambito}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="text-fg3 px-[18px] py-6 text-[12.5px] leading-[1.6]">
+              Memória de cálculo indisponível para este prazo.
+            </p>
+          )}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 /** Marcador de um passo do stepper: concluído (círculo cheio + check), atual
  *  (anel vazado destacado) ou pendente (círculo tracejado). */
 function StepMarcador({ estado }: { estado: "done" | "current" | "todo" }) {
@@ -637,7 +1061,9 @@ function StepMarcador({ estado }: { estado: "done" | "current" | "todo" }) {
   );
 }
 
-/** Menu de atribuição do responsável (papel único 0057) — ligado a onAssign. */
+/** Menu de atribuição do responsável (papel único 0057) — ligado a onAssign.
+ *  Trigger discreto (avatar + anel sutil no hover), mesmo padrão visual de
+ *  `AtribuirResponsavelProcesso` (src/features/processos/components/atribuir-responsavel.tsx). */
 function ResponsavelMenu({
   value,
   nome,
@@ -651,28 +1077,34 @@ function ResponsavelMenu({
   emVoo: boolean;
   onAssign: (assigneeUserId: string | null) => void;
 }) {
+  const avatarSize = 28;
+
   return (
     <Menu.Root>
       <Menu.Trigger
         disabled={emVoo}
+        aria-label={nome ? `Responsável: ${nome}` : "Atribuir responsável"}
         title={nome || "Atribuir responsável"}
-        className="navi border-line bg-panel text-foreground hover:bg-hover ml-auto inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] disabled:opacity-60"
+        className="hover:ring-border flex cursor-pointer items-center gap-2.5 rounded-full outline-none hover:ring-2 disabled:pointer-events-none disabled:opacity-60"
       >
         {nome ? (
-          <Avatar size="sm" variant="outline" initials={initials(nome)} />
+          <Avatar nome={nome} size={avatarSize} />
         ) : (
           <span
             aria-hidden
-            className="border-muted-foreground/40 size-5 shrink-0 rounded-full border border-dashed"
+            className="border-muted-foreground/40 hover:border-primary shrink-0 rounded-full border border-dashed"
+            style={{ width: avatarSize, height: avatarSize }}
           />
         )}
-        <span className="max-w-[140px] truncate">
-          {nome || "Atribuir responsável"}
-        </span>
       </Menu.Trigger>
 
       <Menu.Portal>
-        <Menu.Positioner side="top" align="end" sideOffset={6} className="z-50">
+        <Menu.Positioner
+          side="bottom"
+          align="start"
+          sideOffset={6}
+          className="z-50"
+        >
           <Menu.Popup className={POPUP_CLASS}>
             <Menu.RadioGroup
               value={value ?? ""}
@@ -697,7 +1129,7 @@ function ResponsavelMenu({
                     value={mem.id}
                     className={cn(ITEM_CLASS, "gap-2")}
                   >
-                    <Avatar size="sm" initials={initials(label)} />
+                    <Avatar nome={label} size={22} />
                     <span className="flex-1 truncate">{label}</span>
                     <Menu.RadioItemIndicator className="ml-auto">
                       <Check className="size-4" />

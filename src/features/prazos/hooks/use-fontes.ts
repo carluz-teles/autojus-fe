@@ -6,18 +6,17 @@ import { toast } from "sonner";
 import { useCaptures } from "@/features/captures/hooks/use-captures";
 import {
   useAddWatchedOab,
-  useIntegrations,
   useToggleWatchedOab,
   useWatchedOabs,
 } from "@/features/integrations/hooks/use-integrations";
 
 // Aba "Fontes de dados" ligada ao BE real (ingestão). Compõe os sub-hooks de
 // React Query já existentes das features de aquisição:
-//  · Integrações  → GET /v1/acquisition/integrations (read-only; sem toggle no BE)
+//  · Tribunais    → conexões eproc (ver ConfigTribunais)
 //  · Termos       → GET/POST/PATCH /v1/acquisition/watched-oabs (lista + ligar/add)
 //  · Ingestões    → GET /v1/acquisition/captures (runs + resumo; auto-poll se rodando)
 // Componente = JSX + binding; toda a lógica/derivação vive aqui.
-export type FontesTab = "integr" | "tribunais" | "termos" | "ingest";
+export type FontesTab = "tribunais" | "termos" | "ingest";
 
 export interface FontesTabItem {
   key: FontesTab;
@@ -39,15 +38,6 @@ export interface ResumoCard {
   rot: string;
   val: string;
   sub: string;
-}
-
-export interface IntegracaoVM {
-  id: string;
-  nome: string;
-  desc: string;
-  status: string;
-  statusFg: string;
-  statusBg: string;
 }
 
 export interface TermoVM {
@@ -89,15 +79,6 @@ const MESES = [
   "nov",
   "dez",
 ];
-
-// Metadados de exibição por source de integração (o BE devolve o enum cru).
-const SOURCE_META: Record<string, { nome: string; desc: string }> = {
-  DJEN: { nome: "DJEN", desc: "Diário de Justiça Eletrônico Nacional" },
-  DATAJUD: {
-    nome: "DataJud",
-    desc: "Base Nacional de Dados do Poder Judiciário · CNJ",
-  },
-};
 
 // Rótulo pt-BR do tipo de captura (CaptureKind).
 const KIND_LABEL: Record<string, string> = {
@@ -172,9 +153,8 @@ function relativo(iso: string | null): string {
 const nf = (n: number) => n.toLocaleString("pt-BR");
 
 export function useFontes() {
-  const [fontesTab, setFontesTab] = useState<FontesTab>("integr");
+  const [fontesTab, setFontesTab] = useState<FontesTab>("tribunais");
 
-  const integrQuery = useIntegrations();
   const oabsQuery = useWatchedOabs();
   const capturesQuery = useCaptures();
   const toggleOab = useToggleWatchedOab();
@@ -182,7 +162,6 @@ export function useFontes() {
 
   const fontesTabs = useMemo<FontesTabItem[]>(() => {
     const items: { key: FontesTab; label: string }[] = [
-      { key: "integr", label: "Integrações" },
       { key: "tribunais", label: "Tribunais" },
       { key: "termos", label: "Termos" },
       { key: "ingest", label: "Ingestões" },
@@ -200,29 +179,6 @@ export function useFontes() {
       };
     });
   }, [fontesTab]);
-
-  // ---- Integrações (read-only: o BE não expõe toggle por tribunal) ----
-  const integracoes = useMemo<IntegracaoVM[]>(
-    () =>
-      (integrQuery.data?.data ?? []).map((i) => {
-        const meta = SOURCE_META[i.source] ?? {
-          nome: i.source,
-          desc: "Fonte de dados",
-        };
-        const conectada = /ACTIVE|CONNECTED|OK|ENABLED/i.test(i.status);
-        return {
-          id: i.id,
-          nome: meta.nome,
-          desc: meta.desc,
-          status: conectada ? "Conectada" : i.status,
-          statusFg: conectada ? "var(--green)" : "var(--fg3)",
-          statusBg: conectada
-            ? "color-mix(in oklch, var(--green) 14%, transparent)"
-            : "var(--hover)",
-        };
-      }),
-    [integrQuery.data],
-  );
 
   // ---- Termos (OABs monitoradas) ----
   const termos = useMemo<TermoVM[]>(
@@ -347,10 +303,6 @@ export function useFontes() {
   return {
     fontesTab,
     fontesTabs,
-    // integrações
-    integracoes,
-    integrPending: integrQuery.isPending,
-    integrError: !!integrQuery.error,
     // termos
     termos,
     termosResumo,
