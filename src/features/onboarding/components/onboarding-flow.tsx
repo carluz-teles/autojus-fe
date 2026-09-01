@@ -9,8 +9,8 @@ import {
   X,
 } from "lucide-react";
 
-import { maskOab } from "@/lib/masks";
 import { formatOabDisplay } from "@/features/shared/lib/diario";
+import { maskOab } from "@/lib/masks";
 
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
 

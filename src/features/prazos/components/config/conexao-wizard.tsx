@@ -19,7 +19,11 @@ import { MfaCaptura } from "./mfa-captura";
 
 // TJSP-first: modelo genérico (uma conexão por tribunal), só TJSP calibrado hoje.
 const TRIBUNAIS: { valor: string; label: string; disponivel: boolean }[] = [
-  { valor: "TJSP", label: "TJSP — Tribunal de Justiça de São Paulo", disponivel: true },
+  {
+    valor: "TJSP",
+    label: "TJSP — Tribunal de Justiça de São Paulo",
+    disponivel: true,
+  },
   { valor: "TJRS", label: "TJRS — em breve", disponivel: false },
   { valor: "TRF4", label: "TRF4 — em breve", disponivel: false },
 ];
@@ -48,7 +52,9 @@ export function ConexaoWizard({
   const [court, setCourt] = useState("TJSP");
   const [certRef, setCertRef] = useState("");
   const [connectionId, setConnectionId] = useState<string | null>(null);
-  const [connection, setConnection] = useState<CourtConnectionView | null>(null);
+  const [connection, setConnection] = useState<CourtConnectionView | null>(
+    null,
+  );
   const [qrFile, setQrFile] = useState<File | null>(null);
   const [secret, setSecret] = useState("");
   const [candidates, setCandidates] = useState<MfaSelectionCandidate[] | null>(
@@ -167,7 +173,11 @@ export function ConexaoWizard({
                   className="border-line bg-bg text-foreground w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
                 >
                   {TRIBUNAIS.map((t) => (
-                    <option key={t.valor} value={t.valor} disabled={!t.disponivel}>
+                    <option
+                      key={t.valor}
+                      value={t.valor}
+                      disabled={!t.disponivel}
+                    >
                       {t.label}
                     </option>
                   ))}
@@ -227,9 +237,9 @@ export function ConexaoWizard({
           ) : (
             <div className="flex flex-col gap-3.5">
               <p className="text-fg3 text-[12.5px] leading-[1.5]">
-                No tribunal, em <strong>Configurar segundo fator</strong>, tire um
-                print do QR (ou exporte as contas do seu autenticador) e envie
-                aqui.
+                No tribunal, em <strong>Configurar segundo fator</strong>, tire
+                um print do QR (ou exporte as contas do seu autenticador) e
+                envie aqui.
               </p>
               <MfaCaptura
                 file={qrFile}
