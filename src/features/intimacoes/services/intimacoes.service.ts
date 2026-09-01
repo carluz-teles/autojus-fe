@@ -4,12 +4,20 @@ import type {
   IntimacaoAnalise,
   IntimacaoBucketsEnvelope,
   IntimacaoDetalheView,
+  IntimacaoProvidencia,
   IntimacaoView,
   IntimacoesSummary,
   PageEnvelope,
 } from "../types";
 
 const ENDPOINT = "/v1/intimacoes";
+const ACTION_ITEMS_ENDPOINT = "/v1/action-items";
+
+/** Envelope { data } que os endpoints de action-item usam (diferente do GET
+ *  /v1/intimacoes/:id, que devolve o objeto direto). */
+interface DataEnvelope<T> {
+  data: T;
+}
 
 // Camada de rede da feature: recebe o fetcher (ligado ao Clerk pelo useApi).
 // Não conhece React nem cache — isso é responsabilidade do hook.
@@ -162,36 +170,57 @@ export async function analisarIntimacao(
 }
 
 /**
- * Aprova a providência sugerida no índice `idx` — POST /v1/intimacoes/:id/providencias/:idx/aprovar.
- * Marca a providência como APPROVED e devolve a análise com as providências atualizadas. A criação
- * da tarefa REAL (POST /v1/tasks) é orquestrada ANTES no hook — o BE aqui só vira o status
- * (acquisition não importa a entity de deadline). Idempotente.
+ * Confirma a providência sugerida pela IA — POST /v1/action-items/:id/confirmar.
+ * Promove tipo_status "a_confirmar"→"confiavel"; a tarefa REAL nasce sozinha, depois,
+ * via worker assíncrono (a UI faz poll curto no detalhe até o task_id aparecer — ver
+ * useConfirmarActionItem). Idempotente, body vazio.
  */
-export async function aprovarProvidencia(
+export async function confirmarActionItem(
   fetcher: ApiFetcher,
-  id: string,
-  idx: number,
-  taskId?: string,
-): Promise<IntimacaoAnalise> {
-  return fetcher<IntimacaoAnalise>(
-    `${ENDPOINT}/${id}/providencias/${idx}/aprovar`,
-    { method: "POST", body: taskId ? { task_id: taskId } : undefined },
+  actionItemId: string,
+): Promise<IntimacaoProvidencia> {
+  const res = await fetcher<DataEnvelope<IntimacaoProvidencia>>(
+    `${ACTION_ITEMS_ENDPOINT}/${actionItemId}/confirmar`,
+    { method: "POST" },
   );
+  return res.data;
 }
 
 /**
- * Descarta a providência sugerida no índice `idx` — POST /v1/intimacoes/:id/providencias/:idx/descartar.
- * Marca a providência como DISCARDED e devolve a análise atualizada. Idempotente.
+ * Descarta a providência — POST /v1/action-items/:id/descartar. status→DISCARDED.
+ * Idempotente, body vazio.
  */
-export async function descartarProvidencia(
+export async function descartarActionItem(
   fetcher: ApiFetcher,
-  id: string,
-  idx: number,
-): Promise<IntimacaoAnalise> {
-  return fetcher<IntimacaoAnalise>(
-    `${ENDPOINT}/${id}/providencias/${idx}/descartar`,
+  actionItemId: string,
+): Promise<IntimacaoProvidencia> {
+  const res = await fetcher<DataEnvelope<IntimacaoProvidencia>>(
+    `${ACTION_ITEMS_ENDPOINT}/${actionItemId}/descartar`,
     { method: "POST" },
   );
+  return res.data;
+}
+
+export interface ReclassificarActionItemParams {
+  pieceProfileKey: string;
+  tipo: string;
+}
+
+/**
+ * Reclassifica o tipo de peça da providência — POST /v1/action-items/:id/reclassificar.
+ * Muda tipo_origem→"manual". 400 quando piece_profile_key/tipo não são de um catálogo
+ * válido (ver GET /v1/piece-profiles); 409 quando já existe peça protocolada.
+ */
+export async function reclassificarActionItem(
+  fetcher: ApiFetcher,
+  actionItemId: string,
+  { pieceProfileKey, tipo }: ReclassificarActionItemParams,
+): Promise<IntimacaoProvidencia> {
+  const res = await fetcher<DataEnvelope<IntimacaoProvidencia>>(
+    `${ACTION_ITEMS_ENDPOINT}/${actionItemId}/reclassificar`,
+    { method: "POST", body: { piece_profile_key: pieceProfileKey, tipo } },
+  );
+  return res.data;
 }
 
 export interface AssignResponsavelParams {

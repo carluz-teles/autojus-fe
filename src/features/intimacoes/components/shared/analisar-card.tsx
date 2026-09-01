@@ -5,39 +5,71 @@
 // (Regra nº1): o master-detail (print 2 da spec) reusa EXATAMENTE o estado de
 // pré-análise (mesmo componente, mesma copy aprovada — nenhuma menção a "IA") no
 // painel lateral compacto, e o print 1 reusa a lista de providências pós-análise.
-// Nenhuma mudança de comportamento/copy em relação ao original.
+//
+// Pós migração action_item (tabela real, endereçada por id — não mais jsonb por
+// índice): ProvidenciaRow reage a task_id (não mais status SUGGESTED/APPROVED — ver
+// docstring). Confirmar/Descartar chamam os novos endpoints /v1/action-items/:id/*;
+// a criação da tarefa é 100% assíncrona no BE.
+//
+// Layout da seção "Providências" segue docs/design-card-providencias-v1.md (mockups
+// do usuário, v1.1) — fonte de verdade visual desta revisão; onde divergir do que
+// existia antes desta fatia, o doc vence.
 
 import {
-  ArrowUpRight,
   Check,
   CircleDashed,
   Loader2,
+  Plus,
   RotateCcw,
+  Settings2,
   Sparkles,
   Square,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useCriarPeca } from "@/features/pecas/hooks/use-peca";
 import { formatarData, formatarDataHora } from "@/lib/utils";
 
 import {
   useAnalisarIntimacao,
-  useAprovarProvidencia,
-  useDescartarProvidencia,
+  useConfirmarActionItem,
+  useDescartarActionItem,
 } from "../../hooks/use-intimacoes";
-import type { IntimacaoDetalheView, IntimacaoProvidencia } from "../../types";
+import type {
+  IntimacaoAnaliseCandidate,
+  IntimacaoDetalheView,
+  IntimacaoProvidencia,
+} from "../../types";
 import { EyebrowTitle } from "./eyebrow-title";
+
+/** Rótulo em PT do tipo de providência — fallback quando não há candidato efêmero da
+ *  última análise em mãos (ver `candidato` em ProvidenciaRow). O BE não persiste mais
+ *  título/descrição no action_item (só no candidato efêmero da análise, que se perde
+ *  ao recarregar a página). */
+const TIPO_LABEL: Record<string, string> = {
+  contestar: "Contestar",
+  recorrer: "Recorrer",
+  manifestar: "Manifestar-se",
+  cumprir: "Cumprir determinação",
+  ciencia: "Dar-se por ciente",
+};
+
+function rotuloTipo(tipo: string): string {
+  return TIPO_LABEL[tipo] ?? tipo;
+}
 
 /**
  * Card central de análise. Três estados:
  *  • LOADING (mutation em voo): spinner + linha de status + 3 skeletons.
  *  • PRÉ (ai_analyzed_at == null): CTA "Gerar análise".
- *  • PÓS (ai_analyzed_at != null): "O QUE ACONTECEU" (resumo) + "PROVIDÊNCIAS SUGERIDAS"
- *    (só as SUGGESTED, com responsável/vencimento sugeridos e ações Aprovar/Descartar) +
- *    rodapé de proveniência + "Gerar novamente". Resumo vazio = modo degradado (IA off).
+ *  • PÓS (ai_analyzed_at != null): "O QUE ACONTECEU" (resumo) + seção "Providências"
+ *    (tudo menos DISCARDED — ver ProvidenciaRow pros estados de cada uma) + rodapé de
+ *    proveniência + "Gerar novamente". Resumo vazio = modo degradado (IA off).
  * O botão dispara useAnalisarIntimacao(id) → estado LOADING; erro → toast + alerta.
  */
 export function AnalisarCard({
@@ -46,6 +78,9 @@ export function AnalisarCard({
   intimacao: IntimacaoDetalheView;
 }) {
   const analisar = useAnalisarIntimacao(i.id);
+  const confirmarTodos = useConfirmarActionItem(i.id);
+  const [enviandoTodas, setEnviandoTodas] = useState(false);
+
   const gerar = () =>
     analisar.mutate(undefined, {
       onError: () =>
@@ -84,24 +119,38 @@ export function AnalisarCard({
 
   // Pós-análise. Modo degradado = analisada mas summary vazio (IA não configurada).
   const degradado = !i.ai_summary?.trim();
-  // Providências visíveis = tudo menos DISCARDED, preservando o índice original (as ações
-  // do BE endereçam a providência por índice no array). SUGGESTED trazem os botões; APPROVED
-  // permanecem no card com a referência da tarefa criada (não somem ao aprovar).
-  const itens = i.ai_providencias
-    .map((p, idx) => ({ p, idx }))
-    .filter(({ p }) => p.status !== "DISCARDED");
-  const nSugeridas = itens.filter(({ p }) => p.status === "SUGGESTED").length;
-  const nAprovadas = itens.filter(({ p }) => p.status === "APPROVED").length;
-  const contagem = [
-    nSugeridas > 0
-      ? `${nSugeridas} ${nSugeridas === 1 ? "sugerida a revisar" : "sugeridas a revisar"}`
-      : null,
-    nAprovadas > 0
-      ? `${nAprovadas} ${nAprovadas === 1 ? "aprovada" : "aprovadas"}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // Providências visíveis = tudo menos DISCARDED. Endereçadas por id (não mais por
+  // índice — action_item é uma tabela real agora).
+  const itens = i.ai_providencias.filter((p) => p.status !== "DISCARDED");
+  const pendentes = itens.filter((p) => p.task_id == null);
+
+  // Candidatos EFÊMEROS da última análise (título/descrição ricos que o BE não
+  // persiste) — `useMutation` guarda `data` da última chamada enquanto o componente
+  // não desmonta/reseta. Casados por `tipo` (não há id no candidato ainda). Se dois
+  // itens da mesma análise compartilharem `tipo`, o Map fica só com o último — caso
+  // raro, aceito aqui; o fallback (rotuloTipo) cobre reload de página de qualquer
+  // forma (o Map fica vazio de novo).
+  const candidatoPorTipo = new Map(
+    (analisar.data?.providencias ?? []).map(
+      (c) => [c.tipo, c] as [string, IntimacaoAnaliseCandidate],
+    ),
+  );
+
+  // "Criar todas" (docs/design-card-providencias-v1.md): confirma client-side, uma
+  // chamada por item ainda sem task_id — sem endpoint de bulk no BE. Idempotente
+  // (reconfirmar um item que já tem tarefa é no-op seguro), então não precisa
+  // recalcular `pendentes` no meio do envio.
+  const onCriarTodas = async () => {
+    if (pendentes.length === 0) return;
+    setEnviandoTodas(true);
+    try {
+      await Promise.allSettled(
+        pendentes.map((p) => confirmarTodos.mutateAsync(p.id)),
+      );
+    } finally {
+      setEnviandoTodas(false);
+    }
+  };
 
   return (
     <section className="border-border rounded-xl border px-6 py-6">
@@ -121,23 +170,50 @@ export function AnalisarCard({
 
           {itens.length > 0 ? (
             <div className="mt-7">
-              <div className="flex items-baseline justify-between gap-3">
-                <EyebrowTitle>Providências sugeridas</EyebrowTitle>
-                <span className="text-muted-foreground text-[11px] tabular-nums">
-                  {contagem}
+              <div className="flex items-center gap-2">
+                <Sparkles className="text-primary size-4" strokeWidth={1.8} />
+                <span className="text-foreground text-[15px] font-semibold">
+                  Providências
+                </span>
+                <span className="text-muted-foreground text-[12px]">
+                  geradas pela IA · revise antes de executar
+                </span>
+                <span className="text-muted-foreground ml-auto text-[12px] tabular-nums">
+                  {itens.length}
                 </span>
               </div>
-              <p className="text-muted-foreground mt-1.5 text-[13px] leading-relaxed">
-                Nada vira tarefa até você aprovar e atribuir.
-              </p>
 
-              <ul className="mt-4">
-                {itens.map(({ p, idx }) => (
+              <div className="border-primary/20 bg-primary/5 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3">
+                <p className="text-foreground/90 text-[13px] leading-relaxed">
+                  Cada providência vira uma{" "}
+                  <strong className="font-medium">tarefa</strong>, vinculada ao
+                  prazo que já existe
+                  {i.prazo ? ` (fatal ${formatarData(i.prazo.end_date)})` : ""}.
+                  Confirme para criar a tarefa, ou descarte se não se aplica.
+                </p>
+                <Button
+                  size="sm"
+                  className="shrink-0 gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+                  onClick={onCriarTodas}
+                  disabled={pendentes.length === 0 || enviandoTodas}
+                >
+                  {enviandoTodas ? (
+                    <Loader2
+                      className="size-3.5 animate-spin"
+                      strokeWidth={1.8}
+                    />
+                  ) : null}
+                  Criar todas
+                </Button>
+              </div>
+
+              <ul className="mt-2">
+                {itens.map((p) => (
                   <ProvidenciaRow
-                    key={`${p.title}-${idx}`}
+                    key={p.id}
                     intimacaoId={i.id}
                     providencia={p}
-                    idx={idx}
+                    candidato={candidatoPorTipo.get(p.tipo)}
                   />
                 ))}
               </ul>
@@ -196,143 +272,140 @@ export function AnalisarLoading() {
   );
 }
 
-/** Rótulo do status da tarefa derivado do vencimento (mesma linguagem da tela de Tarefas). */
-export function statusTarefa(dueDate: string | null): string {
-  if (!dueDate) return "Sem prazo";
-  const [y, m, d] = dueDate.split("-").map(Number);
-  if (!y || !m || !d) return "Sem prazo";
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const venc = new Date(y, m - 1, d);
-  if (venc < hoje) return "Atrasada";
-  if (venc.getTime() === hoje.getTime()) return "Vence hoje";
-  return "No prazo";
-}
-
-/** Código curto e estável exibido na pílula de referência da tarefa (derivado do uuid). */
-export function codigoTarefa(taskId: string): string {
-  return `TAR-${taskId.replace(/-/g, "").slice(0, 4).toUpperCase()}`;
+/** Código curto e estável exibido na pílula de referência da tarefa (derivado do uuid).
+ *  `prefix` default "TAR-" é o padrão do resto do app (ver tasks/tarefa-detail.tsx);
+ *  este card usa "T-" na pílula por pedido do mockup (docs/design-card-providencias-v1.md). */
+export function codigoTarefa(taskId: string, prefix = "TAR-"): string {
+  return `${prefix}${taskId.replace(/-/g, "").slice(0, 4).toUpperCase()}`;
 }
 
 /**
- * Uma providência no card de análise. Dois estados:
- *  • APPROVED — permanece no card (não some ao aprovar): checkbox de tarefa + título +
- *    descrição + pílula de status ("Atrasada"…) + referência "TAR-xxxx ↗" (link p/ a tarefa
- *    real) + "tarefa de {responsável}". Sem botões.
- *  • SUGGESTED — círculo tracejado + pílula "Sugerida" (âmbar) + "IA sugere: {resp} · vence
- *    {data}" + ações Aprovar (cria tarefa real + marca APPROVED) / Descartar (marca DISCARDED),
- *    ambas desabilitadas enquanto qualquer mutation está em voo. Erro → toast + role=alert.
+ * Uma providência no card de análise. Endereçada por `id` (action_item é tabela real
+ * agora — não mais índice de array). Dois estados (docs/design-card-providencias-v1.md):
+ *  • PRÉ (task_id == null) — botões "+ Criar tarefa" (chama confirmar; funciona igual
+ *    pra item declarado ou sugerido pela IA — um único botão, um único endpoint, sempre,
+ *    idempotente) e "Descartar". A distinção declarado/ia (tipo_origem/tipo_status) NÃO
+ *    aparece visualmente (pedido explícito do mockup v1.1) — nem como badge, nem como
+ *    texto. Simplificação deliberada: o loading só aparece durante o clique
+ *    (`confirmar.isPending`), não durante a janela automática de materialização de um
+ *    item já declarado (evita um estado "preso" caso o worker atrase além do poll).
+ *  • PÓS (task_id != null) — pílula verde "✓ T-xxxx" (link pra tarefa) e, se
+ *    `gera_peca`, o botão "⚙ Gerar minuta". Sem botões de confirmar/descartar.
+ *  Erro de qualquer mutation → toast + role=alert.
  */
 export function ProvidenciaRow({
   intimacaoId,
   providencia: p,
-  idx,
+  candidato,
 }: {
   intimacaoId: string;
   providencia: IntimacaoProvidencia;
-  idx: number;
+  /** Candidato efêmero da ÚLTIMA análise (título/descrição ricos — ver AnalisarCard).
+   *  undefined = sessão recarregada ou item de uma análise anterior → cai no rótulo
+   *  genérico derivado de `tipo` (rotuloTipo). */
+  candidato?: IntimacaoAnaliseCandidate;
 }) {
-  const aprovar = useAprovarProvidencia(intimacaoId);
-  const descartar = useDescartarProvidencia(intimacaoId);
-  const emVoo = aprovar.isPending || descartar.isPending;
-  const erro = aprovar.isError || descartar.isError;
+  const confirmar = useConfirmarActionItem(intimacaoId);
+  const descartar = useDescartarActionItem(intimacaoId);
+  const emVoo = confirmar.isPending || descartar.isPending;
+  const erro = confirmar.isError || descartar.isError;
 
-  const onAprovar = () =>
-    aprovar.mutate(
-      { idx, providencia: p },
-      {
-        onSuccess: () => toast.success("Providência aprovada e atribuída."),
-        onError: () =>
-          toast.error("Não foi possível aprovar. Tente novamente."),
-      },
-    );
+  const onConfirmar = () =>
+    confirmar.mutate(p.id, {
+      onError: () =>
+        toast.error("Não foi possível criar a tarefa. Tente novamente."),
+    });
   const onDescartar = () =>
-    descartar.mutate(idx, {
+    descartar.mutate(p.id, {
       onError: () =>
         toast.error("Não foi possível descartar. Tente novamente."),
     });
 
-  const aprovada = p.status === "APPROVED";
+  const comTarefa = p.task_id != null;
+  const titulo = candidato?.title || rotuloTipo(p.tipo);
+  const descricao = candidato?.description;
 
   return (
-    <li className="border-border/70 flex gap-3 border-t py-4 first:border-t-0 first:pt-0">
-      <span
-        aria-hidden
-        className="text-muted-foreground/70 mt-0.5 flex shrink-0"
-      >
-        {aprovada ? (
-          <Square className="size-[18px]" strokeWidth={1.8} />
-        ) : (
-          <CircleDashed className="size-[18px]" strokeWidth={1.8} />
-        )}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-foreground text-[14px] font-medium">{p.title}</p>
-        {p.description ? (
-          <p className="text-muted-foreground mt-1 text-[13px] leading-relaxed">
-            {p.description}
-          </p>
-        ) : null}
-
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-          {aprovada ? (
-            <>
-              <Badge variant="outline" className="text-muted-foreground">
-                {statusTarefa(p.due_date)}
-              </Badge>
-              {p.task_id ? (
-                <Link
-                  href={`/tarefas?task=${p.task_id}`}
-                  className="border-border text-muted-foreground hover:bg-muted inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[12px] tabular-nums transition-colors"
-                >
-                  {codigoTarefa(p.task_id)}
-                  <ArrowUpRight className="size-3" strokeWidth={1.8} />
-                </Link>
-              ) : null}
-              {p.suggested_assignee_name ? (
-                <span className="text-muted-foreground text-[12px]">
-                  tarefa de {p.suggested_assignee_name}
-                </span>
-              ) : null}
-            </>
+    <li className="border-border/70 flex items-start justify-between gap-4 border-t py-4 first:border-t-0 first:pt-0">
+      <div className="flex min-w-0 flex-1 gap-3">
+        <span
+          aria-hidden
+          className="text-muted-foreground/70 mt-0.5 flex shrink-0"
+        >
+          {comTarefa ? (
+            <Square className="size-[18px]" strokeWidth={1.8} />
           ) : (
-            <>
+            <CircleDashed className="size-[18px]" strokeWidth={1.8} />
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-foreground text-[14px] font-medium">{titulo}</p>
+          {descricao ? (
+            <p className="text-muted-foreground mt-1 text-[13px] leading-relaxed">
+              {descricao}
+            </p>
+          ) : null}
+
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {p.gera_peca ? (
               <Badge
                 variant="outline"
-                className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                className="border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400"
               >
-                Sugerida
+                Peça
               </Badge>
-              {p.due_date ? (
-                <span className="text-muted-foreground text-[12px]">
-                  vence {formatarData(p.due_date)}
-                </span>
-              ) : null}
-            </>
-          )}
+            ) : (
+              <>
+                <Badge
+                  variant="outline"
+                  className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                >
+                  Ciência
+                </Badge>
+                <Badge variant="outline" className="text-muted-foreground">
+                  fluxo curto
+                </Badge>
+              </>
+            )}
+          </div>
+
+          {erro ? (
+            <p role="alert" className="text-destructive mt-2 text-[12px]">
+              Não foi possível concluir a ação. Tente novamente.
+            </p>
+          ) : null}
         </div>
+      </div>
 
-        {erro ? (
-          <p role="alert" className="text-destructive mt-2 text-[12px]">
-            Não foi possível concluir a ação. Tente novamente.
-          </p>
-        ) : null}
-
-        {aprovada ? null : (
-          <div className="mt-3 flex items-center gap-2">
+      <div className="flex shrink-0 flex-col items-end gap-2">
+        {comTarefa ? (
+          <>
+            {p.gera_peca ? <GerarMinutaDaTarefa providencia={p} /> : null}
+            {p.task_id ? (
+              <Link
+                href={`/tarefas?task=${p.task_id}`}
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[12px] font-medium text-emerald-700 tabular-nums transition-colors hover:bg-emerald-500/20 dark:text-emerald-400"
+              >
+                <Check className="size-3" strokeWidth={2.4} />
+                {codigoTarefa(p.task_id, "T-")}
+              </Link>
+            ) : null}
+          </>
+        ) : (
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              className="border-primary/70 text-primary hover:bg-primary/5 hover:text-primary h-8 gap-1.5 bg-transparent px-3 text-[13px]"
-              onClick={onAprovar}
+              className="h-8 gap-1.5 px-3 text-[13px]"
+              onClick={onConfirmar}
               disabled={emVoo}
             >
-              {aprovar.isPending ? (
+              {confirmar.isPending ? (
                 <Loader2 className="size-3.5 animate-spin" strokeWidth={1.8} />
               ) : (
-                <Check className="size-3.5" strokeWidth={2} />
+                <Plus className="size-3.5" strokeWidth={2} />
               )}
-              Aprovar e atribuir
+              Criar tarefa
             </Button>
             <Button
               variant="ghost"
@@ -347,5 +420,49 @@ export function ProvidenciaRow({
         )}
       </div>
     </li>
+  );
+}
+
+/**
+ * Ponto de entrada TEMPORÁRIO para testar POST /v1/pecas com `task_id` (fatia 4/5 do
+ * BE — a peça herda piece_profile_key/piece_type da providência). Só aparece quando a
+ * providência já tem tarefa E gera peça. Sem tela dedicada ainda: cria e navega direto
+ * pro draft.
+ */
+function GerarMinutaDaTarefa({
+  providencia: p,
+}: {
+  providencia: IntimacaoProvidencia;
+}) {
+  const router = useRouter();
+  const criarPeca = useCriarPeca();
+
+  if (!p.gera_peca || !p.task_id) return null;
+
+  const onClick = () =>
+    criarPeca.mutate(
+      { task_id: p.task_id! },
+      {
+        onSuccess: (peca) => router.push(`/pecas/${peca.id}`),
+        onError: () =>
+          toast.error("Não foi possível gerar a minuta. Tente novamente."),
+      },
+    );
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="h-7 gap-1.5 px-2.5 text-[12.5px]"
+      onClick={onClick}
+      disabled={criarPeca.isPending}
+    >
+      {criarPeca.isPending ? (
+        <Loader2 className="size-3.5 animate-spin" strokeWidth={1.8} />
+      ) : (
+        <Settings2 className="size-3.5" strokeWidth={1.8} />
+      )}
+      Gerar minuta
+    </Button>
   );
 }

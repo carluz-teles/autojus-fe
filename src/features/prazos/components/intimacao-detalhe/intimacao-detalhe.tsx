@@ -220,12 +220,11 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
                     </p>
                   ) : (
                     <ul className="px-4">
-                      {m.providencias.map(({ p, idx }) => (
+                      {m.providencias.map((p) => (
                         <ProvidenciaRow
-                          key={`${p.title}-${idx}`}
+                          key={p.id}
                           intimacaoId={m.id}
                           providencia={p}
-                          idx={idx}
                         />
                       ))}
                     </ul>

@@ -58,12 +58,18 @@ export async function salvarRascunho(
 }
 
 export interface CriarPecaParams {
-  /** intimation | processo | blank — origem do rascunho. */
-  source: string;
+  /** intimation | processo | blank — origem do rascunho. Omitido quando `task_id`
+   *  é usado (o BE deriva a origem/perfil a partir da providência). */
+  source?: string;
   intimation_id?: string;
   case_id?: string;
+  /** Ignorado pelo BE quando `task_id` é enviado (a peça herda piece_profile_key/
+   *  piece_type da providência ligada à tarefa). */
   piece_type?: string;
   title?: string;
+  /** Novo caminho (fatia 4/5 do BE): cria a peça a partir de uma providência
+   *  (action_item) já confirmada/com tarefa — herda piece_profile_key/piece_type. */
+  task_id?: string;
 }
 
 /** Cria (ou reaproveita, idempotente por intimação) um rascunho — POST /v1/pecas. */
@@ -304,6 +310,32 @@ export async function getThesesFromIntimation(
     method: "POST",
     body: params,
   });
+  return res.data;
+}
+
+// ── Catálogo de perfis de peça ───────────────────────────────────────────────
+
+/** Perfil de peça do catálogo — GET /v1/piece-profiles. Usado pra popular o
+ *  <Select> de "Alterar tipo" na providência (reclassificar) e, futuramente,
+ *  pra escolher o tipo na partida da peça. `sections`/`requirements` não têm
+ *  shape fixo documentado ainda — a UI atual só usa key/nome. */
+export interface PieceProfile {
+  key: string;
+  nome: string;
+  polo: string;
+  matter_key: string;
+  base_skeleton_key: string;
+  format_profile_key: string;
+  version_atual: string;
+  sections: unknown[];
+  requirements: unknown[];
+}
+
+/** Catálogo de perfis de peça — GET /v1/piece-profiles (sem paginação). */
+export async function listPieceProfiles(
+  fetcher: ApiFetcher,
+): Promise<PieceProfile[]> {
+  const res = await fetcher<DataEnvelope<PieceProfile[]>>("/v1/piece-profiles");
   return res.data;
 }
 

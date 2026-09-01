@@ -112,11 +112,11 @@ function useModel(i: IntimacaoDetalheView | undefined) {
       i.assignee_user_name?.trim() ||
       (membro ? nomeExibicao(membro.name, membro.email) : "");
 
-    // Providências visíveis = tudo menos DISCARDED, preservando o índice original
-    // (as ações do BE endereçam a providência por índice no array).
-    const providencias = i.ai_providencias
-      .map((p, idx) => ({ p, idx }))
-      .filter(({ p }) => p.status !== "DISCARDED");
+    // Providências visíveis = tudo menos DISCARDED. Endereçadas por `id` — não mais
+    // por índice (action_item é uma tabela real agora, ver types.ts).
+    const providencias = i.ai_providencias.filter(
+      (p) => p.status !== "DISCARDED",
+    );
 
     const analisada = i.ai_analyzed_at !== null;
     const degradado = analisada && !i.ai_summary?.trim();

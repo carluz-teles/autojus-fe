@@ -31,6 +31,7 @@ import {
   listPecas,
   listPecasByProcesso,
   type ListPecasParams,
+  listPieceProfiles,
   removeAttachment,
   salvarRascunho,
   sendChatMessage,
@@ -153,6 +154,17 @@ export function useCriarPeca() {
   return useMutation({
     mutationFn: (params: CriarPecaParams) => criarPeca(fetcher, params),
     onSuccess: () => qc.invalidateQueries({ queryKey: pecasKeys.all }),
+  });
+}
+
+/** Catálogo de perfis de peça — GET /v1/piece-profiles. Estável por sessão
+ *  (fica na tela pouco tempo e não muda entre um render e outro). */
+export function usePieceProfiles() {
+  const fetcher = useApi();
+  return useQuery({
+    queryKey: [...pecasKeys.all, "piece-profiles"] as const,
+    queryFn: () => listPieceProfiles(fetcher),
+    staleTime: Infinity,
   });
 }
 

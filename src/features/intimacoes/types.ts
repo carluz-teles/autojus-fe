@@ -87,38 +87,79 @@ export interface IntimacaoHistoryEntry {
   label: string;
 }
 
-/** Ciclo de vida de uma providência sugerida pela IA. */
-export type IntimacaoProvidenciaStatus = "SUGGESTED" | "APPROVED" | "DISCARDED";
+/** Ciclo de vida (bruto, do BE) de uma providência. Na prática, quem dirige a UI
+ *  pós-migração pra action_item é `task_id` (tarefa nasceu ou não) + `tipo_status`
+ *  (confiavel|a_confirmar) — ver `IntimacaoProvidencia` abaixo. */
+export type IntimacaoProvidenciaStatus =
+  "SUGGESTED" | "CONFIRMED" | "DISCARDED";
+
+/** Tipo de ato/providência — closed set espelhado do BE (internal/deadline). */
+export type ProvidenciaTipo =
+  "contestar" | "recorrer" | "manifestar" | "cumprir" | "ciencia";
+
+/** Proveniência da classificação: declarada no teor, inferida pela IA, ou
+ *  corrigida manualmente (reclassificar muda pra "manual"). */
+export type ProvidenciaTipoOrigem = "declarado" | "ia" | "manual";
+
+/** "confiavel" nasce com tarefa automática (sem revisão); "a_confirmar" espera
+ *  o usuário clicar Confirmar antes de qualquer tarefa nascer. */
+export type ProvidenciaTipoStatus = "confiavel" | "a_confirmar";
 
 /**
- * Uma providência derivada da análise IA (card "Analisar esta intimação"): título curto
- * imperativo (a IA já embute a citação legal, ex.: "Redigir defesa (art. 919, CPC)") +
- * descrição acionável + responsável e vencimento sugeridos pela IA (ambos podem vir null →
- * a UI mostra "—") + status. Só as SUGGESTED trazem os botões de ação na UI. Espelha o
- * IntimacaoProvidenciaView do BE.
+ * Uma providência PERSISTIDA (action_item) — GET /v1/intimacoes/:id e os 3
+ * endpoints de ação (confirmar/descartar/reclassificar) devolvem este shape.
+ * Não tem mais `title`/`description`/`suggested_assignee_*`/`due_date` (eram só
+ * do fluxo antigo, jsonb `ai_providencias`); a UI deriva o rótulo de `tipo`.
+ * Espelha o IntimacaoProvidenciaView do BE.
  */
 export interface IntimacaoProvidencia {
+  id: string;
+  tipo: ProvidenciaTipo;
+  /** true = essa providência dá origem a uma peça (ver `piece_profile_key`). */
+  gera_peca: boolean;
+  /** Perfil de peça (catálogo GET /v1/piece-profiles); null quando gera_peca=false. */
+  piece_profile_key: string | null;
+  tipo_origem: ProvidenciaTipoOrigem;
+  tipo_status: ProvidenciaTipoStatus;
+  /** Confiança da IA (0-1); só preenchido quando tipo_origem="ia". */
+  confianca: number | null;
+  status: IntimacaoProvidenciaStatus;
+  /** Id da tarefa REAL — o BE a cria sozinho (declarada) ou após confirmar (IA),
+   *  sempre de forma assíncrona (worker); null até ela nascer. */
+  task_id: string | null;
+  deadline_id: string | null;
+}
+
+/**
+ * Candidato EFÊMERO devolvido por POST /v1/intimacoes/:id/analise — ainda não é
+ * a linha persistida (sem id/status/task_id: a materialização em action_item
+ * acontece depois, de forma assíncrona, via evento). Espelha o
+ * AnaliseProvidenciaView do BE. `declarado` é o `tipo_origem === "declarado"`
+ * já resolvido em bool pra facilitar a UI de prévia (se algum dia precisar).
+ */
+export interface IntimacaoAnaliseCandidate {
   title: string;
   description: string;
-  /** Id INTERNO do responsável sugerido pela IA (app_user); null quando não sugerido. */
   suggested_assignee_user_id: string | null;
-  /** Nome do responsável sugerido (resolvido no BE); null quando não sugerido. */
   suggested_assignee_name: string | null;
-  /** Vencimento sugerido "YYYY-MM-DD"; null quando não sugerido. */
   due_date: string | null;
-  status: IntimacaoProvidenciaStatus;
-  /** Id da tarefa REAL criada ao aprovar (link da referência no card); null até aprovar. */
-  task_id: string | null;
+  tipo: ProvidenciaTipo;
+  gera_peca: boolean;
+  piece_profile_key: string | null;
+  declarado: boolean;
+  confianca: number | null;
 }
 
 /**
  * Resposta de POST /v1/intimacoes/:id/analise — a análise IA recém-gerada.
  * Espelha o IntimacaoAnaliseView do BE. summary vazio (com analyzed_at preenchido) = modo
- * degradado (IA indisponível).
+ * degradado (IA indisponível). `providencias` são candidatos EFÊMEROS (ver
+ * `IntimacaoAnaliseCandidate`) — NÃO confundir com `ai_providencias` do detalhe
+ * (que é a view persistida, materializada assincronamente após esta resposta).
  */
 export interface IntimacaoAnalise {
   summary: string;
-  providencias: IntimacaoProvidencia[];
+  providencias: IntimacaoAnaliseCandidate[];
   /** ISO timestamp de quando a análise foi (re)gerada. */
   analyzed_at: string;
 }
@@ -150,7 +191,9 @@ export interface IntimacaoDetalheView extends IntimacaoView {
    * ai_analyzed_at preenchido = modo degradado (IA indisponível).
    */
   ai_summary?: string;
-  /** Providências derivadas — sempre array (nunca null); vazio antes da análise. */
+  /** Providências PERSISTIDAS (action_item) — sempre array (nunca null); vazio
+   *  antes da análise ou enquanto a materialização assíncrona não rodou ainda
+   *  (ver heurística de poll em useIntimacaoDetalhe). */
   ai_providencias: IntimacaoProvidencia[];
   /**
    * ISO timestamp da última análise IA; null = pré-análise (o card mostra o CTA);

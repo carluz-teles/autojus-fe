@@ -2,6 +2,7 @@
 
 import {
   keepPreviousData,
+  type QueryClient,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -9,30 +10,27 @@ import {
 } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { createTask } from "@/features/tasks/services/tasks.service";
 import { useApi } from "@/lib/api/use-api";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 
 import {
   analisarIntimacao,
-  aprovarProvidencia,
   assignIntimacaoResponsavel,
   type AssignResponsavelParams,
   type BulkAssignParams,
   bulkAssignResponsavel,
-  descartarProvidencia,
+  confirmarActionItem,
+  descartarActionItem,
   getIntimacao,
   getIntimacoesSummary,
   ignoreIntimacao,
   listIntimacoes,
+  reclassificarActionItem,
+  type ReclassificarActionItemParams,
   reopenIntimacao,
   resolveIntimacao,
 } from "../services/intimacoes.service";
-import type {
-  IntimacaoDetalheView,
-  IntimacaoProvidencia,
-  IntimacoesBuckets,
-} from "../types";
+import type { IntimacaoDetalheView, IntimacoesBuckets } from "../types";
 
 const EMPTY_BUCKETS: IntimacoesBuckets = {
   atraso: 0,
@@ -133,13 +131,88 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
   };
 }
 
-/** Detalhe de uma intimação — GET /v1/intimacoes/:id. */
+// ── Poll curto (auto-off) do detalhe após ações que disparam materialização
+// assíncrona no BE (analisar/confirmar/descartar) ────────────────────────────
+//
+// Desde a migração de ai_providencias (jsonb) para action_item (tabela real), o
+// BE materializa fora da request: (a) POST /analise devolve candidatos EFÊMEROS
+// — as linhas de action_item só aparecem no GET seguinte, alguns instantes
+// depois, via evento; (b) uma providência "confiavel" (declarada, ou IA recém-
+// confirmada) ganha task_id só quando o worker cria a tarefa automática, também
+// alguns instantes depois. A UI não pode saber ISSO sem perguntar de novo — daí
+// o poll curto: guardamos um "poll-window" por intimação (fora do React, no
+// cache do QueryClient) que as 3 mutations abrem, e o `refetchInterval` do
+// detalhe consulta a cada render pra decidir se re-busca.
+//
+// Auto-off por DOIS critérios independentes (o que vier primeiro):
+//   1. estabilizou: o `ai_analyzed_at` em cache já bate com o `targetAnalyzedAt`
+//      esperado (só setado pela análise — confirmar/descartar não mudam esse
+//      campo) E nenhum item "confiavel" ainda está com task_id null;
+//   2. teto de tentativas (POLL_MAX_ATTEMPTS) — nunca gira pra sempre, mesmo se
+//      o worker falhar silenciosamente.
+const POLL_INTERVAL_MS = 1300;
+const POLL_MAX_ATTEMPTS = 6; // ~7-8s de janela
+
+interface PollWindow {
+  /** dataUpdateCount do detalhe no instante em que a janela abriu — a diferença
+   *  pro dataUpdateCount atual é "quantos refetches essa janela já fez". */
+  baselineUpdateCount: number;
+  /** Só setado pela análise: o ai_analyzed_at que ainda esperamos ver refletido
+   *  no cache (linhas de providência materializadas). */
+  targetAnalyzedAt?: string;
+}
+
+function pollWindowKey(id: string) {
+  return [...intimacoesKeys.detail(id), "poll-window"] as const;
+}
+
+/** Abre (ou reabre) a janela de poll do detalhe desta intimação. */
+function abrirJanelaDePoll(
+  qc: QueryClient,
+  id: string,
+  targetAnalyzedAt?: string,
+) {
+  const estadoAtual = qc.getQueryState(intimacoesKeys.detail(id));
+  qc.setQueryData<PollWindow>(pollWindowKey(id), {
+    baselineUpdateCount: estadoAtual?.dataUpdateCount ?? 0,
+    targetAnalyzedAt,
+  });
+}
+
+/** true = ainda falta algo materializar (ver critério 1 acima). */
+function algoPendente(
+  i: IntimacaoDetalheView | undefined,
+  targetAnalyzedAt: string | undefined,
+): boolean {
+  if (!i) return true;
+  if (targetAnalyzedAt && i.ai_analyzed_at !== targetAnalyzedAt) return true;
+  return i.ai_providencias.some(
+    (p) =>
+      p.status !== "DISCARDED" &&
+      p.tipo_status === "confiavel" &&
+      p.task_id === null,
+  );
+}
+
+/** Detalhe de uma intimação — GET /v1/intimacoes/:id. Faz poll curto e auto-off
+ *  logo após analisar/confirmar/descartar (ver bloco acima). */
 export function useIntimacaoDetalhe(id: string) {
   const fetcher = useApi();
+  const qc = useQueryClient();
   return useQuery({
     queryKey: intimacoesKeys.detail(id),
     queryFn: () => getIntimacao(fetcher, id),
     enabled: !!id,
+    refetchInterval: (query) => {
+      const janela = qc.getQueryData<PollWindow>(pollWindowKey(id));
+      if (!janela) return false;
+      const tentativas =
+        query.state.dataUpdateCount - janela.baselineUpdateCount;
+      if (tentativas >= POLL_MAX_ATTEMPTS) return false;
+      if (!algoPendente(query.state.data, janela.targetAnalyzedAt))
+        return false;
+      return POLL_INTERVAL_MS;
+    },
   });
 }
 
@@ -192,10 +265,11 @@ export function useReabrirIntimacao() {
 }
 
 /**
- * Gera/regera a análise IA da intimação — POST /v1/intimacoes/:id/analise.
- * Ao concluir, faz patch do cache do detalhe com os campos ai_* retornados, de modo que o
- * card "Analisar esta intimação" transita para o estado pós-análise sem refetch; e invalida
- * o detalhe para reidratar da linha persistida. Re-executável ("Gerar novamente" sobrescreve).
+ * Gera/regera a análise IA da intimação — POST /v1/intimacoes/:id/analise. A resposta
+ * traz candidatos EFÊMEROS (shape diferente da view persistida — sem id/status/task_id),
+ * então NÃO fazemos mais patch direto do cache com ela. Em vez disso: invalidamos o
+ * detalhe e abrimos a janela de poll curto (ver bloco acima) até as linhas de action_item
+ * (e, pras declaradas, a tarefa automática) aparecerem. Re-executável ("Gerar novamente").
  */
 export function useAnalisarIntimacao(intimacaoId: string) {
   const fetcher = useApi();
@@ -203,58 +277,25 @@ export function useAnalisarIntimacao(intimacaoId: string) {
   return useMutation({
     mutationFn: () => analisarIntimacao(fetcher, intimacaoId),
     onSuccess: (analise) => {
-      qc.setQueryData<IntimacaoDetalheView>(
-        intimacoesKeys.detail(intimacaoId),
-        (prev) =>
-          prev
-            ? {
-                ...prev,
-                ai_summary: analise.summary,
-                ai_providencias: analise.providencias,
-                ai_analyzed_at: analise.analyzed_at,
-              }
-            : prev,
-      );
+      abrirJanelaDePoll(qc, intimacaoId, analise.analyzed_at);
       qc.invalidateQueries({ queryKey: intimacoesKeys.detail(intimacaoId) });
     },
   });
 }
 
 /**
- * Aprova uma providência sugerida: primeiro cria a tarefa REAL (POST /v1/tasks, slice deadline)
- * com título/descrição/responsável/vencimento da providência ligada à intimação; só então marca
- * a providência como APPROVED (POST .../aprovar, slice acquisition). A orquestração vive aqui — o
- * BE mantém os slices desacoplados (acquisition não importa a entity de task). No sucesso faz
- * patch do cache do detalhe (só ai_providencias) e invalida detalhe + tarefas.
+ * Confirma a providência sugerida pela IA — POST /v1/action-items/:id/confirmar.
+ * NÃO cria tarefa aqui (o BE cria sozinho, de forma assíncrona, depois de confirmar) —
+ * por isso abre a mesma janela de poll curto do detalhe, além de invalidar detalhe + tarefas.
  */
-export function useAprovarProvidencia(intimacaoId: string) {
+export function useConfirmarActionItem(intimacaoId: string) {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      idx,
-      providencia,
-    }: {
-      idx: number;
-      providencia: IntimacaoProvidencia;
-    }) => {
-      // 1) cria a tarefa real (reusa o endpoint de tarefas do slice deadline)
-      const task = await createTask(fetcher, {
-        title: providencia.title,
-        description: providencia.description || undefined,
-        assignee_user_id: providencia.suggested_assignee_user_id ?? undefined,
-        due_date: providencia.due_date ?? undefined,
-        intimation_id: intimacaoId,
-      });
-      // 2) marca a providência aprovada, gravando o id da tarefa p/ a referência do card
-      return aprovarProvidencia(fetcher, intimacaoId, idx, task.id);
-    },
-    onSuccess: async (analise) => {
-      qc.setQueryData<IntimacaoDetalheView>(
-        intimacoesKeys.detail(intimacaoId),
-        (prev) =>
-          prev ? { ...prev, ai_providencias: analise.providencias } : prev,
-      );
+    mutationFn: (actionItemId: string) =>
+      confirmarActionItem(fetcher, actionItemId),
+    onSuccess: async () => {
+      abrirJanelaDePoll(qc, intimacaoId);
       await Promise.all([
         qc.invalidateQueries({ queryKey: intimacoesKeys.detail(intimacaoId) }),
         qc.invalidateQueries({ queryKey: ["tasks"] }),
@@ -264,21 +305,40 @@ export function useAprovarProvidencia(intimacaoId: string) {
 }
 
 /**
- * Descarta uma providência sugerida — POST .../descartar. Marca DISCARDED e faz patch do cache
- * do detalhe (só ai_providencias). Não cria tarefa. Idempotente.
+ * Descarta a providência — POST /v1/action-items/:id/descartar. Marca DISCARDED.
+ * Idempotente. Mesma janela de poll + invalidação de detalhe/tarefas do confirmar,
+ * por simetria (inofensivo: sem nada pendente o poll se desliga no 1º refetch).
  */
-export function useDescartarProvidencia(intimacaoId: string) {
+export function useDescartarActionItem(intimacaoId: string) {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (idx: number) =>
-      descartarProvidencia(fetcher, intimacaoId, idx),
-    onSuccess: (analise) => {
-      qc.setQueryData<IntimacaoDetalheView>(
-        intimacoesKeys.detail(intimacaoId),
-        (prev) =>
-          prev ? { ...prev, ai_providencias: analise.providencias } : prev,
-      );
+    mutationFn: (actionItemId: string) =>
+      descartarActionItem(fetcher, actionItemId),
+    onSuccess: async () => {
+      abrirJanelaDePoll(qc, intimacaoId);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: intimacoesKeys.detail(intimacaoId) }),
+        qc.invalidateQueries({ queryKey: ["tasks"] }),
+      ]);
+    },
+  });
+}
+
+/**
+ * Reclassifica o tipo de peça da providência — POST /v1/action-items/:id/reclassificar.
+ * Muda tipo_origem→"manual". Invalida o detalhe para reidratar piece_profile_key/tipo.
+ */
+export function useReclassificarActionItem(intimacaoId: string) {
+  const fetcher = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      actionItemId,
+      ...params
+    }: { actionItemId: string } & ReclassificarActionItemParams) =>
+      reclassificarActionItem(fetcher, actionItemId, params),
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: intimacoesKeys.detail(intimacaoId) });
     },
   });
