@@ -12,6 +12,17 @@ export function roleLabel(role: string): string {
 }
 
 /**
+ * Iniciais para avatar a partir de um nome de exibição (1ª + última palavra).
+ * Fonte única do cálculo — reusado por Equipe, Perfil e Organização.
+ */
+export function iniciais(nome: string): string {
+  const partes = nome.trim().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return "—";
+  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+}
+
+/**
  * Nome de exibição de um membro/responsável: usa o nome; se vazio (comum em
  * contas Clerk de teste sem nome preenchido), cai para a parte local do
  * e-mail; se nenhum dos dois existir, string vazia — NUNCA o id/uuid cru

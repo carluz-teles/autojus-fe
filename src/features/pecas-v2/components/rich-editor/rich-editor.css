@@ -39,6 +39,32 @@
   min-height: 100%;
 }
 
+/* Modo "editor da Construção" (/pecas/[id], estágio pronta): o RichEditor é
+ * embutido dentro do painel-documento único do design — então neutralizamos a
+ * "folha A4" (sombra/margens/fundo próprios) pra o conteúdo fluir flush no
+ * painel, com o padding lateral vindo do wrapper. A toolbar do RichEditor fica
+ * escondida aqui (o design usa uma barra de formatação própria mais enxuta;
+ * a edição inline segue funcionando via atalhos/seleção). */
+.construction-editor .tiptap-a4-page {
+  background: transparent;
+  color: var(--foreground);
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  box-shadow: none;
+  border-radius: 0;
+  min-height: 0;
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  font-size: 14.5px;
+  line-height: 1.9;
+}
+.construction-editor .tiptap-content h1,
+.construction-editor .tiptap-content h2,
+.construction-editor .tiptap-content h3 {
+  text-align: left;
+}
+
 .ProseMirror.tiptap-content p {
   margin: 0 0 0.5em 0;
   text-align: justify;

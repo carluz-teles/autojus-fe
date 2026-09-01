@@ -65,7 +65,7 @@ export function EditorArea({
   const [streamStarted, setStreamStarted] = useState(false);
   const [streamDone, setStreamDone] = useState(false);
   // Ao trocar de peça, zera o flag de streamDone pra reengatar o SSE da nova.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+
   useEffect(() => {
     setStreamDone(false);
   }, [draft.id]);

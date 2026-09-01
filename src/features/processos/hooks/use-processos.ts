@@ -22,8 +22,9 @@ import {
   getProcessoResumo,
   getProcessosSummary,
   listProcessos,
+  updateProcessoManual,
 } from "../services/processos.service";
-import type { ProcessoFilters } from "../types";
+import type { ProcessoFilters, ProcessoPhase } from "../types";
 
 // Chaves de query centralizadas para invalidação consistente.
 export const processosKeys = {
@@ -145,6 +146,22 @@ export function useAssignResponsavel(processoId: string) {
       // Atualiza o detalhe na cache com o ProcessoView fresco devolvido pelo BE.
       qc.setQueryData(processosKeys.detail(processoId), processo);
       // Invalida a lista para refletir o novo responsável.
+      qc.invalidateQueries({ queryKey: processosKeys.lists() });
+    },
+  });
+}
+
+// Grava a fase (override) e/ou o valor da causa preenchidos à mão no cockpit (PATCH
+// parcial). Mesmo padrão do responsável: o BE ecoa o ProcessoView fresco → reidrata o
+// header a partir da linha persistida, e a lista é invalidada.
+export function useUpdateProcessoManual(processoId: string) {
+  const fetcher = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { phase?: ProcessoPhase; claim_value?: number }) =>
+      updateProcessoManual(fetcher, processoId, body),
+    onSuccess: (processo) => {
+      qc.setQueryData(processosKeys.detail(processoId), processo);
       qc.invalidateQueries({ queryKey: processosKeys.lists() });
     },
   });

@@ -28,7 +28,9 @@ import { Underline } from "@tiptap/extension-underline";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { createPortal } from "react-dom";
 
+import { applySectionChangeToHtml } from "../../lib/apply-change-html";
 import { RichToolbar } from "./rich-toolbar";
 
 export interface RichEditorHandle {
@@ -45,6 +47,10 @@ export interface RichEditorHandle {
    *  desaparece sozinho via animação CSS (~2.5s). Chamado pelo EditorArea
    *  logo após aceitar uma iteração pra sinalizar onde a mudança caiu. */
   highlightSection(roman: string): void;
+  /** Aplica uma proposta do Assistente NO EDITOR VIVO: troca o corpo da SEÇÃO
+   *  (ancorada pelo heading do romano) pelos novos parágrafos, e emite update
+   *  (→ autosave). Devolve false quando a seção não foi encontrada — não corrompe. */
+  applySectionChange(sectionRoman: string, newParagraphs: string[]): boolean;
 }
 
 interface Props {
@@ -62,6 +68,12 @@ interface Props {
    *  o parent congela o sync externo pra que o refetch com content_html
    *  final não sobrescreva os chunks já renderizados via appendHtml. */
   disableExternalSync?: boolean;
+  /** Esconde a toolbar embutida — usado quando o parent já provê uma barra de
+   *  formatação própria (ex.: editor da Construção com barra sticky única). */
+  hideToolbar?: boolean;
+  /** Quando fornecido, a toolbar é PORTALIZADA para este container (ex.: a barra
+   *  fixa no HEADER da Construção) em vez de renderizar inline acima da folha. */
+  toolbarContainer?: HTMLElement | null;
 }
 
 export const RichEditor = forwardRef<RichEditorHandle, Props>(
@@ -73,6 +85,8 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
       readOnly = false,
       placeholder,
       disableExternalSync = false,
+      hideToolbar = false,
+      toolbarContainer,
     },
     ref,
   ) {
@@ -158,6 +172,20 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
               behavior: "smooth",
             });
         },
+        applySectionChange(sectionRoman, newParagraphs) {
+          if (!editor) return false;
+          const current = editor.getHTML();
+          const next = applySectionChangeToHtml(
+            current,
+            sectionRoman,
+            newParagraphs,
+          );
+          if (next === current) return false;
+          // emitUpdate → onUpdate → onChange do parent → autosave do content_html.
+          editor.commands.setContent(next, { emitUpdate: true });
+          lastAppliedHtml.current = next;
+          return true;
+        },
         highlightSection(roman: string) {
           if (!roman) return;
           // O ProseMirror reconcilia o DOM e remove qualquer classe que a
@@ -204,9 +232,15 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
       [editor],
     );
 
+    // A toolbar pode ir inline (acima da folha) OU portalizada pro header da
+    // Construção (barra fixa full-width) — nunca dentro da folha nesse caso.
+    const showInlineToolbar = !hideToolbar && !toolbarContainer;
     return (
       <div className="flex flex-col gap-3">
-        <RichToolbar editor={editor} />
+        {showInlineToolbar && <RichToolbar editor={editor} />}
+        {!hideToolbar && toolbarContainer && editor
+          ? createPortal(<RichToolbar editor={editor} />, toolbarContainer)
+          : null}
         <div className="tiptap-a4-page">
           <EditorContent editor={editor} />
         </div>

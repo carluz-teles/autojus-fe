@@ -4,6 +4,7 @@ import type {
   PageEnvelope,
   PartesView,
   ProcessoFilters,
+  ProcessoPhase,
   ProcessoResumoView,
   ProcessosSummary,
   ProcessoView,
@@ -105,6 +106,22 @@ export async function assignResponsavel(
   return fetcher<ProcessoView>(`${ENDPOINT}/${id}/responsavel`, {
     method: "PUT",
     body: { user_id: userId },
+  });
+}
+
+/**
+ * PATCH /v1/processos/:id — grava os campos preenchidos à mão no cockpit: a fase
+ * (phase, override manual) e/ou o valor da causa (claim_value). Parcial: só os campos
+ * enviados são escritos. O BE re-lê e ecoa o ProcessoView fresco.
+ */
+export async function updateProcessoManual(
+  fetcher: ApiFetcher,
+  id: string,
+  body: { phase?: ProcessoPhase; claim_value?: number },
+): Promise<ProcessoView> {
+  return fetcher<ProcessoView>(`${ENDPOINT}/${id}`, {
+    method: "PATCH",
+    body,
   });
 }
 

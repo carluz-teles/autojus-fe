@@ -61,7 +61,7 @@ export function UserMenu() {
               ) : null}
             </div>
             <Menu.Item
-              render={<Link href="/settings?tab=perfil" />}
+              render={<Link href="/configuracoes" />}
               className="hover:bg-accent block px-3 py-2 text-sm outline-none"
             >
               Perfil

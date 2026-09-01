@@ -185,48 +185,6 @@ export interface PecaExportResult {
   expires_in: number;
 }
 
-// ── Fatia 1: peticionamento automático (e-SAJ) ──────────────────────────────
-
-/** Status de uma tentativa de protocolo automático no e-SAJ. */
-export type FilingStatus =
-  "ENFILEIRADO" | "PROTOCOLANDO" | "PROTOCOLADO" | "FALHOU";
-
-/** Resposta do POST /v1/pecas/:id/filing/approve (201 na 1ª vez, 200 idempotente). */
-export interface PecaFilingApproveResult {
-  filing_attempt_id: string;
-  status: FilingStatus;
-  is_idempotent: boolean;
-}
-
-/** Tentativa de protocolo ativa — GET /v1/pecas/:id/filing (ou null se não iniciado). */
-export interface PecaFilingStatus {
-  id: string;
-  draft_id: string;
-  status: FilingStatus;
-  requested_at: string;
-  finished_at?: string | null;
-  failure_reason?: string;
-  filing_number?: string | null;
-  screenshot_keys: string[];
-}
-
-/** Credencial e-SAJ cadastrada — GET /v1/esaj-credentials. A senha NUNCA volta. */
-export interface EsajCredential {
-  id: string;
-  owner_user_id: string;
-  login: string;
-  terms_version: string;
-  terms_accepted_at: string;
-  created_at: string;
-}
-
-/** Body do POST /v1/esaj-credentials. */
-export interface EsajCredentialInput {
-  login: string;
-  password: string;
-  terms_version: string;
-}
-
 // ── Fatia 3: revisão IA (sugestões) ──────────────────────────────────────────
 
 /** Citation — âncora de um finding a um documento do processo. */

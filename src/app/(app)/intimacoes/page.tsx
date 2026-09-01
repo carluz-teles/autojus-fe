@@ -1,7 +1,7 @@
-import { IntimacoesView } from "@/features/intimacoes/components/intimacoes-view";
+import { IntimacoesFeed } from "@/features/prazos/components/acervo/intimacoes-feed";
 
-export const metadata = { title: "Intimações · jus·assessoria" };
+export const metadata = { title: "Intimações · Feed · jus·assessoria" };
 
-export default function IntimacoesPage() {
-  return <IntimacoesView />;
+export default function AcervoIntimacoesPage() {
+  return <IntimacoesFeed />;
 }
