@@ -22,6 +22,7 @@ import {
   getIntimationTheses,
 } from "../services/pecas-v2.service";
 import type { Thesis } from "../types";
+import { isSelectedForGeneration } from "./use-theses";
 
 /** Detalhe da intimação (model do useIntimacaoDetalhe) → contexto do rail. Na partida
  *  ainda não há draft: valor da causa desconhecido ("") e sem anexos (só o Teor). */
@@ -76,15 +77,26 @@ export function usePartida(intimacaoId: string) {
   const thesesQuery = useQuery({
     queryKey: thesesKey(intimacaoId),
     queryFn: () => getIntimationTheses(fetcher, intimacaoId),
+    // Teses persistidas só mudam por "Regenerar" explícito — nunca por refetch.
+    // Evita regeneração/refetch acidental ao revisitar a PARTIDA.
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   });
 
   const generate = useMutation({
     mutationFn: () => generateIntimationTheses(fetcher, intimacaoId),
     onSuccess: (theses) => {
       qc.setQueryData(thesesKey(intimacaoId), theses);
-      // Recém-geradas entram todas selecionadas por padrão (o advogado desmarca).
+      // Recém-geradas: semeia a seleção pelo ESTADO persistido do BE (pending_add
+      // = pré-selecionada; off = não). Só grounded/alta nascem marcadas.
       seededRef.current = true;
-      setSelected(new Set(theses.map((t) => t.id)));
+      setSelected(
+        new Set(
+          theses
+            .filter((t) => isSelectedForGeneration(t.state))
+            .map((t) => t.id),
+        ),
+      );
     },
     onError: () =>
       toast.error("Não foi possível gerar as teses. Tente de novo."),
@@ -94,6 +106,9 @@ export function usePartida(intimacaoId: string) {
   const theses = data ?? [];
 
   // Primeira visita sem teses persistidas → auto-gera uma vez (idempotente por ref).
+  // Depende só do estado da LISTA (data/isLoading/isError), nunca do objeto de mutation
+  // (muda de identidade a cada render). Como o GET devolve as persistidas, revisitas NÃO
+  // caem aqui (data.length > 0) → a geração roda no MÁXIMO 1x por escopo.
   useEffect(() => {
     if (
       !thesesQuery.isLoading &&
@@ -105,13 +120,20 @@ export function usePartida(intimacaoId: string) {
       autoGenRef.current = true;
       generate.mutate();
     }
-  }, [thesesQuery.isLoading, thesesQuery.isError, data, generate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thesesQuery.isLoading, thesesQuery.isError, data]);
 
-  // Teses já persistidas (revisita) → seleciona todas uma vez ao carregar.
+  // Teses já persistidas (revisita) → semeia a seleção pelo ESTADO persistido
+  // (included|pending_add = selecionada; off = não), respeitando a regra do BE
+  // (só grounded/alta nascem marcadas). Roda uma vez ao carregar.
   useEffect(() => {
     if (!seededRef.current && data && data.length > 0) {
       seededRef.current = true;
-      setSelected(new Set(data.map((t) => t.id)));
+      setSelected(
+        new Set(
+          data.filter((t) => isSelectedForGeneration(t.state)).map((t) => t.id),
+        ),
+      );
     }
   }, [data]);
 

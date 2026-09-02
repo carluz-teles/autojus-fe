@@ -12,10 +12,12 @@
 import { Sparkles } from "lucide-react";
 import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
+import type { EditorThesisAction } from "../../hooks/use-theses";
 import { useSaveContentHtml } from "../../hooks/use-workflow";
-import type { Draft } from "../../types";
+import type { Draft, Thesis } from "../../types";
 import { structuredToHtml } from "../rich-editor/html-adapter";
 import { RichEditor, type RichEditorHandle } from "../rich-editor/rich-editor";
+import { DireitoTeses } from "./direito-teses";
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
 
@@ -25,9 +27,22 @@ interface Props {
   editorRef: RefObject<RichEditorHandle | null>;
   /** Refazer a minuta do zero (volta pro CTA "Gerar minuta"). */
   onRefazer: () => void;
+  /** Teses da seção "Do direito" (state ≠ off) — a moldura de aprovação/remoção. */
+  direito: Thesis[];
+  /** Ação de aprovação inline sobre uma tese (approve/discard/approveRemoval/keep/remove). */
+  onThesisAction: (thesis: Thesis, action: EditorThesisAction) => void;
+  /** thesisId com PATCH de estado em voo (desabilita os botões da moldura). */
+  pendingThesisId: string | null;
 }
 
-export function EditorCenter({ draft, editorRef, onRefazer }: Props) {
+export function EditorCenter({
+  draft,
+  editorRef,
+  onRefazer,
+  direito,
+  onThesisAction,
+  pendingThesisId,
+}: Props) {
   const saveHtml = useSaveContentHtml(draft.id);
   // Container do header pra onde a toolbar do RichEditor é portalizada (barra fixa
   // full-width — a formatação NÃO vive dentro da folha).
@@ -65,6 +80,12 @@ export function EditorCenter({ draft, editorRef, onRefazer }: Props) {
     );
   };
 
+  // Só as teses com proposta PENDENTE entram na moldura de confirmação — as
+  // incluídas já estão no texto da peça (não se re-lista o miolo aqui).
+  const pendentesDeTese = direito.filter(
+    (t) => t.state === "pending_add" || t.state === "pending_remove",
+  );
+
   return (
     <div className="pb-10">
       {/* Barra de formatação FIXA no header (full-width) — toolbar portalizada. */}
@@ -96,6 +117,21 @@ export function EditorCenter({ draft, editorRef, onRefazer }: Props) {
               onChange={(html) => scheduleSave(html)}
             />
           </div>
+
+          {/* Moldura de CONFIRMAÇÃO — só as teses com proposta PENDENTE (incluir/
+              remover). As teses já incluídas vivem no texto da peça (content_html)
+              — não são re-listadas aqui (evita duplicar o miolo). A remoção é
+              INICIADA no rail (clicar numa tese incluída → pending_remove); aqui só
+              se CONFIRMA (Aprovar/Descartar · Aprovar remoção/Manter). */}
+          {pendentesDeTese.length > 0 && (
+            <div className="border-line2 border-t pt-4">
+              <DireitoTeses
+                direito={pendentesDeTese}
+                onAction={onThesisAction}
+                pendingId={pendingThesisId}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

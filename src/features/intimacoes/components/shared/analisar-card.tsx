@@ -45,6 +45,7 @@ import { formatarData, formatarDataHora } from "@/lib/utils";
 import {
   useAnalisarIntimacao,
   useConfirmarActionItem,
+  useIntimacaoDetalhe,
 } from "../../hooks/use-intimacoes";
 import type { IntimacaoDetalheView, IntimacaoProvidencia } from "../../types";
 import { EyebrowTitle } from "./eyebrow-title";
@@ -285,6 +286,10 @@ export function AnalisarCard({
   intimacao: IntimacaoDetalheView;
 }) {
   const analisar = useAnalisarIntimacao(i.id);
+  // Mesma query key do detalhe já carregado pelo pai (React Query dedupe) — só
+  // lemos o flag derivado da janela de poll pra saber se a materialização das
+  // providências ainda está em curso após uma análise recém-disparada.
+  const { materializandoAnalise } = useIntimacaoDetalhe(i.id);
 
   const gerar = () =>
     analisar.mutate(undefined, {
@@ -292,8 +297,13 @@ export function AnalisarCard({
         toast.error("Não foi possível gerar a análise. Tente novamente."),
     });
 
-  // LOADING: enquanto a análise (re)gera — card bordado com skeleton (independe de pré/pós).
-  if (analisar.isPending) return <AnalisarLoading />;
+  // LOADING: enquanto a mutation está em voo OU enquanto as providências ainda
+  // materializam de forma assíncrona no BE após a análise (o POST volta em ~2s,
+  // mas as linhas de action_item só aparecem no GET seguinte, alguns instantes
+  // depois — `materializandoAnalise` cobre esse gap; auto-off pelo teto do poll
+  // e pelo caso legítimo de análise sem providência). Card bordado com skeleton
+  // (independe de pré/pós).
+  if (analisar.isPending || materializandoAnalise) return <AnalisarLoading />;
 
   // Pré-análise: nunca analisada ainda → CTA centrado.
   if (!i.ai_analyzed_at) {

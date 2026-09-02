@@ -14,6 +14,7 @@ import type {
   DraftPartyGroup,
   DraftPreamble,
   DraftProcess,
+  DraftProcessDocument,
   DraftProvidence,
   DraftSection,
   PendingChange,
@@ -29,6 +30,7 @@ import type {
   PartyAPI,
   PecaDetailAPI,
   ProcessAPI,
+  ProcessDocumentAPI,
   ProvidenceAPI,
   SectionChangeAPI,
   StructuredContentAPI,
@@ -55,8 +57,14 @@ export function mapPecaDetailToDraft(api: PecaDetailAPI): Draft {
     partyGroups: (api.parties ?? []).map(mapPartyGroup),
     providences: (api.providences ?? []).map(mapProvidence),
     attachments: (api.attachments ?? []).map(mapAttachment),
+    processDocuments: (api.process_documents ?? []).map(mapProcessDocument),
     deadline: mapDeadline(api.deadline),
-    thesisCount: 3, // BE não devolve o count; fixture pré-Fatia B (documentar débito)
+    // TODO(B5): count real de teses. O PecaDetailAPI não expõe a contagem e este
+    // mapper não tem a lista (que vem de GET /v1/pecas/:id/theses, em useThesesController).
+    // Só é usado pelo texto cosmético do EditorBanner ("…e de N teses") no editor
+    // pós-geração, onde o controller de teses não está em escopo — derivar aqui exigiria
+    // threa­dar uma nova query pelo editor-area. Mantido fixo pra não acoplar/quebrar.
+    thesisCount: 3,
     sentToSigningAt: api.sent_to_signing_at,
     signedAt: api.signed_at,
     filedAt: api.filed_at,
@@ -165,6 +173,18 @@ function mapAttachment(api: AttachmentAPI): DraftAttachment {
     name: api.name,
     sizeLabel: formatBytes(api.size_bytes),
     category: api.category ?? "Outro",
+  };
+}
+
+function mapProcessDocument(api: ProcessDocumentAPI): DraftProcessDocument {
+  return {
+    id: api.id,
+    label: api.label,
+    documentType: api.document_type,
+    typeLabel: api.type_label ?? "",
+    eventDate: api.event_date ? formatDatePt(api.event_date) : "",
+    pages: api.pages,
+    status: api.status,
   };
 }
 

@@ -36,6 +36,8 @@ export interface PecaDetailAPI {
   process: ProcessAPI | null;
   deadline: DeadlineAPI | null;
   attachments: AttachmentAPI[];
+  /** Autos do processo (documentos fetchados do court_record). [] quando sem processo. */
+  process_documents: ProcessDocumentAPI[];
   providences: ProvidenceAPI[];
   parties: PartyAPI[];
   review: ReviewAPI | null; // legacy — v2 UI não lê
@@ -115,6 +117,19 @@ export interface AttachmentAPI {
   status: string;
   position: number;
   created_at: string;
+}
+
+/** Documento dos autos do processo (fetchado do court_record). Read-only. */
+export interface ProcessDocumentAPI {
+  id: string;
+  label: string;
+  document_type: string;
+  /** Rótulo pt-BR enriquecido do tipo (BE mapeia o código via eproc.DocumentTypeLabel). */
+  type_label: string;
+  pages: number;
+  status: string;
+  /** Data do evento no eproc — RFC3339 ou "" quando ausente (upload humano). */
+  event_date: string;
 }
 
 export interface ProvidenceAPI {

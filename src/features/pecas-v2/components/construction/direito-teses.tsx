@@ -35,14 +35,14 @@ interface Props {
 export function DireitoTeses({ direito, onAction, pendingId }: Props) {
   return (
     <div className="px-14 pb-1">
-      <h3 className="font-display m-0 mb-3 text-[14.5px] font-semibold">
-        II — Do direito
+      <h3 className="text-fg3 m-0 mb-3 text-[10.5px] font-medium tracking-[0.05em] uppercase">
+        Alterações de tese propostas
       </h3>
 
       {direito.length === 0 ? (
         <p className="text-fg3 m-0 text-[13px] italic">
-          Nenhuma tese incluída — marque uma tese no painel à esquerda para
-          propô-la aqui.
+          Nenhuma alteração pendente — proponha incluir ou remover uma tese no
+          painel à esquerda.
         </p>
       ) : (
         direito.map((t, i) => (

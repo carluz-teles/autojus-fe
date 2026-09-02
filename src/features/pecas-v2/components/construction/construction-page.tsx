@@ -24,6 +24,7 @@ import type { RichEditorHandle } from "../rich-editor/rich-editor";
 import { AssistentePanel } from "./assistente-panel";
 import { EditorCenter } from "./editor-center";
 import { GerandoCenter } from "./gerando-center";
+import { PdfDrawer } from "./pdf-drawer";
 import { TeorDrawer } from "./teor-drawer";
 
 export function ConstructionPage({ id }: { id: string }) {
@@ -38,6 +39,9 @@ export function ConstructionPage({ id }: { id: string }) {
     gerarMinuta,
     isGenerating,
     voltar,
+    verAuto,
+    autoDrawer,
+    fecharAuto,
   } = useConstruction(id);
 
   // Drawer lateral do teor/autos (UI local efêmera).
@@ -70,6 +74,8 @@ export function ConstructionPage({ id }: { id: string }) {
           contexto={draftToPecaContexto(draft)}
           highlightedDocId={highlightedDocId}
           onVerTeor={() => setTeorAberto(true)}
+          onVerAuto={verAuto}
+          openingDocId={null}
           tesesSlot={
             <TesesRail
               theses={theses.theses}
@@ -78,6 +84,7 @@ export function ConstructionPage({ id }: { id: string }) {
               isError={theses.isError}
               onToggle={theses.toggle}
               onFonte={focusSource}
+              teorSourceId={draft.intimation.id}
               isRegenerating={theses.isRegenerating}
             />
           }
@@ -105,6 +112,9 @@ export function ConstructionPage({ id }: { id: string }) {
               draft={draft}
               editorRef={editorRef}
               onRefazer={gerarMinuta}
+              direito={theses.direito}
+              onThesisAction={theses.editorAction}
+              pendingThesisId={theses.isTogglingId}
             />
           )}
         </div>
@@ -128,6 +138,10 @@ export function ConstructionPage({ id }: { id: string }) {
         meta={`Publicado ${draft.intimation.publishedAt} · DJEN · ~${teorLaudas} lauda${teorLaudas > 1 ? "s" : ""}`}
         conteudo={draft.intimation.teor}
       />
+
+      {/* Drawer do documento dos autos — embute o PDF ORIGINAL (fiel ao doc), não
+          o texto extraído (que é feito pra embeddings). */}
+      <PdfDrawer doc={autoDrawer} onClose={fecharAuto} />
     </div>
   );
 }

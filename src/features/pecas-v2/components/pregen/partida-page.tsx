@@ -49,6 +49,9 @@ export function PartidaPage({ intimacaoId }: { intimacaoId: string }) {
             contexto={contexto}
             highlightedDocId={highlightedDocId}
             onVerTeor={() => setTeorAberto(true)}
+            // Partida (pré-geração) não tem autos ainda — nada a abrir.
+            onVerAuto={() => {}}
+            openingDocId={null}
             tesesSlot={
               <TesesRail
                 theses={theses}
@@ -57,7 +60,9 @@ export function PartidaPage({ intimacaoId }: { intimacaoId: string }) {
                 isError={isError}
                 onToggle={toggle}
                 onFonte={onFonte}
+                teorSourceId={contexto.intimacao.id}
                 isRegenerating={isRegenerating}
+                pregen
               />
             }
           />

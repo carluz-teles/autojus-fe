@@ -20,8 +20,14 @@ interface Props {
   isError: boolean;
   onToggle: (thesis: Thesis) => void;
   onFonte: (sourceDocumentId: string) => void;
+  /** Id da intimação de origem — fonte-padrão das teses SEM documento ancorado
+   *  (elas se fundam no TEOR, o 1º item da "Fundada em"). Casa com fundada-em-{id}. */
+  teorSourceId: string;
   /** true enquanto a IA gera as teses — a geração é AUTOMÁTICA (no load), sem botão. */
   isRegenerating: boolean;
+  /** PARTIDA (pré-geração): a peça ainda não existe, então a tese selecionada é só
+   *  "marcada" (✓), SEM o badge "no texto" (não há texto ainda). */
+  pregen?: boolean;
 }
 
 export function TesesRail({
@@ -31,7 +37,9 @@ export function TesesRail({
   isError,
   onToggle,
   onFonte,
+  teorSourceId,
   isRegenerating,
+  pregen = false,
 }: Props) {
   const gerando = isLoading || isRegenerating;
   return (
@@ -67,6 +75,8 @@ export function TesesRail({
             thesis={t}
             onToggle={onToggle}
             onFonte={onFonte}
+            teorSourceId={teorSourceId}
+            pregen={pregen}
           />
         ))}
       </div>
@@ -78,13 +88,31 @@ function TeseRow({
   thesis,
   onToggle,
   onFonte,
+  teorSourceId,
+  pregen,
 }: {
   thesis: Thesis;
   onToggle: (t: Thesis) => void;
   onFonte: (docId: string) => void;
+  teorSourceId: string;
+  pregen: boolean;
 }) {
   const box = boxStyle(thesis.state);
   const included = thesis.state === "included";
+  // Na partida (pregen) não há texto gerado — a tese marcada é só "selecionada",
+  // sem o badge "no texto" (que só faz sentido depois da geração).
+  const showNoTexto = included && !pregen;
+
+  // Fonte da tese: um AUTO (sourceDocumentId preenchido) OU o TEOR da intimação
+  // (fallback quando a IA não ancorou num documento — a tese se funda no teor, que
+  // é o 1º item da "Fundada em"). Assim o chip "ver fonte" nunca fica vazio.
+  const hasDoc = thesis.sourceDocumentId !== "";
+  const sourceId = hasDoc ? thesis.sourceDocumentId : teorSourceId;
+  const sourceLabel = hasDoc ? thesis.sourceLabel : "Teor da intimação";
+  // legalRef é a linha primária quando existe; senão a própria fonte sobe pra
+  // primária (evita uma linha primária vazia com a fonte pendurada embaixo).
+  const primary = thesis.legalRef || sourceLabel;
+  const secondary = thesis.legalRef ? sourceLabel : "";
   const border =
     thesis.state === "pending_remove"
       ? "border-red/40"
@@ -109,7 +137,7 @@ function TeseRow({
         <span className="min-w-0">
           <span className="flex items-center gap-1.5">
             <span className="text-[12px] font-medium">{thesis.label}</span>
-            {included && (
+            {showNoTexto && (
               <span className="bg-green/15 text-green rounded-full px-1.5 py-px text-[8.5px] font-semibold tracking-[0.03em] uppercase">
                 no texto
               </span>
@@ -124,17 +152,20 @@ function TeseRow({
 
       <button
         type="button"
-        onClick={() => onFonte(thesis.sourceDocumentId)}
-        className="border-line2 hover:bg-hover flex w-full items-center gap-[7px] border-t border-dashed py-2 pr-2.5 pl-[35px] text-left"
+        onClick={() => onFonte(sourceId)}
+        disabled={!sourceId}
+        className="border-line2 hover:bg-hover flex w-full items-center gap-[7px] border-t border-dashed py-2 pr-2.5 pl-[35px] text-left disabled:opacity-60"
       >
         <Link2 className="text-primary size-3 flex-none" />
         <span className="min-w-0">
           <span className="text-primary block text-[10.5px] font-medium">
-            {thesis.legalRef}
+            {primary}
           </span>
-          <span className="text-fg3 mt-px block truncate text-[10px]">
-            {thesis.sourceLabel}
-          </span>
+          {secondary && (
+            <span className="text-fg3 mt-px block truncate text-[10px]">
+              {secondary}
+            </span>
+          )}
         </span>
       </button>
     </div>

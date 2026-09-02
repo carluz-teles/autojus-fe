@@ -151,7 +151,11 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
 // Auto-off por DOIS critérios independentes (o que vier primeiro):
 //   1. estabilizou: o `ai_analyzed_at` em cache já bate com o `targetAnalyzedAt`
 //      esperado (só setado pela análise — confirmar/descartar não mudam esse
-//      campo) E nenhum item "confiavel" ainda está com task_id null;
+//      campo), as providências esperadas JÁ MATERIALIZARAM (ver
+//      `expectedProvidenciasCount` — o POST /analise devolve os candidatos
+//      efêmeros e a contagem deles; enquanto `ai_providencias` não refletir essa
+//      contagem, seguimos polando, mesmo que `ai_analyzed_at` já bata), E nenhum
+//      item "confiavel" ainda está com task_id null;
 //   2. teto de tentativas (POLL_MAX_ATTEMPTS) — nunca gira pra sempre, mesmo se
 //      o worker falhar silenciosamente.
 const POLL_INTERVAL_MS = 1300;
@@ -164,6 +168,11 @@ interface PollWindow {
   /** Só setado pela análise: o ai_analyzed_at que ainda esperamos ver refletido
    *  no cache (linhas de providência materializadas). */
   targetAnalyzedAt?: string;
+  /** Só setado pela análise: quantas providências os candidatos efêmeros do POST
+   *  /analise prometeram. Enquanto `ai_providencias` (não-DISCARDED) não atingir
+   *  essa contagem, a materialização ainda não terminou → seguimos polando e o
+   *  card mantém o loading. 0 = análise legítima sem providência (não trava). */
+  expectedProvidenciasCount?: number;
 }
 
 function pollWindowKey(id: string) {
@@ -175,21 +184,42 @@ function abrirJanelaDePoll(
   qc: QueryClient,
   id: string,
   targetAnalyzedAt?: string,
+  expectedProvidenciasCount?: number,
 ) {
   const estadoAtual = qc.getQueryState(intimacoesKeys.detail(id));
   qc.setQueryData<PollWindow>(pollWindowKey(id), {
     baselineUpdateCount: estadoAtual?.dataUpdateCount ?? 0,
     targetAnalyzedAt,
+    expectedProvidenciasCount,
   });
+}
+
+/** Providências visíveis (não-DISCARDED) já materializadas no detalhe. */
+function providenciasVisiveis(i: IntimacaoDetalheView): number {
+  return i.ai_providencias.filter((p) => p.status !== "DISCARDED").length;
 }
 
 /** true = ainda falta algo materializar (ver critério 1 acima). */
 function algoPendente(
   i: IntimacaoDetalheView | undefined,
-  targetAnalyzedAt: string | undefined,
+  janela: PollWindow,
 ): boolean {
   if (!i) return true;
-  if (targetAnalyzedAt && i.ai_analyzed_at !== targetAnalyzedAt) return true;
+  const { targetAnalyzedAt, expectedProvidenciasCount } = janela;
+  // Análise recém-disparada: só estabiliza quando o ai_analyzed_at alvo refletiu
+  // E as providências prometidas pelos candidatos efêmeros do POST já apareceram
+  // no detalhe (a materialização é assíncrona no BE — pode chegar DEPOIS do
+  // ai_analyzed_at). Contagem esperada 0 = análise sem providência → não trava.
+  if (targetAnalyzedAt) {
+    if (i.ai_analyzed_at !== targetAnalyzedAt) return true;
+    if (
+      expectedProvidenciasCount != null &&
+      expectedProvidenciasCount > 0 &&
+      providenciasVisiveis(i) < expectedProvidenciasCount
+    ) {
+      return true;
+    }
+  }
   return i.ai_providencias.some(
     (p) =>
       p.status !== "DISCARDED" &&
@@ -198,26 +228,49 @@ function algoPendente(
   );
 }
 
+/** Quantas tentativas de refetch a janela já consumiu. */
+function tentativasDaJanela(
+  qc: QueryClient,
+  id: string,
+  janela: PollWindow,
+): number {
+  const estado = qc.getQueryState(intimacoesKeys.detail(id));
+  return (estado?.dataUpdateCount ?? 0) - janela.baselineUpdateCount;
+}
+
 /** Detalhe de uma intimação — GET /v1/intimacoes/:id. Faz poll curto e auto-off
- *  logo após analisar/confirmar/descartar (ver bloco acima). */
+ *  logo após analisar/confirmar/descartar (ver bloco acima).
+ *
+ *  `materializandoAnalise` = true quando há uma janela de poll ABERTA por uma
+ *  ANÁLISE recém-disparada (tem `targetAnalyzedAt`) cuja materialização ainda não
+ *  refletiu no detalhe — o card usa isso pra MANTER o loading depois que o POST
+ *  volta (mutation.isPending já caiu), fechando o gap "loading some → vazio →
+ *  providências". Respeita o mesmo auto-off do poll (teto + análise sem
+ *  providência), pra nunca ficar em loading eterno. */
 export function useIntimacaoDetalhe(id: string) {
   const fetcher = useApi();
   const qc = useQueryClient();
-  return useQuery({
+  const query = useQuery({
     queryKey: intimacoesKeys.detail(id),
     queryFn: () => getIntimacao(fetcher, id),
     enabled: !!id,
-    refetchInterval: (query) => {
+    refetchInterval: (q) => {
       const janela = qc.getQueryData<PollWindow>(pollWindowKey(id));
       if (!janela) return false;
-      const tentativas =
-        query.state.dataUpdateCount - janela.baselineUpdateCount;
-      if (tentativas >= POLL_MAX_ATTEMPTS) return false;
-      if (!algoPendente(query.state.data, janela.targetAnalyzedAt))
-        return false;
+      if (tentativasDaJanela(qc, id, janela) >= POLL_MAX_ATTEMPTS) return false;
+      if (!algoPendente(q.state.data, janela)) return false;
       return POLL_INTERVAL_MS;
     },
   });
+
+  const janela = qc.getQueryData<PollWindow>(pollWindowKey(id));
+  const materializandoAnalise =
+    !!janela &&
+    !!janela.targetAnalyzedAt &&
+    tentativasDaJanela(qc, id, janela) < POLL_MAX_ATTEMPTS &&
+    algoPendente(query.data, janela);
+
+  return { ...query, materializandoAnalise };
 }
 
 /** Contadores do inbox — GET /v1/intimacoes/summary. */
@@ -284,7 +337,15 @@ export function useAnalisarIntimacao(intimacaoId: string) {
       // title/description agora são PERSISTIDOS no action_item (migração 0090) e vêm
       // no read model — não há mais cache de candidatos em sessionStorage. O poll
       // cobre a materialização das providências pela IA (assíncrona no acquisition).
-      abrirJanelaDePoll(qc, intimacaoId, analise.analyzed_at);
+      // Guardamos a contagem de candidatos efêmeros do POST como "quantas
+      // providências ainda precisam materializar" — o poll (e o loading) só
+      // fecham quando `ai_providencias` atingir essa contagem (ou o teto).
+      abrirJanelaDePoll(
+        qc,
+        intimacaoId,
+        analise.analyzed_at,
+        analise.providencias.length,
+      );
       qc.invalidateQueries({ queryKey: intimacoesKeys.detail(intimacaoId) });
     },
   });

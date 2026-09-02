@@ -24,7 +24,6 @@ import type {
   DataEnvelope,
   IterateResultAPI,
   PecaDetailAPI,
-  ThesesListAPI,
   ThesisAPI,
 } from "../lib/api-types";
 import type {
@@ -85,10 +84,10 @@ export async function getIntimationTheses(
   fetcher: ApiFetcher,
   intimationId: string,
 ): Promise<Thesis[]> {
-  const res = await fetcher<DataEnvelope<ThesesListAPI>>(
+  const res = await fetcher<DataEnvelope<ThesisAPI[]>>(
     `/v1/intimacoes/${intimationId}/theses`,
   );
-  return (res.data.theses ?? []).map(mapThesisFromApi);
+  return (res.data ?? []).map(mapThesisFromApi);
 }
 
 /** POST /v1/intimacoes/:id/theses — (re)gera+persiste teses da intimação via IA,
@@ -97,11 +96,11 @@ export async function generateIntimationTheses(
   fetcher: ApiFetcher,
   intimationId: string,
 ): Promise<Thesis[]> {
-  const res = await fetcher<DataEnvelope<ThesesListAPI>>(
+  const res = await fetcher<DataEnvelope<ThesisAPI[]>>(
     `/v1/intimacoes/${intimationId}/theses`,
     { method: "POST" },
   );
-  return (res.data.theses ?? []).map(mapThesisFromApi);
+  return (res.data ?? []).map(mapThesisFromApi);
 }
 
 // ── Leitura ──────────────────────────────────────────────────────────────────
@@ -131,10 +130,10 @@ export async function getTheses(
   fetcher: ApiFetcher,
   id: string,
 ): Promise<Thesis[]> {
-  const res = await fetcher<DataEnvelope<ThesesListAPI>>(
+  const res = await fetcher<DataEnvelope<ThesisAPI[]>>(
     `${ENDPOINT}/${id}/theses`,
   );
-  return (res.data.theses ?? []).map(mapThesisFromApi);
+  return (res.data ?? []).map(mapThesisFromApi);
 }
 
 /** POST /v1/pecas/:id/theses — (re)gera sugestões via IA, ancoradas nos
@@ -143,11 +142,11 @@ export async function generateTheses(
   fetcher: ApiFetcher,
   id: string,
 ): Promise<Thesis[]> {
-  const res = await fetcher<DataEnvelope<ThesesListAPI>>(
+  const res = await fetcher<DataEnvelope<ThesisAPI[]>>(
     `${ENDPOINT}/${id}/theses`,
     { method: "POST" },
   );
-  return (res.data.theses ?? []).map(mapThesisFromApi);
+  return (res.data ?? []).map(mapThesisFromApi);
 }
 
 /** PATCH /v1/pecas/:id/theses/:thesisId — muda o estado (transição validada

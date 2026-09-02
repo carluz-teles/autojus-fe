@@ -92,6 +92,24 @@ export interface DraftAttachment {
   category: string;
 }
 
+/** Documento dos autos do processo (fetchado do court_record) — o que a geração
+ *  ancora via RAG. Read-only (vem do BE), diferente de DraftAttachment (upload). */
+export interface DraftProcessDocument {
+  id: string;
+  /** Nome amigável (descrição do evento do eproc, ou fallback do tipo). */
+  label: string;
+  /** Código do tipo do documento (PET, DEC, CERT, …) — bruto do eproc. */
+  documentType: string;
+  /** Rótulo pt-BR enriquecido do tipo ("Certidão", "Planilha de cálculo") — o BE
+   *  mapeia o código; o FE só exibe. Vazio quando não há tipo. */
+  typeLabel: string;
+  /** Data do evento no eproc (DD/MM/AAAA) — exibida separada do nome, desambigua
+   *  documentos do mesmo tipo. Vazio para uploads humanos / docs sem data. */
+  eventDate: string;
+  pages: number;
+  status: string;
+}
+
 /** Prazo derivado da intimação. */
 export interface DraftDeadline {
   /** DD/MM/AAAA. */
@@ -121,6 +139,9 @@ export interface Draft {
   partyGroups: DraftPartyGroup[];
   providences: DraftProvidence[];
   attachments: DraftAttachment[];
+  /** Autos do PROCESSO (documentos fetchados do court_record) — o que a geração
+   *  ancora via RAG. Exibidos na "Fundada em" junto do teor e dos anexos manuais. */
+  processDocuments: DraftProcessDocument[];
   deadline: DraftDeadline;
   /** Total de teses usadas na geração (aparece no banner: "…e de 3 teses"). */
   thesisCount: number;

@@ -45,6 +45,15 @@ export function useConstruction(id: string) {
   const theses = useThesesController(id);
   const generate = useGenerateDraft(id);
 
+  // Auto (documento dos autos) aberto no drawer: o viewer embute o PDF original
+  // (busca os bytes por conta própria via /documentos/:id/raw). Guardamos só a
+  // identificação do doc + os rótulos do cabeçalho. null = drawer fechado.
+  const [autoDrawer, setAutoDrawer] = useState<{
+    id: string;
+    titulo: string;
+    meta: string;
+  } | null>(null);
+
   // Provenance: attachment (Fundada em) destacado por "ver fonte" numa tese.
   const [highlightedDocId, setHighlightedDocId] = useState<string | null>(null);
   // Disparei "Gerar minuta" nesta sessão? Ponte otimista até o saga avançar.
@@ -64,6 +73,14 @@ export function useConstruction(id: string) {
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
+
+  // Abre o PDF original de um auto num drawer com viewer embutido (fiel ao
+  // documento — sem texto reconstruído). O viewer busca os bytes sob demanda.
+  const verAuto = (doc: { id: string; name: string; meta: string }) => {
+    setAutoDrawer({ id: doc.id, titulo: doc.name, meta: doc.meta });
+  };
+
+  const fecharAuto = () => setAutoDrawer(null);
 
   const gerarMinuta = () => {
     if (generate.isPending) return;
@@ -85,6 +102,9 @@ export function useConstruction(id: string) {
     theses,
     highlightedDocId,
     focusSource,
+    verAuto,
+    autoDrawer,
+    fecharAuto,
     gerarMinuta,
     isGenerating: generate.isPending,
     voltar,

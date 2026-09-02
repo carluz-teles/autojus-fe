@@ -83,6 +83,11 @@ function useTheses(id: string) {
     queryKey: thesesKey(id),
     queryFn: () => svc.getTheses(fetcher, id),
     enabled: !!id,
+    // Teses só mudam por PATCH (setQueryData cirúrgico) ou "Regenerar" explícito —
+    // nunca por refetch. Evita refetch/regeneração acidental ao revisitar a tela.
+    // (Precedente do slice: useDraft escopa o comportamento de refetch por-query.)
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -156,7 +161,13 @@ export function useThesesController(id: string): ThesesController {
   const autoGenRef = useRef(false);
 
   // Gera as teses no LOAD quando ainda não há nenhuma (sem botão manual — a geração
-  // acontece sozinha na primeira vez; depois persistem e o GET as devolve).
+  // acontece sozinha na primeira vez; depois persistem e o GET as devolve). Como o
+  // GET agora devolve as teses persistidas, uma revisita NÃO cai neste ramo
+  // (data.length > 0) → a geração roda no MÁXIMO 1x por escopo (guard por autoGenRef
+  // de mount + o próprio load persistido). O effect depende só do estado da LISTA
+  // (data/isLoading/isError), nunca do objeto de mutation — que muda de identidade a
+  // cada render e re-dispararia o effect à toa. regen.isPending é lido sem entrar nas
+  // deps (o ref já sela o disparo único).
   useEffect(() => {
     if (
       !list.isLoading &&
@@ -168,7 +179,8 @@ export function useThesesController(id: string): ThesesController {
       autoGenRef.current = true;
       regen.mutate();
     }
-  }, [list.isLoading, list.isError, list.data, regen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list.isLoading, list.isError, list.data]);
 
   const theses = list.data ?? [];
   const selected = theses.filter((t) => isSelectedForGeneration(t.state));

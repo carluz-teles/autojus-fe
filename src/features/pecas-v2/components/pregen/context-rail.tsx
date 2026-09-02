@@ -6,7 +6,7 @@
 // (o Teor da intimação de origem é o 1º item — fundamentação — seguido dos autos).
 // O bloco TESES A INCLUIR entra via `tesesSlot`.
 
-import { FileText, Mail, User } from "lucide-react";
+import { FileText, Loader2, Mail, User } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type {
@@ -21,6 +21,10 @@ interface Props {
   highlightedDocId: string | null;
   /** Abre o drawer lateral com o teor/autos completo da intimação de origem. */
   onVerTeor: () => void;
+  /** Abre o conteúdo de um documento dos autos (Fundada em) num drawer. */
+  onVerAuto: (doc: PecaContextoDoc) => void;
+  /** Id do auto cujo conteúdo está carregando — mostra spinner no item. */
+  openingDocId: string | null;
   tesesSlot: ReactNode;
 }
 
@@ -28,6 +32,8 @@ export function ContextRail({
   contexto,
   highlightedDocId,
   onVerTeor,
+  onVerAuto,
+  openingDocId,
   tesesSlot,
 }: Props) {
   const { processo, intimacao, partes, autos } = contexto;
@@ -103,7 +109,9 @@ export function ContextRail({
           {autos.length + 1}
         </span>
       </div>
-      <div className="mt-2 flex flex-col gap-1.5">
+      {/* Teor + autos rolam JUNTOS num único container com altura limitada — o teor
+          faz parte da lista (não fica fixo), e o scroll evita empurrar as TESES. */}
+      <div className="mt-2 flex max-h-[340px] flex-col gap-1.5 overflow-y-auto pr-0.5">
         <TeorSource
           id={`fundada-em-${intimacao.id}`}
           publishedAt={intimacao.publishedAt}
@@ -111,15 +119,21 @@ export function ContextRail({
           highlight={intimacao.id === highlightedDocId}
           onClick={onVerTeor}
         />
-        {autos.map((a) => (
-          <DocSource key={a.id} doc={a} highlight={a.id === highlightedDocId} />
-        ))}
         {autos.length === 0 && (
           <p className="text-fg3 text-[11px] leading-[1.5]">
             Sem autos anexados — a peça se funda no teor da intimação. Anexe
             documentos do processo para ancorar mais teses.
           </p>
         )}
+        {autos.map((a) => (
+          <DocSource
+            key={a.id}
+            doc={a}
+            highlight={a.id === highlightedDocId}
+            opening={a.id === openingDocId}
+            onClick={() => onVerAuto(a)}
+          />
+        ))}
       </div>
 
       {/* TESES A INCLUIR */}
@@ -217,23 +231,38 @@ function TeorSource({
   );
 }
 
-/** Item de documento do caso (autos) na FUNDADA EM. */
+/** Item de documento do caso (autos) na FUNDADA EM. Clicável — abre o PDF do
+ *  documento numa aba nova (ver conteúdo). */
 function DocSource({
   doc,
   highlight,
+  opening,
+  onClick,
 }: {
   doc: PecaContextoDoc;
   highlight: boolean;
+  opening: boolean;
+  onClick: () => void;
 }) {
   return (
-    <div
+    <button
+      type="button"
       id={`fundada-em-${doc.id}`}
+      onClick={onClick}
+      disabled={opening}
+      title="Abrir documento"
       className={
-        "border-line bg-background grid grid-cols-[15px_1fr_auto] items-center gap-[9px] rounded-[9px] border border-l-[3px] px-2.5 py-[9px] transition-colors " +
-        (highlight ? "border-l-primary bg-selected" : "border-l-primary/40")
+        "card-hover grid w-full grid-cols-[15px_1fr_auto] items-center gap-[9px] rounded-[9px] border border-l-[3px] px-2.5 py-[9px] text-left transition-colors " +
+        (highlight
+          ? "border-l-primary bg-selected"
+          : "border-line border-l-primary/40")
       }
     >
-      <FileText className="text-primary size-[14px] flex-none" />
+      {opening ? (
+        <Loader2 className="text-primary size-[14px] flex-none animate-spin" />
+      ) : (
+        <FileText className="text-primary size-[14px] flex-none" />
+      )}
       <span className="min-w-0">
         <span className="block truncate text-[12px] font-medium">
           {doc.name}
@@ -243,7 +272,7 @@ function DocSource({
       <span className="bg-primary/10 text-primary flex-none rounded-full px-[7px] py-0.5 text-[9px] font-medium">
         {doc.category}
       </span>
-    </div>
+    </button>
   );
 }
 

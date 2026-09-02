@@ -73,11 +73,30 @@ export function draftToPecaContexto(d: Draft): PecaContexto {
       counselLabel: p.counselLabel,
       isClient: p.isClient,
     })),
-    autos: d.attachments.map((a) => ({
-      id: a.id,
-      name: a.name,
-      meta: a.sizeLabel,
-      category: a.category,
-    })),
+    // "Fundada em" lista, além do teor (injetado pelo rail): os AUTOS do processo
+    // (documentos fetchados do court_record — o que a geração ancora via RAG) e, em
+    // seguida, os anexos manuais. Os autos vêm primeiro por serem a base da peça.
+    autos: [
+      ...d.processDocuments.map((doc) => ({
+        id: doc.id,
+        name: doc.label,
+        // Tipo (enriquecido) · data do evento · páginas — a data fica AQUI, fora do
+        // nome, pra desambiguar documentos do mesmo tipo. Partes vazias são omitidas.
+        meta: [
+          doc.typeLabel || doc.documentType,
+          doc.eventDate,
+          `${doc.pages} pág.`,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        category: "Autos",
+      })),
+      ...d.attachments.map((a) => ({
+        id: a.id,
+        name: a.name,
+        meta: a.sizeLabel,
+        category: a.category,
+      })),
+    ],
   };
 }
