@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Artefatos de design handoff (JS/HTML vendored) — não é código-fonte do app.
     "docs/**",
+    // Assets estáticos vendored (ex.: worker minificado do pdf.js) — não é fonte.
+    "public/**",
   ]),
 
   ...nextVitals,

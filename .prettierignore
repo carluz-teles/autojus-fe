@@ -11,3 +11,6 @@ infra/
 
 # artefatos de design handoff (HTML/JS vendored) — não é código-fonte do app
 docs/
+
+# assets estáticos vendored (worker minificado do pdf.js) — não é código-fonte
+public/pdf.worker.min.mjs

@@ -93,3 +93,36 @@ export async function apiFetch<T>(
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
+
+/**
+ * Variante do apiFetch para respostas BINÁRIAS (ex.: bytes de PDF de um auto).
+ * Mesmo interceptor (URL/headers/JWT/erro tipado), mas devolve o Blob em vez de
+ * fazer res.json(). O caller costuma virar um object URL (URL.createObjectURL)
+ * para embutir num <object>/<iframe> — assim o token nunca vai na URL.
+ */
+export async function apiFetchBlob(
+  path: string,
+  req: ApiRequest = {},
+): Promise<Blob> {
+  const { query, signal, headers, getToken } = req;
+
+  const finalHeaders: Record<string, string> = { ...headers };
+  if (getToken) {
+    const token = await getToken();
+    if (token) finalHeaders["Authorization"] = `Bearer ${token}`;
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(buildUrl(path, query), {
+      method: "GET",
+      headers: finalHeaders,
+      signal,
+    });
+  } catch (cause) {
+    throw networkError(cause);
+  }
+
+  if (!res.ok) throw await apiErrorFromResponse(res);
+  return res.blob();
+}

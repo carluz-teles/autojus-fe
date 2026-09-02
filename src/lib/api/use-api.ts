@@ -3,7 +3,7 @@
 import { useAuth } from "@clerk/nextjs";
 import { useCallback } from "react";
 
-import { apiFetch, type ApiRequest } from "./client";
+import { apiFetch, apiFetchBlob, type ApiRequest } from "./client";
 
 /**
  * Liga o `getToken` do Clerk ao `apiFetch`. É a ponte entre auth e a camada de
@@ -20,3 +20,19 @@ export function useApi() {
 }
 
 export type ApiFetcher = ReturnType<typeof useApi>;
+
+/**
+ * Mesma ponte, para respostas BINÁRIAS (bytes de PDF). Devolve um Blob — o
+ * caller vira object URL para embutir num viewer sem expor o token na URL.
+ */
+export function useApiBlob() {
+  const { getToken } = useAuth();
+
+  return useCallback(
+    (path: string, req: Omit<ApiRequest, "getToken"> = {}) =>
+      apiFetchBlob(path, { ...req, getToken }),
+    [getToken],
+  );
+}
+
+export type ApiBlobFetcher = ReturnType<typeof useApiBlob>;
