@@ -2,6 +2,8 @@
 // que o FE consome saem daqui. Campos que o BE não expõe hoje (intimation.title,
 // deadline em dias) são derivados aqui pra manter a UI intocada.
 
+import { htmlToText } from "@/lib/html/html-to-text";
+
 import type {
   ChatMessage,
   Draft,
@@ -104,7 +106,10 @@ function mapIntimation(api: IntimationAPI | null): DraftIntimation {
     id: api.id,
     title: humanizeIntimationType(api.type),
     publishedAt: formatDatePt(api.made_available_at),
-    teor: api.content,
+    // O teor do DJEN chega como HTML cru; o card/drawer do pecas-v2 exibem como
+    // TEXTO, então extraímos o texto legível aqui (ver htmlToText). Fica no boundary
+    // do mapper → cobre card + drawer num ponto só.
+    teor: htmlToText(api.content),
   };
 }
 
