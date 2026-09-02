@@ -11,7 +11,7 @@
 
 import { Link2 } from "lucide-react";
 
-import type { Thesis, ThesisState } from "../../types";
+import type { Thesis, ThesisAnchor, ThesisState } from "../../types";
 
 interface Props {
   theses: Thesis[];
@@ -103,16 +103,11 @@ function TeseRow({
   // sem o badge "no texto" (que só faz sentido depois da geração).
   const showNoTexto = included && !pregen;
 
-  // Fonte da tese: um AUTO (sourceDocumentId preenchido) OU o TEOR da intimação
-  // (fallback quando a IA não ancorou num documento — a tese se funda no teor, que
-  // é o 1º item da "Fundada em"). Assim o chip "ver fonte" nunca fica vazio.
-  const hasDoc = thesis.sourceDocumentId !== "";
-  const sourceId = hasDoc ? thesis.sourceDocumentId : teorSourceId;
-  const sourceLabel = hasDoc ? thesis.sourceLabel : "Teor da intimação";
-  // legalRef é a linha primária quando existe; senão a própria fonte sobe pra
-  // primária (evita uma linha primária vazia com a fonte pendurada embaixo).
-  const primary = thesis.legalRef || sourceLabel;
-  const secondary = thesis.legalRef ? sourceLabel : "";
+  // Âncoras da tese: quando o BE devolve N (uma tese sustentada por vários autos),
+  // listamos todas agrupadas por label. Quando vazio, caímos no fallback singular
+  // (um AUTO ou o TEOR da intimação) — a tese se funda no teor, o 1º item da
+  // "Fundada em". Assim o bloco "ver fonte" nunca fica vazio.
+  const groups = groupAnchors(thesis.anchors);
   const border =
     thesis.state === "pending_remove"
       ? "border-red/40"
@@ -150,25 +145,132 @@ function TeseRow({
         </span>
       </button>
 
-      <button
-        type="button"
-        onClick={() => onFonte(sourceId)}
-        disabled={!sourceId}
-        className="border-line2 hover:bg-hover flex w-full items-center gap-[7px] border-t border-dashed py-2 pr-2.5 pl-[35px] text-left disabled:opacity-60"
-      >
-        <Link2 className="text-primary size-3 flex-none" />
-        <span className="min-w-0">
-          <span className="text-primary block text-[10.5px] font-medium">
-            {primary}
-          </span>
-          {secondary && (
-            <span className="text-fg3 mt-px block truncate text-[10px]">
-              {secondary}
-            </span>
-          )}
-        </span>
-      </button>
+      {groups.length > 0 ? (
+        <AnchorsBlock
+          legalRef={thesis.legalRef}
+          groups={groups}
+          onFonte={onFonte}
+        />
+      ) : (
+        <FallbackSource
+          legalRef={thesis.legalRef}
+          sourceDocumentId={thesis.sourceDocumentId}
+          sourceLabel={thesis.sourceLabel}
+          teorSourceId={teorSourceId}
+          onFonte={onFonte}
+        />
+      )}
     </div>
+  );
+}
+
+/** Uma âncora agrupada por label: id representante (pro clique), rótulo e contagem
+ *  de documentos distintos que compartilham esse label. */
+interface AnchorGroup {
+  documentId: string;
+  label: string;
+  count: number;
+}
+
+// Agrupa as âncoras por label — os labels podem repetir ("Ato ordinatório · pág. 1")
+// porque são DOCUMENTOS distintos com mesmo tipo/página. Preserva a 1ª ocorrência
+// como representante do clique e conta quantos documentos há no grupo.
+function groupAnchors(anchors: ThesisAnchor[]): AnchorGroup[] {
+  const byLabel = new Map<string, AnchorGroup>();
+  for (const a of anchors) {
+    const g = byLabel.get(a.label);
+    if (g) {
+      g.count += 1;
+    } else {
+      byLabel.set(a.label, {
+        documentId: a.documentId,
+        label: a.label,
+        count: 1,
+      });
+    }
+  }
+  return [...byLabel.values()];
+}
+
+/** Bloco de fontes quando a tese tem N âncoras. legalRef (dispositivo) na 1ª linha;
+ *  abaixo, os grupos de âncoras como chips clicáveis. Cada chip mostra o label e,
+ *  quando há mais de um documento no grupo, um sufixo "(N)". */
+function AnchorsBlock({
+  legalRef,
+  groups,
+  onFonte,
+}: {
+  legalRef: string;
+  groups: AnchorGroup[];
+  onFonte: (docId: string) => void;
+}) {
+  return (
+    <div className="border-line2 border-t border-dashed py-2 pr-2.5 pl-[35px]">
+      {legalRef && (
+        <span className="text-primary flex items-center gap-[7px] text-[10.5px] font-medium">
+          <Link2 className="text-primary size-3 flex-none" />
+          {legalRef}
+        </span>
+      )}
+      <div className="mt-1 flex flex-wrap gap-x-1.5 gap-y-1">
+        {groups.map((g) => (
+          <button
+            key={g.label}
+            type="button"
+            onClick={() => onFonte(g.documentId)}
+            disabled={!g.documentId}
+            title={g.label}
+            className="border-line2 text-fg3 hover:bg-hover hover:text-primary max-w-full truncate rounded-full border px-2 py-px text-[10px] disabled:opacity-60"
+          >
+            {g.label}
+            {g.count > 1 && <span className="text-fg3"> ({g.count})</span>}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Fallback singular (âncoras vazias): um AUTO ou o TEOR da intimação, como antes. */
+function FallbackSource({
+  legalRef,
+  sourceDocumentId,
+  sourceLabel,
+  teorSourceId,
+  onFonte,
+}: {
+  legalRef: string;
+  sourceDocumentId: string;
+  sourceLabel: string;
+  teorSourceId: string;
+  onFonte: (docId: string) => void;
+}) {
+  const hasDoc = sourceDocumentId !== "";
+  const sourceId = hasDoc ? sourceDocumentId : teorSourceId;
+  const label = hasDoc ? sourceLabel : "Teor da intimação";
+  // legalRef é a linha primária quando existe; senão a própria fonte sobe pra
+  // primária (evita uma linha primária vazia com a fonte pendurada embaixo).
+  const primary = legalRef || label;
+  const secondary = legalRef ? label : "";
+  return (
+    <button
+      type="button"
+      onClick={() => onFonte(sourceId)}
+      disabled={!sourceId}
+      className="border-line2 hover:bg-hover flex w-full items-center gap-[7px] border-t border-dashed py-2 pr-2.5 pl-[35px] text-left disabled:opacity-60"
+    >
+      <Link2 className="text-primary size-3 flex-none" />
+      <span className="min-w-0">
+        <span className="text-primary block text-[10.5px] font-medium">
+          {primary}
+        </span>
+        {secondary && (
+          <span className="text-fg3 mt-px block truncate text-[10px]">
+            {secondary}
+          </span>
+        )}
+      </span>
+    </button>
   );
 }
 

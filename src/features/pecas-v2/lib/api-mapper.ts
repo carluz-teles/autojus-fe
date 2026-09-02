@@ -263,6 +263,13 @@ export function mapThesisFromApi(api: ThesisAPI): Thesis {
     sourceDocumentId: api.source_document_id || api.source_intimation_id || "",
     sourceLabel: api.source_label,
     sourceExcerpt: api.source_excerpt,
+    anchors: (api.anchors ?? []).map((a) => ({
+      documentId: a.document_id,
+      label: a.label,
+      excerpt: a.excerpt,
+      page: a.page,
+      grounded: !!a.grounded,
+    })),
     grounded: !!api.grounded,
     state: (api.state as ThesisState) ?? "off",
     position: api.position ?? 0,

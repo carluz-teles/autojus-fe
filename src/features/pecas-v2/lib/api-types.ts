@@ -157,15 +157,29 @@ export interface ThesisAPI {
   label: string;
   foundation: string;
   legal_ref: string;
-  /** FK ao documento do caso (autos) — vazio quando a fonte é o teor. */
+  /** FK ao documento do caso (autos) — vazio quando a fonte é o teor. Âncora PRIMÁRIA. */
   source_document_id: string;
   /** FK à intimação quando a fonte é o TEOR — vazio quando é um doc. */
   source_intimation_id?: string;
   source_label: string;
   source_excerpt: string;
+  /** Page da âncora primária. */
+  source_page?: number;
+  /** TODAS as âncoras da tese (uma tese pode ser sustentada por N autos). A
+   *  primária ainda vem singular acima (compat). Labels podem repetir — são
+   *  documentos distintos com mesmo tipo/página. */
+  anchors?: ThesisAnchorAPI[];
   grounded: boolean;
   state: "off" | "pending_add" | "included" | "pending_remove";
   position: number;
+}
+
+export interface ThesisAnchorAPI {
+  document_id: string;
+  label: string;
+  excerpt: string;
+  page: number;
+  grounded: boolean;
 }
 
 export interface ThesesListAPI {

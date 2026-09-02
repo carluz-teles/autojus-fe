@@ -290,9 +290,27 @@ export interface Thesis {
   sourceLabel: string;
   /** Trecho literal do doc que sustenta a tese (evidência). */
   sourceExcerpt: string;
+  /** TODAS as âncoras da tese (uma tese pode se sustentar em N autos). A primária
+   *  também vive nos campos singulares acima (compat). Vazio → cai no teor. */
+  anchors: ThesisAnchor[];
   /** A fonte sustenta a tese? true → ✓ verde; false → ? dourado. */
   grounded: boolean;
   state: ThesisState;
   /** Ordem estável. */
   position: number;
+}
+
+/** Uma âncora de proveniência de uma tese — um documento dos autos (ou o teor)
+ *  que sustenta a tese. Uma tese pode ter várias. */
+export interface ThesisAnchor {
+  /** FK ao documento de origem (item da "Fundada em"). */
+  documentId: string;
+  /** Rótulo humano da fonte (ex.: "Ato ordinatório · pág. 1"). Pode repetir. */
+  label: string;
+  /** Trecho literal que sustenta a tese. */
+  excerpt: string;
+  /** Página no documento. */
+  page: number;
+  /** A âncora sustenta a tese? */
+  grounded: boolean;
 }
