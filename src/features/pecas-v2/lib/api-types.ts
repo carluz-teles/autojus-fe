@@ -169,6 +169,10 @@ export interface ThesisAPI {
    *  primária ainda vem singular acima (compat). Labels podem repetir — são
    *  documentos distintos com mesmo tipo/página. */
   anchors?: ThesisAnchorAPI[];
+  /** TRECHOS da peça gerada que esta tese produziu (thesis↔segment). Vazio antes
+   *  da geração ou quando nenhuma seção casou com o label. O FE mostra ao propor
+   *  a remoção — "em qual mudança isso vai implicar". */
+  segments?: ThesisSegmentAPI[];
   grounded: boolean;
   state: "off" | "pending_add" | "included" | "pending_remove";
   position: number;
@@ -180,6 +184,13 @@ export interface ThesisAnchorAPI {
   excerpt: string;
   page: number;
   grounded: boolean;
+}
+
+export interface ThesisSegmentAPI {
+  /** Título da seção (ex.: "I — DAS PRELIMINARES"). O FE casa por texto pra ancorar. */
+  heading: string;
+  /** Corpo da seção (parágrafos) — o trecho real a exibir. */
+  conteudo: string;
 }
 
 export interface ThesesListAPI {

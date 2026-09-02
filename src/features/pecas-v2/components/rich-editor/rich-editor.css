@@ -200,3 +200,21 @@
   z-index: 5;
   animation: section-highlight-overlay-fade 4000ms ease-out forwards;
 }
+
+/* Marcação IN LOCO do trecho que uma tese em pending_remove produziu: os blocos
+   da seção ficam tachados + com tinta vermelha translúcida, sinalizando "isto
+   sairá da peça" no próprio texto (não num card à parte). É uma ProseMirror
+   Decoration (classe no nó) — sobrevive à reconciliação do editor. */
+.tiptap-content .peca-pending-remove {
+  background-color: color-mix(in oklch, var(--red, #dc2626) 9%, transparent);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in oklch, var(--red, #dc2626) 70%, transparent);
+  text-decoration-thickness: 1px;
+  color: color-mix(in oklch, var(--red, #dc2626) 55%, var(--fg3, #6b7280));
+  box-shadow: inset 3px 0 0 0 color-mix(in oklch, var(--red, #dc2626) 60%, transparent);
+  border-radius: 2px;
+  padding-inline: 4px;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}

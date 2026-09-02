@@ -31,6 +31,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { createPortal } from "react-dom";
 
 import { applySectionChangeToHtml } from "../../lib/apply-change-html";
+import { PendingRemoval, pendingRemovalKey } from "./pending-removal";
 import { RichToolbar } from "./rich-toolbar";
 
 export interface RichEditorHandle {
@@ -74,6 +75,9 @@ interface Props {
   /** Quando fornecido, a toolbar é PORTALIZADA para este container (ex.: a barra
    *  fixa no HEADER da Construção) em vez de renderizar inline acima da folha. */
   toolbarContainer?: HTMLElement | null;
+  /** Algarismos romanos das seções cujo conteúdo será REMOVIDO (teses em
+   *  pending_remove). Marca esses trechos IN LOCO no texto (tachado/vermelho). */
+  removalRomans?: string[];
 }
 
 export const RichEditor = forwardRef<RichEditorHandle, Props>(
@@ -87,6 +91,7 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
       disableExternalSync = false,
       hideToolbar = false,
       toolbarContainer,
+      removalRomans,
     },
     ref,
   ) {
@@ -113,6 +118,7 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
         TableRow,
         TableHeader,
         TableCell,
+        PendingRemoval,
       ],
       editorProps: {
         attributes: {
@@ -147,6 +153,18 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
       if (!editor) return;
       editor.setEditable(!readOnly);
     }, [editor, readOnly]);
+
+    // Marca no texto os trechos das teses em pending_remove (Decorations, via meta
+    // no plugin). Reage à lista de romanos; a serialização estável evita disparos à
+    // toa quando o array muda de identidade mas não de conteúdo.
+    const romansKey = (removalRomans ?? []).join(",");
+    useEffect(() => {
+      if (!editor) return;
+      const romans = romansKey ? romansKey.split(",") : [];
+      editor.view.dispatch(
+        editor.state.tr.setMeta(pendingRemovalKey, { romans }),
+      );
+    }, [editor, romansKey]);
 
     useImperativeHandle(
       ref,

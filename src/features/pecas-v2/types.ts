@@ -293,11 +293,22 @@ export interface Thesis {
   /** TODAS as âncoras da tese (uma tese pode se sustentar em N autos). A primária
    *  também vive nos campos singulares acima (compat). Vazio → cai no teor. */
   anchors: ThesisAnchor[];
+  /** TRECHOS da peça gerada que esta tese produziu — o texto real que sai ao
+   *  remover a tese. Vazio antes da geração ou sem match de seção. */
+  segments: ThesisSegment[];
   /** A fonte sustenta a tese? true → ✓ verde; false → ? dourado. */
   grounded: boolean;
   state: ThesisState;
   /** Ordem estável. */
   position: number;
+}
+
+/** Um trecho da peça gerada atribuído a uma tese (seção casada por heading). */
+export interface ThesisSegment {
+  /** Título da seção — o FE casa por texto pra ancorar/rolar no editor. */
+  heading: string;
+  /** Corpo da seção (parágrafos) — o trecho real a exibir na remoção. */
+  conteudo: string;
 }
 
 /** Uma âncora de proveniência de uma tese — um documento dos autos (ou o teor)

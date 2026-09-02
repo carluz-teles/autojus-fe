@@ -110,15 +110,19 @@ function TeseBlock({
         </div>
       )}
 
-      <p
-        className={
-          "font-display m-0 text-justify text-[14.5px] leading-[1.9] " +
-          (pendRemove ? "text-fg3 line-through" : "text-foreground")
-        }
-      >
-        {thesis.foundation}{" "}
-        <LegalRefChip legalRef={thesis.legalRef} grounded={thesis.grounded} />
-      </p>
+      {pendRemove && thesis.segments.length > 0 ? (
+        <RemovalHint />
+      ) : (
+        <p
+          className={
+            "font-display m-0 text-justify text-[14.5px] leading-[1.9] " +
+            (pendRemove ? "text-fg3 line-through" : "text-foreground")
+          }
+        >
+          {thesis.foundation}{" "}
+          <LegalRefChip legalRef={thesis.legalRef} grounded={thesis.grounded} />
+        </p>
+      )}
 
       {pendAdd && (
         <div className="mt-2.5 flex gap-2">
@@ -162,6 +166,18 @@ function TeseBlock({
         </div>
       )}
     </div>
+  );
+}
+
+/** Nota compacta da remoção: o TRECHO real já aparece tachado/destacado NO
+ *  PRÓPRIO TEXTO da peça (ProseMirror Decoration), então aqui só apontamos pra
+ *  ele — sem duplicar o conteúdo num card. */
+function RemovalHint() {
+  return (
+    <p className="text-fg3 m-0 text-[13px] leading-[1.6]">
+      O trecho destacado em vermelho no texto acima será removido da peça.
+      Confirme para aplicar.
+    </p>
   );
 }
 

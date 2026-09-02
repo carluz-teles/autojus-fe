@@ -270,6 +270,10 @@ export function mapThesisFromApi(api: ThesisAPI): Thesis {
       page: a.page,
       grounded: !!a.grounded,
     })),
+    segments: (api.segments ?? []).map((s) => ({
+      heading: s.heading,
+      conteudo: s.conteudo,
+    })),
     grounded: !!api.grounded,
     state: (api.state as ThesisState) ?? "off",
     position: api.position ?? 0,

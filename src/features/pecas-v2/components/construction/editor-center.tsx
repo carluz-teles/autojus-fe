@@ -16,6 +16,7 @@ import type { EditorThesisAction } from "../../hooks/use-theses";
 import { useSaveContentHtml } from "../../hooks/use-workflow";
 import type { Draft, Thesis } from "../../types";
 import { structuredToHtml } from "../rich-editor/html-adapter";
+import { romansFromHeadings } from "../rich-editor/pending-removal";
 import { RichEditor, type RichEditorHandle } from "../rich-editor/rich-editor";
 import { DireitoTeses } from "./direito-teses";
 
@@ -86,6 +87,19 @@ export function EditorCenter({
     (t) => t.state === "pending_add" || t.state === "pending_remove",
   );
 
+  // Romanos das seções cujo texto será removido (teses em pending_remove) — o
+  // editor marca esses trechos IN LOCO (tachado/vermelho), em vez de duplicá-los
+  // num card. Deriva do segmento (thesis↔trecho) persistido na geração.
+  const removalRomans = useMemo(
+    () =>
+      romansFromHeadings(
+        direito
+          .filter((t) => t.state === "pending_remove")
+          .flatMap((t) => t.segments.map((s) => s.heading)),
+      ),
+    [direito],
+  );
+
   return (
     <div className="pb-10">
       {/* Barra de formatação FIXA no header (full-width) — toolbar portalizada. */}
@@ -115,6 +129,7 @@ export function EditorCenter({
               html={initialHtml}
               toolbarContainer={toolbarEl}
               onChange={(html) => scheduleSave(html)}
+              removalRomans={removalRomans}
             />
           </div>
 
