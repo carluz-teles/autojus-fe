@@ -28,6 +28,19 @@ export function prazoUrgenciaInfo(
   };
 }
 
+/** Legenda textual do contador ("dias em atraso"/"vence hoje"/"dias restantes"),
+ *  a partir de {atrasado, hoje, magnitude} — extraída de PrazoContagemGrande
+ *  (Regra nº1) pra ser reaproveitada também pela pílula "Prazo:" do breadcrumb
+ *  de Providências (docs/design-card-providencias-v2.md §2): o dado real não
+ *  guarda "N dias úteis" pronto, então reusamos a MESMA contagem/legenda já
+ *  exibida no contador grande, em vez de recalcular. */
+export function legendaDiasRestantes(info: PrazoUrgenciaInfo): string {
+  if (info.atrasado)
+    return info.magnitude === 1 ? "dia em atraso" : "dias em atraso";
+  if (info.hoje) return "vence hoje";
+  return info.magnitude === 1 ? "dia restante" : "dias restantes";
+}
+
 export type Urgencia = "atraso" | "hoje" | "48h" | "7d" | "sem";
 
 /** Faixa de urgência a partir de days_left — null = "sem" (sem prazo). */

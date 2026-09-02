@@ -119,6 +119,13 @@ export type ProvidenciaTipoStatus = "confiavel" | "a_confirmar";
  */
 export interface IntimacaoProvidencia {
   id: string;
+  /** Título rico da providência, persistido no action_item (pode ser null em itens
+   *  criados antes da migração 0090 ou em análise degradada) — o FE cai em
+   *  `rotuloTipo(tipo)` quando ausente. */
+  title: string | null;
+  /** Descrição/fundamento da providência, persistida no action_item; null quando
+   *  ausente (a linha de descrição simplesmente não renderiza). */
+  description: string | null;
   tipo: ProvidenciaTipo;
   /** true = essa providência dá origem a uma peça (ver `piece_profile_key`). */
   gera_peca: boolean;
@@ -129,8 +136,8 @@ export interface IntimacaoProvidencia {
   /** Confiança da IA (0-1); só preenchido quando tipo_origem="ia". */
   confianca: number | null;
   status: IntimacaoProvidenciaStatus;
-  /** Id da tarefa REAL — o BE a cria sozinho (declarada) ou após confirmar (IA),
-   *  sempre de forma assíncrona (worker); null até ela nascer. */
+  /** Id da tarefa REAL — o BE a cria SÍNCRONA na materialização (declarada) ou no
+   *  confirmar (IA), na própria transação; null enquanto não confirmada. */
   task_id: string | null;
   deadline_id: string | null;
 }

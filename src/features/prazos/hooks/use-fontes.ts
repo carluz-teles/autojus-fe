@@ -108,12 +108,13 @@ const STATUS_CORES: Record<string, { fg: string; bg: string }> = {
   },
 };
 
-// "SP347019" → "OAB/SP 347.019" (UF + número agrupado em milhares).
+// "SP347019" → "SP 347.019" (UF em caixa alta + número agrupado em milhares) —
+// mesmo formato "UF XXX.XXX" da máscara do input (ver OabInput), sem prefixo "OAB".
 function fmtOab(oab: string): string {
   const uf = oab.slice(0, 2).toUpperCase();
   const num = oab.slice(2).replace(/\D/g, "");
   const agrupado = num.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return `OAB/${uf} ${agrupado}`;
+  return `${uf} ${agrupado}`;
 }
 
 // Normaliza a OAB digitada no "Adicionar termo" pra chave canônica "UFNUMERO".
@@ -240,7 +241,7 @@ export function useFontes() {
   const addTermoSubmit = useCallback(() => {
     const oab = normalizeOab(addValor);
     if (oab.length < 4) {
-      toast.error("Informe uma OAB válida (ex.: OAB/SP 214.885).");
+      toast.error("Informe uma OAB válida (ex.: SP 214.885).");
       return;
     }
     addOab.mutate(oab, {

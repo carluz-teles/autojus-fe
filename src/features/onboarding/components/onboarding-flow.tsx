@@ -9,8 +9,8 @@ import {
   X,
 } from "lucide-react";
 
+import { OabInput } from "@/components/ui/oab-input";
 import { formatOabDisplay } from "@/features/shared/lib/diario";
-import { maskOab } from "@/lib/masks";
 
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
 
@@ -125,20 +125,18 @@ function Campo({
   value,
   onChange,
   placeholder,
-  mask,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
-  mask?: (v: string) => string;
 }) {
   return (
     <>
       <label className="text-fg3 mb-1.5 block text-[11.5px]">{label}</label>
       <input
         value={value}
-        onChange={(e) => onChange(mask ? mask(e.target.value) : e.target.value)}
+        onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className="border-line bg-panel text-foreground placeholder:text-fg3 w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
       />
@@ -169,13 +167,23 @@ function Org({ f, solo }: { f: F; solo: boolean }) {
           }
         />
       </div>
-      <Campo
-        label={solo ? "Sua OAB" : "CNPJ"}
-        value={f.doc}
-        onChange={f.setDoc}
-        placeholder={solo ? "OAB/SP 000.000" : "00.000.000/0000-00"}
-        mask={solo ? maskOab : undefined}
-      />
+      {solo ? (
+        <>
+          <label className="text-fg3 mb-1.5 block text-[11.5px]">Sua OAB</label>
+          <OabInput
+            value={f.doc}
+            onChange={f.setDoc}
+            className="border-line bg-panel text-foreground placeholder:text-fg3 w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+          />
+        </>
+      ) : (
+        <Campo
+          label="CNPJ"
+          value={f.doc}
+          onChange={f.setDoc}
+          placeholder="00.000.000/0000-00"
+        />
+      )}
       <div className="mt-[26px] flex gap-2.5">
         <button
           onClick={f.voltarWelcome}
@@ -205,13 +213,12 @@ function Oab({ f }: { f: F }) {
         casou com uma delas.
       </p>
       <div className="mb-3.5 flex gap-2">
-        <input
+        <OabInput
           value={f.oab}
-          onChange={(e) => f.setOab(maskOab(e.target.value))}
+          onChange={f.setOab}
           onKeyDown={(e) => {
             if (e.key === "Enter") f.addOab();
           }}
-          placeholder="OAB/SP 000.000"
           className="border-line bg-panel text-foreground placeholder:text-fg3 flex-1 rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
         />
         <button

@@ -121,14 +121,12 @@ export interface PrazoCrossValidation {
 export type PrazoApurarDivergenciaDecisao =
   "aceita_declarado" | "aceita_calculado" | "ajuste_manual";
 
-/** Campos além de `decisao` só importam quando decisao === "ajuste_manual". */
+/** `end_date` só importa (e é obrigatório) quando decisao === "ajuste_manual":
+ *  o advogado escolhe a DATA FATAL específica (formato wire YYYY-MM-DD), em vez de
+ *  uma quantidade de dias — o BE grava essa data direto no prazo. */
 export interface PrazoApurarDivergenciaInput {
   decisao: PrazoApurarDivergenciaDecisao;
-  days?: number;
-  counting?: PrazoCounting;
-  doubled?: boolean;
-  anchor_event?: PrazoAnchorEvent;
-  manual_extra_days?: number;
+  end_date?: string;
 }
 
 export interface PrazoApurarDivergenciaResult {

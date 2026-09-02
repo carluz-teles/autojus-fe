@@ -2,7 +2,7 @@
 
 import { Plus } from "lucide-react";
 
-import { maskOab } from "@/lib/masks";
+import { OabInput } from "@/components/ui/oab-input";
 
 import { type ResumoCard, useFontes } from "../../hooks/use-fontes";
 import { ConfigToggle } from "./config-toggle";
@@ -112,14 +112,13 @@ export function ConfigFontes() {
 
           {fon.addAberto ? (
             <div className="border-line bg-panel mb-[18px] flex items-center gap-2 rounded-xl border p-3">
-              <input
+              <OabInput
                 autoFocus
                 value={fon.addValor}
-                onChange={(e) => fon.setAddValor(maskOab(e.target.value))}
+                onChange={fon.setAddValor}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") fon.addTermoSubmit();
                 }}
-                placeholder="OAB/SP 214.885"
                 className="border-line bg-bg text-foreground flex-1 rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
               />
               <button

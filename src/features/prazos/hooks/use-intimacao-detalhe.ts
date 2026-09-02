@@ -563,12 +563,14 @@ export function useIntimacaoDetalhe(id: string) {
     );
   };
 
-  const onAjusteManual = (manualExtraDays: number) => {
+  // Ajuste manual = escolher uma DATA FATAL específica (endDate, wire YYYY-MM-DD),
+  // não mais uma quantidade de dias — o BE grava a data direto no prazo.
+  const onAjusteManual = (endDate: string) => {
     if (!prazoId) return;
     apurarDivergencia.apurar(
       {
         prazoId,
-        body: { decisao: "ajuste_manual", manual_extra_days: manualExtraDays },
+        body: { decisao: "ajuste_manual", end_date: endDate },
       },
       {
         onSuccess: () => {
@@ -649,6 +651,11 @@ export function useIntimacaoDetalhe(id: string) {
     isPending: query.isPending,
     isError: query.isError,
     model,
+    // Intimação crua (IntimacaoDetalheView) — além do VM `model`, os blocos
+    // compartilhados do card Providências (ProvidenciasLinhaLegal/Banner,
+    // ComoIALeuCard, em features/intimacoes) esperam o shape real do BE, não a
+    // VM derivada desta tela.
+    intimacao: i,
 
     // IA
     analisando: analisar.isPending,

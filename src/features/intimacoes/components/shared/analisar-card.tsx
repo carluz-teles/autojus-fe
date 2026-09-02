@@ -8,29 +8,36 @@
 //
 // Pós migração action_item (tabela real, endereçada por id — não mais jsonb por
 // índice): ProvidenciaRow reage a task_id (não mais status SUGGESTED/APPROVED — ver
-// docstring). Confirmar/Descartar chamam os novos endpoints /v1/action-items/:id/*;
-// a criação da tarefa é 100% assíncrona no BE.
+// docstring). Confirmar chama o novo endpoint /v1/action-items/:id/confirmar; a
+// criação da tarefa é 100% assíncrona no BE.
 //
-// Layout da seção "Providências" segue docs/design-card-providencias-v1.md (mockups
-// do usuário, v1.1) — fonte de verdade visual desta revisão; onde divergir do que
-// existia antes desta fatia, o doc vence.
+// Layout da seção "Providências" segue docs/design-card-providencias-v2.md (v2.1) —
+// fonte de verdade LITERAL (extraída do .dc.html canônico), substitui INTEIRAMENTE a
+// v1. `ProvidenciasLinhaLegal`, `ProvidenciasBanner` e `ComoIALeuCard` são exportados
+// porque também são consumidos por IntimacaoDetalhe (features/prazos) — o card
+// "Providências" de lá tem seu próprio header (não reusa <AnalisarCard/> inteiro),
+// mas usa os MESMOS blocos internos, pra não duplicar a heurística de
+// selo/confiança em dois lugares (Regra nº1).
+//
+// v2.1 (correção do usuário): a trilha "1·Ato / 2·Prazo / 3·Providências" foi
+// removida por decisão explícita, mesmo estando no .dc.html original —
+// `ProvidenciasLinhaLegal` (ex-`ProvidenciasBreadcrumb`) hoje só renderiza a linha
+// de detalhe legal. E "Como a IA leu" deixou de ser um card novo separado do card
+// "Análise" — é o MESMO card (ver `ComoIALeuCard`, corpo = `ai_summary` real).
+//
+// Mapeamento de tokens do mock pro nosso design system: onde o .dc.html usa
+// `var(--accent)` para ênfase (ícone, "Criar todas", borda do "Gerar minuta", label
+// "Como a IA leu"), usamos `var(--primary)`/`text-primary`/`bg-primary` — no NOSSO
+// globals.css o slot shadcn `--accent` foi mantido neutro (cinza) e é `--primary`
+// quem recebeu o teal vibrante do mockup na migração da casca (ver comentário em
+// src/app/globals.css). `var(--gold)`/`var(--green)` batem 1:1 com o mock.
 
-import {
-  Check,
-  CircleDashed,
-  Loader2,
-  Plus,
-  RotateCcw,
-  Settings2,
-  Sparkles,
-  Square,
-} from "lucide-react";
+import { Check, Loader2, Plus, RotateCcw, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { type ReactNode } from "react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCriarPeca } from "@/features/pecas/hooks/use-peca";
 import { formatarData, formatarDataHora } from "@/lib/utils";
@@ -38,19 +45,12 @@ import { formatarData, formatarDataHora } from "@/lib/utils";
 import {
   useAnalisarIntimacao,
   useConfirmarActionItem,
-  useDescartarActionItem,
 } from "../../hooks/use-intimacoes";
-import type {
-  IntimacaoAnaliseCandidate,
-  IntimacaoDetalheView,
-  IntimacaoProvidencia,
-} from "../../types";
+import type { IntimacaoDetalheView, IntimacaoProvidencia } from "../../types";
 import { EyebrowTitle } from "./eyebrow-title";
 
-/** Rótulo em PT do tipo de providência — fallback quando não há candidato efêmero da
- *  última análise em mãos (ver `candidato` em ProvidenciaRow). O BE não persiste mais
- *  título/descrição no action_item (só no candidato efêmero da análise, que se perde
- *  ao recarregar a página). */
+/** Rótulo em PT do tipo de providência — fallback quando o action_item não tem
+ *  `title` persistido (itens anteriores à migração 0090, ou análise degradada). */
 const TIPO_LABEL: Record<string, string> = {
   contestar: "Contestar",
   recorrer: "Recorrer",
@@ -61,6 +61,213 @@ const TIPO_LABEL: Record<string, string> = {
 
 function rotuloTipo(tipo: string): string {
   return TIPO_LABEL[tipo] ?? tipo;
+}
+
+/**
+ * Heurística de confiança da classificação do ato — usada tanto na cor da
+ * pílula "1 · Ato" do breadcrumb quanto no rótulo `{{ atoConf }}` do card "Como
+ * a IA leu" (docs/design-card-providencias-v2.md §2 e §6: a doc pede a MESMA
+ * derivação nos dois pontos). Cobre só os 2 casos reais do pipeline hoje:
+ *  • ALGUM action_item com tipo_origem="ia" → "IA · confiança {média}%" (média
+ *    das `confianca` desses itens, arredondada) — cor var(--primary).
+ *  • senão (100% declarado, ou reclassificado manualmente sem nenhum item de
+ *    origem IA sobrando) → "Declarado na intimação" — cor var(--green).
+ * O terceiro caso do mock ("Divergente · revisar") é conceito do Motor de
+ * Prazos pro PRAZO, não pro Ato, e não existe neste ponto do pipeline — omitido
+ * de propósito (ver v2 §6), não é um esquecimento.
+ */
+function atoConfianca(itens: IntimacaoProvidencia[]): {
+  label: string;
+  cor: string;
+} {
+  const iaItens = itens.filter((p) => p.tipo_origem === "ia");
+  if (iaItens.length > 0) {
+    const confiancas = iaItens
+      .map((p) => p.confianca)
+      .filter((c): c is number => c != null);
+    const media =
+      confiancas.length > 0
+        ? Math.round(
+            (confiancas.reduce((soma, c) => soma + c, 0) / confiancas.length) *
+              100,
+          )
+        : 0;
+    return { label: `IA · confiança ${media}%`, cor: "var(--primary)" };
+  }
+  return { label: "Declarado na intimação", cor: "var(--green)" };
+}
+
+/**
+ * Selo/nasce do BANNER (§3 do v2) — agregado do LOTE, pior caso: se QUALQUER
+ * item visível ainda for `tipo_status="a_confirmar"`, o banner inteiro mostra
+ * "A apurar"/"triagem — confirme o tipo primeiro"; só quando TODOS já forem
+ * "confiavel" o banner mostra "Confiável"/"A fazer". O mock tinha um selo único
+ * por lote; nosso modelo tem `tipo_status` POR item (mais rico — ver
+ * `seloItemInfo`, usado na linha de cada providência). Isto é uma extensão
+ * razoável do mock pro nosso modelo, documentada aqui por pedido explícito do
+ * v2 (não é invenção arbitrária).
+ */
+function bannerSeloNasce(itens: IntimacaoProvidencia[]): {
+  selo: string;
+  nasce: string;
+} {
+  const algumAConfirmar = itens.some((p) => p.tipo_status === "a_confirmar");
+  return algumAConfirmar
+    ? { selo: "A apurar", nasce: "triagem — confirme o tipo primeiro" }
+    : { selo: "Confiável", nasce: "A fazer" };
+}
+
+/** Selo POR ITEM (§4 do v2) — mapeia direto de `tipo_status`, sem agregação. */
+function seloItemInfo(status: IntimacaoProvidencia["tipo_status"]): {
+  label: string;
+  cor: string;
+} {
+  return status === "a_confirmar"
+    ? { label: "A apurar", cor: "var(--gold)" }
+    : { label: "Confiável", cor: "var(--green)" };
+}
+
+/** Badge pequeno com cor dinâmica (± dot) — usado pelos badges de tipo/selo da
+ *  linha de providência. `dot`=true desenha o marcador redondo à esquerda do
+ *  texto (o selo por item, §4 do v2); os demais (Peça/Ciência/fluxo curto) não
+ *  têm dot. */
+function RowBadge({
+  children,
+  cor,
+  fundo,
+  dot,
+}: {
+  children: ReactNode;
+  cor: string;
+  fundo: string;
+  dot?: boolean;
+}) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9.5px] font-medium"
+      style={{ color: cor, background: fundo }}
+    >
+      {dot ? (
+        <span
+          aria-hidden
+          className="size-[5px] shrink-0 rounded-full"
+          style={{ background: cor }}
+        />
+      ) : null}
+      {children}
+    </span>
+  );
+}
+
+/**
+ * Linha de detalhe legal, no topo do bloco Providências
+ * (docs/design-card-providencias-v2.md §2, v2.1). A trilha "1·Ato / 2·Prazo /
+ * 3·Providências" do `.dc.html` original foi removida por decisão explícita do
+ * usuário — NÃO renderizar, mesmo estando no mock. Só a linha de detalhe
+ * sobrevive, e é best-effort: cita só a publicação real (DJEN); NÃO inventamos
+ * artigo de lei/regra de contagem (o mock hardcoda "art. 219, CPC" por regex,
+ * que não é dado real). Sem `published_at`, omite o bloco inteiro (nunca uma
+ * linha vazia/"—").
+ */
+export function ProvidenciasLinhaLegal({
+  intimacao: i,
+}: {
+  intimacao: IntimacaoDetalheView;
+}) {
+  if (!i.published_at) return null;
+
+  return (
+    <div className="border-line2 border-b px-4 py-3">
+      <p className="text-fg3 text-[11px]">
+        Publicação no DJEN em {formatarData(i.published_at)}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Banner "Cada providência vira uma tarefa…" (docs/design-card-providencias-v2.md
+ * §3 — texto completo). Sem prazo vinculado, a frase perde a cláusula do
+ * prazo/selo (não mostramos "fatal —"). Ver `bannerSeloNasce` pro selo/nasce
+ * agregado do lote. SEM CTA "Criar todas" — removido por decisão explícita do
+ * usuário (v2.1): criar tarefa é sempre uma decisão por item, nunca em lote.
+ */
+export function ProvidenciasBanner({
+  intimacao: i,
+  itens,
+}: {
+  intimacao: IntimacaoDetalheView;
+  itens: IntimacaoProvidencia[];
+}) {
+  const { selo, nasce } = bannerSeloNasce(itens);
+  const fatalDate = i.prazo ? formatarData(i.prazo.end_date) : null;
+
+  return (
+    <div className="bg-bg border-line2 border-b px-4 py-2.5">
+      <p className="text-fg2 text-[13px] leading-relaxed">
+        {fatalDate ? (
+          <>
+            Cada providência vira uma{" "}
+            <strong className="font-medium">tarefa</strong>, vinculada ao prazo
+            que já existe (fatal {fatalDate}) e herdando o selo{" "}
+            <strong className="font-medium">{selo}</strong> — nasce em{" "}
+            <strong className="font-medium">{nasce}</strong>.
+          </>
+        ) : (
+          <>
+            Cada providência vira uma{" "}
+            <strong className="font-medium">tarefa</strong> — confirme antes de
+            criar.
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Card "Como a IA leu" (coluna secundária, docs/design-card-providencias-v2.md
+ * §6, v2.1 — correção do usuário). Este é o MESMO card "Análise" que já
+ * existia (mostrava só `ai_summary`) — não um card novo separado: aqui ele
+ * ganha o visual accent/primary do `.dc.html` (label "COMO A IA LEU" + ato em
+ * serif + confiança à direita) por cima do corpo real. O corpo é o
+ * `ai_summary` de verdade (prop `resumo`) — NÃO o texto fixo genérico do mock
+ * ("A IA leu o teor, classificou..."), que era só placeholder de protótipo.
+ * Some quando ainda não há providências (nada pra resumir). Ver
+ * `atoConfianca` pra heurística de confiança (documentada lá).
+ */
+export function ComoIALeuCard({
+  ato,
+  resumo,
+  itens,
+}: {
+  ato: string;
+  resumo: string;
+  itens: IntimacaoProvidencia[];
+}) {
+  if (itens.length === 0) return null;
+  const conf = atoConfianca(itens);
+
+  return (
+    <div
+      className="rounded-xl border px-4 py-3.5"
+      style={{
+        borderColor: "color-mix(in oklch, var(--primary) 26%, transparent)",
+        background: "color-mix(in oklch, var(--primary) 5%, transparent)",
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-primary text-[11px] font-semibold tracking-[0.03em] uppercase">
+          Como a IA leu
+        </span>
+        <span className="text-fg3 ml-auto font-mono text-[10.5px]">
+          {conf.label}
+        </span>
+      </div>
+      <p className="font-display mt-2 mb-1 text-[16px]">{ato || "—"}</p>
+      <p className="text-fg2 text-[11.5px] leading-relaxed">{resumo}</p>
+    </div>
+  );
 }
 
 /**
@@ -78,8 +285,6 @@ export function AnalisarCard({
   intimacao: IntimacaoDetalheView;
 }) {
   const analisar = useAnalisarIntimacao(i.id);
-  const confirmarTodos = useConfirmarActionItem(i.id);
-  const [enviandoTodas, setEnviandoTodas] = useState(false);
 
   const gerar = () =>
     analisar.mutate(undefined, {
@@ -122,35 +327,6 @@ export function AnalisarCard({
   // Providências visíveis = tudo menos DISCARDED. Endereçadas por id (não mais por
   // índice — action_item é uma tabela real agora).
   const itens = i.ai_providencias.filter((p) => p.status !== "DISCARDED");
-  const pendentes = itens.filter((p) => p.task_id == null);
-
-  // Candidatos EFÊMEROS da última análise (título/descrição ricos que o BE não
-  // persiste) — `useMutation` guarda `data` da última chamada enquanto o componente
-  // não desmonta/reseta. Casados por `tipo` (não há id no candidato ainda). Se dois
-  // itens da mesma análise compartilharem `tipo`, o Map fica só com o último — caso
-  // raro, aceito aqui; o fallback (rotuloTipo) cobre reload de página de qualquer
-  // forma (o Map fica vazio de novo).
-  const candidatoPorTipo = new Map(
-    (analisar.data?.providencias ?? []).map(
-      (c) => [c.tipo, c] as [string, IntimacaoAnaliseCandidate],
-    ),
-  );
-
-  // "Criar todas" (docs/design-card-providencias-v1.md): confirma client-side, uma
-  // chamada por item ainda sem task_id — sem endpoint de bulk no BE. Idempotente
-  // (reconfirmar um item que já tem tarefa é no-op seguro), então não precisa
-  // recalcular `pendentes` no meio do envio.
-  const onCriarTodas = async () => {
-    if (pendentes.length === 0) return;
-    setEnviandoTodas(true);
-    try {
-      await Promise.allSettled(
-        pendentes.map((p) => confirmarTodos.mutateAsync(p.id)),
-      );
-    } finally {
-      setEnviandoTodas(false);
-    }
-  };
 
   return (
     <section className="border-border rounded-xl border px-6 py-6">
@@ -169,51 +345,29 @@ export function AnalisarCard({
           </p>
 
           {itens.length > 0 ? (
-            <div className="mt-7">
-              <div className="flex items-center gap-2">
+            <div className="border-line bg-panel mt-7 overflow-hidden rounded-xl border">
+              <div className="border-line2 flex items-center gap-2 border-b px-4 pt-3.5 pb-3">
                 <Sparkles className="text-primary size-4" strokeWidth={1.8} />
-                <span className="text-foreground text-[15px] font-semibold">
+                <span className="text-foreground text-[13px] font-semibold">
                   Providências
                 </span>
-                <span className="text-muted-foreground text-[12px]">
+                <span className="text-fg3 text-[11.5px]">
                   geradas pela IA · revise antes de executar
                 </span>
-                <span className="text-muted-foreground ml-auto text-[12px] tabular-nums">
+                <span className="text-fg3 ml-auto font-mono text-[11px]">
                   {itens.length}
                 </span>
               </div>
 
-              <div className="border-primary/20 bg-primary/5 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3">
-                <p className="text-foreground/90 text-[13px] leading-relaxed">
-                  Cada providência vira uma{" "}
-                  <strong className="font-medium">tarefa</strong>, vinculada ao
-                  prazo que já existe
-                  {i.prazo ? ` (fatal ${formatarData(i.prazo.end_date)})` : ""}.
-                  Confirme para criar a tarefa, ou descarte se não se aplica.
-                </p>
-                <Button
-                  size="sm"
-                  className="shrink-0 gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
-                  onClick={onCriarTodas}
-                  disabled={pendentes.length === 0 || enviandoTodas}
-                >
-                  {enviandoTodas ? (
-                    <Loader2
-                      className="size-3.5 animate-spin"
-                      strokeWidth={1.8}
-                    />
-                  ) : null}
-                  Criar todas
-                </Button>
-              </div>
+              <ProvidenciasLinhaLegal intimacao={i} />
+              <ProvidenciasBanner intimacao={i} itens={itens} />
 
-              <ul className="mt-2">
+              <ul>
                 {itens.map((p) => (
                   <ProvidenciaRow
                     key={p.id}
                     intimacaoId={i.id}
                     providencia={p}
-                    candidato={candidatoPorTipo.get(p.tipo)}
                   />
                 ))}
               </ul>
@@ -274,151 +428,154 @@ export function AnalisarLoading() {
 
 /** Código curto e estável exibido na pílula de referência da tarefa (derivado do uuid).
  *  `prefix` default "TAR-" é o padrão do resto do app (ver tasks/tarefa-detail.tsx);
- *  este card usa "T-" na pílula por pedido do mockup (docs/design-card-providencias-v1.md). */
+ *  este card usa "T-" na pílula por pedido do mockup (docs/design-card-providencias-v2.md). */
 export function codigoTarefa(taskId: string, prefix = "TAR-"): string {
   return `${prefix}${taskId.replace(/-/g, "").slice(0, 4).toUpperCase()}`;
 }
 
+/** Botão de ação da linha de providência — "Criar tarefa" e "Gerar minuta" são o
+ *  MESMO botão (mesmo tamanho/forma), diferindo APENAS na cor (aplicada via `style`
+ *  inline no ponto de uso). Padding 7px 12px / radius 7px / 12px / ícone 13px. */
+const ACAO_BTN_CLASS =
+  "inline-flex shrink-0 items-center gap-1.5 rounded-[7px] border px-3 py-[7px] text-[12px] font-medium transition-[filter] hover:brightness-95 disabled:opacity-60";
+
 /**
  * Uma providência no card de análise. Endereçada por `id` (action_item é tabela real
- * agora — não mais índice de array). Dois estados (docs/design-card-providencias-v1.md):
- *  • PRÉ (task_id == null) — botões "+ Criar tarefa" (chama confirmar; funciona igual
+ * agora — não mais índice de array). Dois estados (docs/design-card-providencias-v2.md §4):
+ *  • PRÉ (task_id == null) — botão "+ Criar tarefa" (chama confirmar; funciona igual
  *    pra item declarado ou sugerido pela IA — um único botão, um único endpoint, sempre,
- *    idempotente) e "Descartar". A distinção declarado/ia (tipo_origem/tipo_status) NÃO
- *    aparece visualmente (pedido explícito do mockup v1.1) — nem como badge, nem como
- *    texto. Simplificação deliberada: o loading só aparece durante o clique
- *    (`confirmar.isPending`), não durante a janela automática de materialização de um
- *    item já declarado (evita um estado "preso" caso o worker atrase além do poll).
+ *    idempotente). SEM botão de Descartar — o .dc.html não tem essa ação nesta view
+ *    (useDescartarActionItem continua existindo no hook layer, só não é usado aqui).
  *  • PÓS (task_id != null) — pílula verde "✓ T-xxxx" (link pra tarefa) e, se
- *    `gera_peca`, o botão "⚙ Gerar minuta". Sem botões de confirmar/descartar.
- *  Erro de qualquer mutation → toast + role=alert.
+ *    `gera_peca`, o botão "Gerar minuta"; senão (Ciência), texto simples "no fluxo".
+ *  Erro de confirmar → toast + role=alert.
  */
 export function ProvidenciaRow({
   intimacaoId,
   providencia: p,
-  candidato,
 }: {
   intimacaoId: string;
   providencia: IntimacaoProvidencia;
-  /** Candidato efêmero da ÚLTIMA análise (título/descrição ricos — ver AnalisarCard).
-   *  undefined = sessão recarregada ou item de uma análise anterior → cai no rótulo
-   *  genérico derivado de `tipo` (rotuloTipo). */
-  candidato?: IntimacaoAnaliseCandidate;
 }) {
   const confirmar = useConfirmarActionItem(intimacaoId);
-  const descartar = useDescartarActionItem(intimacaoId);
-  const emVoo = confirmar.isPending || descartar.isPending;
-  const erro = confirmar.isError || descartar.isError;
+  const emVoo = confirmar.isPending;
+  const erro = confirmar.isError;
 
   const onConfirmar = () =>
     confirmar.mutate(p.id, {
       onError: () =>
         toast.error("Não foi possível criar a tarefa. Tente novamente."),
     });
-  const onDescartar = () =>
-    descartar.mutate(p.id, {
-      onError: () =>
-        toast.error("Não foi possível descartar. Tente novamente."),
-    });
 
   const comTarefa = p.task_id != null;
-  const titulo = candidato?.title || rotuloTipo(p.tipo);
-  const descricao = candidato?.description;
+  // Título/descrição vêm PERSISTIDOS do action_item (read model, migração 0090) —
+  // não mais de cache efêmero por tipo. Fallback ao rótulo genérico quando o item é
+  // antigo (title null) ou a análise degradou.
+  const titulo = p.title || rotuloTipo(p.tipo);
+  const descricao = p.description;
+  const selo = seloItemInfo(p.tipo_status);
 
   return (
-    <li className="border-border/70 flex items-start justify-between gap-4 border-t py-4 first:border-t-0 first:pt-0">
-      <div className="flex min-w-0 flex-1 gap-3">
-        <span
-          aria-hidden
-          className="text-muted-foreground/70 mt-0.5 flex shrink-0"
-        >
-          {comTarefa ? (
-            <Square className="size-[18px]" strokeWidth={1.8} />
+    // Grid 1fr auto — fiel ao .dc.html (Prazos-Linear, bloco <sc-for as="pv">):
+    // padding 12px 16px, gap 12px, border-bottom var(--line2), row-hover.
+    <li className="border-line2 hover:bg-hover grid grid-cols-[1fr_auto] items-center gap-3 border-b px-4 py-3">
+      <div className="min-w-0">
+        <span className="text-foreground block text-[13px] font-medium">
+          {titulo}
+        </span>
+        {descricao ? (
+          <span className="text-fg3 mt-[3px] block text-[11.5px] leading-[1.45]">
+            {descricao}
+          </span>
+        ) : null}
+
+        <span className="mt-2 flex flex-wrap items-center gap-1.5">
+          {/* tipo (Peça=gold / Ciência=cinza) — badge 9.5px do design */}
+          {p.gera_peca ? (
+            <RowBadge
+              cor="var(--gold)"
+              fundo="color-mix(in oklch, var(--gold) 12%, transparent)"
+            >
+              Peça
+            </RowBadge>
           ) : (
-            <CircleDashed className="size-[18px]" strokeWidth={1.8} />
+            <RowBadge cor="var(--fg3)" fundo="var(--hover)">
+              Ciência
+            </RowBadge>
+          )}
+          {!p.gera_peca ? (
+            <RowBadge cor="var(--fg3)" fundo="var(--hover)">
+              fluxo curto
+            </RowBadge>
+          ) : null}
+          <RowBadge
+            cor={selo.cor}
+            fundo={`color-mix(in oklch, ${selo.cor} 12%, transparent)`}
+            dot
+          >
+            {selo.label}
+          </RowBadge>
+          {/* Chip da tarefa — fiel ao design: borda green 38% / fundo green 9% /
+              mono 9.5px + check, dentro do cluster de badges. Clicável (leva à
+              tarefa) — o único desvio do mock estático (§4 do v2). */}
+          {p.task_id ? (
+            <Link
+              href={`/tarefas?task=${p.task_id}`}
+              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[9.5px] font-medium tabular-nums transition-[filter] hover:brightness-95"
+              style={{
+                borderColor:
+                  "color-mix(in oklch, var(--green) 38%, transparent)",
+                background: "color-mix(in oklch, var(--green) 9%, transparent)",
+                color: "var(--green)",
+              }}
+            >
+              <Check className="size-[11px]" strokeWidth={2.4} />
+              {codigoTarefa(p.task_id, "T-")}
+            </Link>
+          ) : null}
+        </span>
+
+        {erro ? (
+          <span
+            role="alert"
+            className="text-destructive mt-2 block text-[12px]"
+          >
+            Não foi possível concluir a ação. Tente novamente.
+          </span>
+        ) : null}
+      </div>
+
+      {/* Coluna de ação (auto) */}
+      {comTarefa ? (
+        <span className="inline-flex items-center gap-2">
+          {p.gera_peca ? (
+            <GerarMinutaDaTarefa providencia={p} />
+          ) : (
+            <span className="text-fg3 text-[11.5px]">no fluxo</span>
           )}
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-foreground text-[14px] font-medium">{titulo}</p>
-          {descricao ? (
-            <p className="text-muted-foreground mt-1 text-[13px] leading-relaxed">
-              {descricao}
-            </p>
-          ) : null}
-
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {p.gera_peca ? (
-              <Badge
-                variant="outline"
-                className="border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400"
-              >
-                Peça
-              </Badge>
-            ) : (
-              <>
-                <Badge
-                  variant="outline"
-                  className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                >
-                  Ciência
-                </Badge>
-                <Badge variant="outline" className="text-muted-foreground">
-                  fluxo curto
-                </Badge>
-              </>
-            )}
-          </div>
-
-          {erro ? (
-            <p role="alert" className="text-destructive mt-2 text-[12px]">
-              Não foi possível concluir a ação. Tente novamente.
-            </p>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="flex shrink-0 flex-col items-end gap-2">
-        {comTarefa ? (
-          <>
-            {p.gera_peca ? <GerarMinutaDaTarefa providencia={p} /> : null}
-            {p.task_id ? (
-              <Link
-                href={`/tarefas?task=${p.task_id}`}
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[12px] font-medium text-emerald-700 tabular-nums transition-colors hover:bg-emerald-500/20 dark:text-emerald-400"
-              >
-                <Check className="size-3" strokeWidth={2.4} />
-                {codigoTarefa(p.task_id, "T-")}
-              </Link>
-            ) : null}
-          </>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 gap-1.5 px-3 text-[13px]"
-              onClick={onConfirmar}
-              disabled={emVoo}
-            >
-              {confirmar.isPending ? (
-                <Loader2 className="size-3.5 animate-spin" strokeWidth={1.8} />
-              ) : (
-                <Plus className="size-3.5" strokeWidth={2} />
-              )}
-              Criar tarefa
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground h-8 px-2 text-[13px]"
-              onClick={onDescartar}
-              disabled={emVoo}
-            >
-              Descartar
-            </Button>
-          </div>
-        )}
-      </div>
+      ) : (
+        // "Criar tarefa" — MESMO botão/tamanho do "Gerar minuta" (ACAO_BTN_CLASS),
+        // só muda a COR: outline NEUTRO (border --line / bg --panel / texto --fg).
+        <button
+          type="button"
+          onClick={onConfirmar}
+          disabled={emVoo}
+          className={ACAO_BTN_CLASS}
+          style={{
+            borderColor: "var(--line)",
+            background: "var(--panel)",
+            color: "var(--foreground)",
+          }}
+        >
+          {emVoo ? (
+            <Loader2 className="size-[13px] animate-spin" strokeWidth={2.2} />
+          ) : (
+            <Plus className="size-[13px]" strokeWidth={2.2} />
+          )}
+          Criar tarefa
+        </button>
+      )}
     </li>
   );
 }
@@ -426,8 +583,9 @@ export function ProvidenciaRow({
 /**
  * Ponto de entrada TEMPORÁRIO para testar POST /v1/pecas com `task_id` (fatia 4/5 do
  * BE — a peça herda piece_profile_key/piece_type da providência). Só aparece quando a
- * providência já tem tarefa E gera peça. Sem tela dedicada ainda: cria e navega direto
- * pro draft.
+ * providência já tem tarefa E gera peça (docs/design-card-providencias-v2.md §5 — a
+ * ação mora só aqui, NÃO existe mais um card "Minuta" separado). Sem tela dedicada
+ * ainda: cria e navega direto pro draft (idempotente por task_id no BE).
  */
 function GerarMinutaDaTarefa({
   providencia: p,
@@ -450,19 +608,38 @@ function GerarMinutaDaTarefa({
     );
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      className="h-7 gap-1.5 px-2.5 text-[12.5px]"
+    // MESMO botão/tamanho do "Criar tarefa" (ACAO_BTN_CLASS); só muda a COR:
+    // accent (borda primary 45% / fundo primary 7% / texto primary).
+    <button
+      type="button"
       onClick={onClick}
       disabled={criarPeca.isPending}
+      className={ACAO_BTN_CLASS}
+      style={{
+        borderColor: "color-mix(in oklch, var(--primary) 45%, transparent)",
+        background: "color-mix(in oklch, var(--primary) 7%, transparent)",
+        color: "var(--primary)",
+      }}
     >
       {criarPeca.isPending ? (
-        <Loader2 className="size-3.5 animate-spin" strokeWidth={1.8} />
+        <Loader2 className="size-[13px] animate-spin" strokeWidth={1.9} />
       ) : (
-        <Settings2 className="size-3.5" strokeWidth={1.8} />
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.9}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3m12 0h3M18.4 5.6l-2.1 2.1M12 18v3M7.7 16.3l-2.1 2.1m12.8 0-2.1-2.1" />
+          <circle cx="12" cy="12" r="4" />
+        </svg>
       )}
       Gerar minuta
-    </Button>
+    </button>
   );
 }

@@ -281,6 +281,9 @@ export function useAnalisarIntimacao(intimacaoId: string) {
   return useMutation({
     mutationFn: () => analisarIntimacao(fetcher, intimacaoId),
     onSuccess: (analise) => {
+      // title/description agora são PERSISTIDOS no action_item (migração 0090) e vêm
+      // no read model — não há mais cache de candidatos em sessionStorage. O poll
+      // cobre a materialização das providências pela IA (assíncrona no acquisition).
       abrirJanelaDePoll(qc, intimacaoId, analise.analyzed_at);
       qc.invalidateQueries({ queryKey: intimacoesKeys.detail(intimacaoId) });
     },
@@ -298,8 +301,10 @@ export function useConfirmarActionItem(intimacaoId: string) {
   return useMutation({
     mutationFn: (actionItemId: string) =>
       confirmarActionItem(fetcher, actionItemId),
+    // Criação de tarefa é SÍNCRONA no BE (POST /confirmar cria+linka a task na
+    // própria transação e retorna o item já com task_id) — não há mais janela de
+    // poll aqui: um refetch do detalhe basta pra a linha refletir "Gerar minuta".
     onSuccess: async () => {
-      abrirJanelaDePoll(qc, intimacaoId);
       await Promise.all([
         qc.invalidateQueries({ queryKey: intimacoesKeys.detail(intimacaoId) }),
         qc.invalidateQueries({ queryKey: ["tasks"] }),

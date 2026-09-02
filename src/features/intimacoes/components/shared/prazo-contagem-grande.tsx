@@ -9,7 +9,11 @@
 import { formatarData } from "@/lib/utils";
 
 import type { IntimacaoPrazoView } from "../../types";
-import { corTextoUrgencia, prazoUrgenciaInfo } from "./prazo-urgencia";
+import {
+  corTextoUrgencia,
+  legendaDiasRestantes,
+  prazoUrgenciaInfo,
+} from "./prazo-urgencia";
 
 /** O número grande + as linhas de vencimento. Derivado do prazo real (days_left,
  * end_date, status). Sem prazo → estado honesto "Sem prazo".
@@ -37,16 +41,8 @@ export function PrazoContagemGrande({
     );
   }
 
-  const { magnitude, atrasado, hoje } = info;
-  const legenda = atrasado
-    ? magnitude === 1
-      ? "dia em atraso"
-      : "dias em atraso"
-    : hoje
-      ? "vence hoje"
-      : magnitude === 1
-        ? "dia restante"
-        : "dias restantes";
+  const { magnitude, hoje } = info;
+  const legenda = legendaDiasRestantes(info);
 
   return (
     <div className="flex items-center gap-3">

@@ -17,10 +17,12 @@ import { Avatar } from "@/components/mock-ui/data-display";
 import { Input } from "@/components/ui/input";
 import {
   AnalisarLoading,
+  ComoIALeuCard,
   ProvidenciaRow,
+  ProvidenciasBanner,
+  ProvidenciasLinhaLegal,
 } from "@/features/intimacoes/components/shared/analisar-card";
 import { nomeExibicao } from "@/features/organization/lib/labels";
-import { useCriarPecaDaIntimacao } from "@/features/pecas-v2/hooks/use-criar-peca";
 import { sanitizeContentHtml } from "@/lib/html/sanitize-content";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +43,6 @@ const ITEM_CLASS =
 // à esquerda, teor + trilha à direita.
 export function IntimacaoDetalhe({ id }: { id: string }) {
   const det = useIntimacaoDetalhe(id);
-  const peca = useCriarPecaDaIntimacao();
   const m = det.model;
 
   if (det.isPending) {
@@ -300,37 +301,28 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
                       Nenhuma providência sugerida para esta intimação.
                     </p>
                   ) : (
-                    <ul className="px-4">
-                      {m.providencias.map((p) => (
-                        <ProvidenciaRow
-                          key={p.id}
-                          intimacaoId={m.id}
-                          providencia={p}
-                        />
-                      ))}
-                    </ul>
+                    <>
+                      {/* Linha de detalhe legal (SEM breadcrumb — removido por
+                          decisão explícita, v2.1) + o banner "Cada providência
+                          vira uma tarefa…" + "Criar todas" —
+                          docs/design-card-providencias-v2.md §2-3
+                          (compartilhados com <AnalisarCard/>, Regra nº1). */}
+                      <ProvidenciasLinhaLegal intimacao={det.intimacao!} />
+                      <ProvidenciasBanner
+                        intimacao={det.intimacao!}
+                        itens={m.providencias}
+                      />
+                      <ul>
+                        {m.providencias.map((p) => (
+                          <ProvidenciaRow
+                            key={p.id}
+                            intimacaoId={m.id}
+                            providencia={p}
+                          />
+                        ))}
+                      </ul>
+                    </>
                   )}
-                  {/* rodapé da peça (minuta): status vem do work_stage; abre o editor */}
-                  <div className="border-line2 bg-bg flex items-center gap-3 border-t px-4 py-3">
-                    <FileText
-                      className="text-fg3 size-[17px] shrink-0"
-                      strokeWidth={1.7}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[12.5px] font-medium">
-                        Minuta — {m.titulo}
-                      </span>
-                      <span className="text-fg3 block text-[11px]">
-                        {m.pecaLabel}
-                      </span>
-                    </span>
-                    <button
-                      onClick={() => peca.abrirConstrucao(id)}
-                      className="border-line bg-panel text-foreground hover:bg-hover shrink-0 rounded-md border px-3 py-1.5 text-[12px] font-medium"
-                    >
-                      {m.pecaExiste ? "Abrir editor" : "Gerar peça"}
-                    </button>
-                  </div>
                   <div className="border-line2 text-fg3 flex items-center justify-between gap-3 border-t px-4 py-3 text-[11.5px]">
                     <span>Gerado em {m.analisadaEm}</span>
                     <button
@@ -344,27 +336,15 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
               ) : null}
             </div>
 
-            {/* SECUNDÁRIA: como a IA leu + teor + trilha */}
+            {/* SECUNDÁRIA: como a IA leu (= card "Análise" fundido, v2.1) +
+                teor + trilha */}
             <div className="flex flex-col gap-3.5">
-              {m.analisada && !m.degradado && m.resumo ? (
-                <div
-                  className="rounded-xl border p-[14px_16px]"
-                  style={{
-                    borderColor:
-                      "color-mix(in oklch, var(--primary) 26%, transparent)",
-                    background:
-                      "color-mix(in oklch, var(--primary) 5%, transparent)",
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-primary text-[11px] font-semibold tracking-[0.03em] uppercase">
-                      Análise
-                    </span>
-                  </div>
-                  <p className="text-fg2 mt-2 text-[12.5px] leading-[1.55]">
-                    {m.resumo}
-                  </p>
-                </div>
+              {m.analisada && !m.degradado && m.providencias.length > 0 ? (
+                <ComoIALeuCard
+                  ato={m.ato}
+                  resumo={m.resumo}
+                  itens={m.providencias}
+                />
               ) : null}
 
               <div className="border-line bg-panel overflow-hidden rounded-xl border">
@@ -448,12 +428,12 @@ function MemoriaCalculoCard({
   emVoo: boolean;
   onAceitarDeclarado: () => void;
   onAceitarCalculado: () => void;
-  onAjusteManual: (manualExtraDays: number) => void;
+  onAjusteManual: (endDate: string) => void;
   onConfirmarTipo: () => void;
   onReclassificarTipo: (tipo: string) => void;
 }) {
   const [ajustando, setAjustando] = useState(false);
-  const [diasAjuste, setDiasAjuste] = useState("");
+  const [dataAjuste, setDataAjuste] = useState("");
   const [reclassificando, setReclassificando] = useState(false);
   const [novoTipo, setNovoTipo] = useState("");
 
@@ -572,24 +552,23 @@ function MemoriaCalculoCard({
                 <div className="flex flex-wrap items-end gap-2">
                   <label className="flex flex-col gap-1">
                     <span className="text-fg3 text-[11px]">
-                      Dias extras (ajuste manual)
+                      Data fatal (ajuste manual)
                     </span>
                     <Input
-                      type="number"
-                      min={0}
-                      value={diasAjuste}
-                      onChange={(e) => setDiasAjuste(e.target.value)}
-                      aria-label="Dias extras do ajuste manual"
-                      className="h-8 w-28 text-[12.5px]"
+                      type="date"
+                      value={dataAjuste}
+                      onChange={(e) => setDataAjuste(e.target.value)}
+                      aria-label="Data fatal do ajuste manual"
+                      className="h-8 w-40 text-[12.5px]"
                     />
                   </label>
                   <button
                     type="button"
-                    disabled={emVoo || diasAjuste.trim() === ""}
+                    disabled={emVoo || dataAjuste === ""}
                     onClick={() => {
-                      onAjusteManual(Number(diasAjuste));
+                      onAjusteManual(dataAjuste);
                       setAjustando(false);
-                      setDiasAjuste("");
+                      setDataAjuste("");
                     }}
                     className="bg-primary text-primary-foreground rounded-lg px-[13px] py-2 text-[12.5px] font-medium disabled:opacity-60"
                   >
