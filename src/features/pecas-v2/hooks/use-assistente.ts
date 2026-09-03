@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
-import type { PendingChange, QuickAdjustKind } from "../types";
+import type { IterateScope, PendingChange, QuickAdjustKind } from "../types";
 import { useIterate, useQuickAdjust } from "./use-iterate";
 
 export interface AssistenteChip {
@@ -59,11 +59,14 @@ export function useAssistente(
     setPropostas((prev) => [...novas, ...prev]);
   };
 
-  const enviar = (instruction: string) => {
+  const enviar = (
+    instruction: string,
+    scope: IterateScope = { kind: "whole" },
+  ) => {
     const t = instruction.trim();
     if (!t || pensando) return;
     iterate.mutate(
-      { scope: { kind: "whole" }, instruction: t },
+      { scope, instruction: t },
       {
         onSuccess: (r) => onResult(r.changes, t),
         onError: () =>
@@ -72,11 +75,14 @@ export function useAssistente(
     );
   };
 
-  const usarChip = (kind: QuickAdjustKind) => {
+  const usarChip = (
+    kind: QuickAdjustKind,
+    scope: IterateScope = { kind: "whole" },
+  ) => {
     if (pensando) return;
     const label = ASSISTENTE_CHIPS.find((c) => c.kind === kind)?.label ?? "";
     quick.mutate(
-      { scope: { kind: "whole" }, kind },
+      { scope, kind },
       {
         onSuccess: (r) => onResult(r.changes, label),
         onError: () =>

@@ -207,12 +207,18 @@ export interface ChatThreadAPI {
   grounded_capable: boolean;
 }
 
+export interface ChatCitationAPI {
+  document_id: string;
+  page: number;
+  quote: string;
+}
+
 export interface ChatMessageAPI {
   id: string;
   draft_id: string;
   role: "user" | "assistant";
   content: string;
-  citations: unknown[]; // v2 ignora citations por ora
+  citations: ChatCitationAPI[];
   grounded: boolean;
   model_version?: string;
   created_at: string;

@@ -326,6 +326,8 @@ export async function sendChatMessage(
     role: "user",
     content: question,
     createdAt: assistant.createdAt,
+    citations: [],
+    grounded: false,
   };
   return { user, assistant };
 }
@@ -545,10 +547,10 @@ export async function removeAttachment(
 
 function mapScopeToApi(scope: IterateScope): {
   kind: string;
-  section_roman?: string;
+  section_id?: string;
 } {
   if (scope.kind === "section") {
-    return { kind: "section", section_roman: scope.roman };
+    return { kind: "section", section_id: scope.sectionId };
   }
   return { kind: "whole" };
 }

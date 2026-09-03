@@ -189,9 +189,10 @@ export function deriveStep(
 
 // ── Iteração / ajustes rápidos ───────────────────────────────────────────────
 
-/** Escopo de uma iteração: "peça toda" ou o id de uma seção específica. */
+/** Escopo de uma iteração: "peça toda" ou uma seção específica (id estável da
+ *  seção, o mesmo do structured_content — o BE valida contra ele). */
 export type IterateScope =
-  { kind: "whole" } | { kind: "section"; roman: string };
+  { kind: "whole" } | { kind: "section"; sectionId: string };
 
 export type QuickAdjustKind =
   "emphatic" | "concise" | "reinforce_thesis" | "add_grounds";
@@ -236,12 +237,24 @@ export interface PreviewState {
 
 export type ChatRole = "user" | "assistant";
 
+/** Citação de uma resposta do chat — um trecho de um documento dos autos que
+ *  sustenta a resposta. */
+export interface ChatCitation {
+  documentId: string;
+  page: number;
+  quote: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: ChatRole;
   content: string;
   /** ISO-8601. */
   createdAt: string;
+  /** Fontes que sustentam a resposta (só no turn do assistente). */
+  citations: ChatCitation[];
+  /** A resposta se apoia em trechos dos autos recuperados (RAG). */
+  grounded: boolean;
 }
 
 export type QuickActionKind =

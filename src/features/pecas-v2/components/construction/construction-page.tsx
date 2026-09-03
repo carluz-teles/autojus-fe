@@ -128,6 +128,7 @@ export function ConstructionPage({ id }: { id: string }) {
             applyToEditor={(roman, novos) =>
               editorRef.current?.applySectionChange(roman, novos) ?? false
             }
+            sections={draft.sections}
           />
         )}
       </div>

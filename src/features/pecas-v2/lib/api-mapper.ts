@@ -295,6 +295,12 @@ export function mapChatMessageFromApi(api: ChatMessageAPI): ChatMessage {
     role: api.role,
     content: api.content,
     createdAt: api.created_at,
+    citations: (api.citations ?? []).map((c) => ({
+      documentId: c.document_id,
+      page: c.page,
+      quote: c.quote,
+    })),
+    grounded: !!api.grounded,
   };
 }
 

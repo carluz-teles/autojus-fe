@@ -33,6 +33,8 @@ export function useSendChatMessage(id: string) {
         role: "user",
         content: question,
         createdAt: new Date().toISOString(),
+        citations: [],
+        grounded: false,
       };
       qc.setQueryData<ChatMessage[]>(draftKeys.chat(id), [
         ...previous,
