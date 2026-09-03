@@ -29,6 +29,7 @@ import {
   useTasks,
   useTasksSummary,
 } from "../hooks/use-tasks";
+import { STATUS_PILL } from "../lib/status-pill";
 import type { TasksSummary, TaskStatus, TaskView } from "../types";
 import { NovaTarefaModal } from "./nova-tarefa-modal";
 
@@ -75,14 +76,6 @@ const ORIGEM_LABEL: Record<string, string> = {
   DEADLINE: "Prazo",
   INTIMATION: "Intimação",
   MANUAL: "Manual",
-};
-
-// Pill de status — tom por display_status.
-const STATUS_PILL: Record<string, string> = {
-  Aberta: "bg-muted text-muted-foreground",
-  "Em execução": "bg-gold/15 text-gold",
-  Concluída: "bg-primary/10 text-primary",
-  Atrasada: "bg-destructive/10 text-destructive",
 };
 
 interface FiltrosExtra {

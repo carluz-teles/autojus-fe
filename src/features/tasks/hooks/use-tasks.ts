@@ -40,8 +40,13 @@ export interface TasksFilters {
   /** Status cru (OPEN/DONE/DISMISSED) — o filtro server-side. As abas de
    *  display_status (Aberta/Em execução/Atrasada) refinam OPEN no cliente. */
   status?: TaskStatus;
-  /** Id interno do responsável (assignee) — filtro server-side. */
+  /** Id interno do responsável (assignee) — filtro server-side. Aceita "me"
+   *  (o BE resolve pro usuário do JWT — usado pelo escopo "Meus"). */
   assignee?: string;
+  /** Tamanho de página (server-side). Default 30 (agenda /tarefas, "Mostrar
+   *  mais" incremental). A Fila pede uma janela maior num único fetch — não
+   *  tem affordance de paginação nessa tela (fila de trabalho, não histórico). */
+  pageSize?: number;
 }
 
 /**
@@ -51,17 +56,20 @@ export interface TasksFilters {
  */
 export function useTasks(filters: TasksFilters = {}) {
   const fetcher = useApi();
+  const pageSize = filters.pageSize ?? PAGE_SIZE;
   const params = {
     status: filters.status,
     assignee: filters.assignee || undefined,
+    pageSize,
   };
 
   const query = useInfiniteQuery({
     queryKey: tasksKeys.list(params),
     queryFn: ({ pageParam }) =>
       listTasks(fetcher, {
-        ...params,
-        limit: PAGE_SIZE,
+        status: params.status,
+        assignee: params.assignee,
+        limit: pageSize,
         cursor: pageParam || undefined,
       }),
     initialPageParam: "",
