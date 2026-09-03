@@ -20,6 +20,7 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
+import { useTriagemCount } from "@/features/triagem/hooks/use-triagem";
 import { cn } from "@/lib/utils";
 
 import { CommandPalette, useCommandPalette } from "./command-palette";
@@ -46,6 +47,9 @@ function iniciais(nome: string | null | undefined, fallback = "?") {
 // visual é portado. "Configurações" NÃO é item de rodapé — vive nos popups.
 export function Sidebar() {
   const palette = useCommandPalette();
+  // Contador ao vivo do item "Triagem" — mesma queryKey da própria tela
+  // (React Query dedupe: sidebar + página montadas juntas não dobram o fetch).
+  const triagemCount = useTriagemCount();
 
   return (
     <>
@@ -70,7 +74,11 @@ export function Sidebar() {
                 {sec.titulo}
               </div>
               {sec.itens.map((item) => (
-                <NavItemLink key={item.href} {...item} />
+                <NavItemLink
+                  key={item.href}
+                  {...item}
+                  count={item.href === "/triagem" ? triagemCount : undefined}
+                />
               ))}
             </div>
           ))}
@@ -89,10 +97,13 @@ function NavItemLink({
   href,
   label,
   icon: Icon,
+  count,
 }: {
   href: string;
   label: string;
   icon: typeof Search;
+  /** Contador ao vivo (ex.: Triagem) — badge só aparece quando > 0. */
+  count?: number;
 }) {
   const pathname = usePathname();
   const active = pathname === href || pathname.startsWith(`${href}/`);
@@ -113,6 +124,11 @@ function NavItemLink({
         className={cn("size-4 shrink-0", active ? "text-primary" : "text-fg3")}
       />
       <span className="min-w-0 flex-1 truncate">{label}</span>
+      {count != null && count > 0 ? (
+        <span className="bg-primary text-primary-foreground ml-auto grid h-4.5 min-w-4.5 shrink-0 place-items-center rounded-full px-1 text-[10px] tabular-nums">
+          {count}
+        </span>
+      ) : null}
     </Link>
   );
 }

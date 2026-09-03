@@ -43,8 +43,11 @@ export interface ListIntimacoesParams {
    */
   urgencia?: string;
   /** Filtro server-side de Status = work_stage (RECEIVED|AWAITING_CONFIRMATION|
-   *  CONFIRMED|DRAFTING|PARTNER_REVIEW|FILED). Estágio derivado no BE. */
-  work_stage?: string;
+   *  CONFIRMED|DRAFTING|PARTNER_REVIEW|FILED). Estágio derivado no BE. Aceita
+   *  múltiplos valores (array) — serializados como CSV (`work_stage=A,B,C`) na
+   *  query string, ex.: a fila de Triagem (RECEIVED,AWAITING_CONFIRMATION,
+   *  CONFIRMED). Um único valor continua indo como string simples. */
+  work_stage?: string | string[];
   /**
    * Filtro server-side do chip "Não confirmadas" (toggle de triagem) — restringe a
    * prazos sugeridos ainda não confirmados (deadline.status = 'PENDING'). Combina com
@@ -83,7 +86,13 @@ export async function listIntimacoes(
       user_status,
       court,
       urgencia,
-      work_stage,
+      // Array vira CSV pro BE (que hoje aceita 1 valor mas está sendo
+      // estendido em paralelo pra aceitar múltiplos separados por vírgula) —
+      // `apiFetch.query` só serializa string|number|boolean, então o join
+      // acontece aqui, não em buildUrl. Array vazio vira "" → omitido (undefined).
+      work_stage: Array.isArray(work_stage)
+        ? work_stage.join(",") || undefined
+        : work_stage,
       nao_confirmado,
       assignee,
     },
