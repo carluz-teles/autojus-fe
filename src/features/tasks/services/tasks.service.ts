@@ -24,7 +24,8 @@ export interface ListTasksParams {
   status?: TaskStatus;
   /** Id interno do responsável — base do filtro "meus". Omitido = de todos. */
   assignee?: string;
-  /** Janela de vencimento (RFC3339). Omitidas = sem recorte. */
+  /** Janela de vencimento ("YYYY-MM-DD", sem hora/timezone — o BE exige
+   *  time.DateOnly exato). Omitidas = sem recorte. */
   from?: string;
   to?: string;
   limit?: number;
@@ -32,12 +33,6 @@ export interface ListTasksParams {
   cursor?: string;
   /** Filtra pelo id da intimação de origem (FK). */
   intimation_id?: string;
-  /**
-   * Escopo "peça-bound" do Pipeline — true devolve só tarefas com draft, OU
-   * kind=PECA, OU action_item.gera_peca (exclui DISMISSED), com `pipeline_stage`
-   * preenchido em cada item. Omitido = sem esse recorte (agenda geral).
-   */
-  pipeline?: boolean;
 }
 
 /** Agenda global — as tarefas do tenant, filtráveis por status/responsável/intimação. */
@@ -51,7 +46,6 @@ export async function listTasks(
     limit = 20,
     cursor,
     intimation_id,
-    pipeline,
   }: ListTasksParams = {},
 ): Promise<PageEnvelope<TaskView>> {
   return fetcher<PageEnvelope<TaskView>>(ENDPOINT, {
@@ -63,7 +57,6 @@ export async function listTasks(
       limit,
       cursor,
       intimation_id,
-      pipeline,
     },
   });
 }

@@ -16,6 +16,7 @@ function task(overrides: Partial<TaskView> & { id: string }): TaskView {
     status: "OPEN",
     source: "DEADLINE",
     completed_at: null,
+    stage: "A_FAZER",
     ...overrides,
   };
 }
@@ -79,63 +80,79 @@ describe("buildAriaLabels", () => {
 describe("buildColumns", () => {
   const nameFor = () => null;
 
-  it("sempre devolve as 3 colunas fixas, na ordem Elaboração/Revisão/Protocolado", () => {
+  it("sempre devolve as 4 colunas fixas, na ordem A Fazer/Elaboração/Revisão/Concluída", () => {
     const columns = buildColumns([], nameFor);
 
     expect(columns.map((c) => c.key)).toEqual([...PIPELINE_ORDEM]);
+    expect(columns.map((c) => c.label)).toEqual([
+      "A Fazer",
+      "Elaboração",
+      "Revisão",
+      "Concluída",
+    ]);
     expect(columns.every((c) => c.vazia)).toBe(true);
   });
 
-  it("agrupa cada tarefa na coluna do seu pipeline_stage (sem cap de tamanho)", () => {
+  it("agrupa cada tarefa na coluna do seu stage (sem cap de tamanho)", () => {
     const tasks = [
-      task({ id: "1", pipeline_stage: "ELABORACAO" }),
-      task({ id: "2", pipeline_stage: "ELABORACAO" }),
-      task({ id: "3", pipeline_stage: "REVISAO" }),
-      task({ id: "4", pipeline_stage: "PROTOCOLADO" }),
+      task({ id: "0", stage: "A_FAZER" }),
+      task({ id: "1", stage: "ELABORACAO" }),
+      task({ id: "2", stage: "ELABORACAO" }),
+      task({ id: "3", stage: "REVISAO" }),
+      task({ id: "4", stage: "CONCLUIDA" }),
     ];
 
     const columns = buildColumns(tasks, nameFor);
     const byKey = Object.fromEntries(columns.map((c) => [c.key, c]));
 
+    expect(byKey.A_FAZER.n).toBe(1);
     expect(byKey.ELABORACAO.n).toBe(2);
     expect(byKey.REVISAO.n).toBe(1);
-    expect(byKey.PROTOCOLADO.n).toBe(1);
+    expect(byKey.CONCLUIDA.n).toBe(1);
     expect(byKey.ELABORACAO.vazia).toBe(false);
   });
 
-  it("tarefa sem pipeline_stage não entra em nenhuma coluna", () => {
-    const tasks = [task({ id: "1", pipeline_stage: undefined })];
+  it("tarefa sem draft pula direto de A Fazer pra Concluída — nunca passa por Elaboração/Revisão", () => {
+    const tasks = [
+      task({ id: "1", title: "Ligar pro cliente", stage: "CONCLUIDA" }),
+    ];
 
     const columns = buildColumns(tasks, nameFor);
+    const byKey = Object.fromEntries(columns.map((c) => [c.key, c]));
 
-    expect(columns.every((c) => c.n === 0)).toBe(true);
+    expect(byKey.CONCLUIDA.n).toBe(1);
+    expect(byKey.CONCLUIDA.cards[0].id).toBe("1");
+    expect(byKey.ELABORACAO.n).toBe(0);
+    expect(byKey.REVISAO.n).toBe(0);
   });
 
   it("o href do card aponta pra /tarefas/:id", () => {
-    const tasks = [task({ id: "abc123", pipeline_stage: "ELABORACAO" })];
+    const tasks = [task({ id: "abc123", stage: "ELABORACAO" })];
 
     const columns = buildColumns(tasks, nameFor);
+    const elaboracao = columns.find((c) => c.key === "ELABORACAO")!;
 
-    expect(columns[0].cards[0].href).toBe("/tarefas/abc123");
+    expect(elaboracao.cards[0].href).toBe("/tarefas/abc123");
   });
 
   it("2 cards com origem e cnjCurto diferentes geram origemAriaLabel diferente (WCAG 2.4.4)", () => {
     const tasks = [
       task({
         id: "1",
-        pipeline_stage: "ELABORACAO",
+        stage: "ELABORACAO",
         intimation_id: "int-1",
         cnj_number: "1012473-58.2024.8.26.0100",
       }),
       task({
         id: "2",
-        pipeline_stage: "ELABORACAO",
+        stage: "ELABORACAO",
         intimation_id: "int-2",
         cnj_number: "2098765-11.2023.8.26.0053",
       }),
     ];
 
-    const [cardA, cardB] = buildColumns(tasks, nameFor)[0].cards;
+    const columns = buildColumns(tasks, nameFor);
+    const [cardA, cardB] = columns.find((c) => c.key === "ELABORACAO")!.cards;
 
     expect(cardA.temOrigem).toBe(true);
     expect(cardB.temOrigem).toBe(true);
@@ -146,19 +163,33 @@ describe("buildColumns", () => {
 });
 
 describe("buildFunil", () => {
-  it("3 etapas, percentuais somando 100% do total contado", () => {
+  it("4 etapas, percentuais somando 100% do total contado", () => {
     const tasks = [
-      task({ id: "1", pipeline_stage: "ELABORACAO" }),
-      task({ id: "2", pipeline_stage: "ELABORACAO" }),
-      task({ id: "3", pipeline_stage: "REVISAO" }),
-      task({ id: "4", pipeline_stage: "PROTOCOLADO" }),
+      task({ id: "0", stage: "A_FAZER" }),
+      task({ id: "1", stage: "ELABORACAO" }),
+      task({ id: "2", stage: "ELABORACAO" }),
+      task({ id: "3", stage: "REVISAO" }),
+      task({ id: "4", stage: "CONCLUIDA" }),
     ];
 
     const funil = buildFunil(tasks);
 
-    expect(funil.map((e) => e.n)).toEqual([2, 1, 1]);
+    expect(funil.map((e) => e.n)).toEqual([1, 2, 1, 1]);
     const somaPct = funil.reduce((acc, e) => acc + parseInt(e.pct, 10), 0);
     expect(somaPct).toBe(100);
+  });
+
+  it("Concluída conta igual às demais etapas — sem exclusão especial do total", () => {
+    const tasks = [
+      task({ id: "1", stage: "CONCLUIDA" }),
+      task({ id: "2", stage: "CONCLUIDA" }),
+    ];
+
+    const funil = buildFunil(tasks);
+    const concluida = funil.find((e) => e.key === "CONCLUIDA")!;
+
+    expect(concluida.n).toBe(2);
+    expect(concluida.pct).toBe("100%");
   });
 
   it("com 0 tarefas não quebra (divisão por zero evitada)", () => {

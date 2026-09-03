@@ -45,12 +45,13 @@ export interface TaskView {
   /** Órgão/vara do processo de origem; ausente numa tarefa avulsa. Aditivo. */
   court?: string;
   /**
-   * Estágio de PRODUÇÃO da peça — só presente quando `GET /v1/tasks?pipeline=true`
-   * (tarefas "peça-bound": tem draft, OU kind=PECA, OU action_item.gera_peca).
-   * Projeção PURA derivada pelo BE (sem campo gravável equivalente na tarefa) —
-   * fonte do agrupamento em colunas do Pipeline (Board/Funil). Aditivo.
+   * Estágio de 4 valores da tarefa — SEMPRE presente (sem omitempty no BE; toda
+   * tarefa, peça-bound ou não, cai num dos 4). Projeção PURA derivada pelo BE a
+   * partir do status da tarefa + do draft vigente (sem campo gravável equivalente
+   * na tarefa) — fonte do agrupamento em colunas do Pipeline (Board/Funil). Uma
+   * tarefa sem draft pula direto de A_FAZER pra CONCLUIDA (sem Elaboração/Revisão).
    */
-  pipeline_stage?: "ELABORACAO" | "REVISAO" | "PROTOCOLADO";
+  stage: "A_FAZER" | "ELABORACAO" | "REVISAO" | "CONCLUIDA";
   /** Preenchido quando status vira DONE (RFC3339). */
   completed_at: string | null;
 }

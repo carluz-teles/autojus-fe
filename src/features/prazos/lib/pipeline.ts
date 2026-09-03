@@ -1,9 +1,11 @@
-// Lógica pura do Pipeline (Board + Funil) sobre TAREFAS reais — 3 estágios FIXOS
-// de produção da peça (Elaboração/Revisão/Protocolado), vindos do `pipeline_stage`
-// do BE (projeção pura, sem campo gravável equivalente — por isso o Pipeline é
-// somente-leitura, sem drag). Sem JSX/React: só deriva colunas/funil/aria-label a
-// partir de TaskView[]. As chaves de ícone/rótulo coincidem com 3 das 6 chaves do
-// PrazoStage legado (StatusIcon em components/icons.tsx) — reuso direto.
+// Lógica pura do Pipeline (Board + Funil) sobre TODAS as tarefas reais (não só
+// peça-bound) — 4 estágios FIXOS (A Fazer/Elaboração/Revisão/Concluída), vindos
+// do `stage` do BE (projeção pura, sem campo gravável equivalente — por isso o
+// Pipeline é somente-leitura, sem drag). Uma tarefa sem draft pula direto de
+// A_FAZER pra CONCLUIDA (nunca passa por Elaboração/Revisão). Sem JSX/React: só
+// deriva colunas/funil/aria-label a partir de TaskView[]. As chaves de ícone
+// reusam 4 das 6 chaves do PrazoStage legado (StatusIcon em components/icons.tsx)
+// — reuso direto, sem criar glifo novo.
 
 import { diasRestantes, rotuloPrazo } from "@/features/shared/prazo";
 import type { TaskView } from "@/features/tasks/types";
@@ -12,35 +14,43 @@ import { formatarDataCurta } from "@/lib/utils";
 import { iniciais } from "../../organization/lib/labels";
 import { cnjCurto, urg, type UrgKey } from "./derivar";
 
-export type PipelineStageKey = "ELABORACAO" | "REVISAO" | "PROTOCOLADO";
+export type PipelineStageKey =
+  "A_FAZER" | "ELABORACAO" | "REVISAO" | "CONCLUIDA";
 
 export const PIPELINE_ORDEM: readonly PipelineStageKey[] = [
+  "A_FAZER",
   "ELABORACAO",
   "REVISAO",
-  "PROTOCOLADO",
+  "CONCLUIDA",
 ];
 
 export const PIPELINE_LABEL: Record<PipelineStageKey, string> = {
-  ELABORACAO: "Em elaboração",
-  REVISAO: "Revisão do sócio",
-  PROTOCOLADO: "Protocolado",
+  A_FAZER: "A Fazer",
+  ELABORACAO: "Elaboração",
+  REVISAO: "Revisão",
+  CONCLUIDA: "Concluída",
 };
 
 // Chave em minúsculo do StatusIcon (components/icons.tsx, tipado PrazoStage) —
-// os 3 estágios do pipeline_stage coincidem 1:1 com 3 das 6 chaves legadas.
-export const PIPELINE_ICON_KEY: Record<
-  PipelineStageKey,
-  "elaboracao" | "revisao" | "protocolado"
-> = {
+// os 4 estágios do stage reusam 4 das 6 chaves legadas: "intimacao" (círculo
+// tracejado = ainda não iniciada) representa A_FAZER, "protocolado" (círculo
+// preenchido com check) representa CONCLUIDA — mesmo glifo de "concluído", sem
+// reintroduzir o conceito de "protocolo" que a tarefa não carrega mais.
+export type PipelineIconKey =
+  "intimacao" | "elaboracao" | "revisao" | "protocolado";
+
+export const PIPELINE_ICON_KEY: Record<PipelineStageKey, PipelineIconKey> = {
+  A_FAZER: "intimacao",
   ELABORACAO: "elaboracao",
   REVISAO: "revisao",
-  PROTOCOLADO: "protocolado",
+  CONCLUIDA: "protocolado",
 };
 
 const PIPELINE_COR: Record<PipelineStageKey, string> = {
+  A_FAZER: "var(--fg3)",
   ELABORACAO: "var(--primary)",
   REVISAO: "var(--gold)",
-  PROTOCOLADO: "var(--green)",
+  CONCLUIDA: "var(--green)",
 };
 
 // Dias corridos até o vencimento, contra HOJE real (hoje resolvido a cada
@@ -145,14 +155,14 @@ function decorar(
 export interface PipelineColumn {
   key: PipelineStageKey;
   label: string;
-  iconKey: "elaboracao" | "revisao" | "protocolado";
+  iconKey: PipelineIconKey;
   n: number;
   cards: PipelineCard[];
   vazia: boolean;
 }
 
-/** Agrupa as tarefas em 3 colunas fixas por `pipeline_stage` — client-side,
- *  sem paginação por coluna (a chamada única já trouxe tudo). */
+/** Agrupa as tarefas em 4 colunas fixas por `stage` — client-side, sem
+ *  paginação por coluna (a chamada única já trouxe tudo). */
 export function buildColumns(
   tasks: TaskView[],
   nameFor: (id: string | undefined | null) => string | null,
@@ -160,7 +170,7 @@ export function buildColumns(
   const ariaLabels = buildAriaLabels(tasks);
   return PIPELINE_ORDEM.map((key) => {
     const cards = tasks
-      .filter((t) => t.pipeline_stage === key)
+      .filter((t) => t.stage === key)
       .map((t) => decorar(t, nameFor, ariaLabels.get(t.id) ?? t.title))
       .sort((a, b) => (a.dias ?? Infinity) - (b.dias ?? Infinity));
     return {
@@ -177,18 +187,20 @@ export function buildColumns(
 export interface FunilEtapa {
   key: PipelineStageKey;
   label: string;
-  iconKey: "elaboracao" | "revisao" | "protocolado";
+  iconKey: PipelineIconKey;
   n: number;
   pct: string;
   barW: string;
   cor: string;
 }
 
-/** 3 barras (Elaboração/Revisão/Protocolado) — todas "ativas" por definição
- *  (Protocolado é o fim natural do pipeline, não uma exclusão). Sem "gargalo". */
+/** 4 barras (A Fazer/Elaboração/Revisão/Concluída) — as 4 contam igual, sem
+ *  exclusão especial: Concluída é um estágio normal do funil (tarefa sem draft
+ *  chega lá direto de A Fazer), não mais um "fim" que se somava à parte. Sem
+ *  "gargalo" (não se aplica a estágios fixos de tarefa, não etapas de esteira). */
 export function buildFunil(tasks: TaskView[]): FunilEtapa[] {
   const counts = PIPELINE_ORDEM.map(
-    (k) => tasks.filter((t) => t.pipeline_stage === k).length,
+    (k) => tasks.filter((t) => t.stage === k).length,
   );
   const total = counts.reduce((a, b) => a + b, 0) || 1;
   const max = Math.max(...counts, 1);
