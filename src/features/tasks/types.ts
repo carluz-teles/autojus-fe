@@ -39,6 +39,11 @@ export interface TaskView {
   deadline_id?: string;
   intimation_id?: string;
   court_record_id?: string;
+  /** CNJ do processo de origem (quando ligada a um court_record); ausente numa
+   *  tarefa avulsa. Aditivo — fatia BE irmã, pode ainda não vir no ambiente local. */
+  cnj_number?: string;
+  /** Órgão/vara do processo de origem; ausente numa tarefa avulsa. Aditivo. */
+  court?: string;
   /** Preenchido quando status vira DONE (RFC3339). */
   completed_at: string | null;
 }
