@@ -47,8 +47,6 @@ export interface TasksFilters {
    *  mais" incremental). A Fila pede uma janela maior num único fetch — não
    *  tem affordance de paginação nessa tela (fila de trabalho, não histórico). */
   pageSize?: number;
-  /** Escopo "peça-bound" do Pipeline — ver ListTasksParams.pipeline. */
-  pipeline?: boolean;
 }
 
 /**
@@ -62,7 +60,6 @@ export function useTasks(filters: TasksFilters = {}) {
   const params = {
     status: filters.status,
     assignee: filters.assignee || undefined,
-    pipeline: filters.pipeline || undefined,
     pageSize,
   };
 
@@ -72,7 +69,6 @@ export function useTasks(filters: TasksFilters = {}) {
       listTasks(fetcher, {
         status: params.status,
         assignee: params.assignee,
-        pipeline: params.pipeline,
         limit: pageSize,
         cursor: pageParam || undefined,
       }),

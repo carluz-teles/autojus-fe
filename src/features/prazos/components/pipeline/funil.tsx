@@ -3,10 +3,10 @@
 import type { usePrazosPipeline } from "../../hooks/use-prazos-pipeline";
 import { StatusIcon } from "../icons";
 
-// Funil: 3 barras (Elaboração/Revisão/Protocolado) — os 3 estágios de PRODUÇÃO
-// da peça, todos "ativos" por definição (Protocolado é o fim natural do
-// pipeline, não uma exclusão). Sem "gargalo" (não se aplica a 3 estágios fixos
-// de tarefa). Somente leitura, como o Board.
+// Funil: 4 barras (A Fazer/Elaboração/Revisão/Concluída) — os 4 estágios de
+// TODAS as tarefas (não só peça-bound), contados igual, sem exclusão especial
+// (Concluída é um estágio normal, não mais um "fim" à parte). Sem "gargalo"
+// (não se aplica a estágios fixos de tarefa). Somente leitura, como o Board.
 export function Funil({
   pipeline,
 }: {
@@ -25,14 +25,14 @@ export function Funil({
       <div className="mx-auto max-w-[760px]">
         <div className="mb-1.5 flex items-baseline justify-between">
           <span className="text-[13px] font-medium">Pipeline de peças</span>
-          <span className="text-fg3 text-[12px]">{pipeline.total} ativos</span>
+          <span className="text-fg3 text-[12px]">{pipeline.total} tarefas</span>
         </div>
         <p className="text-fg3 mb-[22px] text-[12.5px] leading-[1.5]">
           Onde o volume está parado. A largura da barra é relativa à maior
           etapa.
         </p>
         {pipeline.isLoading
-          ? [0, 1, 2].map((i) => <BarSkeleton key={i} />)
+          ? [0, 1, 2, 3].map((i) => <BarSkeleton key={i} />)
           : pipeline.funil.map((e) => (
               <div key={e.key} className="rounded-lg px-2 py-2.5">
                 <div className="flex items-center gap-2.5">

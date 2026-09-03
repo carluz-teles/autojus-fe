@@ -7,11 +7,12 @@ import type { usePrazosPipeline } from "../../hooks/use-prazos-pipeline";
 import type { PipelineCard } from "../../lib/pipeline";
 import { PrioIcon, StatusIcon } from "../icons";
 
-// Board = quadro de trabalho por estágio de PRODUÇÃO da peça (Elaboração/
-// Revisão/Protocolado), ligado a TAREFAS reais. SOMENTE LEITURA: pipeline_stage
-// é projeção pura do BE (sem campo gravável) — sem drag, mesmo que a referência
-// visual mostre cards arrastáveis (decisão de produto travada). O card é um
-// <Link> real pra /tarefas/:id (foco de teclado nativo, Enter ativa).
+// Board = quadro de trabalho por estágio (A Fazer/Elaboração/Revisão/
+// Concluída), ligado a TODAS as tarefas reais (não só peça-bound). SOMENTE
+// LEITURA: stage é projeção pura do BE (sem campo gravável) — sem drag, mesmo
+// que a referência visual mostre cards arrastáveis (decisão de produto
+// travada). O card é um <Link> real pra /tarefas/:id (foco de teclado nativo,
+// Enter ativa).
 export function Board({
   pipeline,
 }: {
@@ -29,7 +30,7 @@ export function Board({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
         {pipeline.isLoading
-          ? [0, 1, 2].map((i) => <ColumnSkeleton key={i} />)
+          ? [0, 1, 2, 3].map((i) => <ColumnSkeleton key={i} />)
           : pipeline.colunas.map((c) => (
               <div
                 key={c.key}
