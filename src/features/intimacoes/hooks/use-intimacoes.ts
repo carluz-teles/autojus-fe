@@ -61,8 +61,10 @@ export interface IntimacoesFilters {
   /** atraso|hoje|proximos_dois_dias|semana|este_mes|mais_adiante|sem_data_definida */
   urgencia?: string;
   /** Status = work_stage (RECEIVED|AWAITING_CONFIRMATION|CONFIRMED|DRAFTING|
-   *  PARTNER_REVIEW|FILED). Estágio derivado no BE. */
-  workStage?: string;
+   *  PARTNER_REVIEW|FILED). Estágio derivado no BE. Aceita um valor único ou
+   *  uma lista (ex.: a fila de Triagem filtra por 3 estágios de uma vez) — o
+   *  service serializa a lista como CSV na query string. */
+  workStage?: string | string[];
   /** Chip "Não confirmadas" (triagem) — filtra prazos sugeridos não confirmados. */
   naoConfirmado?: boolean;
   /** "me" (toggle "Minhas") ou um uuid; casa contra condutor OU revisor. */
@@ -70,6 +72,9 @@ export interface IntimacoesFilters {
   /** Default true. false pula o fetch — ex: NovaPecaModal no contexto de um
    *  processo específico usa useIntimacoesByProcesso em vez desta lista geral. */
   enabled?: boolean;
+  /** Tamanho de página customizado — default PAGE_SIZE (20). Ex.: a fila de
+   *  Triagem busca 100 de uma vez, sem "mostrar mais" (leitura de página única). */
+  limit?: number;
 }
 
 /**
@@ -94,6 +99,7 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     work_stage: filters.workStage || undefined,
     nao_confirmado: filters.naoConfirmado || undefined,
     assignee: filters.assignee || undefined,
+    limit: filters.limit ?? PAGE_SIZE,
   };
 
   const query = useInfiniteQuery({
@@ -101,7 +107,6 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     queryFn: ({ pageParam }) =>
       listIntimacoes(fetcher, {
         ...params,
-        limit: PAGE_SIZE,
         cursor: pageParam || undefined,
       }),
     initialPageParam: "",
