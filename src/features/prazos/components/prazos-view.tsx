@@ -6,6 +6,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 import { usePrazosContagem } from "../hooks/use-prazos-inbox";
+import { usePrazosPipeline } from "../hooks/use-prazos-pipeline";
 import { InboxView } from "./inbox/inbox-view";
 import { PipelineView } from "./pipeline/pipeline-view";
 
@@ -13,30 +14,62 @@ export type PrazosVista = "inbox" | "pipeline";
 export type PipeModo = "board" | "funil";
 
 // Raiz das vistas de prazo (casca "Linear"). A vista (Inbox / Pipeline) é
-// escolhida pelo NAV (rotas /prazos e /prazos/pipeline) — não por tab do topo.
-// O topo mostra ícone + título + contador + (no Pipeline) o toggle Funil/Board
-// + o botão Agrupar, fiel ao mockup.
+// escolhida pelo NAV (rotas /prazos e /prazos/pipeline) — não por tab do topo,
+// e cada rota monta uma instância própria de PrazosView (vista é fixa pro
+// tempo de vida do componente). Por isso cada vista delega pra uma rota
+// dedicada que chama SÓ o hook de dado que ela precisa — evita chamar
+// usePrazosPipeline() (GET /v1/tasks real) sem necessidade na Inbox, e
+// evita hook condicional (react-hooks/rules-of-hooks) aqui na raiz.
 export function PrazosView({ vista = "inbox" }: { vista?: PrazosVista }) {
-  const [pipe, setPipe] = useState<PipeModo>("board");
+  return vista === "inbox" ? <PrazosInboxRoute /> : <PrazosPipelineRoute />;
+}
+
+// Inbox: contador ainda vem do mock (usePrazosContagem) — fora do escopo
+// desta fatia (só Pipeline foi migrado pro dado real).
+function PrazosInboxRoute() {
   const contagem = usePrazosContagem();
-  const n = vista === "inbox" ? contagem.inbox : contagem.pipeline;
 
   return (
     <div className="text-foreground flex min-h-0 min-w-0 flex-1 flex-col text-[13px]">
-      <TopBar vista={vista} n={n} pipe={pipe} setPipe={setPipe} />
-      {vista === "inbox" ? <InboxView /> : <PipelineView modo={pipe} />}
+      <TopBar
+        vista="inbox"
+        contagem={contagem.inbox.toLocaleString("pt-BR")}
+        pipe="board"
+        setPipe={() => {}}
+      />
+      <InboxView />
+    </div>
+  );
+}
+
+// Pipeline: UMA chamada de usePrazosPipeline() (GET /v1/tasks real),
+// compartilhada entre o contador do header e o Board/Funil — nada de query
+// duplicada.
+function PrazosPipelineRoute() {
+  const [pipe, setPipe] = useState<PipeModo>("board");
+  const pipeline = usePrazosPipeline();
+
+  return (
+    <div className="text-foreground flex min-h-0 min-w-0 flex-1 flex-col text-[13px]">
+      <TopBar
+        vista="pipeline"
+        contagem={pipeline.total}
+        pipe={pipe}
+        setPipe={setPipe}
+      />
+      <PipelineView modo={pipe} pipeline={pipeline} />
     </div>
   );
 }
 
 function TopBar({
   vista,
-  n,
+  contagem,
   pipe,
   setPipe,
 }: {
   vista: PrazosVista;
-  n: number;
+  contagem: string;
   pipe: PipeModo;
   setPipe: (p: PipeModo) => void;
 }) {
@@ -50,9 +83,7 @@ function TopBar({
       <span className="text-[13px] font-medium">
         {vista === "inbox" ? "Inbox" : "Pipeline"}
       </span>
-      <span className="text-fg3 font-mono text-[11px]">
-        {n.toLocaleString("pt-BR")}
-      </span>
+      <span className="text-fg3 font-mono text-[11px]">{contagem}</span>
       <div className="ml-auto flex items-center gap-1">
         {vista === "pipeline" ? (
           <>
