@@ -26,6 +26,7 @@ import {
   useSendChatMessage,
 } from "../../hooks/use-chat";
 import type {
+  ChatCitation,
   ChatMessage,
   DraftSection,
   IterateScope,
@@ -296,7 +297,7 @@ function ChatBubble({
         <p className="m-0 whitespace-pre-wrap">{msg.content}</p>
         {!isUser && msg.citations.length > 0 && (
           <div className="border-line2 mt-2 flex flex-col gap-1 border-t pt-2">
-            {msg.citations.map((c, i) => (
+            {groupCitations(msg.citations).map((c, i) => (
               <button
                 key={i}
                 type="button"
@@ -309,6 +310,9 @@ function ChatBubble({
                 <span className="min-w-0">
                   {c.quote ? `"${c.quote}"` : "Documento dos autos"}
                   {c.page ? ` · pág. ${c.page}` : ""}
+                  {c.count > 1 && (
+                    <span className="text-fg3"> ({c.count} autos)</span>
+                  )}
                 </span>
               </button>
             ))}
@@ -317,6 +321,32 @@ function ChatBubble({
       </div>
     </div>
   );
+}
+
+/** Agrupa citações pelo TRECHO (+página) — vários autos distintos podem conter o
+ *  mesmo teor (ex.: várias certidões com a mesma advertência de extinção). Mostra
+ *  uma linha só por trecho, com a contagem de autos; o clique leva ao 1º auto do
+ *  grupo. Mesmo padrão do groupAnchors das teses. */
+function groupCitations(
+  citations: ChatCitation[],
+): (ChatCitation & { count: number })[] {
+  const byKey = new Map<string, ChatCitation & { count: number }>();
+  for (const c of citations) {
+    // Normaliza (minúsculas, colapsa espaços) e usa um PREFIXO do trecho: o mesmo
+    // teor citado a partir de autos distintos costuma vir com excerpts de tamanho/
+    // espaçamento levemente diferentes; o prefixo agrupa esses casos sem colar
+    // trechos realmente distintos.
+    const norm = (c.quote || "")
+      .toLowerCase()
+      .replace(/\s+/g, "") // remove TODO espaço (o mesmo teor às vezes vem com
+      // espaçamento diferente entre autos, ex.: "tornem conclusos"/"tornemconclusos")
+      .slice(0, 80);
+    const key = `${norm}|${c.page}`;
+    const g = byKey.get(key);
+    if (g) g.count += 1;
+    else byKey.set(key, { ...c, count: 1 });
+  }
+  return [...byKey.values()];
 }
 
 function PensandoBubble() {
