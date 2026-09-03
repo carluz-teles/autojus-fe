@@ -163,6 +163,9 @@ export interface Draft {
    *  Quando não-null: source-of-truth. FE dá preferência pra este campo
    *  ao popular o editor; PDF final (Fase C, chromedp) usa ele direto. */
   contentHtml: string | null;
+  /** content_html foi editado à mão desde a última geração (0096). Usado pra
+   *  avisar antes de regerar ao aprovar mudança de tese. */
+  contentEdited: boolean;
 }
 
 /** Step atual do peticionamento — derivado dos timestamps. */

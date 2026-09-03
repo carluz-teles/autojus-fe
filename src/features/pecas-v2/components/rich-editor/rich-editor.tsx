@@ -95,9 +95,16 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
     },
     ref,
   ) {
-    // Guarda ref pro último HTML aplicado externamente pra não disparar
-    // ciclo (Tiptap → onUpdate → parent → prop → setContent → onUpdate…).
+    // lastAppliedHtml = a serialização NORMALIZADA que o Tiptap tem agora (o que
+    // getHTML() devolve). Usado no onUpdate pra distinguir edição real de
+    // normalização/no-op.
     const lastAppliedHtml = useRef(html);
+    // lastExternalHtml = o último valor da PROP `html` que aplicamos. O effect de
+    // sync externo compara contra ISTO (não contra o normalizado) — senão, como o
+    // normalizado ≠ html de entrada, o effect re-aplicaria setContent no mount,
+    // re-parsearia e dispararia um onUpdate de normalização → autosave espúrio
+    // (marcava a peça como "editada à mão" só por abrir).
+    const lastExternalHtml = useRef(html);
 
     const editor = useEditor({
       editable: !readOnly,
@@ -126,8 +133,20 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
           "data-placeholder": placeholder ?? "",
         },
       },
+      // Baseline = a serialização NORMALIZADA do próprio Tiptap (não o HTML de
+      // entrada). Ao parsear, o Tiptap reescreve o HTML (ordem de atributos,
+      // espaços, tags) e emite um onUpdate de normalização que NÃO é edição do
+      // usuário — sem esta baseline, esse update dispararia autosave e marcaria a
+      // peça como "editada à mão" só por abri-la (falso positivo na guarda de
+      // regeração).
+      onCreate({ editor }) {
+        lastAppliedHtml.current = editor.getHTML();
+      },
       onUpdate({ editor }) {
         const nextHtml = editor.getHTML();
+        // Normalização/no-op → não é edição real: não propaga (evita autosave e
+        // o falso "content_edited").
+        if (nextHtml === lastAppliedHtml.current) return;
         lastAppliedHtml.current = nextHtml;
         onChange(nextHtml);
         if (onStats) {
@@ -144,9 +163,10 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
     useEffect(() => {
       if (!editor) return;
       if (disableExternalSync) return;
-      if (html === lastAppliedHtml.current) return;
+      if (html === lastExternalHtml.current) return;
       editor.commands.setContent(html, { emitUpdate: false });
-      lastAppliedHtml.current = html;
+      lastExternalHtml.current = html;
+      lastAppliedHtml.current = editor.getHTML();
     }, [editor, html, disableExternalSync]);
 
     useEffect(() => {
@@ -179,8 +199,9 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
         },
         setHtml(next: string) {
           if (!editor) return;
-          lastAppliedHtml.current = next;
+          lastExternalHtml.current = next;
           editor.commands.setContent(next, { emitUpdate: false });
+          lastAppliedHtml.current = editor.getHTML();
         },
         scrollToEnd() {
           const el = document.querySelector(".tiptap-a4-page");

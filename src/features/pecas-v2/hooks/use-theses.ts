@@ -144,8 +144,13 @@ export interface ThesesController {
   /** Clique numa linha do rail — propõe a transição de estado. */
   toggle: (thesis: Thesis) => void;
   /** Ação de aprovação do editor sobre um bloco de tese (approve/discard/
-   *  approveRemoval/keep/remove). Resolve o estado-alvo e dispara o PATCH. */
-  editorAction: (thesis: Thesis, action: EditorThesisAction) => void;
+   *  approveRemoval/keep/remove). Resolve o estado-alvo e dispara o PATCH. `opts.
+   *  onSuccess` roda após o PATCH persistir (usado p/ regerar a peça no commit). */
+  editorAction: (
+    thesis: Thesis,
+    action: EditorThesisAction,
+    opts?: { onSuccess?: () => void },
+  ) => void;
   /** (Re)gera as sugestões de teses ancoradas nos anexos. */
   regenerate: () => void;
   isRegenerating: boolean;
@@ -197,10 +202,10 @@ export function useThesesController(id: string): ThesesController {
     direito,
     toggle: (thesis) =>
       patch.mutate({ thesisId: thesis.id, state: nextRailState(thesis.state) }),
-    editorAction: (thesis, action) => {
+    editorAction: (thesis, action, opts) => {
       const target = editorTargetState(action, thesis.state);
       if (target === null) return;
-      patch.mutate({ thesisId: thesis.id, state: target });
+      patch.mutate({ thesisId: thesis.id, state: target }, opts);
     },
     regenerate: () => regen.mutate(),
     isRegenerating: regen.isPending,

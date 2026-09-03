@@ -71,6 +71,7 @@ export function mapPecaDetailToDraft(api: PecaDetailAPI): Draft {
     filingNumber: api.filing_number ?? "",
     signedPDFURL: api.signed_pdf_url,
     contentHtml: api.content_html,
+    contentEdited: !!api.content_edited,
   };
 }
 

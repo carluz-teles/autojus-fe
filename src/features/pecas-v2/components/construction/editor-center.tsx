@@ -9,9 +9,11 @@
 // O Assistente aplica propostas direto no editor VIVO via editorRef (compartilhado
 // pela construction-page) — reflete na hora e dispara o autosave.
 
-import { Sparkles } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
+import { marked } from "marked";
 import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
+import { useDraftStream } from "../../hooks/use-draft-stream";
 import type { EditorThesisAction } from "../../hooks/use-theses";
 import { useSaveContentHtml } from "../../hooks/use-workflow";
 import type { Draft, Thesis } from "../../types";
@@ -34,7 +36,14 @@ interface Props {
   onThesisAction: (thesis: Thesis, action: EditorThesisAction) => void;
   /** thesisId com PATCH de estado em voo (desabilita os botões da moldura). */
   pendingThesisId: string | null;
+  /** Regeração em curso (mudou o conjunto de teses): a folha streama o novo texto
+   *  IN LOCO, sem trocar o centro — o shell (rails/toolbar/assistente) permanece. */
+  regenerating: boolean;
 }
+
+// GFM ligado, breaks OFF — o LLM já separa parágrafos (CommonMark). Parse síncrono
+// por frame durante o stream da regeração.
+marked.setOptions({ gfm: true, breaks: false });
 
 export function EditorCenter({
   draft,
@@ -43,6 +52,7 @@ export function EditorCenter({
   direito,
   onThesisAction,
   pendingThesisId,
+  regenerating,
 }: Props) {
   const saveHtml = useSaveContentHtml(draft.id);
   // Container do header pra onde a toolbar do RichEditor é portalizada (barra fixa
@@ -100,6 +110,32 @@ export function EditorCenter({
     [direito],
   );
 
+  // Streaming da REGERAÇÃO: enquanto `regenerating`, o SSE devolve o markdown novo
+  // e a folha mostra o texto sendo reescrito ao vivo (mesmo canal da 1ª geração).
+  const [streamHtml, setStreamHtml] = useState("");
+  const streamScrollRef = useRef<HTMLDivElement>(null);
+  useDraftStream(draft.id, {
+    enabled: regenerating,
+    onProgress: (md) =>
+      setStreamHtml(marked.parse(md, { async: false }) as string),
+  });
+  useEffect(() => {
+    if (streamHtml && streamScrollRef.current) {
+      streamScrollRef.current.scrollTop = streamScrollRef.current.scrollHeight;
+    }
+  }, [streamHtml]);
+
+  // Ao TERMINAR a regeração (regenerating true→false), carrega o content_html novo
+  // na folha viva (setHtml, sem emitir update → não vira autosave) e limpa o stream.
+  const wasRegenerating = useRef(false);
+  useEffect(() => {
+    if (wasRegenerating.current && !regenerating) {
+      if (draft.contentHtml) editorRef.current?.setHtml(draft.contentHtml);
+      setStreamHtml("");
+    }
+    wasRegenerating.current = regenerating;
+  }, [regenerating, draft.contentHtml, editorRef]);
+
   return (
     <div className="pb-10">
       {/* Barra de formatação FIXA no header (full-width) — toolbar portalizada. */}
@@ -123,14 +159,40 @@ export function EditorCenter({
             Rascunho da IA — edite livremente, a autoria é sua
           </div>
 
-          <div className="construction-editor px-10 pt-4 pb-6">
+          <div className="construction-editor relative px-10 pt-4 pb-6">
             <RichEditor
               ref={editorRef}
               html={initialHtml}
               toolbarContainer={toolbarEl}
               onChange={(html) => scheduleSave(html)}
               removalRomans={removalRomans}
+              readOnly={regenerating}
             />
+            {regenerating && (
+              <div className="bg-panel/97 absolute inset-0 z-20 flex flex-col px-10 pt-4 pb-6 backdrop-blur-[1px]">
+                <div className="text-primary mb-4 flex items-center gap-2 text-[12.5px]">
+                  <Loader2 className="size-[15px] animate-spin" />
+                  Reescrevendo a peça com o novo conjunto de teses…
+                </div>
+                {streamHtml.trim().length > 0 ? (
+                  <div
+                    ref={streamScrollRef}
+                    className="font-display flex-1 overflow-y-auto text-[14.5px] leading-[1.9] [&_h1]:mb-3 [&_h1]:text-[18px] [&_h1]:font-semibold [&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:text-[15px] [&_h2]:font-semibold [&_h3]:mt-4 [&_h3]:mb-1.5 [&_h3]:font-semibold [&_li]:mb-1 [&_ol]:mb-3.5 [&_ol]:pl-6 [&_p]:mb-3.5 [&_p]:text-justify [&_ul]:mb-3.5 [&_ul]:pl-6"
+                    dangerouslySetInnerHTML={{ __html: streamHtml }}
+                  />
+                ) : (
+                  <div aria-hidden className="flex flex-col gap-3.5">
+                    {[92, 78, 96, 64, 88, 72].map((w, i) => (
+                      <div
+                        key={i}
+                        className="bg-hover h-3 animate-pulse rounded"
+                        style={{ width: `${w}%` }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Moldura de CONFIRMAÇÃO — só as teses com proposta PENDENTE (incluir/
@@ -138,7 +200,7 @@ export function EditorCenter({
               — não são re-listadas aqui (evita duplicar o miolo). A remoção é
               INICIADA no rail (clicar numa tese incluída → pending_remove); aqui só
               se CONFIRMA (Aprovar/Descartar · Aprovar remoção/Manter). */}
-          {pendentesDeTese.length > 0 && (
+          {!regenerating && pendentesDeTese.length > 0 && (
             <div className="border-line2 border-t pt-4">
               <DireitoTeses
                 direito={pendentesDeTese}

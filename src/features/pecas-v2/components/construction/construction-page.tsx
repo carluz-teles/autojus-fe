@@ -33,10 +33,12 @@ export function ConstructionPage({ id }: { id: string }) {
     isLoading,
     isError,
     stage,
+    regenerating,
     theses,
     highlightedDocId,
     focusSource,
     gerarMinuta,
+    onThesisAction,
     isGenerating,
     voltar,
     verAuto,
@@ -113,8 +115,9 @@ export function ConstructionPage({ id }: { id: string }) {
               editorRef={editorRef}
               onRefazer={gerarMinuta}
               direito={theses.direito}
-              onThesisAction={theses.editorAction}
+              onThesisAction={onThesisAction}
               pendingThesisId={theses.isTogglingId}
+              regenerating={regenerating}
             />
           )}
         </div>

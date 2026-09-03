@@ -14,9 +14,13 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import type { SagaState } from "../types";
+import type { SagaState, Thesis } from "../types";
 import { useDraft } from "./use-draft";
-import { useGenerateDraft, useThesesController } from "./use-theses";
+import {
+  type EditorThesisAction,
+  useGenerateDraft,
+  useThesesController,
+} from "./use-theses";
 
 /** Estágio do CENTRO da tela — a barra e o rail não mudam entre estágios. */
 export type CenterStage = "pregen" | "gerando" | "pronta";
@@ -28,13 +32,20 @@ export type CenterStage = "pregen" | "gerando" | "pronta";
 export function deriveStage(
   saga: SagaState | undefined,
   firedGenerate: boolean,
+  hasContent = false,
 ): CenterStage {
   if (saga === "DRAFTED" || saga === "REVIEWED") return "pronta";
   if (saga === "CREATED" || saga === "EXTRACTING" || saga === "FAILED") {
+    if (saga === "FAILED") return "pronta";
+    // REGERAÇÃO de uma peça que JÁ tem conteúdo (mudou o conjunto de teses):
+    // permanece na tela PRONTA e streama o novo texto DENTRO da folha — nada do
+    // shell (rails, toolbar, assistente) some. O estágio "gerando" (centro cheio)
+    // fica só pra 1ª geração, quando ainda não há folha nenhuma.
+    if (hasContent) return "pronta";
     // CREATED sem ter disparado = peça ainda vazia (pré-geração). CREATED logo
     // após disparar = geração em curso (o worker ainda não avançou o saga).
     if (saga === "CREATED" && !firedGenerate) return "pregen";
-    return saga === "FAILED" ? "pronta" : "gerando";
+    return "gerando";
   }
   return firedGenerate ? "gerando" : "pregen";
 }
@@ -90,12 +101,50 @@ export function useConstruction(id: string) {
     });
   };
 
+  // Ação de tese no editor (aprovar/descartar/manter/remover). Aprovar uma
+  // INCLUSÃO ou uma REMOÇÃO muda o conjunto de teses da peça → a peça é REGERADA
+  // pelo profile (recortar o trecho na unha quebraria coesão E a estrutura do
+  // template). Se a peça foi editada à mão, avisa antes de descartar os ajustes
+  // ("avisar e confirmar"). As demais ações (descartar/manter) não mexem no texto.
+  const onThesisAction = (thesis: Thesis, action: EditorThesisAction) => {
+    const regenerates = action === "approve" || action === "approveRemoval";
+    if (
+      regenerates &&
+      draftQuery.data?.contentEdited &&
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "Esta peça foi editada à mão. Aplicar esta mudança de tese vai refazer a peça inteira pelo modelo e descartar seus ajustes manuais. Deseja continuar?",
+      )
+    ) {
+      return;
+    }
+    theses.editorAction(thesis, action, {
+      onSuccess: () => {
+        if (!regenerates || generate.isPending) return;
+        // O PATCH já persistiu o novo estado da tese; a geração lê o estado
+        // persistido (included ∪ pending_add) e reescreve a peça coesa.
+        setFiredGenerate(true);
+        generate.mutate(theses.selectedIds, {
+          onError: () => setFiredGenerate(false),
+        });
+      },
+    });
+  };
+
   const voltar = () => router.push("/pecas");
 
-  const stage = deriveStage(saga, firedGenerate);
+  const hasContent =
+    !!draftQuery.data?.contentHtml && draftQuery.data.contentHtml.trim() !== "";
+  const stage = deriveStage(saga, firedGenerate, hasContent);
+  // Regeração em curso: a peça já tinha folha e o saga voltou a EXTRACTING/CREATED.
+  // O centro fica em "pronta" e a folha streama o novo conteúdo.
+  const regenerating =
+    stage === "pronta" &&
+    (saga === "EXTRACTING" || (saga === "CREATED" && firedGenerate));
 
   return {
     draft: draftQuery.data,
+    regenerating,
     isLoading: draftQuery.isLoading,
     isError: draftQuery.isError,
     stage,
@@ -106,6 +155,7 @@ export function useConstruction(id: string) {
     autoDrawer,
     fecharAuto,
     gerarMinuta,
+    onThesisAction,
     isGenerating: generate.isPending,
     voltar,
   };

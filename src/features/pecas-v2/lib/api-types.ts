@@ -30,6 +30,9 @@ export interface PecaDetailAPI {
   // pela IA antes do 1º save humano. Quando não-null, source-of-truth
   // pro editor (RichEditor) e pro renderer PDF (chromedp, Fase C).
   content_html: string | null;
+  /** content_html foi editado à mão desde a última geração (0096). Mudar teses
+   *  regenera a peça e descartaria os ajustes — o FE avisa antes. */
+  content_edited?: boolean;
   authorship: "assistant" | "human_taken";
 
   intimation: IntimationAPI | null;

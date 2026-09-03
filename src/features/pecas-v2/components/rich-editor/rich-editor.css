@@ -208,10 +208,15 @@
 .tiptap-content .peca-pending-remove {
   background-color: color-mix(in oklch, var(--red, #dc2626) 9%, transparent);
   text-decoration: line-through;
-  text-decoration-color: color-mix(in oklch, var(--red, #dc2626) 70%, transparent);
+  text-decoration-color: color-mix(
+    in oklch,
+    var(--red, #dc2626) 70%,
+    transparent
+  );
   text-decoration-thickness: 1px;
   color: color-mix(in oklch, var(--red, #dc2626) 55%, var(--fg3, #6b7280));
-  box-shadow: inset 3px 0 0 0 color-mix(in oklch, var(--red, #dc2626) 60%, transparent);
+  box-shadow: inset 3px 0 0 0
+    color-mix(in oklch, var(--red, #dc2626) 60%, transparent);
   border-radius: 2px;
   padding-inline: 4px;
   transition:

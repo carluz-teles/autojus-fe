@@ -69,8 +69,7 @@ export const PendingRemoval = Extension.create({
           init: () => ({ romans: [], decos: DecorationSet.empty }),
           apply(tr, value, _oldState, newState) {
             const meta = tr.getMeta(pendingRemovalKey) as
-              | { romans: string[] }
-              | undefined;
+              { romans: string[] } | undefined;
             if (meta) {
               return {
                 romans: meta.romans,
