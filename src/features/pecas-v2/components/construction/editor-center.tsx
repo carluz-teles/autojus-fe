@@ -9,7 +9,7 @@
 // O Assistente aplica propostas direto no editor VIVO via editorRef (compartilhado
 // pela construction-page) — reflete na hora e dispara o autosave.
 
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { marked } from "marked";
 import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
@@ -25,8 +25,6 @@ interface Props {
   draft: Draft;
   /** Ref pro RichEditor — compartilhado com o Assistente (aplicar propostas). */
   editorRef: RefObject<RichEditorHandle | null>;
-  /** Refazer a minuta do zero (volta pro CTA "Gerar minuta"). */
-  onRefazer: () => void;
   /** Regeração em curso (mudou o conjunto de teses): a folha streama o novo texto
    *  IN LOCO, sem trocar o centro — o shell (rails/toolbar/assistente) permanece. */
   regenerating: boolean;
@@ -36,12 +34,7 @@ interface Props {
 // por frame durante o stream da regeração.
 marked.setOptions({ gfm: true, breaks: false });
 
-export function EditorCenter({
-  draft,
-  editorRef,
-  onRefazer,
-  regenerating,
-}: Props) {
+export function EditorCenter({ draft, editorRef, regenerating }: Props) {
   const saveHtml = useSaveContentHtml(draft.id);
   // Container do header pra onde a toolbar do RichEditor é portalizada (barra fixa
   // full-width — a formatação NÃO vive dentro da folha).
@@ -110,24 +103,10 @@ export function EditorCenter({
       {/* Barra de formatação FIXA no header (full-width) — toolbar portalizada. */}
       <div className="border-line sticky top-0 z-10 flex items-center gap-2 border-b bg-[color-mix(in_oklch,var(--panel)_94%,transparent)] px-4 py-1.5 backdrop-blur">
         <div ref={setToolbarEl} className="min-w-0 flex-1" />
-        <button
-          type="button"
-          onClick={onRefazer}
-          className="border-primary/35 bg-primary/[0.07] text-primary hover:bg-primary/10 ml-auto inline-flex flex-none items-center gap-1.5 rounded-[7px] border px-2.5 py-1.5 text-[11.5px] font-medium"
-        >
-          <Sparkles className="size-[13px]" />
-          Refazer com IA
-        </button>
       </div>
 
       <div className="mx-auto my-7 max-w-[720px]">
         <div className="border-line bg-panel overflow-hidden rounded-md border shadow-[0_8px_30px_oklch(0.27_0.012_200/8%)]">
-          {/* strip "Rascunho da IA" */}
-          <div className="border-line2 text-primary flex items-center gap-2 border-b px-5 py-2.5 text-[11px]">
-            <Sparkles className="size-[13px] flex-none" />
-            Rascunho da IA — edite livremente, a autoria é sua
-          </div>
-
           <div className="construction-editor relative px-10 pt-4 pb-6">
             <RichEditor
               ref={editorRef}

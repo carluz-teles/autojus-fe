@@ -116,7 +116,6 @@ export function ConstructionPage({ id }: { id: string }) {
             <EditorCenter
               draft={draft}
               editorRef={editorRef}
-              onRefazer={gerarMinuta}
               regenerating={regenerating}
             />
           )}
