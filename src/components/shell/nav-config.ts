@@ -1,5 +1,4 @@
 import {
-  Calendar,
   Clock,
   Columns3,
   FolderOpen,
@@ -46,7 +45,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     itens: [
       { href: "/pipeline", label: "Pipeline", icon: Columns3 },
       { href: "/fila", label: "Fila", icon: ListOrdered },
-      { href: "/calendario", label: "Calendário", icon: Calendar },
     ],
   },
   {
@@ -74,7 +72,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/meus-prazos", label: "Meus Prazos", icon: Clock },
   { href: "/pipeline", label: "Pipeline", icon: Columns3 },
   { href: "/fila", label: "Fila", icon: ListOrdered },
-  { href: "/calendario", label: "Calendário", icon: Calendar },
   { href: "/processos", label: "Processos", icon: FolderOpen },
   { href: "/intimacoes", label: "Intimações", icon: Mail },
   { href: "/configuracoes", label: "Configurações", icon: Settings },
