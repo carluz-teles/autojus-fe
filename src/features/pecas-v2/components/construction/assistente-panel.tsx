@@ -9,7 +9,7 @@
 //                 respostas ancoradas (citações dos documentos).
 
 import { Link2, MessageSquare, Send, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   Select,
@@ -140,6 +140,17 @@ function AjustarMode({
   const scope: IterateScope = scopeId
     ? { kind: "section", sectionId: scopeId }
     : { kind: "whole" };
+
+  // Se a seção selecionada some do conjunto atual (ex.: a peça foi regerada e as
+  // seções mudaram), volta pra "peça inteira" — senão o Select mostraria "peça
+  // inteira" mas ainda mandaria o sectionId antigo (escopo inválido).
+  const idsKey = sections.map((s) => s.id).join(",");
+  useEffect(() => {
+    setScopeId((cur) =>
+      cur && !sections.some((s) => s.id === cur) ? "" : cur,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idsKey]);
 
   const submit = () => {
     if (!msg.trim() || pensando) return;
