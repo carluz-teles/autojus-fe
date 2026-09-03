@@ -32,6 +32,12 @@ export interface ListTasksParams {
   cursor?: string;
   /** Filtra pelo id da intimação de origem (FK). */
   intimation_id?: string;
+  /**
+   * Escopo "peça-bound" do Pipeline — true devolve só tarefas com draft, OU
+   * kind=PECA, OU action_item.gera_peca (exclui DISMISSED), com `pipeline_stage`
+   * preenchido em cada item. Omitido = sem esse recorte (agenda geral).
+   */
+  pipeline?: boolean;
 }
 
 /** Agenda global — as tarefas do tenant, filtráveis por status/responsável/intimação. */
@@ -45,10 +51,20 @@ export async function listTasks(
     limit = 20,
     cursor,
     intimation_id,
+    pipeline,
   }: ListTasksParams = {},
 ): Promise<PageEnvelope<TaskView>> {
   return fetcher<PageEnvelope<TaskView>>(ENDPOINT, {
-    query: { status, assignee, from, to, limit, cursor, intimation_id },
+    query: {
+      status,
+      assignee,
+      from,
+      to,
+      limit,
+      cursor,
+      intimation_id,
+      pipeline,
+    },
   });
 }
 

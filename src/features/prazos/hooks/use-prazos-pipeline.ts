@@ -1,191 +1,54 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { useMemo } from "react";
 
-import { canMove, dec, ORDEM, type PrazoDec, stageLabel } from "../lib/derivar";
-import { type PrazoMock, type PrazoStage } from "../mocks/prazos.mock";
-import { listPrazos, moverEstagio } from "../services/prazos-triagem.service";
-import { prazosKeys } from "./use-prazos-inbox";
+import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+import { useTasks } from "@/features/tasks/hooks/use-tasks";
 
-// ── sub-hook: overrides de estágio (arrastar cards no Board) ───────────────────
-function useStageOverrides() {
-  const [overrides, setOverrides] = useState<Record<string, PrazoStage>>({});
-  const aplica = useCallback(
-    (base: PrazoMock[]) =>
-      base.map((p) => (overrides[p.id] ? { ...p, stage: overrides[p.id] } : p)),
-    [overrides],
-  );
-  const set = useCallback(
-    (id: string, stage: PrazoStage) =>
-      setOverrides((o) => ({ ...o, [id]: stage })),
-    [],
-  );
-  return { aplica, set };
-}
+import {
+  buildColumns,
+  buildFunil,
+  type FunilEtapa,
+  type PipelineColumn,
+} from "../lib/pipeline";
 
-// ── sub-hook: estado do drag-and-drop (HTML5 nativo, como no mockup) ──────────
-function useDnD() {
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [hoverCol, setHoverCol] = useState<PrazoStage | null>(null);
-  return { dragId, setDragId, hoverCol, setHoverCol };
-}
+// Janela única (sem "carregar mais" nessa tela — é quadro de trabalho, não
+// histórico). Cobre o volume esperado de tarefas "peça-bound" OPEN de um
+// escritório. Mesmo padrão de use-prazos-fila.ts (FILA_PAGE_SIZE).
+const PIPELINE_PAGE_SIZE = 300;
 
-export interface BoardCard extends PrazoDec {
-  temFlag: boolean;
-  flag: string;
-  flagCor: string;
-  flagFundo: string;
-  dragging: boolean;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-}
-
-export interface BoardColumn {
-  key: PrazoStage;
-  label: string;
-  n: number;
-  cards: BoardCard[];
-  extra: number;
-  temExtra: boolean;
-  vazia: boolean;
-  isDropTarget: boolean;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent) => void;
-}
-
-export interface FunilEtapa {
-  key: PrazoStage;
-  label: string;
-  n: number;
-  pct: string;
-  barW: string;
-  cor: string;
-  gargalo: boolean;
-}
-
-// Bandeira do card (divergência/IA) — sinaliza o que trava o avanço.
-function flagDe(p: PrazoMock) {
-  if (p.origem === "divergente")
-    return {
-      temFlag: true,
-      flag: "divergência",
-      flagCor: "var(--gold)",
-      flagFundo: "color-mix(in oklch, var(--gold) 14%, transparent)",
-    };
-  if (p.origem === "ia")
-    return {
-      temFlag: true,
-      flag: "IA",
-      flagCor: "var(--primary)",
-      flagFundo: "color-mix(in oklch, var(--primary) 11%, transparent)",
-    };
-  return { temFlag: false, flag: "", flagCor: "", flagFundo: "" };
-}
-
-// Hook público do Pipeline — compõe overrides + DnD e devolve funil + board.
+// Hook público do Pipeline (Board + Funil) — ligado a TAREFAS reais, não mais
+// a intimações/PrazoMock. UMA chamada: GET /v1/tasks?pipeline=true&status=OPEN
+// (o BE devolve só tarefas "peça-bound" — tem draft, OU kind=PECA, OU
+// action_item.gera_peca — com `pipeline_stage` preenchido). O agrupamento em 3
+// colunas fixas (Elaboração/Revisão/Protocolado) é client-side.
+//
+// SOMENTE LEITURA: pipeline_stage é projeção pura do BE, sem campo gravável —
+// decisão de produto travada, por isso não há drag (mesmo que a referência
+// visual mostre cards arrastáveis).
 export function usePrazosPipeline() {
-  const query = useQuery({ queryKey: prazosKeys.all, queryFn: listPrazos });
-  const stages = useStageOverrides();
-  const dnd = useDnD();
+  const directory = useOrgMembersDirectory();
+  const query = useTasks({
+    status: "OPEN",
+    pipeline: true,
+    pageSize: PIPELINE_PAGE_SIZE,
+  });
 
-  const todos = useMemo(
-    () => stages.aplica(query.data ?? []),
-    [query.data, stages],
+  const colunas = useMemo<PipelineColumn[]>(
+    () => buildColumns(query.tarefas, directory.nameFor),
+    [query.tarefas, directory.nameFor],
   );
 
-  const tentarMover = useCallback(
-    (id: string, to: PrazoStage) => {
-      const item = todos.find((p) => p.id === id);
-      const v = canMove(item, to);
-      if (v.silent) return;
-      if (v.ok) {
-        void moverEstagio(id, to).then(() => stages.set(id, to));
-        if (v.msg) toast.success(v.msg);
-      } else if (v.reason) {
-        toast.warning(v.reason);
-      }
-    },
-    [todos, stages],
-  );
-
-  const colunas = useMemo<BoardColumn[]>(
-    () =>
-      ORDEM.map((key) => {
-        const itens = todos.filter((p) => p.stage === key);
-        return {
-          key,
-          label: stageLabel(key),
-          n: itens.length,
-          cards: itens.slice(0, 8).map((p): BoardCard => ({
-            ...dec(p),
-            ...flagDe(p),
-            dragging: dnd.dragId === p.id,
-            onDragStart: () => dnd.setDragId(p.id),
-            onDragEnd: () => {
-              dnd.setDragId(null);
-              dnd.setHoverCol(null);
-            },
-          })),
-          extra: Math.max(0, itens.length - 8),
-          temExtra: itens.length > 8,
-          vazia: itens.length === 0,
-          isDropTarget: dnd.hoverCol === key && dnd.dragId !== null,
-          onDragOver: (e: React.DragEvent) => {
-            e.preventDefault();
-            if (dnd.hoverCol !== key) dnd.setHoverCol(key);
-          },
-          onDrop: (e: React.DragEvent) => {
-            e.preventDefault();
-            if (dnd.dragId) tentarMover(dnd.dragId, key);
-            dnd.setDragId(null);
-            dnd.setHoverCol(null);
-          },
-        };
-      }),
-    [todos, dnd, tentarMover],
-  );
-
-  const funil = useMemo<FunilEtapa[]>(() => {
-    const ativos = todos.filter((p) => p.stage !== "protocolado");
-    const total = ativos.length || 1;
-    const max = Math.max(
-      ...ORDEM.map((k) => todos.filter((p) => p.stage === k).length),
-      1,
-    );
-    const cores: Record<PrazoStage, string> = {
-      intimacao: "var(--fg3)",
-      confirmar: "var(--gold)",
-      confirmado: "var(--blue)",
-      elaboracao: "var(--primary)",
-      revisao: "var(--gold)",
-      protocolado: "var(--green)",
-    };
-    return ORDEM.map((key) => {
-      const n = todos.filter((p) => p.stage === key).length;
-      return {
-        key,
-        label: stageLabel(key),
-        n,
-        pct: Math.round((n / total) * 100) + "%",
-        barW: Math.round((n / max) * 100) + "%",
-        cor: cores[key],
-        gargalo: key === "confirmar" && n / total > 0.35,
-      };
-    });
-  }, [todos]);
-
-  const totalAtivos = useMemo(
-    () => todos.filter((p) => p.stage !== "protocolado").length,
-    [todos],
+  const funil = useMemo<FunilEtapa[]>(
+    () => buildFunil(query.tarefas),
+    [query.tarefas],
   );
 
   return {
-    isLoading: query.isLoading,
+    isLoading: query.isPending,
+    isError: !!query.error,
     colunas,
     funil,
-    totalAtivos: totalAtivos.toLocaleString("pt-BR"),
-    arrastando: dnd.dragId !== null,
+    total: query.tarefas.length.toLocaleString("pt-BR"),
   };
 }
