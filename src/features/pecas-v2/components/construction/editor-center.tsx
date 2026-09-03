@@ -14,13 +14,10 @@ import { marked } from "marked";
 import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDraftStream } from "../../hooks/use-draft-stream";
-import type { EditorThesisAction } from "../../hooks/use-theses";
 import { useSaveContentHtml } from "../../hooks/use-workflow";
-import type { Draft, Thesis } from "../../types";
+import type { Draft } from "../../types";
 import { structuredToHtml } from "../rich-editor/html-adapter";
-import { romansFromHeadings } from "../rich-editor/pending-removal";
 import { RichEditor, type RichEditorHandle } from "../rich-editor/rich-editor";
-import { DireitoTeses } from "./direito-teses";
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
 
@@ -30,12 +27,6 @@ interface Props {
   editorRef: RefObject<RichEditorHandle | null>;
   /** Refazer a minuta do zero (volta pro CTA "Gerar minuta"). */
   onRefazer: () => void;
-  /** Teses da seção "Do direito" (state ≠ off) — a moldura de aprovação/remoção. */
-  direito: Thesis[];
-  /** Ação de aprovação inline sobre uma tese (approve/discard/approveRemoval/keep/remove). */
-  onThesisAction: (thesis: Thesis, action: EditorThesisAction) => void;
-  /** thesisId com PATCH de estado em voo (desabilita os botões da moldura). */
-  pendingThesisId: string | null;
   /** Regeração em curso (mudou o conjunto de teses): a folha streama o novo texto
    *  IN LOCO, sem trocar o centro — o shell (rails/toolbar/assistente) permanece. */
   regenerating: boolean;
@@ -49,9 +40,6 @@ export function EditorCenter({
   draft,
   editorRef,
   onRefazer,
-  direito,
-  onThesisAction,
-  pendingThesisId,
   regenerating,
 }: Props) {
   const saveHtml = useSaveContentHtml(draft.id);
@@ -90,25 +78,6 @@ export function EditorCenter({
       AUTOSAVE_DEBOUNCE_MS,
     );
   };
-
-  // Só as teses com proposta PENDENTE entram na moldura de confirmação — as
-  // incluídas já estão no texto da peça (não se re-lista o miolo aqui).
-  const pendentesDeTese = direito.filter(
-    (t) => t.state === "pending_add" || t.state === "pending_remove",
-  );
-
-  // Romanos das seções cujo texto será removido (teses em pending_remove) — o
-  // editor marca esses trechos IN LOCO (tachado/vermelho), em vez de duplicá-los
-  // num card. Deriva do segmento (thesis↔trecho) persistido na geração.
-  const removalRomans = useMemo(
-    () =>
-      romansFromHeadings(
-        direito
-          .filter((t) => t.state === "pending_remove")
-          .flatMap((t) => t.segments.map((s) => s.heading)),
-      ),
-    [direito],
-  );
 
   // Streaming da REGERAÇÃO: enquanto `regenerating`, o SSE devolve o markdown novo
   // e a folha mostra o texto sendo reescrito ao vivo (mesmo canal da 1ª geração).
@@ -165,11 +134,12 @@ export function EditorCenter({
               html={initialHtml}
               toolbarContainer={toolbarEl}
               onChange={(html) => scheduleSave(html)}
-              removalRomans={removalRomans}
               readOnly={regenerating}
             />
             {regenerating && (
-              <div className="bg-panel/97 absolute inset-0 z-20 flex flex-col px-10 pt-4 pb-6 backdrop-blur-[1px]">
+              // z-0 (abaixo do header sticky z-10) — senão a folha streamando cobre
+              // o header ao rolar. Cobre o editor por ser irmão posicionado depois.
+              <div className="bg-panel/97 absolute inset-0 z-0 flex flex-col px-10 pt-4 pb-6 backdrop-blur-[1px]">
                 <div className="text-primary mb-4 flex items-center gap-2 text-[12.5px]">
                   <Loader2 className="size-[15px] animate-spin" />
                   Reescrevendo a peça com o novo conjunto de teses…
@@ -194,21 +164,6 @@ export function EditorCenter({
               </div>
             )}
           </div>
-
-          {/* Moldura de CONFIRMAÇÃO — só as teses com proposta PENDENTE (incluir/
-              remover). As teses já incluídas vivem no texto da peça (content_html)
-              — não são re-listadas aqui (evita duplicar o miolo). A remoção é
-              INICIADA no rail (clicar numa tese incluída → pending_remove); aqui só
-              se CONFIRMA (Aprovar/Descartar · Aprovar remoção/Manter). */}
-          {!regenerating && pendentesDeTese.length > 0 && (
-            <div className="border-line2 border-t pt-4">
-              <DireitoTeses
-                direito={pendentesDeTese}
-                onAction={onThesisAction}
-                pendingId={pendingThesisId}
-              />
-            </div>
-          )}
         </div>
       </div>
     </div>

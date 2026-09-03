@@ -17,7 +17,7 @@ import { useState } from "react";
 import type { SagaState, Thesis } from "../types";
 import { useDraft } from "./use-draft";
 import {
-  type EditorThesisAction,
+  isSelectedForGeneration,
   useGenerateDraft,
   useThesesController,
 } from "./use-theses";
@@ -101,28 +101,15 @@ export function useConstruction(id: string) {
     });
   };
 
-  // Ação de tese no editor (aprovar/descartar/manter/remover). Aprovar uma
-  // INCLUSÃO ou uma REMOÇÃO muda o conjunto de teses da peça → a peça é REGERADA
-  // pelo profile (recortar o trecho na unha quebraria coesão E a estrutura do
-  // template). Se a peça foi editada à mão, avisa antes de descartar os ajustes
-  // ("avisar e confirmar"). As demais ações (descartar/manter) não mexem no texto.
-  const onThesisAction = (thesis: Thesis, action: EditorThesisAction) => {
-    const regenerates = action === "approve" || action === "approveRemoval";
-    if (
-      regenerates &&
-      draftQuery.data?.contentEdited &&
-      typeof window !== "undefined" &&
-      !window.confirm(
-        "Esta peça foi editada à mão. Aplicar esta mudança de tese vai refazer a peça inteira pelo modelo e descartar seus ajustes manuais. Deseja continuar?",
-      )
-    ) {
-      return;
-    }
-    theses.editorAction(thesis, action, {
+  // Commit de uma mudança de tese pelo popover de confirmação do rail. Alterna o
+  // estado COMMITTED direto (included↔off) — sem passo intermediário de moldura —
+  // e REGENERA a peça pelo profile (recortar o trecho na unha quebraria coesão E a
+  // estrutura do template; a geração lê o estado persistido e reescreve coesa).
+  const commitThesisToggle = (thesis: Thesis) => {
+    if (generate.isPending) return;
+    const isRemoval = isSelectedForGeneration(thesis.state);
+    theses.setState(thesis.id, isRemoval ? "off" : "included", {
       onSuccess: () => {
-        if (!regenerates || generate.isPending) return;
-        // O PATCH já persistiu o novo estado da tese; a geração lê o estado
-        // persistido (included ∪ pending_add) e reescreve a peça coesa.
         setFiredGenerate(true);
         generate.mutate(theses.selectedIds, {
           onError: () => setFiredGenerate(false),
@@ -155,7 +142,8 @@ export function useConstruction(id: string) {
     autoDrawer,
     fecharAuto,
     gerarMinuta,
-    onThesisAction,
+    commitThesisToggle,
+    contentEdited: !!draftQuery.data?.contentEdited,
     isGenerating: generate.isPending,
     voltar,
   };

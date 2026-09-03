@@ -143,6 +143,13 @@ export interface ThesesController {
   direito: Thesis[];
   /** Clique numa linha do rail — propõe a transição de estado. */
   toggle: (thesis: Thesis) => void;
+  /** Aplica um estado ALVO direto (sem passar por pending) — usado pelo commit do
+   *  popover de confirmação. `opts.onSuccess` roda após o PATCH persistir. */
+  setState: (
+    thesisId: string,
+    state: ThesisState,
+    opts?: { onSuccess?: () => void },
+  ) => void;
   /** Ação de aprovação do editor sobre um bloco de tese (approve/discard/
    *  approveRemoval/keep/remove). Resolve o estado-alvo e dispara o PATCH. `opts.
    *  onSuccess` roda após o PATCH persistir (usado p/ regerar a peça no commit). */
@@ -202,6 +209,8 @@ export function useThesesController(id: string): ThesesController {
     direito,
     toggle: (thesis) =>
       patch.mutate({ thesisId: thesis.id, state: nextRailState(thesis.state) }),
+    setState: (thesisId, state, opts) =>
+      patch.mutate({ thesisId, state }, opts),
     editorAction: (thesis, action, opts) => {
       const target = editorTargetState(action, thesis.state);
       if (target === null) return;

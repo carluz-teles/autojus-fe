@@ -38,7 +38,8 @@ export function ConstructionPage({ id }: { id: string }) {
     highlightedDocId,
     focusSource,
     gerarMinuta,
-    onThesisAction,
+    commitThesisToggle,
+    contentEdited,
     isGenerating,
     voltar,
     verAuto,
@@ -84,7 +85,9 @@ export function ConstructionPage({ id }: { id: string }) {
               selectedCount={theses.selectedCount}
               isLoading={theses.isLoading}
               isError={theses.isError}
-              onToggle={theses.toggle}
+              onToggle={stage === "pronta" ? commitThesisToggle : theses.toggle}
+              confirmBeforeToggle={stage === "pronta"}
+              contentEdited={contentEdited}
               onFonte={focusSource}
               teorSourceId={draft.intimation.id}
               isRegenerating={theses.isRegenerating}
@@ -114,9 +117,6 @@ export function ConstructionPage({ id }: { id: string }) {
               draft={draft}
               editorRef={editorRef}
               onRefazer={gerarMinuta}
-              direito={theses.direito}
-              onThesisAction={onThesisAction}
-              pendingThesisId={theses.isTogglingId}
               regenerating={regenerating}
             />
           )}
