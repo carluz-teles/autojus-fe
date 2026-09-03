@@ -45,12 +45,16 @@ export function AssistentePanel({
   draftId,
   applyToEditor,
   sections,
+  onSource,
 }: {
   draftId: string;
   /** Aplica a proposta (troca o corpo da seção) no editor vivo; false se não achar. */
   applyToEditor: (sectionRoman: string, newParagraphs: string[]) => boolean;
   /** Seções da peça — alimentam o seletor de escopo do modo Ajustar. */
   sections: DraftSection[];
+  /** Destaca o documento na "Fundada em" (mesmo mecanismo do "ver fonte" das
+   *  teses) — usado ao clicar numa citação de uma resposta do chat. */
+  onSource: (documentId: string) => void;
 }) {
   const [mode, setMode] = useState<Mode>("ajustar");
 
@@ -85,7 +89,7 @@ export function AssistentePanel({
           sections={sections}
         />
       ) : (
-        <PerguntarMode draftId={draftId} />
+        <PerguntarMode draftId={draftId} onSource={onSource} />
       )}
     </aside>
   );
@@ -213,7 +217,13 @@ function AjustarMode({
 
 // ── Modo PERGUNTAR (chat Q&A) ────────────────────────────────────────────────
 
-function PerguntarMode({ draftId }: { draftId: string }) {
+function PerguntarMode({
+  draftId,
+  onSource,
+}: {
+  draftId: string;
+  onSource: (documentId: string) => void;
+}) {
   const thread = useChatThread(draftId);
   const send = useSendChatMessage(draftId);
   const quick = useRunQuickAction(draftId);
@@ -235,7 +245,7 @@ function PerguntarMode({ draftId }: { draftId: string }) {
         )}
         <div className="flex flex-col gap-2.5">
           {mensagens.map((m) => (
-            <ChatBubble key={m.id} msg={m} />
+            <ChatBubble key={m.id} msg={m} onSource={onSource} />
           ))}
           {pensando && <PensandoBubble />}
         </div>
@@ -265,7 +275,13 @@ function PerguntarMode({ draftId }: { draftId: string }) {
   );
 }
 
-function ChatBubble({ msg }: { msg: ChatMessage }) {
+function ChatBubble({
+  msg,
+  onSource,
+}: {
+  msg: ChatMessage;
+  onSource: (documentId: string) => void;
+}) {
   const isUser = msg.role === "user";
   return (
     <div className={isUser ? "flex justify-end" : "flex justify-start"}>
@@ -281,16 +297,20 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
         {!isUser && msg.citations.length > 0 && (
           <div className="border-line2 mt-2 flex flex-col gap-1 border-t pt-2">
             {msg.citations.map((c, i) => (
-              <div
+              <button
                 key={i}
-                className="text-fg3 flex items-start gap-1.5 text-[10.5px] leading-[1.4]"
+                type="button"
+                onClick={() => c.documentId && onSource(c.documentId)}
+                disabled={!c.documentId}
+                title={c.documentId ? "Ver fonte nos autos" : undefined}
+                className="text-fg3 hover:text-primary flex items-start gap-1.5 text-left text-[10.5px] leading-[1.4] disabled:cursor-default disabled:hover:text-inherit"
               >
                 <Link2 className="text-primary mt-px size-3 flex-none" />
                 <span className="min-w-0">
                   {c.quote ? `"${c.quote}"` : "Documento dos autos"}
                   {c.page ? ` · pág. ${c.page}` : ""}
                 </span>
-              </div>
+              </button>
             ))}
           </div>
         )}

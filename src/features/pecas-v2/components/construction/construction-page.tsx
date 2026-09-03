@@ -129,6 +129,7 @@ export function ConstructionPage({ id }: { id: string }) {
               editorRef.current?.applySectionChange(roman, novos) ?? false
             }
             sections={draft.sections}
+            onSource={focusSource}
           />
         )}
       </div>
