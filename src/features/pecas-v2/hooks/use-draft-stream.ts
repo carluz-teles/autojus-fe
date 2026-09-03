@@ -1,15 +1,20 @@
 "use client";
 
-// useDraftStream — assina o SSE /v1/pecas/:id/generation-stream, extrai o
-// campo `draft_markdown` do JSON incremental do LLM e dispara onProgress
-// com o markdown FULL acumulado (throttled por rAF). Usado pelo EditorArea
-// pra "digitar" a peça no Tiptap em tempo real.
+// useDraftStream — assina o SSE /v1/pecas/:id/generation-stream e ACUMULA os
+// chunks crus (markdown) do LLM, disparando onProgress com o markdown FULL a cada
+// frame. Usado pra "digitar" a peça em tempo real (1ª geração e regeração).
 //
-// Por que markdown e não HTML: tokens do LLM cortam tags no meio (`<h2>` chega
-// como `<`, `h`, `2>`) e o ProseMirror escapa fragmentos incompletos, corrompendo
-// o output. Markdown é o padrão da indústria pra LLM streaming (ChatGPT Canvas,
-// Claude Artifacts, Cursor) — não tem tags pareadas pra corromper, funciona
-// char-a-char. BE emite markdown, FE converte pra HTML e aplica com setHtml.
+// O modelo emite MARKDOWN PURO (a geração não usa mais JSON schema — isso
+// truncava). Cada chunk do SSE é um delta cru; acumulamos direto (nada de extrair
+// campo JSON — o parser antigo `draft_markdown` retornava vazio no markdown cru, e
+// era por isso que o streaming não aparecia).
+//
+// Reset por geração: o BE publica StreamResetMarker (␞) como 1º chunk de cada
+// (re)geração. Ao vê-lo, zeramos o buffer — descarta o replay stale da geração
+// anterior (o cliente costuma conectar antes do worker resetar o stream Redis).
+//
+// Por que markdown e não HTML: tokens do LLM cortam tags no meio; markdown não tem
+// tags pareadas pra corromper. BE emite markdown, FE converte pra HTML e aplica.
 //
 // Ativa apenas quando `enabled` é true (tipicamente sagaState === EXTRACTING).
 // Emite onDone quando o BE fecha o stream (saga DRAFTED/FAILED). Reconexão
@@ -19,9 +24,11 @@
 import { useAuth } from "@clerk/nextjs";
 import { useEffect, useRef } from "react";
 
-import { createStreamingJsonFieldParser } from "../lib/stream-parser";
-
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
+// Marcador de reset publicado pelo BE (generate.go StreamResetMarker) como 1º
+// chunk de cada geração. Ao recebê-lo, zeramos o buffer acumulado.
+const STREAM_RESET_MARKER = "␞";
 
 interface Options {
   enabled: boolean;
@@ -35,7 +42,9 @@ interface Options {
 
 export function useDraftStream(draftId: string, opts: Options): void {
   const { getToken } = useAuth();
-  const parserRef = useRef(createStreamingJsonFieldParser("draft_markdown"));
+  // Buffer cru de markdown acumulado (não JSON). Zerado por conexão e ao receber
+  // o StreamResetMarker.
+  const accRef = useRef("");
   const onProgressRef = useRef(opts.onProgress);
   const onDoneRef = useRef(opts.onDone);
   const onErrorRef = useRef(opts.onError);
@@ -68,8 +77,8 @@ export function useDraftStream(draftId: string, opts: Options): void {
       };
       if (cancelled || !streamToken) return;
 
-      // Reseta parser por conexão (nova geração pode reiniciar do zero)
-      parserRef.current = createStreamingJsonFieldParser("draft_markdown");
+      // Zera o buffer por conexão (nova geração reinicia do zero).
+      accRef.current = "";
 
       const url = `${API}/v1/pecas/${draftId}/generation-stream?stream_token=${encodeURIComponent(streamToken)}`;
       es = new EventSource(url, { withCredentials: false });
@@ -90,14 +99,28 @@ export function useDraftStream(draftId: string, opts: Options): void {
       // (no pior caso é limitado a 1x/seg em aba em background pelo spec,
       // nunca suspenso por completo), garantindo que o streaming progrida
       // de verdade independente de a aba estar em foco.
+      // resetSeen: só renderizamos DEPOIS do marcador de reset desta geração. Os
+      // chunks que chegam antes são o replay stale da geração anterior (o cliente
+      // costuma conectar antes de o worker resetar o stream Redis) — ignorá-los
+      // elimina o flash da peça antiga. Auto-reconnect do EventSource preserva este
+      // flag (mesma closure), então um resume no meio da geração segue renderizando.
+      let resetSeen = false;
       let pending = false;
       es.addEventListener("chunk", (e: MessageEvent) => {
-        parserRef.current.push(e.data);
+        const data = e.data as string;
+        if (data.includes(STREAM_RESET_MARKER)) {
+          resetSeen = true;
+          accRef.current = data.split(STREAM_RESET_MARKER).pop() ?? "";
+          onProgressRef.current(accRef.current);
+          return;
+        }
+        if (!resetSeen) return; // descarta replay stale pré-reset
+        accRef.current += data;
         if (pending) return;
         pending = true;
         setTimeout(() => {
           pending = false;
-          onProgressRef.current(parserRef.current.full());
+          onProgressRef.current(accRef.current);
         }, 16);
       });
 
