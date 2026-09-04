@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/mock-ui/button";
+import { Input } from "@/components/mock-ui/input";
 import { Card, SectionTitle, Segmented } from "@/components/mock-ui/layout";
 import { Badge, StatusBadge } from "@/components/mock-ui/status-badge";
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
@@ -30,6 +31,7 @@ import type { TaskView } from "@/features/tasks/types";
 import { ApiError } from "@/lib/api/errors";
 import { formatDate } from "@/lib/format";
 
+import { useEditarLabel } from "../hooks/use-editar-label";
 import {
   useIntimacoesByProcesso,
   useTasksByProcesso,
@@ -274,12 +276,13 @@ function CockpitContent({
               ).map(([k, v]) => (
                 <div
                   key={k}
-                  className="border-border flex justify-between gap-3 border-b py-2 text-[13px] last:border-0"
+                  className="border-border flex justify-between gap-3 border-b py-2 text-[13px]"
                 >
                   <span className="text-muted-foreground">{k}</span>
                   <span className="text-right">{v || "—"}</span>
                 </div>
               ))}
+              <ApelidoRow processo={p} />
             </div>
           </Card>
 
@@ -635,6 +638,74 @@ function AbaPecas({
         </div>
       ) : null}
     </Card>
+  );
+}
+
+// ── Apelido (label manual do título) ───────────────────────────────────────────
+
+/**
+ * Linha editável do "Apelido" no card "Dados do processo" — grava PATCH
+ * /v1/processos/:id {label} (limpa o override do título com string vazia).
+ * Mesma linguagem visual das outras linhas do card; vira um mini-form RHF+Zod
+ * sob demanda (botão "editar"), como o form de dados pessoais do Perfil.
+ */
+function ApelidoRow({ processo }: { processo: ProcessoView }) {
+  const { editando, abrir, cancelar, submit, register, errors, isSaving } =
+    useEditarLabel(processo);
+
+  if (editando) {
+    return (
+      <form
+        onSubmit={submit}
+        className="border-border flex items-start justify-between gap-3 border-b py-2 text-[13px] last:border-0"
+      >
+        <span className="text-muted-foreground shrink-0 pt-1.5">Apelido</span>
+        <div className="flex flex-1 flex-col items-end gap-1.5">
+          <Input
+            autoFocus
+            maxLength={255}
+            placeholder="Apelido pro processo (opcional)"
+            aria-invalid={errors.label ? true : undefined}
+            className="text-right"
+            {...register("label")}
+          />
+          {errors.label ? (
+            <p className="text-destructive text-xs">{errors.label.message}</p>
+          ) : null}
+          <div className="flex gap-1.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={cancelar}
+              disabled={isSaving}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" size="sm" disabled={isSaving}>
+              {isSaving ? "Salvando…" : "Salvar"}
+            </Button>
+          </div>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div className="border-border flex justify-between gap-3 border-b py-2 text-[13px] last:border-0">
+      <span className="text-muted-foreground">Apelido</span>
+      <button
+        type="button"
+        onClick={abrir}
+        className="hover:text-foreground -my-0.5 rounded px-1 text-right transition-colors"
+      >
+        {processo.label ? (
+          processo.label
+        ) : (
+          <span className="text-muted-foreground">Definir apelido</span>
+        )}
+      </button>
+    </div>
   );
 }
 

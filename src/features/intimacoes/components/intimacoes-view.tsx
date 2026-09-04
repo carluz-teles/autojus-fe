@@ -24,7 +24,6 @@ import {
   useIntimacoes,
 } from "../hooks/use-intimacoes";
 import { TYPE_LABEL, USER_STATUS_LABEL } from "../lib/labels";
-import { tituloIntimacao } from "../lib/titulo";
 import type {
   IntimacaoPrazoView,
   IntimacaoView,
@@ -722,7 +721,7 @@ function LinhaIntimacao({
       {/* col 2 — título + processo + tag de análise */}
       <span className="min-w-0">
         <span className="text-foreground block truncate text-[14px]">
-          {tituloIntimacao(item)}
+          {item.title}
         </span>
         <span className="mt-0.5 flex items-center gap-2">
           <span className="text-muted-foreground truncate text-[11.5px] tabular-nums">
@@ -785,7 +784,7 @@ function PainelDetalhe({ id }: { id: string }) {
         {TYPE_LABEL[i.type] ?? i.type} · {i.court}
       </p>
       <h2 className="font-display mt-2 text-[26px] leading-tight font-medium text-pretty">
-        {tituloIntimacao(i)}
+        {i.title}
       </h2>
       <p className="text-muted-foreground mt-1 text-xs tabular-nums">
         {i.cnj_number}

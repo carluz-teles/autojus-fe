@@ -10,7 +10,6 @@ import {
   useIntimacoes,
   useIntimacoesSummary,
 } from "@/features/intimacoes/hooks/use-intimacoes";
-import { tituloIntimacao } from "@/features/intimacoes/lib/titulo";
 import type {
   IntimacaoView,
   IntimacoesBuckets,
@@ -164,7 +163,7 @@ function LinhaUrgente({ intimacao: i }: { intimacao: IntimacaoView }) {
     >
       <span className="min-w-0">
         <span className="text-foreground block text-sm font-medium">
-          {tituloIntimacao(i)}
+          {i.title}
         </span>
         <span className="text-muted-foreground mt-0.5 block text-[11.5px] tabular-nums">
           {i.cnj_number}

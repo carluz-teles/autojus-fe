@@ -124,17 +124,11 @@ function publicadoLabel(iso: string | undefined | null): string {
   return dataCurta(iso);
 }
 
-function truncar(texto: string, max = 90): string {
-  const t = texto.trim();
-  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
-}
-
-// Providência exibida: assunto → prévia truncada → classe → "—".
+// Providência exibida: title do BE (label manual > réu+CNJ > classe·assunto,
+// docs/erd-motor-de-prazos-v1.md) — mesma fonte usada em toda a UI, nunca
+// derivado de novo aqui (Regra nº1: uma só fonte de verdade).
 function providenciaLabel(i: IntimacaoView): string {
-  if (i.subject.trim()) return i.subject.trim();
-  if (i.content_preview.trim()) return truncar(i.content_preview);
-  if (i.class.trim()) return i.class.trim();
-  return "—";
+  return i.title.trim() || "—";
 }
 
 function prazoLabelCor(i: IntimacaoView): { label: string; cor: string } {

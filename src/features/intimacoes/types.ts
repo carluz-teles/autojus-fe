@@ -35,6 +35,12 @@ export interface IntimacaoView {
   class: string;
   /** Assunto (court_record.subject); "" quando não informado. */
   subject: string;
+  /**
+   * Título de exibição — calculado no BE, sempre presente. Prioridade: label
+   * manual do processo > réu+CNJ > classe·assunto. Substitui a derivação
+   * client-side que existia em lib/titulo.ts (Regra nº1 — fonte única).
+   */
+  title: string;
   /** ID do court_record — deep-link ao processo (/processos/:court_record_id). */
   court_record_id: string;
   court: string;

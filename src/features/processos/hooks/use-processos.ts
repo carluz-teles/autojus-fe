@@ -151,15 +151,19 @@ export function useAssignResponsavel(processoId: string) {
   });
 }
 
-// Grava a fase (override) e/ou o valor da causa preenchidos à mão no cockpit (PATCH
-// parcial). Mesmo padrão do responsável: o BE ecoa o ProcessoView fresco → reidrata o
-// header a partir da linha persistida, e a lista é invalidada.
+// Grava a fase (override), o valor da causa e/ou o apelido manual do título
+// (label) preenchidos à mão no cockpit (PATCH parcial). Mesmo padrão do
+// responsável: o BE ecoa o ProcessoView fresco → reidrata o header a partir da
+// linha persistida, e a lista é invalidada.
 export function useUpdateProcessoManual(processoId: string) {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { phase?: ProcessoPhase; claim_value?: number }) =>
-      updateProcessoManual(fetcher, processoId, body),
+    mutationFn: (body: {
+      phase?: ProcessoPhase;
+      claim_value?: number;
+      label?: string;
+    }) => updateProcessoManual(fetcher, processoId, body),
     onSuccess: (processo) => {
       qc.setQueryData(processosKeys.detail(processoId), processo);
       qc.invalidateQueries({ queryKey: processosKeys.lists() });
