@@ -16,6 +16,19 @@ export interface ProcessoView {
   degree: ProcessoDegree;
   class: string;
   subject: string;
+  /**
+   * Título de exibição — calculado no BE, sempre presente. Prioridade: label
+   * manual > réu+CNJ > classe·assunto. Espelha IntimacaoView.title (mesma
+   * fonte única, Regra nº1).
+   */
+  title: string;
+  /**
+   * Valor bruto do apelido manual (label do processo) — string quando definido,
+   * null quando não há override (título cai no fallback automático). Só
+   * processos têm este campo (intimações não). Usado para popular o form de
+   * edição do título.
+   */
+  label: string | null;
   judging_body: string;
   filed_at: string | null;
   secrecy: ProcessoSecrecy;

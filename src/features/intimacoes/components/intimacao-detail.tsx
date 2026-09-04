@@ -28,7 +28,6 @@ import {
   useAssignIntimacaoResponsavel,
   useIntimacaoDetalhe,
 } from "../hooks/use-intimacoes";
-import { tituloIntimacao } from "../lib/titulo";
 import type { IntimacaoDetalheView, IntimacaoPrazoView } from "../types";
 import { AnalisarCard } from "./shared/analisar-card";
 import { Avatar, initials } from "./shared/avatar";
@@ -82,7 +81,7 @@ export function IntimacaoDetail({ id }: { id: string }) {
       <header className="mt-2 flex items-start justify-between gap-6">
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-foreground text-[32px] leading-[1.1] font-normal text-pretty">
-            {tituloIntimacao(i)}
+            {i.title}
           </h1>
           <p className="text-muted-foreground mt-2.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12.5px]">
             {i.class ? <span>{i.class} ·</span> : null}

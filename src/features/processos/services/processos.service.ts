@@ -111,13 +111,15 @@ export async function assignResponsavel(
 
 /**
  * PATCH /v1/processos/:id — grava os campos preenchidos à mão no cockpit: a fase
- * (phase, override manual) e/ou o valor da causa (claim_value). Parcial: só os campos
- * enviados são escritos. O BE re-lê e ecoa o ProcessoView fresco.
+ * (phase, override manual), o valor da causa (claim_value) e/ou o apelido manual
+ * do título (label). Parcial: só os campos enviados são escritos. `label: ""`
+ * limpa o override e volta o título ao fallback automático (contrato do BE).
+ * O BE re-lê e ecoa o ProcessoView fresco.
  */
 export async function updateProcessoManual(
   fetcher: ApiFetcher,
   id: string,
-  body: { phase?: ProcessoPhase; claim_value?: number },
+  body: { phase?: ProcessoPhase; claim_value?: number; label?: string },
 ): Promise<ProcessoView> {
   return fetcher<ProcessoView>(`${ENDPOINT}/${id}`, {
     method: "PATCH",

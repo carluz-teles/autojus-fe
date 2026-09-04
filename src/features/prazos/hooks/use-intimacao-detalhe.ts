@@ -14,7 +14,6 @@ import {
   useResolverIntimacao,
 } from "@/features/intimacoes/hooks/use-intimacoes";
 import { TYPE_LABEL } from "@/features/intimacoes/lib/labels";
-import { tituloIntimacao } from "@/features/intimacoes/lib/titulo";
 import type {
   IntimacaoDetalheView,
   IntimacaoUserStatus,
@@ -422,9 +421,10 @@ function useModel(i: IntimacaoDetalheView | undefined) {
       id: i.id,
       cnj: i.cnj_number,
       courtRecordId: i.court_record_id,
-      // Título = o ATO classificado pela IA (pós-análise); fallback classe+assunto
-      // pré-análise. `ato` também alimenta o pill "Ato" da derivação.
-      titulo: i.ai_act?.trim() || tituloIntimacao(i),
+      // Título = o ATO classificado pela IA (pós-análise); fallback ao título
+      // calculado no BE (label manual > réu+CNJ > classe·assunto) pré-análise.
+      // `ato` também alimenta o pill "Ato" da derivação.
+      titulo: i.ai_act?.trim() || i.title,
       ato: i.ai_act?.trim() ?? "",
       tipoLabel: TYPE_LABEL[i.type],
       orgao: i.judging_body || i.court,
