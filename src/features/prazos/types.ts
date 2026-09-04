@@ -136,22 +136,6 @@ export interface PrazoApurarDivergenciaResult {
   decisao: PrazoApurarDivergenciaDecisao;
 }
 
-// ── Apuração de tipo por IA (POST /v1/prazos/:id/apurar-tipo) ──
-
-export type PrazoApurarTipoAcao = "confirmar" | "reclassificar";
-
-/** `tipo` obrigatório só quando acao === "reclassificar". */
-export interface PrazoApurarTipoInput {
-  acao: PrazoApurarTipoAcao;
-  tipo?: string;
-}
-
-export interface PrazoApurarTipoResult {
-  deadline_id: string;
-  tipo: string;
-  selo: PrazoSelo;
-}
-
 // ── F2: confirmar prazo ("Aprovar tudo") ──
 // POST /v1/prazos/confirm — o advogado ajusta o prazo derivado e monta as tarefas;
 // numa tacada o deadline vira OPEN + N tasks. Idempotente por intimation_id.
