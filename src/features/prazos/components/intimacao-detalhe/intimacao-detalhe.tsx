@@ -223,8 +223,6 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
             onAceitarDeclarado={det.onAceitarDeclarado}
             onAceitarCalculado={det.onAceitarCalculado}
             onAjusteManual={det.onAjusteManual}
-            onConfirmarTipo={det.onConfirmarTipo}
-            onReclassificarTipo={det.onReclassificarTipo}
           />
 
           {/* 2 colunas */}
@@ -419,8 +417,6 @@ function MemoriaCalculoCard({
   onAceitarDeclarado,
   onAceitarCalculado,
   onAjusteManual,
-  onConfirmarTipo,
-  onReclassificarTipo,
 }: {
   memoria: MemoriaCalculoVM | null;
   pending: boolean;
@@ -429,13 +425,9 @@ function MemoriaCalculoCard({
   onAceitarDeclarado: () => void;
   onAceitarCalculado: () => void;
   onAjusteManual: (endDate: string) => void;
-  onConfirmarTipo: () => void;
-  onReclassificarTipo: (tipo: string) => void;
 }) {
   const [ajustando, setAjustando] = useState(false);
   const [dataAjuste, setDataAjuste] = useState("");
-  const [reclassificando, setReclassificando] = useState(false);
-  const [novoTipo, setNovoTipo] = useState("");
 
   if (!pending && !erro && !memoria) return null;
 
@@ -601,122 +593,6 @@ function MemoriaCalculoCard({
                 <Check className="size-3.5 shrink-0" strokeWidth={2.2} />
                 Apurado — {memoria.divergencia.decisaoLabel}. Selo agora
                 Confiável; decisão registrada na trilha.
-              </div>
-            </div>
-          ) : null}
-
-          {/* APURAÇÃO: tipo inferido por IA */}
-          {memoria.tipoIa?.pendente ? (
-            <div
-              className="border-line2 border-b px-[18px] py-[15px]"
-              style={{
-                background:
-                  "color-mix(in oklch, var(--primary) 5%, transparent)",
-              }}
-            >
-              <div className="mb-[11px] flex items-center gap-2">
-                <Sparkles
-                  className="text-primary size-[15px]"
-                  strokeWidth={1.8}
-                />
-                <span className="text-primary text-[12.5px] font-semibold">
-                  Tipo inferido por IA — confirme antes de assumir
-                </span>
-                <span className="text-fg3 ml-auto font-mono text-[11px]">
-                  confiança {memoria.tipoIa.confPct}%
-                </span>
-              </div>
-              <div className="border-line bg-panel mb-[11px] rounded-[9px] border px-[13px] py-[11px]">
-                <div className="text-fg3 text-[10px] tracking-[0.04em] uppercase">
-                  Ato classificado
-                </div>
-                <div className="font-display my-2 text-[17px]">
-                  {memoria.tipoIa.tipo}
-                </div>
-                <div
-                  role="progressbar"
-                  aria-valuenow={memoria.tipoIa.confPct}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label={`Confiança da classificação: ${memoria.tipoIa.confPct}%`}
-                  className="bg-line2 h-[5px] overflow-hidden rounded-full"
-                >
-                  <div
-                    className="bg-primary h-full"
-                    style={{ width: `${memoria.tipoIa.confPct}%` }}
-                  />
-                </div>
-              </div>
-
-              {!reclassificando ? (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={onConfirmarTipo}
-                    disabled={emVoo}
-                    className="bg-primary text-primary-foreground rounded-lg px-[13px] py-2 text-[12.5px] font-medium disabled:opacity-60"
-                  >
-                    Confirmar tipo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setReclassificando(true)}
-                    disabled={emVoo}
-                    className="border-line bg-panel text-foreground hover:bg-hover rounded-lg border px-[13px] py-2 text-[12.5px] disabled:opacity-60"
-                  >
-                    Reclassificar
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-end gap-2">
-                  <label className="flex flex-col gap-1">
-                    <span className="text-fg3 text-[11px]">Novo tipo</span>
-                    <Input
-                      value={novoTipo}
-                      onChange={(e) => setNovoTipo(e.target.value)}
-                      placeholder="Ex.: Embargos de declaração"
-                      aria-label="Novo tipo do ato"
-                      className="h-8 w-56 text-[12.5px]"
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    disabled={emVoo || novoTipo.trim() === ""}
-                    onClick={() => {
-                      onReclassificarTipo(novoTipo);
-                      setReclassificando(false);
-                      setNovoTipo("");
-                    }}
-                    className="bg-primary text-primary-foreground rounded-lg px-[13px] py-2 text-[12.5px] font-medium disabled:opacity-60"
-                  >
-                    Confirmar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setReclassificando(false)}
-                    disabled={emVoo}
-                    className="text-fg3 hover:bg-hover rounded-lg px-[13px] py-2 text-[12.5px] disabled:opacity-60"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : null}
-
-          {memoria.tipoIa?.resolvida ? (
-            <div className="border-line2 border-b px-[18px] py-[15px]">
-              <div
-                role="status"
-                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px]"
-                style={{
-                  background:
-                    "color-mix(in oklch, var(--green) 10%, transparent)",
-                  color: "var(--green)",
-                }}
-              >
-                <Check className="size-3.5 shrink-0" strokeWidth={2.2} />
-                Tipo confirmado — selo agora Confiável; registrado na trilha.
               </div>
             </div>
           ) : null}

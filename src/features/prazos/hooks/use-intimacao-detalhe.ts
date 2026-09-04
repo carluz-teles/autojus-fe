@@ -30,7 +30,6 @@ import type {
   PrazoSelo,
 } from "../types";
 import { useApurarDivergenciaPrazo } from "./use-apurar-divergencia-prazo";
-import { useApurarTipoPrazo } from "./use-apurar-tipo-prazo";
 import { usePrazo } from "./use-prazo";
 
 // ── helpers puros (rótulos/datas) ────────────────────────────────────────────
@@ -273,13 +272,6 @@ export interface MemoriaCalculoVM {
     causa: string;
     decisaoLabel: string;
   } | null;
-  tipoIa: {
-    pendente: boolean;
-    resolvida: boolean;
-    tipo: string;
-    /** 0-100. */
-    confPct: number;
-  } | null;
 }
 
 /** Deriva a VM da memória de cálculo a partir do PrazoDetalheView (V1). Prazo
@@ -334,16 +326,6 @@ function buildMemoria(p: PrazoDetalheView | null): MemoriaCalculoVM | null {
     : null;
 
   const tipoIaPendente = p.origem === "ia" && p.selo === "a_apurar";
-  const tipoIaResolvida = p.origem === "ia" && p.selo === "confiavel";
-  const tipoIa =
-    calc && (tipoIaPendente || tipoIaResolvida)
-      ? {
-          pendente: tipoIaPendente,
-          resolvida: tipoIaResolvida,
-          tipo: calc.ia_tipo_inferido?.trim() || "—",
-          confPct: Math.round((calc.ia_confianca ?? 0) * 100),
-        }
-      : null;
 
   return {
     prazoId: p.id,
@@ -368,7 +350,6 @@ function buildMemoria(p: PrazoDetalheView | null): MemoriaCalculoVM | null {
       ambito: h.ambito?.trim() || "—",
     })),
     divergencia,
-    tipoIa,
   };
 }
 
@@ -514,18 +495,17 @@ export function useIntimacaoDetalhe(id: string) {
   const prazoId = i?.prazo?.deadline_id ?? null;
   const prazoDetalhe = usePrazo(prazoId);
   const apurarDivergencia = useApurarDivergenciaPrazo();
-  const apurarTipo = useApurarTipoPrazo();
   const memoria = useMemo(
     () => buildMemoria(prazoDetalhe.prazo),
     [prazoDetalhe.prazo],
   );
 
-  // A apuração (divergência/tipo) roda no slice "prazos" mas o BE mescla o
+  // A apuração (divergência) roda no slice "prazos" mas o BE mescla o
   // evento resultante na Trilha da intimação (i.history) e pode confirmar o
   // prazo (stepper) — ambos lidos da query de detalhe da intimação, não da de
   // prazos. Invalida aqui (orquestrador, onde o `id` já está disponível) em vez
-  // de dentro de use-apurar-divergencia-prazo/use-apurar-tipo-prazo, pra não
-  // acoplar esses hooks genéricos ao query key do slice intimacoes.
+  // de dentro de use-apurar-divergencia-prazo, pra não acoplar esse hook
+  // genérico ao query key do slice intimacoes.
   const invalidateIntimacaoDetalhe = () =>
     queryClient.invalidateQueries({ queryKey: intimacoesKeys.detail(id) });
 
@@ -579,38 +559,6 @@ export function useIntimacaoDetalhe(id: string) {
         },
         onError: () =>
           toast.error("Não foi possível registrar o ajuste. Tente novamente."),
-      },
-    );
-  };
-
-  const onConfirmarTipo = () => {
-    if (!prazoId) return;
-    apurarTipo.apurar(
-      { prazoId, body: { acao: "confirmar" } },
-      {
-        onSuccess: () => {
-          invalidateIntimacaoDetalhe();
-          toast.success("Tipo confirmado.");
-        },
-        onError: () =>
-          toast.error("Não foi possível confirmar o tipo. Tente novamente."),
-      },
-    );
-  };
-
-  const onReclassificarTipo = (tipo: string) => {
-    if (!prazoId || !tipo.trim()) return;
-    apurarTipo.apurar(
-      { prazoId, body: { acao: "reclassificar", tipo: tipo.trim() } },
-      {
-        onSuccess: () => {
-          invalidateIntimacaoDetalhe();
-          toast.success("Tipo reclassificado.");
-        },
-        onError: () =>
-          toast.error(
-            "Não foi possível reclassificar o tipo. Tente novamente.",
-          ),
       },
     );
   };
@@ -677,11 +625,9 @@ export function useIntimacaoDetalhe(id: string) {
     memoria,
     memoriaPending: !!prazoId && prazoDetalhe.isPending,
     memoriaErro: !!prazoId && prazoDetalhe.isError,
-    memoriaEmVoo: apurarDivergencia.isPending || apurarTipo.isPending,
+    memoriaEmVoo: apurarDivergencia.isPending,
     onAceitarDeclarado,
     onAceitarCalculado,
     onAjusteManual,
-    onConfirmarTipo,
-    onReclassificarTipo,
   };
 }
