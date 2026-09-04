@@ -168,25 +168,6 @@ export interface Draft {
   contentEdited: boolean;
 }
 
-/** Step atual do peticionamento — derivado dos timestamps. */
-export type WorkflowStep =
-  "construcao" | "assinatura" | "protocolo" | "concluida";
-
-/** Deriva o step atual a partir dos 3 timestamps datados. Regra:
- *  sentToSigningAt=null → Construção;
- *  sentToSigningAt!=null && signedAt=null → Assinatura;
- *  signedAt!=null && filedAt=null → Protocolo;
- *  filedAt!=null → Concluída.
- */
-export function deriveStep(
-  d: Pick<Draft, "sentToSigningAt" | "signedAt" | "filedAt">,
-): WorkflowStep {
-  if (d.filedAt) return "concluida";
-  if (d.signedAt) return "protocolo";
-  if (d.sentToSigningAt) return "assinatura";
-  return "construcao";
-}
-
 // ── Iteração / ajustes rápidos ───────────────────────────────────────────────
 
 /** Escopo de uma iteração: "peça toda" ou uma seção específica (id estável da
@@ -259,29 +240,6 @@ export interface ChatMessage {
 
 export type QuickActionKind =
   "summarize_case" | "suggest_theses" | "check_deadline" | "find_precedents";
-
-// ── Protocolo automático (Fatia 1 — e-SAJ) ──────────────────────────────────
-
-/** Status de uma tentativa de protocolo automático no e-SAJ. */
-export type FilingStatus =
-  "ENFILEIRADO" | "PROTOCOLANDO" | "PROTOCOLADO" | "FALHOU";
-
-/** Resposta do POST /v1/pecas/:id/filing/approve (201 na 1ª vez, 200 idempotente). */
-export interface FilingApproveResult {
-  filingAttemptId: string;
-  status: FilingStatus;
-  isIdempotent: boolean;
-}
-
-/** Tentativa de protocolo — GET /v1/pecas/:id/filing (null se nunca solicitado). */
-export interface FilingAttempt {
-  id: string;
-  status: FilingStatus;
-  requestedAt: string;
-  finishedAt: string | null;
-  failureReason: string | null;
-  filingNumber: string | null;
-}
 
 // ── Teses da peça (contrato Teses — provenance obrigatória) ──────────────────
 
