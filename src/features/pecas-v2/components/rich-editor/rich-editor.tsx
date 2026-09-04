@@ -40,6 +40,9 @@ export interface RichEditorHandle {
   appendHtml(html: string): void;
   /** Substitui o conteúdo inteiro. */
   setHtml(html: string): void;
+  /** HTML atual do documento — usado pelo "Salvar" da barra pra fazer o flush
+   *  explícito do autosave (o mesmo `editor.getHTML()` do Tiptap). */
+  getHTML(): string;
   /** Rola pro fim (útil enquanto o cursor da IA vai descendo). */
   scrollToEnd(): void;
   /** Destaca visualmente a seção cujo heading começa com o algarismo romano
@@ -202,6 +205,9 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
           lastExternalHtml.current = next;
           editor.commands.setContent(next, { emitUpdate: false });
           lastAppliedHtml.current = editor.getHTML();
+        },
+        getHTML() {
+          return editor?.getHTML() ?? "";
         },
         scrollToEnd() {
           const el = document.querySelector(".tiptap-a4-page");

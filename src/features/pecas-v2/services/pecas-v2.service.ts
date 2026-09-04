@@ -29,9 +29,6 @@ import type {
 import type {
   ChatMessage,
   Draft,
-  FilingApproveResult,
-  FilingAttempt,
-  FilingStatus,
   IterateScope,
   IterationResult,
   PendingChange,
@@ -381,23 +378,7 @@ export async function refazerDoZero(
   return { sagaState: "EXTRACTING" };
 }
 
-// ── Workflow steps (Fatia 2a) ───────────────────────────────────────────────
-
-/** "Enviar para assinatura" — marca sent_to_signing_at=now(). Idempotente. */
-export async function sendToSigning(
-  fetcher: ApiFetcher,
-  id: string,
-): Promise<void> {
-  await fetcher(`${ENDPOINT}/${id}/enviar-para-assinatura`, { method: "POST" });
-}
-
-/** Voltar pra Construção — nulla sent_to_signing_at. 404 se já assinado. */
-export async function revertToConstruction(
-  fetcher: ApiFetcher,
-  id: string,
-): Promise<void> {
-  await fetcher(`${ENDPOINT}/${id}/voltar-para-construcao`, { method: "POST" });
-}
+// ── Autosave do editor rico (PUT /pecas/:id/content-html) ───────────────────
 
 /** Autosave do editor rico (Fase B). Grava content_html direto na coluna.
  *  A partir do 1º save, content_html vira source-of-truth pro renderer PDF
@@ -412,90 +393,6 @@ export async function saveContentHtml(
     method: "PUT",
     body: { content_html: contentHtml },
   });
-}
-
-/** Assinar peça — Fatia 2b. Gera PDF no BE, chama GCP KMS pra assinatura RSA,
- *  aplica PAdES via digitorus/pdfsign, sobe PDF assinado no storage. Requer
- *  certificate_id do certificado A1 cadastrado. Senha vem do vault (não é
- *  pedida ao user — armazenada cifrada no upload). */
-export async function signPeca(
-  fetcher: ApiFetcher,
-  id: string,
-  certificateId: string,
-): Promise<void> {
-  await fetcher(`${ENDPOINT}/${id}/sign`, {
-    method: "POST",
-    body: { certificate_id: certificateId },
-  });
-}
-
-/** Marcar como protocolada — grava filed_at + filing_number opcional. */
-export async function filePeca(
-  fetcher: ApiFetcher,
-  id: string,
-  filingNumber: string,
-): Promise<void> {
-  await fetcher(`${ENDPOINT}/${id}/file`, {
-    method: "POST",
-    body: { filing_number: filingNumber },
-  });
-}
-
-// ── Protocolo automático (Fatia 1 — e-SAJ) ──────────────────────────────────
-// NUNCA dispara sozinho: exige o clique explícito de "Protocolar automaticamente"
-// (ver docs/erd-execucao-judicial-tjsp.md §16 — o RPA em si ainda está em
-// calibração contra o e-SAJ real; o fallback manual do step Protocolo continua
-// disponível se a credencial não estiver cadastrada ou a tentativa falhar).
-
-interface FilingApproveResultAPI {
-  filing_attempt_id: string;
-  status: FilingStatus;
-  is_idempotent: boolean;
-}
-
-interface FilingAttemptAPI {
-  id: string;
-  status: FilingStatus;
-  requested_at: string;
-  finished_at?: string | null;
-  failure_reason?: string | null;
-  filing_number?: string | null;
-}
-
-/** Aprova o protocolo automático — POST /v1/pecas/:id/filing/approve. */
-export async function approveFiling(
-  fetcher: ApiFetcher,
-  id: string,
-): Promise<FilingApproveResult> {
-  const res = await fetcher<DataEnvelope<FilingApproveResultAPI>>(
-    `${ENDPOINT}/${id}/filing/approve`,
-    { method: "POST" },
-  );
-  return {
-    filingAttemptId: res.data.filing_attempt_id,
-    status: res.data.status,
-    isIdempotent: res.data.is_idempotent,
-  };
-}
-
-/** Status da tentativa de protocolo automático — GET /v1/pecas/:id/filing
- *  (null quando nunca foi solicitado). */
-export async function getFilingStatus(
-  fetcher: ApiFetcher,
-  id: string,
-): Promise<FilingAttempt | null> {
-  const res = await fetcher<DataEnvelope<FilingAttemptAPI | null>>(
-    `${ENDPOINT}/${id}/filing`,
-  );
-  if (!res.data) return null;
-  return {
-    id: res.data.id,
-    status: res.data.status,
-    requestedAt: res.data.requested_at,
-    finishedAt: res.data.finished_at ?? null,
-    failureReason: res.data.failure_reason ?? null,
-    filingNumber: res.data.filing_number ?? null,
-  };
 }
 
 // ── Anexos (POST/DELETE /pecas/:id/anexos) ────────────────────────────────────

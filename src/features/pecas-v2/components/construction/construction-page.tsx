@@ -13,8 +13,10 @@
 // com o design). Componente = JSX + binding; a lógica vive no useConstruction.
 
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { useConstruction } from "../../hooks/use-construction";
+import { useSaveContentHtml } from "../../hooks/use-workflow";
 import { draftToPecaContexto } from "../../lib/peca-contexto";
 import { ContextRail } from "../pregen/context-rail";
 import { EmptyCenter } from "../pregen/empty-center";
@@ -53,6 +55,18 @@ export function ConstructionPage({ id }: { id: string }) {
   // content_html vivo (fonte-única).
   const editorRef = useRef<RichEditorHandle | null>(null);
 
+  // "Salvar" = flush explícito do autosave (o EditorCenter já salva com debounce;
+  // isto força o PUT do HTML atual + feedback). Só faz sentido na peça pronta.
+  const salvar = useSaveContentHtml(id);
+  const handleSalvar = () => {
+    const html = editorRef.current?.getHTML();
+    if (!html) return;
+    salvar.mutate(html, {
+      onSuccess: () => toast.success("Salvo"),
+      onError: () => toast.error("Não foi possível salvar. Tente de novo."),
+    });
+  };
+
   if (isLoading) return <PageSkeleton />;
   if (isError || !draft) return <PageError onBack={voltar} />;
 
@@ -70,6 +84,9 @@ export function ConstructionPage({ id }: { id: string }) {
         title={draft.title}
         cnjShort={shortCnj(draft.process.cnj)}
         onBack={voltar}
+        onSalvar={handleSalvar}
+        salvando={salvar.isPending}
+        podeSalvar={stage === "pronta"}
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
