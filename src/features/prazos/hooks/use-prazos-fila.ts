@@ -2,29 +2,30 @@
 
 import { useMemo, useState } from "react";
 
+import { useActionItems } from "@/features/action-items/hooks/use-action-items";
+import { STATUS_LABEL } from "@/features/action-items/lib/status-pill";
+import type { ActionItemView } from "@/features/action-items/types";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { iniciais, nomeExibicao } from "@/features/organization/lib/labels";
 import { diasRestantes, rotuloPrazo } from "@/features/shared/prazo";
-import { useTasks } from "@/features/tasks/hooks/use-tasks";
-import type { TaskView } from "@/features/tasks/types";
 
 import { cnjCurto, urg, type UrgKey } from "../lib/derivar";
 
-// Fila / Meus Prazos ligadas a GET /v1/tasks (real) — não mais ao mock de
-// PrazoMock. "Meus Prazos" trava assignee="me" (o BE resolve pelo JWT); a
-// Fila deixa "Todos" ou uma pílula de responsável (id interno, via
-// useOrgMembersDirectory — GET /v1/organization/members).
+// Fila / Meus Prazos ligadas a GET /v1/action-items (real). "Meus Prazos" trava
+// assignee="me" (o BE resolve pelo JWT); a Fila deixa "Todos" ou uma pílula de
+// responsável (id interno, via useOrgMembersDirectory).
 
 // Janela única (sem "carregar mais" nessa tela — é fila de trabalho, não
-// histórico). Cobre o volume esperado de tarefas OPEN de um escritório.
+// histórico). Cobre o volume esperado de providências ativas de um escritório.
 const FILA_PAGE_SIZE = 200;
 const TETO = 25;
 
-// Item de uma faixa da fila: TaskView decorado pra bind direto na UI.
+// Item de uma faixa da fila: ActionItemView decorado pra bind direto na UI.
 export interface FilaItem {
   id: string;
   providencia: string;
-  displayStatus: string;
+  status: ActionItemView["status"];
+  statusLabel: string;
   dias: number | null;
   prazoLabel: string;
   urgCor: string;
@@ -33,8 +34,6 @@ export interface FilaItem {
   court: string;
   respLabel: string;
   respIniciais: string;
-  /** Só navega quando a tarefa tem intimation_id (tarefa avulsa não tem detalhe). */
-  clickable: boolean;
   href: string;
 }
 
@@ -59,9 +58,7 @@ export interface FilaFiltro {
   onClick: () => void;
 }
 
-// Faixas fixas — port de _filaView (gdefs), agora em DIAS CORRIDOS (diferença
-// cosmética aceita: o cálculo em dias úteis fica no slice deadline). Tarefa
-// sem due_date (dias null) cai em "Depois".
+// Faixas fixas em DIAS CORRIDOS. Providência sem due_date (dias null) cai em "Depois".
 const GDEFS: {
   label: string;
   cor: string;
@@ -89,8 +86,7 @@ const GDEFS: {
 ];
 
 // Dias corridos até o vencimento, contra HOJE real. null = sem due_date.
-// hoje resolvido a cada chamada (nunca cacheado no módulo).
-function diasDaTarefa(dueDate: string | null): number | null {
+function diasDaProvidencia(dueDate: string | null): number | null {
   if (!dueDate) return null;
   return diasRestantes(
     dueDate.slice(0, 10),
@@ -99,26 +95,26 @@ function diasDaTarefa(dueDate: string | null): number | null {
 }
 
 function decorar(
-  t: TaskView,
+  p: ActionItemView,
   nameFor: (id: string | undefined | null) => string | null,
 ): FilaItem {
-  const dias = diasDaTarefa(t.due_date);
+  const dias = diasDaProvidencia(p.due_date);
   const u = urg(dias ?? Number.POSITIVE_INFINITY);
-  const nome = nameFor(t.assignee_user_id);
+  const nome = nameFor(p.assignee_user_id);
   return {
-    id: t.id,
-    providencia: t.title,
-    displayStatus: t.display_status ?? "",
+    id: p.id,
+    providencia: p.title,
+    status: p.status,
+    statusLabel: STATUS_LABEL[p.status],
     dias,
     prazoLabel: rotuloPrazo(dias),
     urgCor: u.cor,
     urgK: u.k,
-    cnjCurto: t.cnj_number ? cnjCurto(t.cnj_number) : "",
-    court: t.court ?? "",
+    cnjCurto: p.cnj_number ? cnjCurto(p.cnj_number) : "",
+    court: p.court ?? "",
     respLabel: nome ?? "—",
     respIniciais: nome ? iniciais(nome) : "—",
-    clickable: !!t.intimation_id,
-    href: t.intimation_id ? `/intimacoes/${t.intimation_id}` : "",
+    href: `/providencias/${p.id}`,
   };
 }
 
@@ -131,24 +127,29 @@ function useFilaResp(meus: boolean) {
   return { respId, efetivo, setRespId };
 }
 
-// Hook público da Fila — compõe os sub-hooks e devolve tudo bindável. O
-// componente só faz JSX + binding (regra do CLAUDE.md).
+// Hook público da Fila — compõe os sub-hooks e devolve tudo bindável.
 export function usePrazosFila(meus = false) {
   const filtro = useFilaResp(meus);
   const directory = useOrgMembersDirectory();
 
-  const query = useTasks({
-    status: "OPEN",
+  // Sem filtro de status: a fila de trabalho mostra TODO + WORKING; excluímos
+  // DONE client-side (a fila é "o que ainda precisa ser feito", não histórico).
+  const query = useActionItems({
     assignee: filtro.efetivo,
     pageSize: FILA_PAGE_SIZE,
   });
 
+  const ativas = useMemo(
+    () => query.providencias.filter((p) => p.status !== "DONE"),
+    [query.providencias],
+  );
+
   const grupos = useMemo<FilaGrupo[]>(
     () =>
       GDEFS.map((g) => {
-        const decorados = query.tarefas
-          .filter((t) => g.test(diasDaTarefa(t.due_date)))
-          .map((t) => decorar(t, directory.nameFor))
+        const decorados = ativas
+          .filter((p) => g.test(diasDaProvidencia(p.due_date)))
+          .map((p) => decorar(p, directory.nameFor))
           .sort((a, b) => (a.dias ?? Infinity) - (b.dias ?? Infinity));
         return {
           label: g.label,
@@ -160,7 +161,7 @@ export function usePrazosFila(meus = false) {
           temExtra: decorados.length > TETO,
         };
       }).filter((g) => g.n > 0),
-    [query.tarefas, directory.nameFor],
+    [ativas, directory.nameFor],
   );
 
   const filtros = useMemo<FilaFiltro[]>(() => {
@@ -191,6 +192,6 @@ export function usePrazosFila(meus = false) {
     grupos,
     filtros,
     podeFiltroResp: !meus,
-    total: query.tarefas.length.toLocaleString("pt-BR"),
+    total: ativas.length.toLocaleString("pt-BR"),
   };
 }

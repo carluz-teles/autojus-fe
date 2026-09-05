@@ -184,10 +184,10 @@ export async function analisarIntimacao(
 }
 
 /**
- * Confirma a providência sugerida pela IA — POST /v1/action-items/:id/confirmar.
- * Promove tipo_status "a_confirmar"→"confiavel"; a tarefa REAL nasce sozinha, depois,
- * via worker assíncrono (a UI faz poll curto no detalhe até o task_id aparecer — ver
- * useConfirmarActionItem). Idempotente, body vazio.
+ * Confirma o TIPO da providência — POST /v1/action-items/:id/confirmar. Promove o
+ * gate de tipo "a_confirmar"→"confiavel" (é o "Confirmar tipo" do card de leitura,
+ * NÃO o "Iniciar providência"). Idempotente, body vazio. O ciclo de trabalho da
+ * providência (iniciar/comecar/concluir) é separado deste gate de tipo.
  */
 export async function confirmarActionItem(
   fetcher: ApiFetcher,
@@ -195,21 +195,6 @@ export async function confirmarActionItem(
 ): Promise<IntimacaoProvidencia> {
   const res = await fetcher<DataEnvelope<IntimacaoProvidencia>>(
     `${ACTION_ITEMS_ENDPOINT}/${actionItemId}/confirmar`,
-    { method: "POST" },
-  );
-  return res.data;
-}
-
-/**
- * Descarta a providência — POST /v1/action-items/:id/descartar. status→DISCARDED.
- * Idempotente, body vazio.
- */
-export async function descartarActionItem(
-  fetcher: ApiFetcher,
-  actionItemId: string,
-): Promise<IntimacaoProvidencia> {
-  const res = await fetcher<DataEnvelope<IntimacaoProvidencia>>(
-    `${ACTION_ITEMS_ENDPOINT}/${actionItemId}/descartar`,
     { method: "POST" },
   );
   return res.data;

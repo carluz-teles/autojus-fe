@@ -40,7 +40,6 @@ import {
   rotuloPrazo,
   urgenciaDe,
 } from "@/features/shared/prazo";
-import { useTasksDaIntimacao } from "@/features/tasks/hooks/use-tasks-da-intimacao";
 import { formatBytes, formatDate } from "@/lib/format";
 import { sanitizeContentHtml } from "@/lib/html/sanitize-content";
 import { cn } from "@/lib/utils";
@@ -192,7 +191,7 @@ export function PecaContextoFromIntimacao({
 }
 
 // PecaContextoBody é o render puro — todas as buscas dependentes acontecem
-// aqui (usePartes, useIntimacaoDetalhe pra distribution_date, useTasksDaIntimacao).
+// aqui (usePartes, useIntimacaoDetalhe pra distribution_date + providências).
 // Nunca importado por telas — só por adapters PecaContexto/PecaContextoFromIntimacao.
 interface PecaContextoBodyProps {
   // Prazo
@@ -255,8 +254,9 @@ function PecaContextoBody({
   const distribuicao =
     distributionDateOverride || intimDetail?.distribution_date || "";
 
-  // Providências = tasks vinculadas à intimação (quando existe).
-  const { tasks: providencias } = useTasksDaIntimacao(intimId || null);
+  // Providências (action_item) da intimação de origem — vêm no detalhe da
+  // intimação (ai_providencias).
+  const providencias = intimDetail?.ai_providencias ?? [];
 
   return (
     // w-[300px] shrink-0 — a sidebar tem largura FIXA em todas as 3 telas
@@ -355,24 +355,22 @@ function PecaContextoBody({
         <>
           <Rotulo className="mt-6">Providências</Rotulo>
           <div className="flex flex-col gap-1.5">
-            {providencias.map((t) => (
+            {providencias.map((p) => (
               <div
-                key={t.id}
+                key={p.id}
                 className="flex gap-2 py-1 text-[12.5px] leading-[1.35]"
               >
                 <span className="text-[var(--gold)]">•</span>
                 <div className="min-w-0 flex-1">
-                  <span className="block">{t.title}</span>
+                  <span className="block">{p.title ?? "Providência"}</span>
                   <Link
-                    href={`/tarefas?task=${t.id}`}
+                    href={`/providencias/${p.id}`}
                     className="text-primary mt-0.5 inline-flex items-center gap-1 font-mono text-[10.5px] no-underline hover:no-underline"
                   >
-                    {t.source ? `${t.source} · ` : ""}
-                    {t.status === "DONE"
-                      ? "Concluída"
-                      : t.status === "DISMISSED"
-                        ? "Descartada"
-                        : "Aberta"}
+                    {p.gera_peca ? "Peça · " : "Ciência · "}
+                    {p.tipo_status === "confiavel"
+                      ? "Confiável"
+                      : "A confirmar"}
                     <ArrowUpRight className="size-2.5" strokeWidth={2.4} />
                   </Link>
                 </div>

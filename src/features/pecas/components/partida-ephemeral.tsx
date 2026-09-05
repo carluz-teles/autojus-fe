@@ -249,8 +249,8 @@ export function PartidaEphemeral({
               pra trocar o tipo — as teses são re-sugeridas.
             </p>
             <p className="text-muted-foreground mt-1.5 text-[13px] leading-[1.6]">
-              A IA parte da intimação e das providências desta tarefa. Oriente
-              como conduzir — você revisa e refaz o que quiser antes de assinar.
+              Parte da intimação e das providências. Oriente como conduzir —
+              você revisa e refaz o que quiser antes de assinar.
             </p>
 
             <div className="border-border bg-muted/40 my-6 rounded-xl border px-4 py-3.5">

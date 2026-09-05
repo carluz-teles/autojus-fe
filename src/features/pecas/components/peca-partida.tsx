@@ -370,9 +370,8 @@ export function PecaPartida({ id, onWorkspace }: PecaPartidaProps) {
                 Vamos redigir sua {tipoPecaLabel}
               </h2>
               <p className="text-muted-foreground mt-1.5 text-[13px] leading-[1.6]">
-                A IA parte da intimação e das providências desta tarefa. Oriente
-                como conduzir — você revisa e refaz o que quiser antes de
-                assinar.
+                Parte da intimação e das providências. Oriente como conduzir —
+                você revisa e refaz o que quiser antes de assinar.
               </p>
 
               {/* Painel "A IA vai usar" */}

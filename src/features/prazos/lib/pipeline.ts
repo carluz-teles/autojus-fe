@@ -1,62 +1,54 @@
-// Lógica pura do Pipeline (Board + Funil) sobre TODAS as tarefas reais (não só
-// peça-bound) — 4 estágios FIXOS (A Fazer/Elaboração/Revisão/Concluída), vindos
-// do `stage` do BE (projeção pura, sem campo gravável equivalente — por isso o
-// Pipeline é somente-leitura, sem drag). Uma tarefa sem draft pula direto de
-// A_FAZER pra CONCLUIDA (nunca passa por Elaboração/Revisão). Sem JSX/React: só
-// deriva colunas/funil/aria-label a partir de TaskView[]. As chaves de ícone
-// reusam 4 das 6 chaves do PrazoStage legado (StatusIcon em components/icons.tsx)
-// — reuso direto, sem criar glifo novo.
+// Lógica pura do Pipeline (Board + Funil) sobre as providências reais (action_item)
+// — 3 colunas FIXAS por `status` de trabalho (A Fazer=TODO / Em elaboração=WORKING
+// / Concluída=DONE). SUGGESTED nunca aparece (o BE não o retorna no board). SEM
+// coluna "Revisão". O Pipeline é somente-leitura (sem drag): a mudança de status
+// só acontece por ação de domínio (iniciar/comecar/concluir), nunca por arrastar.
+// Sem JSX/React: só deriva colunas/funil/aria-label a partir de ActionItemView[].
+// As chaves de ícone reusam chaves do StatusIcon legado (components/icons.tsx).
 
+import type { ActionItemView } from "@/features/action-items/types";
 import { diasRestantes, rotuloPrazo } from "@/features/shared/prazo";
-import type { TaskView } from "@/features/tasks/types";
 import { formatarDataCurta } from "@/lib/utils";
 
 import { iniciais } from "../../organization/lib/labels";
 import { cnjCurto, urg, type UrgKey } from "./derivar";
 
-export type PipelineStageKey =
-  "A_FAZER" | "ELABORACAO" | "REVISAO" | "CONCLUIDA";
+// A chave da coluna É o status de trabalho do BE (TODO/WORKING/DONE) — sem
+// remapeamento intermediário, a coluna reflete direto o status da providência.
+export type PipelineStatusKey = "TODO" | "WORKING" | "DONE";
 
-export const PIPELINE_ORDEM: readonly PipelineStageKey[] = [
-  "A_FAZER",
-  "ELABORACAO",
-  "REVISAO",
-  "CONCLUIDA",
+export const PIPELINE_ORDEM: readonly PipelineStatusKey[] = [
+  "TODO",
+  "WORKING",
+  "DONE",
 ];
 
-export const PIPELINE_LABEL: Record<PipelineStageKey, string> = {
-  A_FAZER: "A Fazer",
-  ELABORACAO: "Elaboração",
-  REVISAO: "Revisão",
-  CONCLUIDA: "Concluída",
+export const PIPELINE_LABEL: Record<PipelineStatusKey, string> = {
+  TODO: "A Fazer",
+  WORKING: "Em elaboração",
+  DONE: "Concluída",
 };
 
-// Chave em minúsculo do StatusIcon (components/icons.tsx, tipado PrazoStage) —
-// os 4 estágios do stage reusam 4 das 6 chaves legadas: "intimacao" (círculo
-// tracejado = ainda não iniciada) representa A_FAZER, "protocolado" (círculo
-// preenchido com check) representa CONCLUIDA — mesmo glifo de "concluído", sem
-// reintroduzir o conceito de "protocolo" que a tarefa não carrega mais.
-export type PipelineIconKey =
-  "intimacao" | "elaboracao" | "revisao" | "protocolado";
+// Chave em minúsculo do StatusIcon (components/icons.tsx, tipado PrazoStage) — as
+// 3 colunas reusam chaves legadas: "intimacao" (círculo tracejado) = A Fazer,
+// "elaboracao" = Em elaboração, "protocolado" (círculo com check) = Concluída.
+export type PipelineIconKey = "intimacao" | "elaboracao" | "protocolado";
 
-export const PIPELINE_ICON_KEY: Record<PipelineStageKey, PipelineIconKey> = {
-  A_FAZER: "intimacao",
-  ELABORACAO: "elaboracao",
-  REVISAO: "revisao",
-  CONCLUIDA: "protocolado",
+export const PIPELINE_ICON_KEY: Record<PipelineStatusKey, PipelineIconKey> = {
+  TODO: "intimacao",
+  WORKING: "elaboracao",
+  DONE: "protocolado",
 };
 
-const PIPELINE_COR: Record<PipelineStageKey, string> = {
-  A_FAZER: "var(--fg3)",
-  ELABORACAO: "var(--primary)",
-  REVISAO: "var(--gold)",
-  CONCLUIDA: "var(--green)",
+const PIPELINE_COR: Record<PipelineStatusKey, string> = {
+  TODO: "var(--fg3)",
+  WORKING: "var(--primary)",
+  DONE: "var(--green)",
 };
 
 // Dias corridos até o vencimento, contra HOJE real (hoje resolvido a cada
-// chamada — nunca cacheado no módulo). Espelha o helper local (não exportado)
-// de use-prazos-fila.ts — não extraído pra não tocar a fatia A já aprovada.
-function diasDaTarefa(dueDate: string | null): number | null {
+// chamada — nunca cacheado no módulo).
+function diasDaProvidencia(dueDate: string | null): number | null {
   if (!dueDate) return null;
   return diasRestantes(
     dueDate.slice(0, 10),
@@ -76,12 +68,14 @@ export interface PipelineCard {
   urgK: UrgKey;
   respLabel: string;
   respIniciais: string;
-  /** Tem intimação de origem (t.intimation_id) — mostra o chip "ver intimação". */
+  /** Providência que gera peça — mostra o badge "Peça". */
+  geraPeca: boolean;
+  /** Ciência (não gera peça) — mostra o badge "fluxo curto · ciência". */
+  fluxoCurto: boolean;
+  /** Tem intimação de origem — mostra o chip "ver intimação". */
   temOrigem: boolean;
   origemHref: string;
-  /** Nome acessível ÚNICO do chip "ver intimação" (WCAG 2.4.4) — reusa o mesmo
-   *  cnjCurto do card pra diferenciar cards com origem (senão todo chip
-   *  anuncia o texto idêntico "ver intimação"). Só relevante quando temOrigem. */
+  /** Nome acessível ÚNICO do chip "ver intimação" (WCAG 2.4.4). */
   origemAriaLabel: string;
   href: string;
   /** Nome acessível ÚNICO do card (WCAG 2.4.4) — ver buildAriaLabels. */
@@ -90,51 +84,51 @@ export interface PipelineCard {
 
 // Base do nome acessível: título + local (court · CNJ completo, NÃO truncado)
 // + data curta (dd/mm). Ex.: "Contestação — TJSP · 1012473-58..., vence 04/09".
-function ariaLabelBase(t: TaskView): string {
-  const local = [t.court, t.cnj_number].filter(Boolean).join(" · ");
-  const data = t.due_date ? formatarDataCurta(t.due_date) : null;
+function ariaLabelBase(p: ActionItemView): string {
+  const local = [p.court, p.cnj_number].filter(Boolean).join(" · ");
+  const data = p.due_date ? formatarDataCurta(p.due_date) : null;
   const vence = data ? `vence ${data}` : "sem prazo definido";
-  return local ? `${t.title} — ${local}, ${vence}` : `${t.title} — ${vence}`;
+  return local ? `${p.title} — ${local}, ${vence}` : `${p.title} — ${vence}`;
 }
 
 /**
- * Garante nome acessível ÚNICO por tarefa (WCAG 2.4.4 — dois links não podem
- * anunciar o mesmo texto). Quando duas ou mais tarefas geram a mesma base
- * (título/CNJ/urgência idênticos), desempata anexando os últimos 6 caracteres
- * do id — suficiente pra nunca colidir, sem poluir o rótulo no caso comum
- * (nenhuma colisão).
+ * Garante nome acessível ÚNICO por providência (WCAG 2.4.4 — dois links não podem
+ * anunciar o mesmo texto). Quando duas ou mais geram a mesma base, desempata
+ * anexando os últimos 6 caracteres do id.
  */
-export function buildAriaLabels(tasks: TaskView[]): Map<string, string> {
+export function buildAriaLabels(
+  providencias: ActionItemView[],
+): Map<string, string> {
   const bases = new Map<string, string>();
   const counts = new Map<string, number>();
-  for (const t of tasks) {
-    const base = ariaLabelBase(t);
-    bases.set(t.id, base);
+  for (const p of providencias) {
+    const base = ariaLabelBase(p);
+    bases.set(p.id, base);
     counts.set(base, (counts.get(base) ?? 0) + 1);
   }
   const out = new Map<string, string>();
-  for (const t of tasks) {
-    const base = bases.get(t.id) ?? t.title;
+  for (const p of providencias) {
+    const base = bases.get(p.id) ?? p.title;
     const duplicada = (counts.get(base) ?? 0) > 1;
-    out.set(t.id, duplicada ? `${base} · tarefa ${t.id.slice(-6)}` : base);
+    out.set(p.id, duplicada ? `${base} · providência ${p.id.slice(-6)}` : base);
   }
   return out;
 }
 
 function decorar(
-  t: TaskView,
+  p: ActionItemView,
   nameFor: (id: string | undefined | null) => string | null,
   ariaLabel: string,
 ): PipelineCard {
-  const dias = diasDaTarefa(t.due_date);
+  const dias = diasDaProvidencia(p.due_date);
   const u = urg(dias ?? Number.POSITIVE_INFINITY);
-  const nome = nameFor(t.assignee_user_id);
-  const cnj = t.cnj_number ? cnjCurto(t.cnj_number) : "";
+  const nome = nameFor(p.assignee_user_id);
+  const cnj = p.cnj_number ? cnjCurto(p.cnj_number) : "";
   return {
-    id: t.id,
-    providencia: t.title,
+    id: p.id,
+    providencia: p.title,
     cnjCurto: cnj,
-    court: t.court ?? "",
+    court: p.court ?? "",
     dias,
     prazoLabel: rotuloPrazo(dias),
     urgCor: u.cor,
@@ -142,18 +136,20 @@ function decorar(
     urgK: u.k,
     respLabel: nome ?? "—",
     respIniciais: nome ? iniciais(nome) : "—",
-    temOrigem: !!t.intimation_id,
-    origemHref: t.intimation_id ? `/intimacoes/${t.intimation_id}` : "",
+    geraPeca: p.gera_peca,
+    fluxoCurto: !p.gera_peca,
+    temOrigem: !!p.intimation_id,
+    origemHref: p.intimation_id ? `/intimacoes/${p.intimation_id}` : "",
     origemAriaLabel: cnj
       ? `Ver intimação de origem — processo ${cnj}`
-      : `Ver intimação de origem — ${t.title}`,
-    href: `/tarefas/${t.id}`,
+      : `Ver intimação de origem — ${p.title}`,
+    href: `/providencias/${p.id}`,
     ariaLabel,
   };
 }
 
 export interface PipelineColumn {
-  key: PipelineStageKey;
+  key: PipelineStatusKey;
   label: string;
   iconKey: PipelineIconKey;
   n: number;
@@ -161,17 +157,17 @@ export interface PipelineColumn {
   vazia: boolean;
 }
 
-/** Agrupa as tarefas em 4 colunas fixas por `stage` — client-side, sem
+/** Agrupa as providências em 3 colunas fixas por `status` — client-side, sem
  *  paginação por coluna (a chamada única já trouxe tudo). */
 export function buildColumns(
-  tasks: TaskView[],
+  providencias: ActionItemView[],
   nameFor: (id: string | undefined | null) => string | null,
 ): PipelineColumn[] {
-  const ariaLabels = buildAriaLabels(tasks);
+  const ariaLabels = buildAriaLabels(providencias);
   return PIPELINE_ORDEM.map((key) => {
-    const cards = tasks
-      .filter((t) => t.stage === key)
-      .map((t) => decorar(t, nameFor, ariaLabels.get(t.id) ?? t.title))
+    const cards = providencias
+      .filter((p) => p.status === key)
+      .map((p) => decorar(p, nameFor, ariaLabels.get(p.id) ?? p.title))
       .sort((a, b) => (a.dias ?? Infinity) - (b.dias ?? Infinity));
     return {
       key,
@@ -185,7 +181,7 @@ export function buildColumns(
 }
 
 export interface FunilEtapa {
-  key: PipelineStageKey;
+  key: PipelineStatusKey;
   label: string;
   iconKey: PipelineIconKey;
   n: number;
@@ -194,13 +190,10 @@ export interface FunilEtapa {
   cor: string;
 }
 
-/** 4 barras (A Fazer/Elaboração/Revisão/Concluída) — as 4 contam igual, sem
- *  exclusão especial: Concluída é um estágio normal do funil (tarefa sem draft
- *  chega lá direto de A Fazer), não mais um "fim" que se somava à parte. Sem
- *  "gargalo" (não se aplica a estágios fixos de tarefa, não etapas de esteira). */
-export function buildFunil(tasks: TaskView[]): FunilEtapa[] {
+/** 3 barras (A Fazer/Em elaboração/Concluída) — as 3 contam igual. */
+export function buildFunil(providencias: ActionItemView[]): FunilEtapa[] {
   const counts = PIPELINE_ORDEM.map(
-    (k) => tasks.filter((t) => t.stage === k).length,
+    (k) => providencias.filter((p) => p.status === k).length,
   );
   const total = counts.reduce((a, b) => a + b, 0) || 1;
   const max = Math.max(...counts, 1);

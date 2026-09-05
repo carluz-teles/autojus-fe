@@ -674,7 +674,7 @@ function PainelProcesso({ id }: { id: string }) {
       </div>
 
       <p className="text-muted-foreground mt-3 text-[12px]">
-        — intim · — tarefas abertas · — peças
+        — intim · — providências abertas · — peças
       </p>
 
       <Link

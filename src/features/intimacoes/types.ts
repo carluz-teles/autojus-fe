@@ -96,13 +96,14 @@ export interface IntimacaoHistoryEntry {
   label: string;
 }
 
-/** Ciclo de vida (bruto, do BE) de uma providência. Na prática, quem dirige a UI
- *  pós-migração pra action_item é `task_id` (tarefa nasceu ou não) + `tipo_status`
- *  (confiavel|a_confirmar) — ver `IntimacaoProvidencia` abaixo. */
+/** Status de TRABALHO da providência (action_item) — ciclo linear sem saída.
+ *  SUGGESTED = só sugerida (ainda não iniciada); a partir de TODO ela está no
+ *  trabalho (board/fila). A "Tarefa" foi eliminada: a Providência é a única
+ *  unidade atômica de trabalho. */
 export type IntimacaoProvidenciaStatus =
-  "SUGGESTED" | "CONFIRMED" | "DISCARDED";
+  "SUGGESTED" | "TODO" | "WORKING" | "DONE";
 
-/** Tipo de ato/providência — closed set espelhado do BE (internal/deadline). */
+/** Tipo de ato/providência — closed set espelhado do BE (internal/actionitem). */
 export type ProvidenciaTipo =
   "contestar" | "recorrer" | "manifestar" | "cumprir" | "ciencia";
 
@@ -110,27 +111,26 @@ export type ProvidenciaTipo =
  *  corrigida manualmente (reclassificar muda pra "manual"). */
 export type ProvidenciaTipoOrigem = "declarado" | "ia" | "manual";
 
-/** "confiavel" nasce com tarefa automática (sem revisão); "a_confirmar" espera
- *  o usuário clicar Confirmar antes de qualquer tarefa nascer. */
+/** Gate de TIPO: "confiavel" já pode ser iniciada direto; "a_confirmar" espera
+ *  o usuário confirmar o tipo antes (POST /confirmar). É ortogonal ao `status`
+ *  de trabalho. */
 export type ProvidenciaTipoStatus = "confiavel" | "a_confirmar";
 
 /**
- * Uma providência PERSISTIDA (action_item) — GET /v1/intimacoes/:id e os 3
- * endpoints de ação (confirmar/descartar/reclassificar) devolvem este shape.
- * Não tem mais `title`/`description`/`suggested_assignee_*`/`due_date` (eram só
- * do fluxo antigo, jsonb `ai_providencias`); a UI deriva o rótulo de `tipo`.
- * Substitui também o antigo `kind` (PECA|CIENCIA) — `gera_peca` já carrega a
- * mesma informação, com mais granularidade via `tipo`/`piece_profile_key`.
- * Espelha o IntimacaoProvidenciaView do BE.
+ * Uma providência PERSISTIDA (action_item) — GET /v1/intimacoes/:id devolve este
+ * shape em `ai_providencias`. A "Tarefa" foi eliminada: não há mais `task_id`; o
+ * ciclo de trabalho é o `status` (SUGGESTED→TODO→WORKING→DONE). O `id` É o id do
+ * action_item — usado para o link `/providencias/:id`, os endpoints de transição
+ * (iniciar/comecar/concluir) e o gate de tipo (confirmar/reclassificar), e como
+ * `action_item_id` ao criar a peça. Espelha o IntimacaoProvidenciaView do BE.
  */
 export interface IntimacaoProvidencia {
+  /** Id do action_item — base de /providencias/:id, das transições e do action_item_id da peça. */
   id: string;
   /** Título rico da providência, persistido no action_item (pode ser null em itens
-   *  criados antes da migração 0090 ou em análise degradada) — o FE cai em
-   *  `rotuloTipo(tipo)` quando ausente. */
+   *  antigos ou análise degradada) — o FE cai em `rotuloTipo(tipo)` quando ausente. */
   title: string | null;
-  /** Descrição/fundamento da providência, persistida no action_item; null quando
-   *  ausente (a linha de descrição simplesmente não renderiza). */
+  /** Descrição/fundamento da providência; null quando ausente. */
   description: string | null;
   tipo: ProvidenciaTipo;
   /** true = essa providência dá origem a uma peça (ver `piece_profile_key`). */
@@ -141,10 +141,8 @@ export interface IntimacaoProvidencia {
   tipo_status: ProvidenciaTipoStatus;
   /** Confiança da IA (0-1); só preenchido quando tipo_origem="ia". */
   confianca: number | null;
+  /** Status de trabalho: SUGGESTED (não iniciada) → TODO → WORKING → DONE. */
   status: IntimacaoProvidenciaStatus;
-  /** Id da tarefa REAL — o BE a cria SÍNCRONA na materialização (declarada) ou no
-   *  confirmar (IA), na própria transação; null enquanto não confirmada. */
-  task_id: string | null;
   deadline_id: string | null;
 }
 

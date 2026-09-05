@@ -11,6 +11,8 @@ import { Card, SectionTitle, Segmented } from "@/components/mock-ui/layout";
 import { Badge, StatusBadge } from "@/components/mock-ui/status-badge";
 import { useSetBreadcrumb } from "@/components/shell/breadcrumb-context";
 import { Tooltip } from "@/components/ui/tooltip";
+import { STATUS_LABEL } from "@/features/action-items/lib/status-pill";
+import type { ActionItemView } from "@/features/action-items/types";
 import { AndamentosTimeline } from "@/features/andamentos/components/andamentos-timeline";
 import { AtividadeDoEscritorio } from "@/features/andamentos/components/atividade-do-escritorio";
 import { useAtividadeDoProcesso } from "@/features/andamentos/hooks/use-atividade-do-processo";
@@ -26,15 +28,14 @@ import {
   rotuloPrazo,
   urgenciaDe,
 } from "@/features/shared/prazo";
-import { NovaTarefaModal } from "@/features/tasks/components/nova-tarefa-modal";
-import type { TaskView } from "@/features/tasks/types";
 import { ApiError } from "@/lib/api/errors";
 import { formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 import { useEditarLabel } from "../hooks/use-editar-label";
 import {
+  useActionItemsByProcesso,
   useIntimacoesByProcesso,
-  useTasksByProcesso,
 } from "../hooks/use-processo-tabs";
 import { usePartes, useProcesso } from "../hooks/use-processos";
 import type { ProcessoView } from "../types";
@@ -44,7 +45,7 @@ type Aba =
   | "atividade"
   | "andamentos"
   | "intimacoes"
-  | "tarefas"
+  | "providencias"
   | "pecas"
   | "documentos";
 
@@ -123,7 +124,7 @@ function CockpitContent({
   aba: Aba;
   onAba: (a: Aba) => void;
 }) {
-  const tarefasQuery = useTasksByProcesso(p.id);
+  const providenciasQuery = useActionItemsByProcesso(p.id);
   const intimacoesQuery = useIntimacoesByProcesso(p.id);
   const { members } = useOrgMembersDirectory();
   // Chamadas elevadas ao componente principal para alimentar a contagem do
@@ -132,14 +133,14 @@ function CockpitContent({
   const pecasQuery = usePecasByProcesso(p.id);
   const documentosQuery = useDocumentosDoProcesso(p.id);
   const atividadeQuery = useAtividadeDoProcesso(p.id);
-  // Tarefas não concluídas para o badge.
-  const tarefasAbertas = (tarefasQuery.data ?? []).filter(
-    (t) => t.status !== "DONE" && t.status !== "DISMISSED",
+  // Providências não concluídas para o badge (SUGGESTED não vem no read model do
+  // board/aba — o BE só retorna TODO/WORKING/DONE).
+  const providenciasAbertas = (providenciasQuery.data ?? []).filter(
+    (p) => p.status !== "DONE",
   );
 
   const totalIntimacoes = intimacoesQuery.data?.length ?? 0;
 
-  const [novaTarefaAberta, setNovaTarefaAberta] = useState(false);
   const [novaPecaAberta, setNovaPecaAberta] = useState(false);
 
   return (
@@ -173,9 +174,6 @@ function CockpitContent({
                 Gerar peça
               </Button>
             )}
-            <Button variant="outline" onClick={() => setNovaTarefaAberta(true)}>
-              Nova tarefa
-            </Button>
             <Button variant="outline" size="icon">
               ···
             </Button>
@@ -213,10 +211,10 @@ function CockpitContent({
             contagem: totalIntimacoes ? String(totalIntimacoes) : undefined,
           },
           {
-            valor: "tarefas",
-            label: "Tarefas",
-            contagem: tarefasAbertas.length
-              ? String(tarefasAbertas.length)
+            valor: "providencias",
+            label: "Providências",
+            contagem: providenciasAbertas.length
+              ? String(providenciasAbertas.length)
               : undefined,
           },
           {
@@ -249,12 +247,7 @@ function CockpitContent({
             </Card>
           )}
           {aba === "intimacoes" && <AbaIntimacoes processoId={p.id} />}
-          {aba === "tarefas" && (
-            <AbaTarefas
-              processoId={p.id}
-              assigneeUserIdSugerido={p.assigned_user_id}
-            />
-          )}
+          {aba === "providencias" && <AbaProvidencias processoId={p.id} />}
           {aba === "pecas" && <AbaPecas pecasQuery={pecasQuery} />}
           {aba === "documentos" && <ProcessoDocumentos processoId={p.id} />}
         </div>
@@ -323,13 +316,6 @@ function CockpitContent({
           </Card>
         </div>
       </div>
-
-      <NovaTarefaModal
-        aberto={novaTarefaAberta}
-        onFechar={() => setNovaTarefaAberta(false)}
-        courtRecordId={p.id}
-        assigneeUserIdSugerido={p.assigned_user_id}
-      />
 
       <NovaPecaModal
         aberto={novaPecaAberta}
@@ -463,34 +449,19 @@ function AbaIntimacoes({ processoId }: { processoId: string }) {
 
 // ── Aba Tarefas — agrupada por status (Atrasada primeiro) ─────────────────────
 
-function AbaTarefas({
-  processoId,
-  assigneeUserIdSugerido,
-}: {
-  processoId: string;
-  assigneeUserIdSugerido?: string | null;
-}) {
-  const { data: tarefas, isPending, isError } = useTasksByProcesso(processoId);
-  const [novaTarefaAberta, setNovaTarefaAberta] = useState(false);
+// Atrasada = tem prazo já vencido E ainda não concluída — derivado no client
+// (o read model de action_item não traz um "display_status" pronto).
+function estaAtrasada(p: ActionItemView): boolean {
+  if (p.status === "DONE" || !p.due_date) return false;
+  return p.due_date.slice(0, 10) < new Date().toISOString().slice(0, 10);
+}
 
-  const botaoNovaTarefa = (
-    <Button
-      size="sm"
-      variant="outline"
-      onClick={() => setNovaTarefaAberta(true)}
-    >
-      Nova tarefa
-    </Button>
-  );
-
-  const modal = (
-    <NovaTarefaModal
-      aberto={novaTarefaAberta}
-      onFechar={() => setNovaTarefaAberta(false)}
-      courtRecordId={processoId}
-      assigneeUserIdSugerido={assigneeUserIdSugerido}
-    />
-  );
+function AbaProvidencias({ processoId }: { processoId: string }) {
+  const {
+    data: providencias,
+    isPending,
+    isError,
+  } = useActionItemsByProcesso(processoId);
 
   if (isPending) {
     return (
@@ -512,67 +483,68 @@ function AbaTarefas({
     return (
       <Card className="mt-4">
         <p role="alert" className="text-destructive text-[13.5px]">
-          Erro ao carregar tarefas.
+          Erro ao carregar providências.
         </p>
       </Card>
     );
   }
 
-  if (!tarefas || tarefas.length === 0) {
+  if (!providencias || providencias.length === 0) {
     return (
-      <>
-        <Card className="mt-4 px-5.5 pt-1.5 pb-3.5">
-          <div className="flex items-center justify-between gap-4 py-4">
-            <p className="text-muted-foreground text-[13.5px]">
-              Nenhuma tarefa vinculada.
-            </p>
-            {botaoNovaTarefa}
-          </div>
-        </Card>
-        {modal}
-      </>
+      <Card className="mt-4 px-5.5 pt-1.5 pb-3.5">
+        <div className="flex items-center gap-4 py-4">
+          <p className="text-muted-foreground text-[13.5px]">
+            Nenhuma providência vinculada.
+          </p>
+        </div>
+      </Card>
     );
   }
 
-  // display_status é DERIVADO pelo BE (Aberta|Em execução|Concluída|Atrasada);
-  // agrupamos por ele em vez de recalcular a data no client (fonte única de verdade).
-  const atrasadas = tarefas.filter((t) => t.display_status === "Atrasada");
-  const resto = tarefas.filter((t) => t.display_status !== "Atrasada");
+  const atrasadas = providencias.filter(estaAtrasada);
+  const resto = providencias.filter((p) => !estaAtrasada(p));
 
   return (
-    <>
-      <div className="mt-4 flex justify-end">{botaoNovaTarefa}</div>
-      <Card className="mt-3 px-5.5 pt-1.5 pb-3.5">
-        {atrasadas.length > 0 && (
-          <p className="text-destructive mt-4 text-[11px] font-semibold tracking-[0.1em] uppercase first:mt-0">
-            ● Atrasada
-          </p>
-        )}
-        {atrasadas.map((t) => (
-          <TarefaRow key={t.id} tarefa={t} />
-        ))}
-        {resto.map((t) => (
-          <TarefaRow key={t.id} tarefa={t} />
-        ))}
-      </Card>
-      {modal}
-    </>
+    <Card className="mt-4 px-5.5 pt-1.5 pb-3.5">
+      {atrasadas.length > 0 && (
+        <p className="text-destructive mt-4 text-[11px] font-semibold tracking-[0.1em] uppercase first:mt-0">
+          ● Atrasada
+        </p>
+      )}
+      {atrasadas.map((p) => (
+        <ProvidenciaRow key={p.id} providencia={p} atrasada />
+      ))}
+      {resto.map((p) => (
+        <ProvidenciaRow key={p.id} providencia={p} />
+      ))}
+    </Card>
   );
 }
 
-function TarefaRow({ tarefa: t }: { tarefa: TaskView }) {
+function ProvidenciaRow({
+  providencia: p,
+  atrasada,
+}: {
+  providencia: ActionItemView;
+  atrasada?: boolean;
+}) {
   return (
     <Link
-      href={`/tasks/${t.id}`}
+      href={`/providencias/${p.id}`}
       className="border-border hover:bg-muted grid grid-cols-[minmax(0,1fr)_140px_110px] items-center gap-4 border-b px-1 py-3.5 no-underline last:border-0 hover:no-underline"
     >
-      <span className="text-foreground truncate text-sm">{t.title}</span>
-      <span className="text-muted-foreground text-[12.5px]">
-        {t.display_status ?? t.status}
+      <span className="text-foreground truncate text-sm">{p.title}</span>
+      <span
+        className={cn(
+          "text-[12.5px]",
+          atrasada ? "text-destructive" : "text-muted-foreground",
+        )}
+      >
+        {atrasada ? "Atrasada" : STATUS_LABEL[p.status]}
       </span>
       <span className="text-muted-foreground text-[12.5px] tabular-nums">
-        {t.due_date
-          ? `vence ${t.due_date.slice(0, 10).split("-").reverse().join("/")}`
+        {p.due_date
+          ? `vence ${p.due_date.slice(0, 10).split("-").reverse().join("/")}`
           : "—"}
       </span>
     </Link>

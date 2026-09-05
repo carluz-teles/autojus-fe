@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { TaskView } from "@/features/tasks/types";
+import type { ActionItemView } from "@/features/action-items/types";
 
 import {
   buildAriaLabels,
@@ -9,22 +9,29 @@ import {
   PIPELINE_ORDEM,
 } from "./pipeline";
 
-function task(overrides: Partial<TaskView> & { id: string }): TaskView {
+function item(
+  overrides: Partial<ActionItemView> & { id: string },
+): ActionItemView {
   return {
+    intimation_id: "int-x",
     title: "Contestação",
+    tipo: "contestar",
+    gera_peca: true,
+    tipo_origem: "declarado",
+    tipo_status: "confiavel",
     due_date: "2026-09-04",
-    status: "OPEN",
-    source: "DEADLINE",
+    status: "TODO",
     completed_at: null,
-    stage: "A_FAZER",
+    created_at: "2026-09-01T00:00:00Z",
+    updated_at: "2026-09-01T00:00:00Z",
     ...overrides,
   };
 }
 
 describe("buildAriaLabels", () => {
   it("dá o rótulo base (título — court · CNJ, vence dd/mm) quando o card é único", () => {
-    const tasks = [
-      task({
+    const items = [
+      item({
         id: "a",
         title: "Contestação",
         court: "TJSP",
@@ -33,23 +40,23 @@ describe("buildAriaLabels", () => {
       }),
     ];
 
-    const labels = buildAriaLabels(tasks);
+    const labels = buildAriaLabels(items);
 
     expect(labels.get("a")).toBe(
       "Contestação — TJSP · 1012473-58.2024.8.26.0100, vence 04/09",
     );
   });
 
-  it("gera aria-label DIFERENTE para 2 tasks com título/CNJ/urgência idênticos mas ids diferentes", () => {
-    const tasks = [
-      task({
+  it("gera aria-label DIFERENTE para 2 providências com título/CNJ/urgência idênticos mas ids diferentes", () => {
+    const items = [
+      item({
         id: "aaaaaa111111",
         title: "Contestação",
         court: "TJSP",
         cnj_number: "1012473-58.2024.8.26.0100",
         due_date: "2026-09-04",
       }),
-      task({
+      item({
         id: "bbbbbb222222",
         title: "Contestação",
         court: "TJSP",
@@ -58,7 +65,7 @@ describe("buildAriaLabels", () => {
       }),
     ];
 
-    const labels = buildAriaLabels(tasks);
+    const labels = buildAriaLabels(items);
     const labelA = labels.get("aaaaaa111111");
     const labelB = labels.get("bbbbbb222222");
 
@@ -69,90 +76,106 @@ describe("buildAriaLabels", () => {
   });
 
   it("sem CNJ/court/due_date, ainda gera um rótulo legível e não-vazio", () => {
-    const tasks = [task({ id: "a", title: "Tarefa avulsa", due_date: null })];
+    const items = [
+      item({ id: "a", title: "Dar-se por ciente", due_date: null }),
+    ];
 
-    const labels = buildAriaLabels(tasks);
+    const labels = buildAriaLabels(items);
 
-    expect(labels.get("a")).toBe("Tarefa avulsa — sem prazo definido");
+    expect(labels.get("a")).toBe("Dar-se por ciente — sem prazo definido");
   });
 });
 
 describe("buildColumns", () => {
   const nameFor = () => null;
 
-  it("sempre devolve as 4 colunas fixas, na ordem A Fazer/Elaboração/Revisão/Concluída", () => {
+  it("sempre devolve as 3 colunas fixas, na ordem A Fazer/Em elaboração/Concluída", () => {
     const columns = buildColumns([], nameFor);
 
     expect(columns.map((c) => c.key)).toEqual([...PIPELINE_ORDEM]);
+    expect(columns.map((c) => c.key)).toEqual(["TODO", "WORKING", "DONE"]);
     expect(columns.map((c) => c.label)).toEqual([
       "A Fazer",
-      "Elaboração",
-      "Revisão",
+      "Em elaboração",
       "Concluída",
     ]);
     expect(columns.every((c) => c.vazia)).toBe(true);
   });
 
-  it("agrupa cada tarefa na coluna do seu stage (sem cap de tamanho)", () => {
-    const tasks = [
-      task({ id: "0", stage: "A_FAZER" }),
-      task({ id: "1", stage: "ELABORACAO" }),
-      task({ id: "2", stage: "ELABORACAO" }),
-      task({ id: "3", stage: "REVISAO" }),
-      task({ id: "4", stage: "CONCLUIDA" }),
+  it("agrupa cada providência na coluna do seu status (sem cap de tamanho)", () => {
+    const items = [
+      item({ id: "0", status: "TODO" }),
+      item({ id: "1", status: "WORKING" }),
+      item({ id: "2", status: "WORKING" }),
+      item({ id: "3", status: "DONE" }),
     ];
 
-    const columns = buildColumns(tasks, nameFor);
+    const columns = buildColumns(items, nameFor);
     const byKey = Object.fromEntries(columns.map((c) => [c.key, c]));
 
-    expect(byKey.A_FAZER.n).toBe(1);
-    expect(byKey.ELABORACAO.n).toBe(2);
-    expect(byKey.REVISAO.n).toBe(1);
-    expect(byKey.CONCLUIDA.n).toBe(1);
-    expect(byKey.ELABORACAO.vazia).toBe(false);
+    expect(byKey.TODO.n).toBe(1);
+    expect(byKey.WORKING.n).toBe(2);
+    expect(byKey.DONE.n).toBe(1);
+    expect(byKey.WORKING.vazia).toBe(false);
   });
 
-  it("tarefa sem draft pula direto de A Fazer pra Concluída — nunca passa por Elaboração/Revisão", () => {
-    const tasks = [
-      task({ id: "1", title: "Ligar pro cliente", stage: "CONCLUIDA" }),
+  it("SUGGESTED nunca entra em nenhuma coluna (não aparece no board)", () => {
+    const items = [
+      item({ id: "1", status: "SUGGESTED" }),
+      item({ id: "2", status: "TODO" }),
     ];
 
-    const columns = buildColumns(tasks, nameFor);
-    const byKey = Object.fromEntries(columns.map((c) => [c.key, c]));
+    const columns = buildColumns(items, nameFor);
+    const total = columns.reduce((acc, c) => acc + c.n, 0);
 
-    expect(byKey.CONCLUIDA.n).toBe(1);
-    expect(byKey.CONCLUIDA.cards[0].id).toBe("1");
-    expect(byKey.ELABORACAO.n).toBe(0);
-    expect(byKey.REVISAO.n).toBe(0);
+    expect(total).toBe(1);
+    expect(columns.find((c) => c.key === "TODO")!.n).toBe(1);
   });
 
-  it("o href do card aponta pra /tarefas/:id", () => {
-    const tasks = [task({ id: "abc123", stage: "ELABORACAO" })];
+  it("o href do card aponta pra /providencias/:id", () => {
+    const items = [item({ id: "abc123", status: "WORKING" })];
 
-    const columns = buildColumns(tasks, nameFor);
-    const elaboracao = columns.find((c) => c.key === "ELABORACAO")!;
+    const columns = buildColumns(items, nameFor);
+    const working = columns.find((c) => c.key === "WORKING")!;
 
-    expect(elaboracao.cards[0].href).toBe("/tarefas/abc123");
+    expect(working.cards[0].href).toBe("/providencias/abc123");
+  });
+
+  it("deriva geraPeca/fluxoCurto do gera_peca da providência", () => {
+    const items = [
+      item({ id: "peca", status: "TODO", gera_peca: true }),
+      item({ id: "ciencia", status: "TODO", gera_peca: false }),
+    ];
+
+    const cards = buildColumns(items, nameFor).find(
+      (c) => c.key === "TODO",
+    )!.cards;
+    const byId = Object.fromEntries(cards.map((c) => [c.id, c]));
+
+    expect(byId.peca.geraPeca).toBe(true);
+    expect(byId.peca.fluxoCurto).toBe(false);
+    expect(byId.ciencia.geraPeca).toBe(false);
+    expect(byId.ciencia.fluxoCurto).toBe(true);
   });
 
   it("2 cards com origem e cnjCurto diferentes geram origemAriaLabel diferente (WCAG 2.4.4)", () => {
-    const tasks = [
-      task({
+    const items = [
+      item({
         id: "1",
-        stage: "ELABORACAO",
+        status: "WORKING",
         intimation_id: "int-1",
         cnj_number: "1012473-58.2024.8.26.0100",
       }),
-      task({
+      item({
         id: "2",
-        stage: "ELABORACAO",
+        status: "WORKING",
         intimation_id: "int-2",
         cnj_number: "2098765-11.2023.8.26.0053",
       }),
     ];
 
-    const columns = buildColumns(tasks, nameFor);
-    const [cardA, cardB] = columns.find((c) => c.key === "ELABORACAO")!.cards;
+    const columns = buildColumns(items, nameFor);
+    const [cardA, cardB] = columns.find((c) => c.key === "WORKING")!.cards;
 
     expect(cardA.temOrigem).toBe(true);
     expect(cardB.temOrigem).toBe(true);
@@ -163,36 +186,35 @@ describe("buildColumns", () => {
 });
 
 describe("buildFunil", () => {
-  it("4 etapas, percentuais somando 100% do total contado", () => {
-    const tasks = [
-      task({ id: "0", stage: "A_FAZER" }),
-      task({ id: "1", stage: "ELABORACAO" }),
-      task({ id: "2", stage: "ELABORACAO" }),
-      task({ id: "3", stage: "REVISAO" }),
-      task({ id: "4", stage: "CONCLUIDA" }),
+  it("3 etapas, percentuais somando 100% do total contado", () => {
+    const items = [
+      item({ id: "0", status: "TODO" }),
+      item({ id: "1", status: "WORKING" }),
+      item({ id: "2", status: "WORKING" }),
+      item({ id: "3", status: "DONE" }),
     ];
 
-    const funil = buildFunil(tasks);
+    const funil = buildFunil(items);
 
-    expect(funil.map((e) => e.n)).toEqual([1, 2, 1, 1]);
+    expect(funil.map((e) => e.n)).toEqual([1, 2, 1]);
     const somaPct = funil.reduce((acc, e) => acc + parseInt(e.pct, 10), 0);
     expect(somaPct).toBe(100);
   });
 
   it("Concluída conta igual às demais etapas — sem exclusão especial do total", () => {
-    const tasks = [
-      task({ id: "1", stage: "CONCLUIDA" }),
-      task({ id: "2", stage: "CONCLUIDA" }),
+    const items = [
+      item({ id: "1", status: "DONE" }),
+      item({ id: "2", status: "DONE" }),
     ];
 
-    const funil = buildFunil(tasks);
-    const concluida = funil.find((e) => e.key === "CONCLUIDA")!;
+    const funil = buildFunil(items);
+    const concluida = funil.find((e) => e.key === "DONE")!;
 
     expect(concluida.n).toBe(2);
     expect(concluida.pct).toBe("100%");
   });
 
-  it("com 0 tarefas não quebra (divisão por zero evitada)", () => {
+  it("com 0 providências não quebra (divisão por zero evitada)", () => {
     const funil = buildFunil([]);
 
     expect(funil.every((e) => e.n === 0)).toBe(true);

@@ -110,9 +110,9 @@ export interface PecaPatchResult {
   updated_at: string;
 }
 
-/** Resposta do POST /v1/pecas (criação/idempotente). `task_id`/`piece_profile_key`
- *  só vêm preenchidos quando a peça nasceu a partir de uma providência (task_id
- *  no body da criação — fatia 4/5 do BE). */
+/** Resposta do POST /v1/pecas (criação/idempotente). `action_item_id`/`piece_profile_key`
+ *  só vêm preenchidos quando a peça nasceu a partir de uma providência (action_item_id
+ *  no body da criação — o BE devolve `action_item_id,omitempty`, pós-fusão migration 0099). */
 export interface PecaCreated {
   id: string;
   tenant_id: string;
@@ -125,7 +125,7 @@ export interface PecaCreated {
   saga_state: string;
   created_at: string;
   updated_at: string;
-  task_id?: string | null;
+  action_item_id?: string | null;
   piece_profile_key?: string | null;
 }
 

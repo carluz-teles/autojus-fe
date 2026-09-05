@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 
-import { STATUS_PILL } from "@/features/tasks/lib/status-pill";
+import { STATUS_PILL } from "@/features/action-items/lib/status-pill";
 import { cn } from "@/lib/utils";
 
 import { type FilaItem, usePrazosFila } from "../../hooks/use-prazos-fila";
 import { PrioIcon } from "../icons";
 
 // Fila / Meus Prazos: a lista de trabalho em 3 faixas de prioridade (Vencidos /
-// Esta semana / Depois), ligada a GET /v1/tasks. "Meus Prazos" passa meus=true
-// (trava assignee="me", resolvido pelo BE; esconde as pílulas de filtro).
+// Esta semana / Depois), ligada a GET /v1/action-items. "Meus Prazos" passa
+// meus=true (trava assignee="me", resolvido pelo BE; esconde as pílulas de filtro).
 export function FilaView({ meus, titulo }: { meus?: boolean; titulo: string }) {
   const fila = usePrazosFila(meus);
 
@@ -109,18 +109,14 @@ function FilaRow({ it }: { it: FilaItem }) {
           </span>
         ) : null}
       </span>
-      {it.displayStatus ? (
-        <span
-          className={cn(
-            "inline-flex w-fit items-center rounded-full px-2 py-px text-[11px]",
-            STATUS_PILL[it.displayStatus] ?? "bg-muted text-muted-foreground",
-          )}
-        >
-          {it.displayStatus}
-        </span>
-      ) : (
-        <span />
-      )}
+      <span
+        className={cn(
+          "inline-flex w-fit items-center rounded-full px-2 py-px text-[11px]",
+          STATUS_PILL[it.status] ?? "bg-muted text-muted-foreground",
+        )}
+      >
+        {it.statusLabel}
+      </span>
       <span className="font-mono text-[12px]" style={{ color: it.urgCor }}>
         {it.prazoLabel}
       </span>
@@ -133,16 +129,12 @@ function FilaRow({ it }: { it: FilaItem }) {
     </>
   );
 
-  if (it.clickable) {
-    return (
-      <Link
-        href={it.href}
-        className={cn(rowClass, "border-line2 hover:bg-hover")}
-      >
-        {conteudo}
-      </Link>
-    );
-  }
-
-  return <div className={cn(rowClass, "border-line2")}>{conteudo}</div>;
+  return (
+    <Link
+      href={it.href}
+      className={cn(rowClass, "border-line2 hover:bg-hover")}
+    >
+      {conteudo}
+    </Link>
+  );
 }

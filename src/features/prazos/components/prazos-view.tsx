@@ -18,7 +18,7 @@ export type PipeModo = "board" | "funil";
 // e cada rota monta uma instância própria de PrazosView (vista é fixa pro
 // tempo de vida do componente). Por isso cada vista delega pra uma rota
 // dedicada que chama SÓ o hook de dado que ela precisa — evita chamar
-// usePrazosPipeline() (GET /v1/tasks real) sem necessidade na Inbox, e
+// usePrazosPipeline() (GET /v1/action-items real) sem necessidade na Inbox, e
 // evita hook condicional (react-hooks/rules-of-hooks) aqui na raiz.
 export function PrazosView({ vista = "inbox" }: { vista?: PrazosVista }) {
   return vista === "inbox" ? <PrazosInboxRoute /> : <PrazosPipelineRoute />;
@@ -42,7 +42,7 @@ function PrazosInboxRoute() {
   );
 }
 
-// Pipeline: UMA chamada de usePrazosPipeline() (GET /v1/tasks real),
+// Pipeline: UMA chamada de usePrazosPipeline() (GET /v1/action-items real),
 // compartilhada entre o contador do header e o Board/Funil — nada de query
 // duplicada.
 function PrazosPipelineRoute() {
