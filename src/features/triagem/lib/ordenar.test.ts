@@ -14,6 +14,9 @@ function prazo(days_left: number, confirmed = false): IntimacaoPrazoView {
     days_left,
     status: "PENDING",
     confirmed,
+    origem: "calculado",
+    selo: confirmed ? "confiavel" : "a_apurar",
+    tipo_ato: "manifestacao",
   };
 }
 
@@ -26,6 +29,9 @@ function item(
     cnj_number: `0000000-00.2026.8.26.${id}`,
     class: "",
     subject: "",
+    title: `Intimação ${id}`,
+    autor: "",
+    reu: "",
     court_record_id: `cr-${id}`,
     court: "TJSP",
     degree: "G1",
@@ -38,6 +44,7 @@ function item(
     published_at: "2026-09-01T00:00:00Z",
     deadline_start_at: "2026-09-01T00:00:00Z",
     content_preview: "",
+    estado: "sem_prazo",
     prazo: null,
     ai_analyzed_at: null,
     assignee_user_id: null,

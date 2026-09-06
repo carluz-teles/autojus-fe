@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 
+import { CnpjInput } from "@/components/ui/cnpj-input";
 import { OabInput } from "@/components/ui/oab-input";
 import { formatOabDisplay } from "@/features/shared/lib/diario";
 
@@ -177,12 +178,14 @@ function Org({ f, solo }: { f: F; solo: boolean }) {
           />
         </>
       ) : (
-        <Campo
-          label="CNPJ"
-          value={f.doc}
-          onChange={f.setDoc}
-          placeholder="00.000.000/0000-00"
-        />
+        <>
+          <label className="text-fg3 mb-1.5 block text-[11.5px]">CNPJ</label>
+          <CnpjInput
+            value={f.doc}
+            onChange={f.setDoc}
+            className="border-line bg-panel text-foreground placeholder:text-fg3 w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+          />
+        </>
       )}
       <div className="mt-[26px] flex gap-2.5">
         <button

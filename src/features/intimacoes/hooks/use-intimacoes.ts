@@ -30,7 +30,11 @@ import {
   reopenIntimacao,
   resolveIntimacao,
 } from "../services/intimacoes.service";
-import type { IntimacaoDetalheView, IntimacoesBuckets } from "../types";
+import type {
+  IntimacaoDetalheView,
+  IntimacoesBuckets,
+  OrigemFacets,
+} from "../types";
 
 const EMPTY_BUCKETS: IntimacoesBuckets = {
   atraso: 0,
@@ -40,6 +44,17 @@ const EMPTY_BUCKETS: IntimacoesBuckets = {
   este_mes: 0,
   mais_adiante: 0,
   sem_data_definida: 0,
+};
+
+const EMPTY_ORIGEM_FACETS: OrigemFacets = {
+  declarado: 0,
+  validado: 0,
+  calculado: 0,
+  divergente: 0,
+  ia: 0,
+  manual: 0,
+  a_classificar: 0,
+  sem_prazo: 0,
 };
 
 const PAGE_SIZE = 20;
@@ -65,6 +80,10 @@ export interface IntimacoesFilters {
    *  uma lista (ex.: a fila de Triagem filtra por 3 estágios de uma vez) — o
    *  service serializa a lista como CSV na query string. */
   workStage?: string | string[];
+  /** Origem do prazo (declarado|validado|calculado|divergente|ia|manual|
+   *  sem_prazo) — aba de origem da Triagem. Vazio/undefined = "Todos" (sem
+   *  filtro). Não afeta as contagens de `origemFacets`. */
+  origem?: string;
   /** Chip "Não confirmadas" (triagem) — filtra prazos sugeridos não confirmados. */
   naoConfirmado?: boolean;
   /** "me" (toggle "Minhas") ou um uuid; casa contra condutor OU revisor. */
@@ -97,6 +116,7 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     court: filters.court || undefined,
     urgencia: filters.urgencia || undefined,
     work_stage: filters.workStage || undefined,
+    origem: filters.origem || undefined,
     nao_confirmado: filters.naoConfirmado || undefined,
     assignee: filters.assignee || undefined,
     limit: filters.limit ?? PAGE_SIZE,
@@ -125,6 +145,7 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     intimacoes: pages.flatMap((p) => p.data),
     filters: first?.filters ?? {},
     buckets: first?.buckets ?? EMPTY_BUCKETS,
+    origemFacets: first?.origem_facets ?? EMPTY_ORIGEM_FACETS,
     totalCount: first?.page.total_count ?? 0,
     total: first?.page.total ?? 0,
     isPending: query.isPending,

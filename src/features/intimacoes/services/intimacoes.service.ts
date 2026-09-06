@@ -49,6 +49,14 @@ export interface ListIntimacoesParams {
    *  CONFIRMED). Um único valor continua indo como string simples. */
   work_stage?: string | string[];
   /**
+   * Filtro server-side de ORIGEM do prazo (closed set: declarado|validado|
+   * calculado|divergente|ia|manual|sem_prazo). Alimenta as abas de origem da
+   * Triagem — filtra a lista mas NÃO afeta as contagens do envelope
+   * `origem_facets` (o BE ignora este filtro ao contar as facets, pra cada aba
+   * mostrar o total real). Omitido quando vazio (= "Todos").
+   */
+  origem?: string;
+  /**
    * Filtro server-side do chip "Não confirmadas" (toggle de triagem) — restringe a
    * prazos sugeridos ainda não confirmados (deadline.status = 'PENDING'). Combina com
    * qualquer tab temporal; é um parâmetro à parte de `urgencia`.
@@ -73,6 +81,7 @@ export async function listIntimacoes(
     court,
     urgencia,
     work_stage,
+    origem,
     nao_confirmado,
     assignee,
   }: ListIntimacoesParams = {},
@@ -86,6 +95,7 @@ export async function listIntimacoes(
       user_status,
       court,
       urgencia,
+      origem,
       // Array vira CSV pro BE (que hoje aceita 1 valor mas está sendo
       // estendido em paralelo pra aceitar múltiplos separados por vírgula) —
       // `apiFetch.query` só serializa string|number|boolean, então o join

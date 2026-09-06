@@ -26,6 +26,23 @@ export interface IntimacaoPrazoView {
   status: string;
   /** false = derivado mas ainda não confirmado por um humano. */
   confirmed: boolean;
+  /**
+   * De onde veio a data do prazo — closed set do BE
+   * (declarado|validado|calculado|divergente|ia|manual|a_classificar|sem_prazo).
+   * Alimenta a aba de origem da Triagem e o chip "Origem" do item. "" quando ausente.
+   */
+  origem: string;
+  /**
+   * Selo de confiança — dimensão ortogonal ao relógio: "confiavel" já pode
+   * seguir, "a_apurar" espera apuração humana. "" quando ausente.
+   */
+  selo: string;
+  /**
+   * Tipo de ato jurídico que a intimação exige (deadline.tipo_ato do BE) — o "o
+   * que fazer": apelacao|contestacao|manifestacao|cumprimento_sentenca|ciencia|
+   * indeterminado|… "" quando não derivado. Rotulado via TIPO_ATO_LABEL.
+   */
+  tipo_ato: string;
 }
 
 export interface IntimacaoView {
@@ -35,6 +52,10 @@ export interface IntimacaoView {
   class: string;
   /** Assunto (court_record.subject); "" quando não informado. */
   subject: string;
+  /** Nome do 1º autor do processo (joined no BE); "" quando ausente. */
+  autor: string;
+  /** Nome do 1º réu do processo (joined no BE); "" quando ausente. */
+  reu: string;
   /**
    * Título de exibição — calculado no BE, sempre presente. Prioridade: label
    * manual do processo > réu+CNJ > classe·assunto. Substitui a derivação
@@ -55,6 +76,13 @@ export interface IntimacaoView {
   published_at: string;
   deadline_start_at: string;
   content_preview: string;
+  /**
+   * ESTADO DO PRAZO exibido (chip/aba da Triagem) — fonte ÚNICA do rótulo de estado:
+   * declarado|validado|calculado|divergente|ia|manual quando há prazo real, e
+   * a_classificar|sem_prazo para NO_DEADLINE (a origem crua é placeholder 'calculado'
+   * ali). O chip usa `estado`, NUNCA `prazo.origem` (que vaza 'calculado' no NO_DEADLINE).
+   */
+  estado: IntimacaoOrigem;
   /** Prazo derivado desta intimação; null quando ainda não calculado. */
   prazo: IntimacaoPrazoView | null;
   /**
@@ -282,10 +310,32 @@ export interface IntimacoesBuckets {
   sem_data_definida: number;
 }
 
+/** Origem do prazo — closed set espelhado do BE (?origem=<v>). */
+export type IntimacaoOrigem =
+  | "declarado"
+  | "validado"
+  | "calculado"
+  | "divergente"
+  | "ia"
+  | "manual"
+  | "a_classificar"
+  | "sem_prazo";
+
+/**
+ * Contagens por origem do prazo — incluídas no envelope da lista. Cada número é
+ * quantas intimações a aba daquela origem mostraria, computado sobre o conjunto
+ * INTEIRO do filtro atual EXCETO o próprio `origem` (o BE ignora o filtro de
+ * origem ao contar, então o total continua correto ao trocar de aba). Espelha o
+ * IntimacaoOrigemFacetsView do BE.
+ */
+export type OrigemFacets = Record<IntimacaoOrigem, number>;
+
 /**
  * Envelope da lista de intimações — estende o PageEnvelope padrão com os buckets
- * de contagem por urgência (retornados pelo BE junto à página).
+ * de contagem por urgência e as facets de origem do prazo (retornados pelo BE
+ * junto à página).
  */
 export interface IntimacaoBucketsEnvelope extends PageEnvelope<IntimacaoView> {
   buckets: IntimacoesBuckets;
+  origem_facets: OrigemFacets;
 }

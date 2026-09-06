@@ -42,3 +42,6 @@ next-env.d.ts
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# referência visual temporária de design (Claude Design) — não commitar
+.triagem-design-ref.html

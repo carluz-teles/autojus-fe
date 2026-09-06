@@ -81,7 +81,7 @@ function TopBar({
         <Columns3 className="text-fg2 size-4" strokeWidth={1.9} />
       )}
       <span className="text-[13px] font-medium">
-        {vista === "inbox" ? "Inbox" : "Pipeline"}
+        {vista === "inbox" ? "Inbox" : "Providências"}
       </span>
       <span className="text-fg3 font-mono text-[11px]">{contagem}</span>
       <div className="ml-auto flex items-center gap-1">

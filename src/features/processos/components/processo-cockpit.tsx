@@ -14,8 +14,6 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { STATUS_LABEL } from "@/features/action-items/lib/status-pill";
 import type { ActionItemView } from "@/features/action-items/types";
 import { AndamentosTimeline } from "@/features/andamentos/components/andamentos-timeline";
-import { AtividadeDoEscritorio } from "@/features/andamentos/components/atividade-do-escritorio";
-import { useAtividadeDoProcesso } from "@/features/andamentos/hooks/use-atividade-do-processo";
 import { ProcessoDocumentos } from "@/features/documentos/components/processo-documentos";
 import { useDocumentosDoProcesso } from "@/features/documentos/hooks/use-documentos-do-processo";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
@@ -42,12 +40,7 @@ import type { ProcessoView } from "../types";
 import { AtribuirResponsavelProcesso } from "./atribuir-responsavel";
 
 type Aba =
-  | "atividade"
-  | "andamentos"
-  | "intimacoes"
-  | "providencias"
-  | "pecas"
-  | "documentos";
+  "andamentos" | "intimacoes" | "providencias" | "pecas" | "documentos";
 
 // Mapa lifecycle → rótulo + tom do StatusBadge.
 const LIFECYCLE_LABEL: Record<string, string> = {
@@ -132,7 +125,6 @@ function CockpitContent({
   // dentro de AbaPecas/ProcessoDocumentos não duplica requisição de rede.
   const pecasQuery = usePecasByProcesso(p.id);
   const documentosQuery = useDocumentosDoProcesso(p.id);
-  const atividadeQuery = useAtividadeDoProcesso(p.id);
   // Providências não concluídas para o badge (SUGGESTED não vem no read model do
   // board/aba — o BE só retorna TODO/WORKING/DONE).
   const providenciasAbertas = (providenciasQuery.data ?? []).filter(
@@ -195,13 +187,6 @@ function CockpitContent({
         onChange={onAba}
         opcoes={[
           {
-            valor: "atividade",
-            label: "Atividade",
-            contagem: atividadeQuery.totalCount
-              ? String(atividadeQuery.totalCount)
-              : undefined,
-          },
-          {
             valor: "andamentos",
             label: "Linha do tempo",
           },
@@ -236,11 +221,6 @@ function CockpitContent({
 
       <div className="mt-4 grid grid-cols-[minmax(0,1fr)_280px] items-start gap-4">
         <div>
-          {aba === "atividade" && (
-            <Card className="px-5.5 pt-2 pb-4">
-              <AtividadeDoEscritorio processoId={p.id} />
-            </Card>
-          )}
           {aba === "andamentos" && (
             <Card className="px-5.5 pt-2 pb-4">
               <AndamentosTimeline processoId={p.id} />

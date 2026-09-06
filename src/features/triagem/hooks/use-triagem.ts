@@ -21,23 +21,62 @@ export const TRIAGEM_WORK_STAGES: IntimacaoWorkStage[] = [
 // intimações a triar, mas a lista só carrega a 1ª leva.
 const TRIAGEM_LIMIT = 100;
 
+/** Filtros da Triagem além da fila fixa de estágios: aba de origem + as duas
+ *  facetas do design (órgão/tribunal + urgência). Todos server-side. */
+export interface TriagemFilters {
+  /** Aba de origem (`?origem=`); "" / undefined = "Todos". */
+  origem?: string;
+  /** Faceta "Órgão" (`?court=`) — tribunal distinto do conjunto. */
+  court?: string;
+  /** Pill/faceta "Urgência" (`?urgencia=`) — closed set do BE. */
+  urgencia?: string;
+}
+
 /**
  * Fila de Triagem — intimações que ainda não viraram tarefa, ordenada por
  * urgência. REUSA useIntimacoes (mesmo fetch/cache/paginação por cursor de
  * Intimações) só com work_stage=CSV + limit=100, SEM ?sort= (mantém o default
  * made_available_at DESC do BE); a ordenação por urgência é aplicada aqui,
  * client-side (ver ordenarPorUrgencia).
+ *
+ * `origem` (aba selecionada) vira `?origem=` — filtro server-side; troca de aba
+ * refaz o fetch. `origemFacets` (do envelope, contagens sobre o conjunto inteiro
+ * do filtro exceto o próprio origem) alimenta as abas com contagem correta,
+ * mesmo com só a 1ª leva (100) carregada. `undefined`/"" = aba "Todos".
+ * `court`/`urgencia` são as duas facetas do design (barra Filtrar + pills de
+ * urgência) — também server-side. `buckets` (contagens por urgência) alimenta as
+ * pills; `filterOptions` (do envelope) traz as opções distintas de tribunal.
  */
-export function useTriagem() {
-  const { intimacoes, totalCount, isPending, isFetching, error } =
-    useIntimacoes({
-      workStage: TRIAGEM_WORK_STAGES,
-      limit: TRIAGEM_LIMIT,
-    });
+export function useTriagem(filters: TriagemFilters = {}) {
+  const {
+    intimacoes,
+    filters: filterOptions,
+    buckets,
+    totalCount,
+    origemFacets,
+    isPending,
+    isFetching,
+    error,
+  } = useIntimacoes({
+    workStage: TRIAGEM_WORK_STAGES,
+    origem: filters.origem,
+    court: filters.court,
+    urgencia: filters.urgencia,
+    limit: TRIAGEM_LIMIT,
+  });
 
   const itens = useMemo(() => ordenarPorUrgencia(intimacoes), [intimacoes]);
 
-  return { itens, totalCount, isPending, isFetching, error };
+  return {
+    itens,
+    totalCount,
+    origemFacets,
+    buckets,
+    filterOptions,
+    isPending,
+    isFetching,
+    error,
+  };
 }
 
 /**

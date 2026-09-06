@@ -24,11 +24,8 @@ import {
   useIntimacoes,
 } from "../hooks/use-intimacoes";
 import { TYPE_LABEL, USER_STATUS_LABEL } from "../lib/labels";
-import type {
-  IntimacaoPrazoView,
-  IntimacaoView,
-  IntimacoesBuckets,
-} from "../types";
+import { URGENCIA_TABS } from "../lib/urgencia-tabs";
+import type { IntimacaoPrazoView, IntimacaoView } from "../types";
 import { AnalisarCard } from "./shared/analisar-card";
 import { AtribuirResponsavel } from "./shared/atribuir-responsavel";
 import { Avatar, initials } from "./shared/avatar";
@@ -50,31 +47,6 @@ import { TeorPublicacao } from "./shared/teor-publicacao";
 // (useIntimacaoDetalhe) e REUSA o <AnalisarCard/> da tela de detalhe — os 2
 // estados dos prints (com/sem análise) são o mesmo componente, sem duplicar.
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** Tabs de urgência: rótulo, valor de wire (?urgencia) e a chave do bucket que
- * traz a contagem real. O valor de wire de "Esta semana" é "semana" — só o
- * NOME do campo no envelope `buckets` é "esta_semana" (ver types.ts). São seis
- * tabs; mais_adiante fica de fora do master-detail (calculado mas não é tab). */
-const URGENCIA_TABS: {
-  value: string;
-  label: string;
-  bucketKey: keyof IntimacoesBuckets;
-}[] = [
-  { value: "atraso", label: "Em atraso", bucketKey: "atraso" },
-  { value: "hoje", label: "Vence hoje", bucketKey: "hoje" },
-  {
-    value: "proximos_dois_dias",
-    label: "Próximos dois dias",
-    bucketKey: "proximos_dois_dias",
-  },
-  { value: "semana", label: "Esta semana", bucketKey: "esta_semana" },
-  { value: "este_mes", label: "Este mês", bucketKey: "este_mes" },
-  {
-    value: "sem_data_definida",
-    label: "Sem data definida",
-    bucketKey: "sem_data_definida",
-  },
-];
 
 type ModoVisao = "triagem" | "prazos";
 
