@@ -27,7 +27,12 @@ export const TIPO_ATO_LABEL: Record<string, string> = {
  * COM prazo (o "o que fazer") ganham chip de tipo.
  */
 export function tipoAtoChipLabel(tipoAto: string): string {
-  if (!tipoAto || tipoAto === "indeterminado" || tipoAto === "ciencia" || tipoAto === "sem_ato") {
+  if (
+    !tipoAto ||
+    tipoAto === "indeterminado" ||
+    tipoAto === "ciencia" ||
+    tipoAto === "sem_ato"
+  ) {
     return "";
   }
   return TIPO_ATO_LABEL[tipoAto] ?? "";

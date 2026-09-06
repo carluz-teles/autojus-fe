@@ -102,7 +102,6 @@ export async function confirmarPrazo(
   });
 }
 
-
 /**
  * Preview ao vivo — recalcula o vencimento sem persistir.
  * POST /v1/prazos/preview → PrazoPreviewResult. Chamado com debounce ~300ms

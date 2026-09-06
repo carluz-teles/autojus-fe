@@ -75,7 +75,11 @@ describe("abasVisiveis", () => {
 
   it("'A classificar' (pendência) é aba própria, separada de 'Sem prazo' (ciência)", () => {
     const abas = abasVisiveis(facets({ a_classificar: 187, sem_prazo: 309 }));
-    expect(abas.map((a) => a.value)).toEqual([null, "a_classificar", "sem_prazo"]);
+    expect(abas.map((a) => a.value)).toEqual([
+      null,
+      "a_classificar",
+      "sem_prazo",
+    ]);
     expect(abas.find((a) => a.value === "a_classificar")).toEqual({
       value: "a_classificar",
       label: "A classificar",
