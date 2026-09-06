@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["src/**/*.test.{ts,tsx}"],
+  "project": ["src/**/*.{ts,tsx}"],
+  "ignore": ["src/components/ui/**"],
+  "ignoreDependencies": [],
+  "next": {
+    "entry": [
+      "next.config.{js,ts,mjs}",
+      "src/app/**/{page,layout,route,template,default,loading,error,not-found,global-error}.{js,jsx,ts,tsx}",
+      "src/middleware.{js,ts}"
+    ]
+  }
+}
