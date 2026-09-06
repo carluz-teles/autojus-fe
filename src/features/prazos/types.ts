@@ -206,29 +206,6 @@ export interface PrazoConfirmResult {
   tasks: Array<{ id: string; title: string; due_date: string | null }>;
 }
 
-// ── Tarefas sugeridas por LLM (on-demand) ──
-// GET /v1/prazos/:id/suggested-tasks → a "Análise" que pré-preenche o F2 "Aprovar tudo".
-// O LLM (via OpenRouter) lê a intimação + o prazo e devolve, numa tacada: o resumo do
-// que aconteceu, a recomendação do que fazer e as tarefas acionáveis; o advogado
-// edita/aprova. `kind` é uma categoria curta livre (ANALISE|PECA|PROTOCOLO|…).
-export interface SuggestedTask {
-  title: string;
-  kind: string;
-  /** "Por quê" da tarefa. Sempre presente no BE (sem omitempty), pode vir "". */
-  description: string;
-}
-
-/**
- * Resposta 200: a Análise única (sem envelope de cursor). `summary` ("O que aconteceu")
- * e `recommendation` ("O que fazer") são sempre presentes (BE sem omitempty), mas vêm ""
- * quando o LLM não está configurado/indisponível — nesse caso `suggested_tasks` é [].
- */
-export interface SuggestedTasksResult {
-  summary: string;
-  recommendation: string;
-  suggested_tasks: SuggestedTask[];
-}
-
 /**
  * Contadores agregados da agenda de prazos — GET /v1/prazos/summary. Objeto único
  * (sem envelope de cursor). Alimenta a KpiRow do topo da tela.
