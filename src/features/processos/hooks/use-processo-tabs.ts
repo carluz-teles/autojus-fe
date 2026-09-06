@@ -2,9 +2,9 @@
 
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
+import { listActionItemsByProcesso } from "@/features/action-items/services/action-items.service";
 import { listIntimacoesByProcesso } from "@/features/intimacoes/services/intimacoes.service";
 import { listPrazosByProcesso } from "@/features/prazos/services/prazos.service";
-import { listTasksByProcesso } from "@/features/tasks/services/tasks.service";
 import { useApi } from "@/lib/api/use-api";
 
 // ── Intimações do processo ────────────────────────────────────────────────────
@@ -62,17 +62,18 @@ export function usePrazosByProcesso(processoId: string) {
   };
 }
 
-// ── Tarefas do processo ───────────────────────────────────────────────────────
+// ── Providências do processo ──────────────────────────────────────────────────
 
 /**
- * Tarefas de um processo — GET /v1/processos/:id/tasks (soonest-due-first, tudo
- * em memória via limit=100). Desligado enquanto `processoId` for vazio.
+ * Providências de um processo — GET /v1/processos/:id/action-items (soonest-due-
+ * first, tudo em memória via limit=100). Desligado enquanto `processoId` for vazio.
  */
-export function useTasksByProcesso(processoId: string) {
+export function useActionItemsByProcesso(processoId: string) {
   const fetcher = useApi();
   return useQuery({
-    queryKey: ["tasks", "por-processo", processoId],
-    queryFn: () => listTasksByProcesso(fetcher, { processoId, limit: 100 }),
+    queryKey: ["action-items", "por-processo", processoId],
+    queryFn: () =>
+      listActionItemsByProcesso(fetcher, { processoId, limit: 100 }),
     enabled: !!processoId,
     select: (data) => data.data,
   });

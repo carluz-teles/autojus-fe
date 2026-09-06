@@ -58,8 +58,8 @@ export interface NextDeadlineView {
   end_date: string;
   /** Dias restantes (negativo = vencido). */
   days_left: number;
-  /** Tipo legible do prazo (ex.: "Recurso", "Contestação"). */
-  kind: string;
+  /** Tipo do ato do prazo (snake_case: "apelacao"|"contestacao"|…). */
+  tipo_ato: string;
 }
 
 /**

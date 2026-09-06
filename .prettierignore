@@ -14,3 +14,6 @@ docs/
 
 # assets estáticos vendored (worker minificado do pdf.js) — não é código-fonte
 public/pdf.worker.min.mjs
+
+# referência visual temporária de design (Claude Design) — não é código-fonte, não commitar
+.triagem-design-ref.html

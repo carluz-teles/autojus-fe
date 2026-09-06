@@ -67,9 +67,10 @@ export interface CriarPecaParams {
    *  piece_type da providência ligada à tarefa). */
   piece_type?: string;
   title?: string;
-  /** Novo caminho (fatia 4/5 do BE): cria a peça a partir de uma providência
-   *  (action_item) já confirmada/com tarefa — herda piece_profile_key/piece_type. */
-  task_id?: string;
+  /** Cria a peça a partir de uma providência (action_item) — o BE resolve
+   *  intimation_id/case_id/piece_type da providência (herda piece_profile_key/
+   *  piece_type). Substitui o antigo `task_id` (a "Tarefa" foi eliminada). */
+  action_item_id?: string;
 }
 
 /** Cria (ou reaproveita, idempotente por intimação) um rascunho — POST /v1/pecas. */

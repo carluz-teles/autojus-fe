@@ -17,7 +17,7 @@ import { Avatar } from "@/components/mock-ui/data-display";
 import { Input } from "@/components/ui/input";
 import {
   AnalisarLoading,
-  ComoIALeuCard,
+  LeituraDoTeorCard,
   ProvidenciaRow,
   ProvidenciasBanner,
   ProvidenciasLinhaLegal,
@@ -37,10 +37,9 @@ const POPUP_CLASS =
 const ITEM_CLASS =
   "focus:bg-accent focus:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-md py-1.5 pr-2 pl-2 text-[13px] outline-none select-none data-disabled:pointer-events-none data-disabled:opacity-50";
 
-// Detalhe da intimação (unidade de trabalho), ligado ao backend real via
-// useIntimacaoDetalhe. Faixa de identidade + stepper de ciclo de vida + ação
-// rápida (responsável); 2 colunas: providências geradas por IA (sob demanda)
-// à esquerda, teor + trilha à direita.
+// Detalhe da intimação, ligado ao backend real via useIntimacaoDetalhe. Faixa de
+// identidade + stepper de ciclo de vida + ação rápida (responsável); 2 colunas:
+// providências (sob demanda) à esquerda, teor + trilha à direita.
 export function IntimacaoDetalhe({ id }: { id: string }) {
   const det = useIntimacaoDetalhe(id);
   const m = det.model;
@@ -238,7 +237,7 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
                 {m.analisada && !m.degradado ? (
                   <>
                     <span className="text-fg3 text-[11.5px]">
-                      geradas pela IA · revise antes de executar
+                      revise antes de iniciar
                     </span>
                     <span className="text-fg3 ml-auto font-mono text-[11px]">
                       {m.nProvidencias}
@@ -258,11 +257,11 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
                     />
                   </div>
                   <div className="font-display mb-1.5 text-[16px]">
-                    Gerar providências com IA
+                    Gerar providências
                   </div>
                   <p className="text-fg3 mx-auto mb-4 max-w-[330px] text-[12px] leading-[1.55]">
-                    A IA lê o teor, classifica o ato, deriva o prazo e sugere as
-                    providências. A geração é sob demanda para controlar custo.
+                    Lê o teor, classifica o ato, deriva o prazo e sugere as
+                    providências. Geração sob demanda para controlar custo.
                   </p>
                   {det.analiseErro ? (
                     <p
@@ -301,8 +300,7 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
                   ) : (
                     <>
                       {/* Linha de detalhe legal (SEM breadcrumb — removido por
-                          decisão explícita, v2.1) + o banner "Cada providência
-                          vira uma tarefa…" + "Criar todas" —
+                          decisão explícita, v2.1) + o banner das providências —
                           docs/design-card-providencias-v2.md §2-3
                           (compartilhados com <AnalisarCard/>, Regra nº1). */}
                       <ProvidenciasLinhaLegal intimacao={det.intimacao!} />
@@ -334,11 +332,12 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
               ) : null}
             </div>
 
-            {/* SECUNDÁRIA: como a IA leu (= card "Análise" fundido, v2.1) +
+            {/* SECUNDÁRIA: leitura do teor (= card "Análise" fundido, v2.1) +
                 teor + trilha */}
             <div className="flex flex-col gap-3.5">
               {m.analisada && !m.degradado && m.providencias.length > 0 ? (
-                <ComoIALeuCard
+                <LeituraDoTeorCard
+                  intimacaoId={m.id}
                   ato={m.ato}
                   resumo={m.resumo}
                   itens={m.providencias}

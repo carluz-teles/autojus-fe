@@ -17,7 +17,8 @@ export type PrazoCounting = "BUSINESS" | "CALENDAR";
 // Prazo base (o que a aba do processo entrega).
 export interface PrazoView {
   id: string;
-  kind: string;
+  /** Tipo do ato que o prazo exige (snake_case: "manifestacao"|"apelacao"|…; "" quando não há). */
+  tipo_ato: string;
   /** Fim do prazo (RFC3339). */
   end_date: string;
   /** Dias restantes (negativo = vencido). Base da contagem regressiva. */
@@ -153,7 +154,8 @@ export interface PrazoConfirmTask {
 
 /** Prazo ajustado pelo advogado antes de abrir. */
 export interface PrazoConfirmDeadline {
-  kind: string;
+  /** Tipo do ato (snake_case). Ao trocar, o BE re-deriva os dias da tabela legal. */
+  tipo_ato: string;
   days: number;
   counting: PrazoCounting;
   doubled: boolean;
@@ -168,7 +170,8 @@ export interface PrazoConfirmDeadline {
 export interface PrazoPreviewInput {
   intimation_id: string;
   anchor_event: PrazoAnchorEvent;
-  kind: string;
+  /** Tipo do ato (snake_case). O BE re-deriva os dias ao trocar. */
+  tipo_ato: string;
   days: number;
   counting: PrazoCounting;
   doubled: boolean;
@@ -201,29 +204,6 @@ export interface PrazoConfirmInput {
 export interface PrazoConfirmResult {
   deadline: PrazoDetalheView & { confirmed_by?: string };
   tasks: Array<{ id: string; title: string; due_date: string | null }>;
-}
-
-// ── Tarefas sugeridas por LLM (on-demand) ──
-// GET /v1/prazos/:id/suggested-tasks → a "Análise" que pré-preenche o F2 "Aprovar tudo".
-// O LLM (via OpenRouter) lê a intimação + o prazo e devolve, numa tacada: o resumo do
-// que aconteceu, a recomendação do que fazer e as tarefas acionáveis; o advogado
-// edita/aprova. `kind` é uma categoria curta livre (ANALISE|PECA|PROTOCOLO|…).
-export interface SuggestedTask {
-  title: string;
-  kind: string;
-  /** "Por quê" da tarefa. Sempre presente no BE (sem omitempty), pode vir "". */
-  description: string;
-}
-
-/**
- * Resposta 200: a Análise única (sem envelope de cursor). `summary` ("O que aconteceu")
- * e `recommendation` ("O que fazer") são sempre presentes (BE sem omitempty), mas vêm ""
- * quando o LLM não está configurado/indisponível — nesse caso `suggested_tasks` é [].
- */
-export interface SuggestedTasksResult {
-  summary: string;
-  recommendation: string;
-  suggested_tasks: SuggestedTask[];
 }
 
 /**

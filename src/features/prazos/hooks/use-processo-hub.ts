@@ -30,6 +30,7 @@ import type {
 import { formatDate } from "@/lib/format";
 
 import { iniciais } from "../lib/derivar";
+import { tipoAtoLabel } from "../lib/labels";
 
 // PROCESSO · HUB — cockpit do caso, agora ligado ao BACKEND REAL. O hook público
 // compõe os hooks de dados reais (detalhe, resumo IA, partes, andamentos e as abas
@@ -451,7 +452,7 @@ function useReferencias_private(id: string) {
     () =>
       prazosQ.prazos.map((p) => ({
         id: p.id,
-        kind: p.kind,
+        kind: tipoAtoLabel(p.tipo_ato),
         interno: p.start_date ? formatDate(p.start_date) : "",
         fatal: formatDate(p.end_date),
         prazoCurto: prazoCurto(p.days_left),

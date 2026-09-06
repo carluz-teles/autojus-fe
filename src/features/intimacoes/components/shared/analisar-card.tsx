@@ -7,9 +7,10 @@
 // painel lateral compacto, e o print 1 reusa a lista de providências pós-análise.
 //
 // Pós migração action_item (tabela real, endereçada por id — não mais jsonb por
-// índice): ProvidenciaRow reage a task_id (não mais status SUGGESTED/APPROVED — ver
-// docstring). Confirmar chama o novo endpoint /v1/action-items/:id/confirmar; a
-// criação da tarefa é 100% assíncrona no BE.
+// índice): ProvidenciaRow reage ao `status` de trabalho (SUGGESTED→TODO→WORKING→DONE,
+// sem estado de descarte). "Iniciar providência" chama /v1/action-items/:id/iniciar
+// (SUGGESTED→TODO); "Confirmar tipo" chama /v1/action-items/:id/confirmar (gate de tipo
+// a_confirmar→confiável) — são ações DISTINTAS, não o mesmo botão.
 //
 // Layout da seção "Providências" segue docs/design-card-providencias-v2.md (v2.1) —
 // fonte de verdade LITERAL (extraída do .dc.html canônico), substitui INTEIRAMENTE a
@@ -39,12 +40,16 @@ import { type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+// Rótulo do status de trabalho: fonte única (Regra nº1) em action-items/lib/status-pill;
+// não redefinir localmente (o board e a fila consomem o MESMO mapa).
+import { STATUS_LABEL } from "@/features/action-items/lib/status-pill";
 import { useCriarPeca } from "@/features/pecas/hooks/use-peca";
 import { formatarData, formatarDataHora } from "@/lib/utils";
 
 import {
   useAnalisarIntimacao,
   useConfirmarActionItem,
+  useIniciarProvidencia,
   useIntimacaoDetalhe,
 } from "../../hooks/use-intimacoes";
 import type { IntimacaoDetalheView, IntimacaoProvidencia } from "../../types";
@@ -81,9 +86,9 @@ function atoConfianca(itens: IntimacaoProvidencia[]): {
   label: string;
   cor: string;
 } {
-  const iaItens = itens.filter((p) => p.tipo_origem === "ia");
-  if (iaItens.length > 0) {
-    const confiancas = iaItens
+  const inferidos = itens.filter((p) => p.tipo_origem === "ia");
+  if (inferidos.length > 0) {
+    const confiancas = inferidos
       .map((p) => p.confianca)
       .filter((c): c is number => c != null);
     const media =
@@ -93,7 +98,7 @@ function atoConfianca(itens: IntimacaoProvidencia[]): {
               100,
           )
         : 0;
-    return { label: `IA · confiança ${media}%`, cor: "var(--primary)" };
+    return { label: `confiança ${media}%`, cor: "var(--primary)" };
   }
   return { label: "Declarado na intimação", cor: "var(--green)" };
 }
@@ -208,17 +213,15 @@ export function ProvidenciasBanner({
       <p className="text-fg2 text-[13px] leading-relaxed">
         {fatalDate ? (
           <>
-            Cada providência vira uma{" "}
-            <strong className="font-medium">tarefa</strong>, vinculada ao prazo
-            que já existe (fatal {fatalDate}) e herdando o selo{" "}
-            <strong className="font-medium">{selo}</strong> — nasce em{" "}
+            Cada providência é uma unidade de trabalho, vinculada ao prazo que
+            já existe (fatal {fatalDate}) e herdando o selo{" "}
+            <strong className="font-medium">{selo}</strong> — entra em{" "}
             <strong className="font-medium">{nasce}</strong>.
           </>
         ) : (
           <>
-            Cada providência vira uma{" "}
-            <strong className="font-medium">tarefa</strong> — confirme antes de
-            criar.
+            Cada providência é uma unidade de trabalho — confirme o tipo antes
+            de iniciar.
           </>
         )}
       </p>
@@ -230,24 +233,37 @@ export function ProvidenciasBanner({
  * Card "Como a IA leu" (coluna secundária, docs/design-card-providencias-v2.md
  * §6, v2.1 — correção do usuário). Este é o MESMO card "Análise" que já
  * existia (mostrava só `ai_summary`) — não um card novo separado: aqui ele
- * ganha o visual accent/primary do `.dc.html` (label "COMO A IA LEU" + ato em
- * serif + confiança à direita) por cima do corpo real. O corpo é o
- * `ai_summary` de verdade (prop `resumo`) — NÃO o texto fixo genérico do mock
- * ("A IA leu o teor, classificou..."), que era só placeholder de protótipo.
- * Some quando ainda não há providências (nada pra resumir). Ver
- * `atoConfianca` pra heurística de confiança (documentada lá).
+ * ganha o visual accent/primary do `.dc.html` (label "LEITURA DO TEOR" + ato em
+ * serif + confiança à direita) por cima do corpo real. O corpo é o `ai_summary`
+ * de verdade (prop `resumo`). Some quando ainda não há providências. Traz o botão
+ * "Confirmar tipo" (POST /confirmar) quando alguma providência do lote ainda está
+ * com o gate de tipo em "a_confirmar" — é o gate de TIPO, separado do "Iniciar
+ * providência" (que roda por linha). Ver `atoConfianca` pra heurística de confiança.
  */
-export function ComoIALeuCard({
+export function LeituraDoTeorCard({
+  intimacaoId,
   ato,
   resumo,
   itens,
 }: {
+  intimacaoId: string;
   ato: string;
   resumo: string;
   itens: IntimacaoProvidencia[];
 }) {
+  const confirmar = useConfirmarActionItem(intimacaoId);
   if (itens.length === 0) return null;
   const conf = atoConfianca(itens);
+  const aConfirmar = itens.filter((p) => p.tipo_status === "a_confirmar");
+
+  const onConfirmarTipo = () => {
+    for (const p of aConfirmar) {
+      confirmar.mutate(p.id, {
+        onError: () =>
+          toast.error("Não foi possível confirmar o tipo. Tente novamente."),
+      });
+    }
+  };
 
   return (
     <div
@@ -259,7 +275,7 @@ export function ComoIALeuCard({
     >
       <div className="flex items-center gap-2">
         <span className="text-primary text-[11px] font-semibold tracking-[0.03em] uppercase">
-          Como a IA leu
+          Leitura do teor
         </span>
         <span className="text-fg3 ml-auto font-mono text-[10.5px]">
           {conf.label}
@@ -267,6 +283,22 @@ export function ComoIALeuCard({
       </div>
       <p className="font-display mt-2 mb-1 text-[16px]">{ato || "—"}</p>
       <p className="text-fg2 text-[11.5px] leading-relaxed">{resumo}</p>
+      {aConfirmar.length > 0 ? (
+        <button
+          type="button"
+          onClick={onConfirmarTipo}
+          disabled={confirmar.isPending}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-[7px] px-3 py-[7px] text-[12px] font-medium text-white transition-[filter] hover:brightness-95 disabled:opacity-60"
+          style={{ background: "var(--primary)" }}
+        >
+          {confirmar.isPending ? (
+            <Loader2 className="size-[13px] animate-spin" strokeWidth={2.2} />
+          ) : (
+            <Check className="size-[13px]" strokeWidth={2.2} />
+          )}
+          Confirmar tipo
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -276,8 +308,9 @@ export function ComoIALeuCard({
  *  • LOADING (mutation em voo): spinner + linha de status + 3 skeletons.
  *  • PRÉ (ai_analyzed_at == null): CTA "Gerar análise".
  *  • PÓS (ai_analyzed_at != null): "O QUE ACONTECEU" (resumo) + seção "Providências"
- *    (tudo menos DISCARDED — ver ProvidenciaRow pros estados de cada uma) + rodapé de
- *    proveniência + "Gerar novamente". Resumo vazio = modo degradado (IA off).
+ *    (por status de trabalho SUGGESTED→TODO→WORKING→DONE — ver ProvidenciaRow pros
+ *    estados de cada uma) + rodapé de proveniência + "Gerar novamente". Resumo vazio =
+ *    modo degradado.
  * O botão dispara useAnalisarIntimacao(id) → estado LOADING; erro → toast + alerta.
  */
 export function AnalisarCard({
@@ -317,7 +350,7 @@ export function AnalisarCard({
         </h3>
         <p className="text-muted-foreground mt-2 max-w-[400px] text-[13.5px] leading-relaxed text-pretty">
           Leitura do teor da publicação para gerar o resumo do que aconteceu e
-          as providências a cumprir. Você revisa antes de tudo virar tarefa.
+          as providências a cumprir. Você revisa antes de iniciar cada uma.
         </p>
         {analisar.isError ? (
           <p role="alert" className="text-destructive mt-4 text-[13px]">
@@ -332,11 +365,10 @@ export function AnalisarCard({
     );
   }
 
-  // Pós-análise. Modo degradado = analisada mas summary vazio (IA não configurada).
+  // Pós-análise. Modo degradado = analisada mas summary vazio.
   const degradado = !i.ai_summary?.trim();
-  // Providências visíveis = tudo menos DISCARDED. Endereçadas por id (não mais por
-  // índice — action_item é uma tabela real agora).
-  const itens = i.ai_providencias.filter((p) => p.status !== "DISCARDED");
+  // Providências (action_item), endereçadas por id.
+  const itens = i.ai_providencias;
 
   return (
     <section className="border-border rounded-xl border px-6 py-6">
@@ -362,7 +394,7 @@ export function AnalisarCard({
                   Providências
                 </span>
                 <span className="text-fg3 text-[11.5px]">
-                  geradas pela IA · revise antes de executar
+                  revise antes de iniciar
                 </span>
                 <span className="text-fg3 ml-auto font-mono text-[11px]">
                   {itens.length}
@@ -436,29 +468,28 @@ export function AnalisarLoading() {
   );
 }
 
-/** Código curto e estável exibido na pílula de referência da tarefa (derivado do uuid).
- *  `prefix` default "TAR-" é o padrão do resto do app (ver tasks/tarefa-detail.tsx);
- *  este card usa "T-" na pílula por pedido do mockup (docs/design-card-providencias-v2.md). */
-export function codigoTarefa(taskId: string, prefix = "TAR-"): string {
-  return `${prefix}${taskId.replace(/-/g, "").slice(0, 4).toUpperCase()}`;
+/** Código curto e estável da providência (derivado do uuid) — PRV-XXXX; o design
+ *  usa o prefixo curto na pílula (docs/design-card-providencias-v2.md). */
+export function codigoProvidencia(id: string, prefix = "PRV-"): string {
+  return `${prefix}${id.replace(/-/g, "").slice(0, 4).toUpperCase()}`;
 }
 
-/** Botão de ação da linha de providência — "Criar tarefa" e "Gerar minuta" são o
- *  MESMO botão (mesmo tamanho/forma), diferindo APENAS na cor (aplicada via `style`
- *  inline no ponto de uso). Padding 7px 12px / radius 7px / 12px / ícone 13px. */
+/** Botão de ação da linha de providência — "Iniciar providência" e "Gerar minuta"
+ *  são o MESMO botão (mesmo tamanho/forma), diferindo APENAS na cor (aplicada via
+ *  `style` inline). Padding 7px 12px / radius 7px / 12px / ícone 13px. */
 const ACAO_BTN_CLASS =
   "inline-flex shrink-0 items-center gap-1.5 rounded-[7px] border px-3 py-[7px] text-[12px] font-medium transition-[filter] hover:brightness-95 disabled:opacity-60";
 
 /**
- * Uma providência no card de análise. Endereçada por `id` (action_item é tabela real
- * agora — não mais índice de array). Dois estados (docs/design-card-providencias-v2.md §4):
- *  • PRÉ (task_id == null) — botão "+ Criar tarefa" (chama confirmar; funciona igual
- *    pra item declarado ou sugerido pela IA — um único botão, um único endpoint, sempre,
- *    idempotente). SEM botão de Descartar — o .dc.html não tem essa ação nesta view
- *    (useDescartarActionItem continua existindo no hook layer, só não é usado aqui).
- *  • PÓS (task_id != null) — pílula verde "✓ T-xxxx" (link pra tarefa) e, se
- *    `gera_peca`, o botão "Gerar minuta"; senão (Ciência), texto simples "no fluxo".
- *  Erro de confirmar → toast + role=alert.
+ * Uma providência no card de análise. Endereçada por `id` (o id do action_item).
+ * Dois estados (docs/design-card-providencias-v2.md §4):
+ *  • NÃO INICIADA (status === "SUGGESTED") — botão "+ Iniciar providência" (chama
+ *    POST /iniciar; SUGGESTED→TODO). É o "Iniciar providência", distinto do gate de
+ *    tipo "Confirmar tipo" (que mora no card de leitura).
+ *  • INICIADA (status !== "SUGGESTED") — pílula verde "✓ PRV-xxxx" (link pra
+ *    /providencias/:id) e, se `gera_peca`, o botão "Gerar minuta"; senão (Ciência),
+ *    texto simples "no fluxo".
+ *  Erro de iniciar → toast + role=alert.
  */
 export function ProvidenciaRow({
   intimacaoId,
@@ -467,27 +498,23 @@ export function ProvidenciaRow({
   intimacaoId: string;
   providencia: IntimacaoProvidencia;
 }) {
-  const confirmar = useConfirmarActionItem(intimacaoId);
-  const emVoo = confirmar.isPending;
-  const erro = confirmar.isError;
+  const iniciar = useIniciarProvidencia(intimacaoId);
+  const emVoo = iniciar.isPending;
+  const erro = iniciar.isError;
 
-  const onConfirmar = () =>
-    confirmar.mutate(p.id, {
+  const onIniciar = () =>
+    iniciar.mutate(p.id, {
       onError: () =>
-        toast.error("Não foi possível criar a tarefa. Tente novamente."),
+        toast.error("Não foi possível iniciar a providência. Tente novamente."),
     });
 
-  const comTarefa = p.task_id != null;
-  // Título/descrição vêm PERSISTIDOS do action_item (read model, migração 0090) —
-  // não mais de cache efêmero por tipo. Fallback ao rótulo genérico quando o item é
-  // antigo (title null) ou a análise degradou.
+  const iniciada = p.status !== "SUGGESTED";
   const titulo = p.title || rotuloTipo(p.tipo);
   const descricao = p.description;
   const selo = seloItemInfo(p.tipo_status);
 
   return (
-    // Grid 1fr auto — fiel ao .dc.html (Prazos-Linear, bloco <sc-for as="pv">):
-    // padding 12px 16px, gap 12px, border-bottom var(--line2), row-hover.
+    // Grid 1fr auto — fiel ao .dc.html (Prazos-Linear, bloco <sc-for as="pv">).
     <li className="border-line2 hover:bg-hover grid grid-cols-[1fr_auto] items-center gap-3 border-b px-4 py-3">
       <div className="min-w-0">
         <span className="text-foreground block text-[13px] font-medium">
@@ -525,12 +552,10 @@ export function ProvidenciaRow({
           >
             {selo.label}
           </RowBadge>
-          {/* Chip da tarefa — fiel ao design: borda green 38% / fundo green 9% /
-              mono 9.5px + check, dentro do cluster de badges. Clicável (leva à
-              tarefa) — o único desvio do mock estático (§4 do v2). */}
-          {p.task_id ? (
+          {/* Chip da providência iniciada — leva a /providencias/:id. */}
+          {iniciada ? (
             <Link
-              href={`/tarefas?task=${p.task_id}`}
+              href={`/providencias/${p.id}`}
               className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[9.5px] font-medium tabular-nums transition-[filter] hover:brightness-95"
               style={{
                 borderColor:
@@ -538,9 +563,10 @@ export function ProvidenciaRow({
                 background: "color-mix(in oklch, var(--green) 9%, transparent)",
                 color: "var(--green)",
               }}
+              title={STATUS_LABEL[p.status]}
             >
               <Check className="size-[11px]" strokeWidth={2.4} />
-              {codigoTarefa(p.task_id, "T-")}
+              {codigoProvidencia(p.id, "PRV-")}
             </Link>
           ) : null}
         </span>
@@ -556,26 +582,26 @@ export function ProvidenciaRow({
       </div>
 
       {/* Coluna de ação (auto) */}
-      {comTarefa ? (
+      {iniciada ? (
         <span className="inline-flex items-center gap-2">
           {p.gera_peca ? (
-            <GerarMinutaDaTarefa providencia={p} />
+            <GerarMinutaDaProvidencia providencia={p} />
           ) : (
             <span className="text-fg3 text-[11.5px]">no fluxo</span>
           )}
         </span>
       ) : (
-        // "Criar tarefa" — MESMO botão/tamanho do "Gerar minuta" (ACAO_BTN_CLASS),
-        // só muda a COR: outline NEUTRO (border --line / bg --panel / texto --fg).
+        // "Iniciar providência" — MESMO botão/tamanho do "Gerar minuta"
+        // (ACAO_BTN_CLASS); cor accent (borda primary / texto primary).
         <button
           type="button"
-          onClick={onConfirmar}
+          onClick={onIniciar}
           disabled={emVoo}
           className={ACAO_BTN_CLASS}
           style={{
-            borderColor: "var(--line)",
-            background: "var(--panel)",
-            color: "var(--foreground)",
+            borderColor: "color-mix(in oklch, var(--primary) 45%, transparent)",
+            background: "color-mix(in oklch, var(--primary) 7%, transparent)",
+            color: "var(--primary)",
           }}
         >
           {emVoo ? (
@@ -583,7 +609,7 @@ export function ProvidenciaRow({
           ) : (
             <Plus className="size-[13px]" strokeWidth={2.2} />
           )}
-          Criar tarefa
+          Iniciar providência
         </button>
       )}
     </li>
@@ -591,13 +617,13 @@ export function ProvidenciaRow({
 }
 
 /**
- * Ponto de entrada TEMPORÁRIO para testar POST /v1/pecas com `task_id` (fatia 4/5 do
- * BE — a peça herda piece_profile_key/piece_type da providência). Só aparece quando a
- * providência já tem tarefa E gera peça (docs/design-card-providencias-v2.md §5 — a
- * ação mora só aqui, NÃO existe mais um card "Minuta" separado). Sem tela dedicada
- * ainda: cria e navega direto pro draft (idempotente por task_id no BE).
+ * Gera a minuta a partir da providência — POST /v1/pecas com `action_item_id` (a
+ * peça herda piece_profile_key/piece_type da providência). Só aparece quando a
+ * providência já foi iniciada E gera peça (docs/design-card-providencias-v2.md §5 —
+ * a ação mora só aqui, NÃO existe card "Minuta" separado). Cria e navega direto
+ * pro draft (idempotente por action_item_id no BE).
  */
-function GerarMinutaDaTarefa({
+function GerarMinutaDaProvidencia({
   providencia: p,
 }: {
   providencia: IntimacaoProvidencia;
@@ -605,11 +631,11 @@ function GerarMinutaDaTarefa({
   const router = useRouter();
   const criarPeca = useCriarPeca();
 
-  if (!p.gera_peca || !p.task_id) return null;
+  if (!p.gera_peca || p.status === "SUGGESTED") return null;
 
   const onClick = () =>
     criarPeca.mutate(
-      { task_id: p.task_id! },
+      { action_item_id: p.id },
       {
         onSuccess: (peca) => router.push(`/pecas/${peca.id}`),
         onError: () =>
@@ -618,8 +644,7 @@ function GerarMinutaDaTarefa({
     );
 
   return (
-    // MESMO botão/tamanho do "Criar tarefa" (ACAO_BTN_CLASS); só muda a COR:
-    // accent (borda primary 45% / fundo primary 7% / texto primary).
+    // MESMO botão/tamanho do "Iniciar providência" (ACAO_BTN_CLASS); accent.
     <button
       type="button"
       onClick={onClick}

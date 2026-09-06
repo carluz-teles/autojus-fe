@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { iniciarActionItem } from "@/features/action-items/services/action-items.service";
 import { useApi } from "@/lib/api/use-api";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 
@@ -20,7 +21,6 @@ import {
   type BulkAssignParams,
   bulkAssignResponsavel,
   confirmarActionItem,
-  descartarActionItem,
   getIntimacao,
   getIntimacoesSummary,
   ignoreIntimacao,
@@ -30,7 +30,11 @@ import {
   reopenIntimacao,
   resolveIntimacao,
 } from "../services/intimacoes.service";
-import type { IntimacaoDetalheView, IntimacoesBuckets } from "../types";
+import type {
+  IntimacaoDetalheView,
+  IntimacoesBuckets,
+  OrigemFacets,
+} from "../types";
 
 const EMPTY_BUCKETS: IntimacoesBuckets = {
   atraso: 0,
@@ -40,6 +44,17 @@ const EMPTY_BUCKETS: IntimacoesBuckets = {
   este_mes: 0,
   mais_adiante: 0,
   sem_data_definida: 0,
+};
+
+const EMPTY_ORIGEM_FACETS: OrigemFacets = {
+  declarado: 0,
+  validado: 0,
+  calculado: 0,
+  divergente: 0,
+  ia: 0,
+  manual: 0,
+  a_classificar: 0,
+  sem_prazo: 0,
 };
 
 const PAGE_SIZE = 20;
@@ -65,6 +80,10 @@ export interface IntimacoesFilters {
    *  uma lista (ex.: a fila de Triagem filtra por 3 estágios de uma vez) — o
    *  service serializa a lista como CSV na query string. */
   workStage?: string | string[];
+  /** Origem do prazo (declarado|validado|calculado|divergente|ia|manual|
+   *  sem_prazo) — aba de origem da Triagem. Vazio/undefined = "Todos" (sem
+   *  filtro). Não afeta as contagens de `origemFacets`. */
+  origem?: string;
   /** Chip "Não confirmadas" (triagem) — filtra prazos sugeridos não confirmados. */
   naoConfirmado?: boolean;
   /** "me" (toggle "Minhas") ou um uuid; casa contra condutor OU revisor. */
@@ -97,6 +116,7 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     court: filters.court || undefined,
     urgencia: filters.urgencia || undefined,
     work_stage: filters.workStage || undefined,
+    origem: filters.origem || undefined,
     nao_confirmado: filters.naoConfirmado || undefined,
     assignee: filters.assignee || undefined,
     limit: filters.limit ?? PAGE_SIZE,
@@ -125,6 +145,7 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     intimacoes: pages.flatMap((p) => p.data),
     filters: first?.filters ?? {},
     buckets: first?.buckets ?? EMPTY_BUCKETS,
+    origemFacets: first?.origem_facets ?? EMPTY_ORIGEM_FACETS,
     totalCount: first?.page.total_count ?? 0,
     total: first?.page.total ?? 0,
     isPending: query.isPending,
@@ -199,12 +220,12 @@ function abrirJanelaDePoll(
   });
 }
 
-/** Providências visíveis (não-DISCARDED) já materializadas no detalhe. */
+/** Providências já materializadas no detalhe. */
 function providenciasVisiveis(i: IntimacaoDetalheView): number {
-  return i.ai_providencias.filter((p) => p.status !== "DISCARDED").length;
+  return i.ai_providencias.length;
 }
 
-/** true = ainda falta algo materializar (ver critério 1 acima). */
+/** true = ainda falta a análise materializar (ver critério 1 acima). */
 function algoPendente(
   i: IntimacaoDetalheView | undefined,
   janela: PollWindow,
@@ -225,12 +246,7 @@ function algoPendente(
       return true;
     }
   }
-  return i.ai_providencias.some(
-    (p) =>
-      p.status !== "DISCARDED" &&
-      p.tipo_status === "confiavel" &&
-      p.task_id === null,
-  );
+  return false;
 }
 
 /** Quantas tentativas de refetch a janela já consumiu. */
@@ -357,9 +373,10 @@ export function useAnalisarIntimacao(intimacaoId: string) {
 }
 
 /**
- * Confirma a providência sugerida pela IA — POST /v1/action-items/:id/confirmar.
- * NÃO cria tarefa aqui (o BE cria sozinho, de forma assíncrona, depois de confirmar) —
- * por isso abre a mesma janela de poll curto do detalhe, além de invalidar detalhe + tarefas.
+ * Confirma o TIPO da providência — POST /v1/action-items/:id/confirmar. É o gate de
+ * TIPO ("Confirmar tipo" do card de leitura), promove "a_confirmar"→"confiavel".
+ * NÃO é o "Iniciar providência" (esse é `useIniciarProvidencia`). Invalida detalhe +
+ * providências. Idempotente.
  */
 export function useConfirmarActionItem(intimacaoId: string) {
   const fetcher = useApi();
@@ -367,34 +384,31 @@ export function useConfirmarActionItem(intimacaoId: string) {
   return useMutation({
     mutationFn: (actionItemId: string) =>
       confirmarActionItem(fetcher, actionItemId),
-    // Criação de tarefa é SÍNCRONA no BE (POST /confirmar cria+linka a task na
-    // própria transação e retorna o item já com task_id) — não há mais janela de
-    // poll aqui: um refetch do detalhe basta pra a linha refletir "Gerar minuta".
     onSuccess: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: intimacoesKeys.detail(intimacaoId) }),
-        qc.invalidateQueries({ queryKey: ["tasks"] }),
+        qc.invalidateQueries({ queryKey: ["action-items"] }),
       ]);
     },
   });
 }
 
 /**
- * Descarta a providência — POST /v1/action-items/:id/descartar. Marca DISCARDED.
- * Idempotente. Mesma janela de poll + invalidação de detalhe/tarefas do confirmar,
- * por simetria (inofensivo: sem nada pendente o poll se desliga no 1º refetch).
+ * Inicia a providência sugerida — POST /v1/action-items/:id/iniciar (SUGGESTED→TODO).
+ * É o "Iniciar providência": tira a sugestão do diagnóstico e a coloca no trabalho
+ * (board/fila). Invalida o detalhe da intimação (a linha reflete "iniciada") + as
+ * providências do board/fila.
  */
-export function useDescartarActionItem(intimacaoId: string) {
+export function useIniciarProvidencia(intimacaoId: string) {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (actionItemId: string) =>
-      descartarActionItem(fetcher, actionItemId),
+      iniciarActionItem(fetcher, actionItemId),
     onSuccess: async () => {
-      abrirJanelaDePoll(qc, intimacaoId);
       await Promise.all([
         qc.invalidateQueries({ queryKey: intimacoesKeys.detail(intimacaoId) }),
-        qc.invalidateQueries({ queryKey: ["tasks"] }),
+        qc.invalidateQueries({ queryKey: ["action-items"] }),
       ]);
     },
   });

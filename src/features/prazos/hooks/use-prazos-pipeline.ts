@@ -2,8 +2,8 @@
 
 import { useMemo } from "react";
 
+import { useActionItems } from "@/features/action-items/hooks/use-action-items";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
-import { useTasks } from "@/features/tasks/hooks/use-tasks";
 
 import {
   buildColumns,
@@ -13,38 +13,33 @@ import {
 } from "../lib/pipeline";
 
 // Janela única (sem "carregar mais" nessa tela — é quadro de trabalho, não
-// histórico). Cobre o volume esperado de TODAS as tarefas (não só peça-bound)
-// de um escritório. Mesmo padrão de use-prazos-fila.ts (FILA_PAGE_SIZE). BUG
-// PRÉ-EXISTENTE (não desta fatia): MaxLimit=100 do BE trunca silenciosamente —
-// paginação real é follow-up futuro (Architect já sinalizou).
+// histórico). Cobre o volume esperado de providências de um escritório. BUG
+// PRÉ-EXISTENTE (não desta fatia): MaxLimit do BE pode truncar silenciosamente —
+// paginação real é follow-up futuro.
 const PIPELINE_PAGE_SIZE = 300;
 
-// Hook público do Pipeline (Board + Funil) — ligado a TODAS as tarefas reais
-// (não só peça-bound), não mais a intimações/PrazoMock. UMA chamada: GET
-// /v1/tasks SEM filtro de status — o BE já exclui DISMISSED incondicionalmente
-// (ListTasks: "DISMISSED is always excluded"), e como a 4ª coluna (Concluída)
-// É o estado DONE, um filtro `status=OPEN` esconderia a própria coluna que
-// queremos mostrar. `stage` vem preenchido em cada item (sempre presente, sem
-// omitempty). O agrupamento em 4 colunas fixas (A Fazer/Elaboração/Revisão/
-// Concluída) é client-side.
+// Hook público do Pipeline (Board + Funil) — ligado às providências reais
+// (action_item). UMA chamada: GET /v1/action-items SEM filtro de status — o BE
+// já exclui SUGGESTED incondicionalmente e retorna só TODO/WORKING/DONE, que são
+// exatamente as 3 colunas. O agrupamento em 3 colunas fixas (A Fazer/Em
+// elaboração/Concluída) por `status` é client-side.
 //
-// SOMENTE LEITURA: stage é projeção pura do BE, sem campo gravável — decisão
-// de produto travada, por isso não há drag (mesmo que a referência visual
-// mostre cards arrastáveis).
+// SOMENTE LEITURA: sem drag — a mudança de status é ação de domínio
+// (iniciar/comecar/concluir), nunca por arrastar (decisão de produto travada).
 export function usePrazosPipeline() {
   const directory = useOrgMembersDirectory();
-  const query = useTasks({
+  const query = useActionItems({
     pageSize: PIPELINE_PAGE_SIZE,
   });
 
   const colunas = useMemo<PipelineColumn[]>(
-    () => buildColumns(query.tarefas, directory.nameFor),
-    [query.tarefas, directory.nameFor],
+    () => buildColumns(query.providencias, directory.nameFor),
+    [query.providencias, directory.nameFor],
   );
 
   const funil = useMemo<FunilEtapa[]>(
-    () => buildFunil(query.tarefas),
-    [query.tarefas],
+    () => buildFunil(query.providencias),
+    [query.providencias],
   );
 
   return {
@@ -52,6 +47,6 @@ export function usePrazosPipeline() {
     isError: !!query.error,
     colunas,
     funil,
-    total: query.tarefas.length.toLocaleString("pt-BR"),
+    total: query.providencias.length.toLocaleString("pt-BR"),
   };
 }

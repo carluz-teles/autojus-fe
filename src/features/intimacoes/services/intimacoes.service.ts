@@ -49,6 +49,14 @@ export interface ListIntimacoesParams {
    *  CONFIRMED). Um único valor continua indo como string simples. */
   work_stage?: string | string[];
   /**
+   * Filtro server-side de ORIGEM do prazo (closed set: declarado|validado|
+   * calculado|divergente|ia|manual|sem_prazo). Alimenta as abas de origem da
+   * Triagem — filtra a lista mas NÃO afeta as contagens do envelope
+   * `origem_facets` (o BE ignora este filtro ao contar as facets, pra cada aba
+   * mostrar o total real). Omitido quando vazio (= "Todos").
+   */
+  origem?: string;
+  /**
    * Filtro server-side do chip "Não confirmadas" (toggle de triagem) — restringe a
    * prazos sugeridos ainda não confirmados (deadline.status = 'PENDING'). Combina com
    * qualquer tab temporal; é um parâmetro à parte de `urgencia`.
@@ -73,6 +81,7 @@ export async function listIntimacoes(
     court,
     urgencia,
     work_stage,
+    origem,
     nao_confirmado,
     assignee,
   }: ListIntimacoesParams = {},
@@ -86,6 +95,7 @@ export async function listIntimacoes(
       user_status,
       court,
       urgencia,
+      origem,
       // Array vira CSV pro BE (que hoje aceita 1 valor mas está sendo
       // estendido em paralelo pra aceitar múltiplos separados por vírgula) —
       // `apiFetch.query` só serializa string|number|boolean, então o join
@@ -184,10 +194,10 @@ export async function analisarIntimacao(
 }
 
 /**
- * Confirma a providência sugerida pela IA — POST /v1/action-items/:id/confirmar.
- * Promove tipo_status "a_confirmar"→"confiavel"; a tarefa REAL nasce sozinha, depois,
- * via worker assíncrono (a UI faz poll curto no detalhe até o task_id aparecer — ver
- * useConfirmarActionItem). Idempotente, body vazio.
+ * Confirma o TIPO da providência — POST /v1/action-items/:id/confirmar. Promove o
+ * gate de tipo "a_confirmar"→"confiavel" (é o "Confirmar tipo" do card de leitura,
+ * NÃO o "Iniciar providência"). Idempotente, body vazio. O ciclo de trabalho da
+ * providência (iniciar/comecar/concluir) é separado deste gate de tipo.
  */
 export async function confirmarActionItem(
   fetcher: ApiFetcher,
@@ -195,21 +205,6 @@ export async function confirmarActionItem(
 ): Promise<IntimacaoProvidencia> {
   const res = await fetcher<DataEnvelope<IntimacaoProvidencia>>(
     `${ACTION_ITEMS_ENDPOINT}/${actionItemId}/confirmar`,
-    { method: "POST" },
-  );
-  return res.data;
-}
-
-/**
- * Descarta a providência — POST /v1/action-items/:id/descartar. status→DISCARDED.
- * Idempotente, body vazio.
- */
-export async function descartarActionItem(
-  fetcher: ApiFetcher,
-  actionItemId: string,
-): Promise<IntimacaoProvidencia> {
-  const res = await fetcher<DataEnvelope<IntimacaoProvidencia>>(
-    `${ACTION_ITEMS_ENDPOINT}/${actionItemId}/descartar`,
     { method: "POST" },
   );
   return res.data;

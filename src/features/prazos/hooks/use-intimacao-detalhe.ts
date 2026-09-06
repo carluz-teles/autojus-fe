@@ -389,11 +389,9 @@ function useModel(i: IntimacaoDetalheView | undefined) {
       i.assignee_user_name?.trim() ||
       (membro ? nomeExibicao(membro.name, membro.email) : "");
 
-    // Providências visíveis = tudo menos DISCARDED. Endereçadas por `id` — não mais
-    // por índice (action_item é uma tabela real agora, ver types.ts).
-    const providencias = i.ai_providencias.filter(
-      (p) => p.status !== "DISCARDED",
-    );
+    // Providências (action_item) da intimação, endereçadas por `id`. O status é o
+    // ciclo de trabalho (SUGGESTED→TODO→WORKING→DONE) — sem estado "descartado".
+    const providencias = i.ai_providencias;
 
     const analisada = i.ai_analyzed_at !== null;
     const degradado = analisada && !i.ai_summary?.trim();
