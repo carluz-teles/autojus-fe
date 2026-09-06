@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-import { kindLabel } from "../lib/labels";
+import { tipoAtoLabel } from "../lib/labels";
 import type {
   PrazoAgendaView,
   PrazoCounting,
@@ -139,7 +139,9 @@ export function PrazoCard({
 
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="leading-snug font-medium">{kindLabel(prazo.kind)}</h3>
+          <h3 className="leading-snug font-medium">
+            {tipoAtoLabel(prazo.tipo_ato)}
+          </h3>
           {agenda ? (
             <p className="text-muted-foreground mt-0.5 truncate text-xs tabular-nums">
               {agenda.cnj_number}

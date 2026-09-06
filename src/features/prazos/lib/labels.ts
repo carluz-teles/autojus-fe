@@ -4,38 +4,10 @@
 
 import type { PrazoStatus } from "../types";
 
-// "kind" legível: mapa dos tipos conhecidos + humanização de fallback, para que
-// qualquer valor do BE apareça apresentável. As CHAVES são o vocabulário REAL do
-// BE (pt-BR — deadline_rule seed: CONTESTACAO/MANIFESTACAO/GENERICO), não códigos
-// em inglês. Aliases em inglês ficam por compat, mas o BE usa os pt-BR.
-const KIND_LABEL: Record<string, string> = {
-  CONTESTACAO: "Contestação",
-  MANIFESTACAO: "Manifestação",
-  GENERICO: "Genérico",
-  RECURSO: "Recurso",
-  CONTRARRAZOES: "Contrarrazões",
-  EMBARGOS: "Embargos",
-  AGRAVO: "Agravo",
-  AGRAVO_INTERNO: "Agravo interno",
-  CUMPRIMENTO: "Cumprimento de sentença",
-  PAGAMENTO: "Pagamento",
-  DEFESA: "Defesa",
-  // aliases legados (compat)
-  APPEAL: "Recurso",
-  ANSWER: "Contestação",
-  MANIFESTATION: "Manifestação",
-};
-
-function humanize(raw: string): string {
-  const spaced = raw.replace(/_/g, " ").toLowerCase();
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
-
-/** Tipo do prazo em pt-BR — mapa conhecido, senão humaniza o snake_case do BE. */
-export function kindLabel(kind: string): string {
-  if (!kind) return "Prazo";
-  return KIND_LABEL[kind] ?? humanize(kind);
-}
+// Rótulo do tipo de ato do prazo (deadline.tipo_ato) — fonte única em
+// intimacoes/lib/tipo-ato.ts (Regra nº1: um só mapa app-wide). Reexportado aqui
+// para os consumidores da feature prazos que já importavam de "../lib/labels".
+export { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
 
 /**
  * Rótulo de situação derivado de (status, days_left) — a única fonte da coluna

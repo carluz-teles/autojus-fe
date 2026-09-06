@@ -35,7 +35,7 @@ import {
 import { useNoDeadlinePrazo } from "../hooks/use-no-deadline-prazo";
 import { usePrazoDaIntimacao } from "../hooks/use-prazo-da-intimacao";
 import { useReopenPrazo } from "../hooks/use-reopen-prazo";
-import { kindLabel } from "../lib/labels";
+import { tipoAtoLabel } from "../lib/labels";
 import type {
   PrazoAnchorEvent,
   PrazoCounting,
@@ -179,7 +179,7 @@ function PainelSugerido({
   const confirmarDireto = useConfirmarPrazo();
 
   // "Confirmar prazo" = aceitar a sugestão da regra em 1 clique, SEM abrir o form.
-  // Usa os valores derivados (kind/days/counting/dobro/âncora/extra) como estão.
+  // Usa os valores derivados (tipo_ato/days/counting/dobro/âncora/extra) como estão.
   // "Ajustar" (onStartEditing) é o caminho que abre o form pra editar antes.
   function handleConfirmDirect() {
     const d = prazoParaForm as PrazoDetalheView;
@@ -187,7 +187,7 @@ function PainelSugerido({
       {
         intimation_id: intimationId,
         deadline: {
-          kind: prazo.kind,
+          tipo_ato: prazo.tipo_ato,
           days: prazo.days ?? d.days,
           counting: prazo.counting,
           doubled: prazo.doubled,
@@ -294,7 +294,7 @@ function PainelSugerido({
       {/* Grid de derivação */}
       {days != null || anchorEvent || startDate ? (
         <div className="border-border/60 bg-background/50 grid grid-cols-3 gap-3 rounded-lg border p-3 text-sm">
-          <DerivacaoItem label="Tipo" value={kindLabel(prazo.kind)} />
+          <DerivacaoItem label="Tipo" value={tipoAtoLabel(prazo.tipo_ato)} />
           <DerivacaoItem
             label="Termo inicial"
             value={
@@ -403,7 +403,7 @@ function FormAjuste({
     submit: submitRaw,
     doubled,
     setDoubled,
-    kind,
+    tipoAto,
     counting,
     setCounting,
     anchorEvent,
@@ -412,7 +412,7 @@ function FormAjuste({
     setHasHolidays,
     manualExtraDays,
     doubledReason,
-    kindOptions,
+    tipoAtoOptions,
     doubledReasonOptions,
     preview,
     previewPending,
@@ -436,35 +436,38 @@ function FormAjuste({
       {/* Tipo de prazo + Termo inicial (2 colunas) */}
       <div className="grid gap-3.5 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="prazo_kind">Tipo de prazo</Label>
+          <Label htmlFor="prazo_tipo_ato">Tipo de prazo</Label>
           <Select
-            value={kind}
+            value={tipoAto}
             items={Object.fromEntries(
-              kindOptions.map((k) => [k.value, kindLabel(k.value)]),
+              tipoAtoOptions.map((t) => [t.value, t.label]),
             )}
             onValueChange={(v) =>
               v != null &&
-              setValue("kind", v, { shouldDirty: true, shouldValidate: true })
+              setValue("tipo_ato", v, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
             }
           >
             <SelectTrigger
-              id="prazo_kind"
+              id="prazo_tipo_ato"
               className="w-full"
-              aria-invalid={errors.kind ? true : undefined}
+              aria-invalid={errors.tipo_ato ? true : undefined}
             >
               <SelectValue placeholder="Selecione o tipo" />
             </SelectTrigger>
             <SelectContent>
-              {kindOptions.map((k) => (
-                <SelectItem key={k.value} value={k.value}>
-                  {kindLabel(k.value)}
+              {tipoAtoOptions.map((t) => (
+                <SelectItem key={t.value} value={t.value}>
+                  {t.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {errors.kind ? (
+          {errors.tipo_ato ? (
             <p className="text-destructive text-sm" role="alert">
-              {errors.kind.message}
+              {errors.tipo_ato.message}
             </p>
           ) : null}
         </div>

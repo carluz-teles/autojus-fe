@@ -32,3 +32,13 @@ export function tipoAtoChipLabel(tipoAto: string): string {
   }
   return TIPO_ATO_LABEL[tipoAto] ?? "";
 }
+
+/**
+ * Rótulo pt-BR do tipo de ato para exibição SEMPRE presente (título de card de prazo,
+ * item de derivação, opção de picker): mapa conhecido, senão o fallback genérico "Prazo".
+ * Diferente de tipoAtoChipLabel (que devolve "" para tipos que não viram chip próprio).
+ */
+export function tipoAtoLabel(tipoAto: string): string {
+  if (!tipoAto) return "Prazo";
+  return TIPO_ATO_LABEL[tipoAto] ?? "Prazo";
+}

@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
+import { TIPO_ATO_LABEL } from "@/features/intimacoes/lib/tipo-ato";
+
 import type {
   PrazoAnchorEvent,
   PrazoConfirmInput,
@@ -18,7 +20,7 @@ import { usePreviewPrazo } from "./use-preview-prazo";
 // ── Zod: fonte da validação client-side ──
 
 const schema = z.object({
-  kind: z.string().trim().min(1, "Informe o tipo do prazo."),
+  tipo_ato: z.string().trim().min(1, "Informe o tipo do prazo."),
   days: z
     .number({ message: "Informe os dias do prazo." })
     .int("Use um número inteiro de dias.")
@@ -33,22 +35,29 @@ const schema = z.object({
 
 export type ConfirmarPrazoValues = z.infer<typeof schema>;
 
-// Tipos de prazo conhecidos (rótulos pt-BR). O detalhe pode trazer um kind fora
-// desta lista — kindOptions() injeta o valor atual para não perdê-lo no select.
-// Vocabulário de kinds em pt-BR — ALINHADO ao BE (deadline_rule usa CONTESTACAO/
-// MANIFESTACAO/GENERICO; os demais são escolhas manuais usuais). O confirm envia o
-// value como está; por isso precisa casar com o que o BE deriva/espera.
-const PRAZO_KINDS: { value: string; label: string }[] = [
-  { value: "CONTESTACAO", label: "Contestação" },
-  { value: "MANIFESTACAO", label: "Manifestação" },
-  { value: "RECURSO", label: "Recurso" },
-  { value: "CONTRARRAZOES", label: "Contrarrazões" },
-  { value: "EMBARGOS", label: "Embargos" },
-  { value: "AGRAVO", label: "Agravo" },
-  { value: "CUMPRIMENTO", label: "Cumprimento de sentença" },
-  { value: "PAGAMENTO", label: "Pagamento" },
-  { value: "GENERICO", label: "Genérico" },
+// Conjunto FECHADO de tipos de ato com prazo (deadline-bearing). Valores em
+// snake_case = deadline.tipo_ato do BE; rótulos via TIPO_ATO_LABEL (fonte única).
+// O detalhe pode trazer um tipo_ato fora desta lista — tipoAtoOptions() injeta o
+// valor atual para não perdê-lo no select. Ao trocar, o BE re-deriva os dias.
+const DEADLINE_BEARING_TIPOS: string[] = [
+  "contestacao",
+  "replica",
+  "manifestacao",
+  "apelacao",
+  "contrarrazoes_apelacao",
+  "agravo_instrumento",
+  "embargos_declaracao",
+  "recurso_inominado",
+  "cumprimento_sentenca",
+  "embargos_execucao",
+  "generico",
 ];
+
+const TIPO_ATO_OPTIONS: { value: string; label: string }[] =
+  DEADLINE_BEARING_TIPOS.map((value) => ({
+    value,
+    label: TIPO_ATO_LABEL[value] ?? value,
+  }));
 
 // Motivos usuais de prazo em dobro no CPC (o detalhe pode trazer outro).
 const DOUBLED_REASONS: string[] = [
@@ -82,7 +91,7 @@ function toConfirmInput(
   return {
     intimation_id: intimationId,
     deadline: {
-      kind: values.kind.trim(),
+      tipo_ato: values.tipo_ato.trim(),
       days: values.days,
       counting: values.counting,
       doubled: values.doubled,
@@ -131,7 +140,7 @@ export function useConfirmarPrazoForm({
   const form = useForm<ConfirmarPrazoValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      kind: prazo.kind,
+      tipo_ato: prazo.tipo_ato,
       days: (prazo as PrazoDetalheView).days ?? 15,
       counting: prazo.counting ?? "BUSINESS",
       doubled: prazo.doubled ?? false,
@@ -144,7 +153,7 @@ export function useConfirmarPrazoForm({
 
   // useWatch — assinatura por campo, compatível com React Compiler.
   const doubled = useWatch({ control: form.control, name: "doubled" });
-  const kind = useWatch({ control: form.control, name: "kind" });
+  const tipoAto = useWatch({ control: form.control, name: "tipo_ato" });
   const doubledReason = useWatch({
     control: form.control,
     name: "doubled_reason",
@@ -183,7 +192,7 @@ export function useConfirmarPrazoForm({
   const { preview, isPending: previewPending } = usePreviewPrazo({
     intimationId,
     anchorEvent: debouncedPreview.anchorEvent,
-    kind,
+    tipoAto,
     days: debouncedPreview.days,
     counting: debouncedPreview.counting,
     doubled: debouncedPreview.doubled,
@@ -214,10 +223,15 @@ export function useConfirmarPrazoForm({
 
   // Selects "completos": incluem o valor pré-preenchido mesmo se estiver fora das
   // listas conhecidas (evita um select mostrar vazio por causa do BE).
-  const kindOptions = useMemo(() => {
-    const known = PRAZO_KINDS.some((k) => k.value === kind);
-    return known ? PRAZO_KINDS : [{ value: kind, label: kind }, ...PRAZO_KINDS];
-  }, [kind]);
+  const tipoAtoOptions = useMemo(() => {
+    const known = TIPO_ATO_OPTIONS.some((t) => t.value === tipoAto);
+    return known
+      ? TIPO_ATO_OPTIONS
+      : [
+          { value: tipoAto, label: TIPO_ATO_LABEL[tipoAto] ?? tipoAto },
+          ...TIPO_ATO_OPTIONS,
+        ];
+  }, [tipoAto]);
 
   const doubledReasonOptions = useMemo(() => {
     const current = doubledReason?.trim();
@@ -238,7 +252,7 @@ export function useConfirmarPrazoForm({
     // campos controlled
     doubled,
     setDoubled,
-    kind,
+    tipoAto,
     counting,
     setCounting,
     anchorEvent,
@@ -248,7 +262,7 @@ export function useConfirmarPrazoForm({
     manualExtraDays,
     doubledReason: doubledReason ?? "",
     // options
-    kindOptions,
+    tipoAtoOptions,
     doubledReasonOptions,
     // preview ao vivo
     preview,

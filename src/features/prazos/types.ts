@@ -17,7 +17,8 @@ export type PrazoCounting = "BUSINESS" | "CALENDAR";
 // Prazo base (o que a aba do processo entrega).
 export interface PrazoView {
   id: string;
-  kind: string;
+  /** Tipo do ato que o prazo exige (snake_case: "manifestacao"|"apelacao"|…; "" quando não há). */
+  tipo_ato: string;
   /** Fim do prazo (RFC3339). */
   end_date: string;
   /** Dias restantes (negativo = vencido). Base da contagem regressiva. */
@@ -153,7 +154,8 @@ export interface PrazoConfirmTask {
 
 /** Prazo ajustado pelo advogado antes de abrir. */
 export interface PrazoConfirmDeadline {
-  kind: string;
+  /** Tipo do ato (snake_case). Ao trocar, o BE re-deriva os dias da tabela legal. */
+  tipo_ato: string;
   days: number;
   counting: PrazoCounting;
   doubled: boolean;
@@ -168,7 +170,8 @@ export interface PrazoConfirmDeadline {
 export interface PrazoPreviewInput {
   intimation_id: string;
   anchor_event: PrazoAnchorEvent;
-  kind: string;
+  /** Tipo do ato (snake_case). O BE re-deriva os dias ao trocar. */
+  tipo_ato: string;
   days: number;
   counting: PrazoCounting;
   doubled: boolean;

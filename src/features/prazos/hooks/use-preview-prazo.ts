@@ -14,7 +14,7 @@ import type {
 export interface PreviewPrazoParams {
   intimationId: string;
   anchorEvent: PrazoAnchorEvent | "";
-  kind: string;
+  tipoAto: string;
   days: number;
   counting: PrazoCounting;
   doubled: boolean;
@@ -34,7 +34,7 @@ export interface PreviewPrazoParams {
 export function usePreviewPrazo({
   intimationId,
   anchorEvent,
-  kind,
+  tipoAto,
   days,
   counting,
   doubled,
@@ -51,7 +51,7 @@ export function usePreviewPrazo({
     enabled &&
     !!intimationId &&
     !!anchorEvent &&
-    !!kind &&
+    !!tipoAto &&
     days > 0 &&
     Number.isInteger(days);
 
@@ -61,7 +61,7 @@ export function usePreviewPrazo({
       "preview",
       intimationId,
       anchorEvent,
-      kind,
+      tipoAto,
       days,
       counting,
       doubled,
@@ -71,7 +71,7 @@ export function usePreviewPrazo({
       previewPrazo(fetcher, {
         intimation_id: intimationId,
         anchor_event: anchorEvent as PrazoAnchorEvent,
-        kind,
+        tipo_ato: tipoAto,
         days,
         counting,
         doubled,
