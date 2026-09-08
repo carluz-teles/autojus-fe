@@ -85,7 +85,9 @@ export function useOnboardingFlow() {
   // e seu org_id voltou ao token da sessão.
   useEffect(() => {
     if (!stepStorageKey || restoredStepFor.current === stepStorageKey) return;
-    const stored = window.localStorage.getItem(stepStorageKey) as OnbStep | null;
+    const stored = window.localStorage.getItem(
+      stepStorageKey,
+    ) as OnbStep | null;
     if (stored && STORED_STEPS.has(stored)) {
       if (!orgId && stored !== "welcome" && stored !== "org") return;
       queueMicrotask(() => setStep(stored));
