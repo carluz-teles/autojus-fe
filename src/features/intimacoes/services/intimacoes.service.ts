@@ -61,6 +61,8 @@ export interface ListIntimacoesParams {
    * mostrar o total real). Omitido quando vazio (= "Todos").
    */
   origem?: string;
+  /** Recorte operacional da triagem; vazio mantém a listagem completa. */
+  triage_lane?: "attention" | "ready" | "science" | "historical";
   /**
    * Filtro server-side do chip "Não confirmadas" (toggle de triagem) — restringe a
    * prazos sugeridos ainda não confirmados (deadline.status = 'PENDING'). Combina com
@@ -92,6 +94,7 @@ export async function listIntimacoes(
     due_to,
     work_stage,
     origem,
+    triage_lane,
     nao_confirmado,
     assignee,
   }: ListIntimacoesParams = {},
@@ -113,6 +116,7 @@ export async function listIntimacoes(
       due_from,
       due_to,
       origem,
+      triage_lane,
       // Array vira CSV pro BE (que hoje aceita 1 valor mas está sendo
       // estendido em paralelo pra aceitar múltiplos separados por vírgula) —
       // `apiFetch.query` só serializa string|number|boolean, então o join
@@ -173,6 +177,23 @@ export async function resolveIntimacao(
 ): Promise<IntimacaoView> {
   return fetcher<IntimacaoView>(`${ENDPOINT}/${id}/resolve`, {
     method: "POST",
+  });
+}
+
+export async function resolveIntimacoesBatch(
+  fetcher: ApiFetcher,
+  ids: string[],
+): Promise<number> {
+  await Promise.all(ids.map((id) => resolveIntimacao(fetcher, id)));
+  return ids.length;
+}
+
+export async function confirmTrustedDeadlinesBatch(
+  fetcher: ApiFetcher,
+): Promise<{ affected: number }> {
+  return fetcher<{ affected: number }>("/v1/prazos/confirm-batch", {
+    method: "POST",
+    body: { all: true, intimation_ids: [] },
   });
 }
 

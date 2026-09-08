@@ -89,16 +89,35 @@ export function ListagemIntimacoes({ triagem = false }: { triagem?: boolean }) {
             </NativeSelect>
           </ListToolbar>
           {triagem && (
-            <FilterTabs
-              label="Origem do prazo"
-              title="Prazo"
-              tabs={m.origemTabs}
-            />
+            <>
+              <FilterTabs label="Fila de trabalho" tabs={m.laneTabs} />
+              {m.lane !== "historical" ? (
+                <FilterTabs
+                  label="Origem do prazo"
+                  title="Prazo"
+                  tabs={m.origemTabs}
+                />
+              ) : null}
+            </>
           )}
         </>
       }
     >
       <div className="flex min-w-0 flex-col gap-3 px-4 py-3">
+        {m.bulkAction ? (
+          <div className="border-border bg-muted/30 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3">
+            <p className="text-muted-foreground text-xs">
+              Revise o recorte e conclua os itens repetitivos de uma só vez.
+            </p>
+            <Button
+              size="sm"
+              disabled={m.bulkAction.pending}
+              onClick={() => void m.bulkAction?.run()}
+            >
+              {m.bulkAction.pending ? "Processando…" : m.bulkAction.label}
+            </Button>
+          </div>
+        ) : null}
         <div
           role="status"
           aria-live="polite"

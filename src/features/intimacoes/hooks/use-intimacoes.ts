@@ -22,6 +22,7 @@ import {
   type BulkAssignParams,
   bulkAssignResponsavel,
   confirmarActionItem,
+  confirmTrustedDeadlinesBatch,
   getIntimacao,
   getIntimacoesSummary,
   ignoreIntimacao,
@@ -30,6 +31,7 @@ import {
   type ReclassificarActionItemParams,
   reopenIntimacao,
   resolveIntimacao,
+  resolveIntimacoesBatch,
 } from "../services/intimacoes.service";
 import type {
   IntimacaoDetalheView,
@@ -91,6 +93,8 @@ export interface IntimacoesFilters {
    *  sem_prazo) — aba de origem da Triagem. Vazio/undefined = "Todos" (sem
    *  filtro). Não afeta as contagens de `origemFacets`. */
   origem?: string;
+  /** Caixa operacional da triagem; ausente na tela completa de Intimações. */
+  triageLane?: "attention" | "ready" | "science" | "historical";
   /** Chip "Não confirmadas" (triagem) — filtra prazos sugeridos não confirmados. */
   naoConfirmado?: boolean;
   /** "me" (toggle "Minhas") ou um uuid; casa contra condutor OU revisor. */
@@ -124,6 +128,7 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     due_to: filters.dueTo || undefined,
     work_stage: filters.workStage || undefined,
     origem: filters.origem || undefined,
+    triage_lane: filters.triageLane || undefined,
     nao_confirmado: filters.naoConfirmado || undefined,
     assignee: filters.assignee || undefined,
     limit: filters.limit ?? PAGE_SIZE,
@@ -343,6 +348,26 @@ export function useResolverIntimacao() {
   return useMutation({
     mutationFn: (id: string) => resolveIntimacao(fetcher, id),
     onSuccess: (_, id) => invalidar(id),
+  });
+}
+
+export function useConfirmarPrazosConfiaveisEmLote() {
+  const fetcher = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => confirmTrustedDeadlinesBatch(fetcher),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: intimacoesKeys.all }),
+  });
+}
+
+export function useDarCienciaEmLote() {
+  const fetcher = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => resolveIntimacoesBatch(fetcher, ids),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: intimacoesKeys.all }),
   });
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { toast } from "sonner";
 
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { nomeExibicao } from "@/features/organization/lib/labels";
@@ -20,12 +21,21 @@ import {
 } from "../lib/listagem";
 import { URGENCIA_TABS } from "../lib/urgencia-tabs";
 import { useFilaNavigation, useFiltrosDaFila } from "./use-fila-navigation";
-import { useIntimacoes } from "./use-intimacoes";
+import {
+  useConfirmarPrazosConfiaveisEmLote,
+  useDarCienciaEmLote,
+  useIntimacoes,
+} from "./use-intimacoes";
 
-export const TRIAGEM_STAGES = [
-  "RECEIVED",
-  "AWAITING_CONFIRMATION",
-  "CONFIRMED",
+export const TRIAGEM_STAGES = ["RECEIVED", "AWAITING_CONFIRMATION"];
+
+export type TriageLane = "attention" | "ready" | "science" | "historical";
+
+const TRIAGE_LANES: Array<{ value: TriageLane; label: string }> = [
+  { value: "attention", label: "Precisa de análise" },
+  { value: "ready", label: "Pronto para confirmar" },
+  { value: "science", label: "Para ciência" },
+  { value: "historical", label: "Histórico importado" },
 ];
 
 export function useListagemIntimacoes(triagem: boolean) {
@@ -37,6 +47,7 @@ export function useListagemIntimacoes(triagem: boolean) {
     "processos";
   const search = url.get("q");
   const origem = url.get("origem");
+  const lane = (url.get("fila") || "attention") as TriageLane;
   const dueFrom = url.get("due_from");
   const dueTo = url.get("due_to");
   const urgency =
@@ -50,6 +61,7 @@ export function useListagemIntimacoes(triagem: boolean) {
     sort,
     cnj: url.get("cnj") || undefined,
     origem: origem || undefined,
+    triageLane: triagem ? lane : undefined,
     urgencia: urgency || undefined,
     dueFrom,
     dueTo,
@@ -59,6 +71,36 @@ export function useListagemIntimacoes(triagem: boolean) {
     workStage: triagem ? TRIAGEM_STAGES : url.get("work_stage"),
     limit: 20,
     prefetchNextPage: true,
+  });
+  const confirmBatch = useConfirmarPrazosConfiaveisEmLote();
+  const scienceBatch = useDarCienciaEmLote();
+  const laneCountBase = {
+    search,
+    court: url.get("court"),
+    assignee: url.get("assignee"),
+    user_status: "PENDING",
+    workStage: TRIAGEM_STAGES,
+    limit: 1,
+  } as const;
+  const attentionCount = useIntimacoes({
+    ...laneCountBase,
+    triageLane: "attention",
+    enabled: triagem,
+  });
+  const readyCount = useIntimacoes({
+    ...laneCountBase,
+    triageLane: "ready",
+    enabled: triagem,
+  });
+  const scienceCount = useIntimacoes({
+    ...laneCountBase,
+    triageLane: "science",
+    enabled: triagem,
+  });
+  const historicalCount = useIntimacoes({
+    ...laneCountBase,
+    triageLane: "historical",
+    enabled: triagem,
   });
   const change = (values: Record<string, string | null>) =>
     url.set({ ...values, abertos: null });
@@ -85,6 +127,24 @@ export function useListagemIntimacoes(triagem: boolean) {
     count: tab.count,
     ativo: (tab.value ?? "") === origem,
     onClick: () => change({ origem: tab.value, ...limparUrgencia }),
+  }));
+  const laneCounts: Record<TriageLane, number> = {
+    attention: attentionCount.totalCount,
+    ready: readyCount.totalCount,
+    science: scienceCount.totalCount,
+    historical: historicalCount.totalCount,
+  };
+  const laneTabs = TRIAGE_LANES.map((tab) => ({
+    key: tab.value,
+    label: tab.label,
+    count: laneCounts[tab.value],
+    ativo: lane === tab.value,
+    onClick: () =>
+      change({
+        fila: tab.value === "attention" ? null : tab.value,
+        origem: null,
+        ...limparUrgencia,
+      }),
   }));
   const urgencyTabs = [
     {
@@ -204,6 +264,56 @@ export function useListagemIntimacoes(triagem: boolean) {
     filters,
     active,
     origemTabs,
+    laneTabs,
+    lane,
+    bulkAction:
+      triagem && lane === "ready" && query.totalCount > 0 && active.length === 0
+        ? {
+            label: `Confirmar ${query.totalCount.toLocaleString("pt-BR")} prazos confiáveis`,
+            pending: confirmBatch.isPending,
+            run: async () => {
+              if (
+                !window.confirm(
+                  `Confirmar os ${query.totalCount.toLocaleString("pt-BR")} prazos confiáveis? Esta ação ficará registrada em seu nome.`,
+                )
+              )
+                return;
+              try {
+                const result = await confirmBatch.mutateAsync();
+                toast.success(
+                  `${result.affected.toLocaleString("pt-BR")} prazos confirmados`,
+                );
+              } catch {
+                toast.error("Não foi possível confirmar os prazos em lote.");
+              }
+            },
+          }
+        : triagem && lane === "science" && intimacoes.length > 0
+          ? {
+              label: `Dar ciência em ${intimacoes.length.toLocaleString("pt-BR")} itens exibidos`,
+              pending: scienceBatch.isPending,
+              run: async () => {
+                if (
+                  !window.confirm(
+                    `Dar ciência nos ${intimacoes.length.toLocaleString("pt-BR")} itens exibidos?`,
+                  )
+                )
+                  return;
+                try {
+                  const affected = await scienceBatch.mutateAsync(
+                    intimacoes.map((item) => item.id),
+                  );
+                  toast.success(
+                    `Ciência registrada em ${affected.toLocaleString("pt-BR")} itens`,
+                  );
+                } catch {
+                  toast.error(
+                    "Não foi possível registrar as ciências em lote.",
+                  );
+                }
+              },
+            }
+          : null,
     urgencyTabs,
     urgency,
     dueFrom,
@@ -229,6 +339,7 @@ export function useListagemIntimacoes(triagem: boolean) {
       change({
         q: null,
         origem: null,
+        fila: null,
         ...limparUrgencia,
         court: null,
         assignee: null,

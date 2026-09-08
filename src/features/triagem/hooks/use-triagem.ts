@@ -7,6 +7,7 @@ export function useTriagemCount(): number | undefined {
   const query = useIntimacoes({
     workStage: TRIAGEM_STAGES,
     user_status: "PENDING",
+    triageLane: "attention",
     limit: 1,
   });
   return query.isPending ? undefined : query.totalCount;
