@@ -321,6 +321,7 @@ export function mapSectionChangeFromApi(
     explanation: overrides?.explanation ?? api.explanation,
     oldParagraphs: api.old_paragraphs ?? [],
     newParagraphs: api.new_paragraphs ?? [],
+    baseRevision: api.base_revision ?? "",
   };
 }
 

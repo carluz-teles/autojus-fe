@@ -202,6 +202,8 @@ export interface PendingChange {
   explanation: string;
   oldParagraphs: string[];
   newParagraphs: string[];
+  /** Revisão exata do HTML usada para produzir esta proposta. */
+  baseRevision: string;
 }
 
 /** Estado do painel "Ajuste proposto" — 1..N cards pendentes derivados de uma

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import type { Proposta } from "../../hooks/use-assistente";
 import { useChatThread, useSendChatMessage } from "../../hooks/use-chat";
+import { isProposalStale } from "../../lib/proposal-revision";
 import type { ChatCitation, ChatMessage } from "../../types";
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
@@ -13,11 +14,13 @@ const CHAT_ACTIONS = ["Resumir os autos", "Deixar a peça mais concisa"];
 
 export function AssistentePanel({
   draftId,
+  contentRevision,
   applyToEditor,
   beforeRequest,
   onSource,
 }: {
   draftId: string;
+  contentRevision: string;
   applyToEditor: (
     sectionRoman: string,
     newParagraphs: string[],
@@ -78,6 +81,12 @@ export function AssistentePanel({
 
   const accept = async (proposal: Proposta) => {
     if (lock.current) return;
+    if (isProposalStale(proposal, contentRevision)) {
+      toast.error(
+        "Esta proposta foi criada para uma versão anterior da peça. Gere uma nova proposta para aplicar com segurança.",
+      );
+      return;
+    }
     lock.current = true;
     setBusy(true);
     try {
@@ -156,11 +165,13 @@ export function AssistentePanel({
                 message.changes?.map((change, index) => {
                   const key = `${message.id}:${index}`;
                   const proposal: Proposta = { ...change, key, pedido: "" };
+                  const stale = isProposalStale(proposal, contentRevision);
                   return (
                     <PropostaCard
                       key={key}
                       proposta={proposal}
                       disabled={busy}
+                      stale={stale}
                       resolution={decisions[key]}
                       onAceitar={() => void accept(proposal)}
                       onRejeitar={() => resolve(key, "Proposta rejeitada")}
@@ -349,12 +360,14 @@ function PropostaCard({
   onRejeitar,
   disabled,
   resolution,
+  stale,
 }: {
   proposta: Proposta;
   onAceitar: () => void;
   onRejeitar: () => void;
   disabled: boolean;
   resolution?: string;
+  stale: boolean;
 }) {
   const rotulo =
     proposta.pedido ||
@@ -372,6 +385,11 @@ function PropostaCard({
         </span>
       </div>
       <div className="px-3 py-2.5">
+        {stale && !resolution && (
+          <p className="mb-2 text-[11px] text-amber-700" role="status">
+            Proposta desatualizada. Gere uma nova proposta para esta versão.
+          </p>
+        )}
         {proposta.explanation && (
           <p className="text-fg3 mb-2 text-[11px] leading-[1.5]">
             {proposta.explanation}
@@ -404,7 +422,7 @@ function PropostaCard({
           <button
             type="button"
             onClick={onAceitar}
-            disabled={disabled}
+            disabled={disabled || stale}
             className="bg-primary text-primary-foreground inline-flex flex-1 items-center justify-center gap-1.5 rounded-[7px] px-3 py-[7px] text-[12px] font-medium"
           >
             Aceitar

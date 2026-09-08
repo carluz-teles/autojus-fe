@@ -243,6 +243,7 @@ export interface SectionChangeAPI {
   explanation: string;
   old_paragraphs: string[];
   new_paragraphs: string[];
+  base_revision: string;
 }
 
 // ── Assume authorship (POST /v1/pecas/:id/assume-authorship) ────────────────

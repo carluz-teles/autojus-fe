@@ -585,6 +585,7 @@ export function ConstructionPage({ id }: { id: string }) {
                   <AssistentePanel
                     key={id}
                     draftId={id}
+                    contentRevision={save.queue.revision}
                     beforeRequest={save.flush}
                     onSource={source}
                     applyToEditor={(roman, next, old) =>
