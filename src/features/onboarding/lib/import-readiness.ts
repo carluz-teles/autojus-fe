@@ -21,6 +21,7 @@ export function courtAccess(
     (c) => c.system === "EPROC" && (!court || c.court === court),
   );
   if (relevant.some((c) => c.status === "CONNECTED")) return "connected";
+  if (relevant.some((c) => c.status === "ERROR")) return "error";
   if (
     relevant.some((c) =>
       ["MFA_ENROLLMENT_REQUIRED", "MFA_REQUIRED", "REAUTH_REQUIRED"].includes(

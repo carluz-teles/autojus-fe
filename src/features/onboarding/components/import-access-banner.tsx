@@ -11,12 +11,13 @@ import { courtAccess } from "../lib/import-readiness";
 export function ImportAccessBanner() {
   const pathname = usePathname();
   const query = useCourtConnections();
+  const access = courtAccess(query.data ?? []);
   if (
     pathname === "/primeira-importacao" ||
     pathname.startsWith("/configuracoes") ||
     query.isPending ||
     query.isError ||
-    courtAccess(query.data ?? []) === "connected"
+    access === "connected"
   )
     return null;
   return (
@@ -26,14 +27,19 @@ export function ImportAccessBanner() {
     >
       <AlertCircle className="text-gold size-3.5 shrink-0" />
       <span>
-        Busca automática de autos pendente: conecte o eproc com certificado e
-        2FA.
+        {access === "error"
+          ? "Certificado e 2FA configurados. Não foi possível autenticar no eproc."
+          : access === "mfa"
+            ? "Conclua o segundo fator do eproc para ativar a busca automática de autos."
+            : access === "connecting"
+              ? "Estamos autenticando o eproc para ativar a busca automática de autos."
+              : "Busca automática de autos pendente: configure o acesso ao eproc."}
       </span>
       <Link
         className="text-primary font-medium hover:underline"
         href="/primeira-importacao"
       >
-        Concluir preparação
+        {access === "error" ? "Tentar novamente" : "Concluir preparação"}
       </Link>
     </div>
   );

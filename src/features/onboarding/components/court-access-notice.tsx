@@ -27,11 +27,13 @@ export function CourtAccessNotice({
     ? "Confira o ambiente deste processo"
     : query.isError
       ? "Não foi possível verificar o acesso aos autos"
-      : access === "connecting"
-        ? "Conexão com o eproc em andamento"
-        : access === "mfa"
-          ? "Conclua o segundo fator do eproc"
-          : `Acesso ao eproc${court ? ` · ${court}` : ""} não identificado`;
+      : access === "error"
+        ? "Não foi possível autenticar no eproc"
+        : access === "connecting"
+          ? "Conexão com o eproc em andamento"
+          : access === "mfa"
+            ? "Conclua o segundo fator do eproc"
+            : `Acesso ao eproc${court ? ` · ${court}` : ""} não identificado`;
   return (
     <div
       role="status"

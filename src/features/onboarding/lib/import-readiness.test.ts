@@ -35,5 +35,6 @@ describe("preparação da importação", () => {
     expect(
       courtAccess([{ ...conn, status: "MFA_ENROLLMENT_REQUIRED" }], "TJSP"),
     ).toBe("mfa");
+    expect(courtAccess([{ ...conn, status: "ERROR" }], "TJSP")).toBe("error");
   });
 });
