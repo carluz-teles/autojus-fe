@@ -14,6 +14,7 @@ import {
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 import { useWorkMutation } from "../hooks/use-workspace";
+import { primaryWorkAction } from "../lib/work-action";
 import type { ActionItemView } from "../types";
 import { WORK_TYPES } from "./new-providencia";
 
@@ -32,6 +33,7 @@ export function WorkActions({
   >(null);
   const [menu, setMenu] = useState(false);
   const terminal = ["DONE", "CANCELLED", "DISMISSED"].includes(item.status);
+  const primaryAction = primaryWorkAction(item);
   const retorno = returnTo || `/providencias/${item.id}`;
   const pieceHref = item.draft_id
     ? `/pecas/${item.draft_id}?retorno=${encodeURIComponent(retorno)}`
@@ -51,27 +53,26 @@ export function WorkActions({
   const generating = item.draft_state === "EXTRACTING";
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {item.status === "SUGGESTED" ? (
+      {primaryAction === "review-suggestion" ? (
         <Button size="sm" disabled={busy} onClick={() => ask("accept")}>
           Revisar e adicionar
         </Button>
-      ) : item.intimation_id &&
-        (item.draft_id ||
-          (item.gera_peca && !terminal && item.tipo_status === "confiavel")) ? (
+      ) : primaryAction === "open-piece" ||
+        primaryAction === "generate-piece" ? (
         <Button
           size="sm"
-          variant={item.draft_id ? "outline" : "default"}
+          variant={primaryAction === "open-piece" ? "outline" : "default"}
           nativeButton={false}
           render={<Link href={pieceHref} />}
         >
           <Sparkles data-icon="inline-start" />
-          {item.draft_id
+          {primaryAction === "open-piece"
             ? generating
               ? "Acompanhar geração"
               : "Abrir peça"
             : "Gerar peça"}
         </Button>
-      ) : !terminal && item.gera_peca && item.intimation_id ? (
+      ) : primaryAction === "review-type" ? (
         <Button
           size="sm"
           variant="outline"
@@ -80,14 +81,14 @@ export function WorkActions({
         >
           Revisar tipo
         </Button>
-      ) : item.status === "TODO" ? (
+      ) : primaryAction === "start-work" ? (
         <Button size="sm" disabled={busy} onClick={() => run("start")}>
           {busy && (
             <LoaderCircle data-icon="inline-start" className="animate-spin" />
           )}
           Começar trabalho
         </Button>
-      ) : item.status === "WORKING" ? (
+      ) : primaryAction === "complete-work" ? (
         <Button size="sm" disabled={busy} onClick={() => run("complete")}>
           Concluir providência
         </Button>
