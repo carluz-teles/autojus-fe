@@ -98,7 +98,11 @@ export function useCertWizard() {
     setErro(null);
     setAberto(true);
   }, []);
-  const fechar = useCallback(() => setAberto(false), []);
+  const fechar = useCallback(() => {
+    setAberto(false);
+    setSenha("");
+    setFile(null);
+  }, []);
 
   const selecionarArquivo = useCallback((f: File) => {
     setErro(null);
@@ -121,6 +125,8 @@ export function useCertWizard() {
         onSuccess: () => {
           toast.success("Certificado adicionado.");
           setAberto(false);
+          setSenha("");
+          setFile(null);
         },
         onError: (e) => {
           setErro(

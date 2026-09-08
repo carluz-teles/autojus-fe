@@ -100,7 +100,7 @@ export function MfaCaptura({
 
       <div className="flex items-center gap-3">
         <span className="bg-line h-px flex-1" />
-        <span className="text-fg3 text-[11px]">ou cole o código</span>
+        <span className="text-fg3 text-[11px]">ou informe a chave TOTP</span>
         <span className="bg-line h-px flex-1" />
       </div>
 
@@ -108,7 +108,8 @@ export function MfaCaptura({
         value={secret}
         disabled={disabled}
         onChange={(e) => onSecret(e.target.value)}
-        placeholder="Cole aqui o código/chave que aparece junto do QR"
+        aria-label="Chave de configuração TOTP"
+        placeholder="Chave de configuração, não o código de seis dígitos"
         rows={2}
         spellCheck={false}
         autoComplete="off"

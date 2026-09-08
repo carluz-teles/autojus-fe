@@ -1,24 +1,9 @@
 "use client";
-
-// Barra contextual da tela de Construção (pré-geração): voltar, tipo da peça +
-// chip "Vazia" + CNJ curto; à direita Salvar / Protocolar.
-// "Salvar" faz o flush explícito do autosave quando a peça está pronta.
-// "Protocolar" é placeholder — o protocolo automático (e-SAJ) é uma vertical
-// separada, ainda a construir.
-
 import { ChevronLeft } from "lucide-react";
+import type { ReactNode } from "react";
 
-interface Props {
-  title: string;
-  cnjShort: string;
-  onBack: () => void;
-  /** Dispara o flush do autosave (só quando `podeSalvar`). */
-  onSalvar?: () => void;
-  /** Save em andamento — vira o rótulo pra "Salvando…". */
-  salvando?: boolean;
-  /** Habilita o "Salvar" (peça já gerada/pronta). */
-  podeSalvar?: boolean;
-}
+import { ShellHeader } from "@/components/shell/page-frame";
+import { Button } from "@/components/ui/button";
 
 export function TopBar({
   title,
@@ -27,68 +12,73 @@ export function TopBar({
   onSalvar,
   salvando,
   podeSalvar,
-}: Props) {
-  return (
-    <div className="border-line flex flex-none items-center gap-3 border-b px-5 py-[11px]">
-      <button
-        type="button"
-        onClick={onBack}
-        className="text-fg2 hover:bg-hover -ml-[9px] inline-flex items-center gap-1.5 rounded-md px-[9px] py-[5px] text-xs"
-      >
-        <ChevronLeft className="size-[13px]" />
-        Voltar · início
-      </button>
-
-      <span className="text-[13px] font-medium">{title}</span>
-      <span className="bg-hover text-fg2 rounded-full px-[9px] py-0.5 text-[11px] font-medium">
-        Vazia
-      </span>
-      <span className="text-fg3 font-mono text-[11px]">{cnjShort}</span>
-
-      <div className="ml-auto flex gap-2">
-        <BarButton
-          label={salvando ? "Salvando…" : "Salvar"}
-          onClick={onSalvar}
-          disabled={!podeSalvar || salvando}
-          disabledTitle="Disponível após gerar a minuta"
-        />
-        <BarButton
-          label="Protocolar"
-          primary
-          disabled
-          disabledTitle="Em breve"
-        />
-      </div>
-    </div>
-  );
-}
-
-function BarButton({
-  label,
-  primary,
-  onClick,
-  disabled,
-  disabledTitle,
+  state = "Preparação",
+  saveLabel,
+  actions,
+  onRename,
 }: {
-  label: string;
-  primary?: boolean;
-  onClick?: () => void;
-  disabled?: boolean;
-  disabledTitle?: string;
+  title: string;
+  cnjShort: string;
+  onBack: () => void;
+  onSalvar?: () => void;
+  salvando?: boolean;
+  podeSalvar?: boolean;
+  state?: string;
+  saveLabel?: string;
+  actions?: ReactNode;
+  onRename?: (title: string) => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={disabled ? disabledTitle : undefined}
-      className={
-        primary
-          ? "bg-primary text-primary-foreground rounded-[7px] px-[13px] py-[7px] text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
-          : "border-line bg-panel text-foreground hover:bg-hover disabled:hover:bg-panel rounded-[7px] border px-3 py-[7px] text-xs disabled:cursor-not-allowed disabled:opacity-60"
-      }
-    >
-      {label}
-    </button>
+    <ShellHeader>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Voltar à origem"
+        onClick={onBack}
+      >
+        <ChevronLeft />
+      </Button>
+      {onRename ? (
+        <input
+          aria-label="Título da peça"
+          key={title}
+          defaultValue={title}
+          className="focus-visible:ring-ring min-w-0 flex-1 truncate bg-transparent text-sm font-medium outline-none focus-visible:ring-2"
+          onBlur={(e) => {
+            if (e.target.value.trim() && e.target.value.trim() !== title)
+              onRename(e.target.value.trim());
+          }}
+        />
+      ) : (
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+          {title}
+        </span>
+      )}
+      <span className="text-muted-foreground hidden max-w-44 truncate font-mono text-xs xl:block">
+        {cnjShort}
+      </span>
+      <span className="bg-muted text-muted-foreground shrink-0 rounded px-2 py-1 text-xs">
+        {state}
+      </span>
+      {saveLabel && (
+        <span
+          role="status"
+          className="text-muted-foreground hidden text-xs sm:inline"
+        >
+          {saveLabel}
+        </span>
+      )}
+      {onSalvar && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onSalvar}
+          disabled={!podeSalvar || salvando}
+        >
+          {salvando ? "Salvando…" : "Salvar"}
+        </Button>
+      )}
+      {actions}
+    </ShellHeader>
   );
 }

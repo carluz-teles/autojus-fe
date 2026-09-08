@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 
 import { useApi } from "@/lib/api/use-api";
 
@@ -13,6 +13,7 @@ import { useUploadDocumento } from "./use-upload-documento";
 // Status intermediários da saga (entre UPLOADED e READY): enquanto houver documento
 // nesses estados, a aba está "processando…" e vale repolling.
 const PROCESSING: ReadonlySet<DocumentView["status"]> = new Set([
+  "UPLOADED",
   "EXTRACTING",
   "EXTRACTED",
   "CHUNKED",
@@ -21,22 +22,27 @@ const PROCESSING: ReadonlySet<DocumentView["status"]> = new Set([
 /**
  * Hook público da aba Documentos — leitura via React Query + as ações (upload, baixar,
  * excluir) compostas de sub-hooks `_private` (um por responsabilidade). O componente só
- * chama este. Sem paginação (o conjunto do processo cabe na aba, como em prazos).
+ * chama este. Paginado por cursor para manter todos os autos acessíveis.
  *
  * O polling se auto-desliga (CLAUDE.md): só refetcha enquanto algum doc está em extração/
- * indexação. Na Fatia 1 o doc para em UPLOADED (sem pipeline), então fica inerte; acende
- * sozinho quando o Bloco C (extração/embeddings) entrar.
+ * indexação, incluindo a espera pelo worker após o upload.
  */
 export function useDocumentosDoProcesso(processoId: string) {
   const fetcher = useApi();
 
-  const query = useQuery({
+  const query = useInfiniteQuery({
     queryKey: ["documentos", "processo", processoId],
-    queryFn: () =>
-      listDocumentosByProcesso(fetcher, { processoId, limit: 100 }),
+    queryFn: ({ pageParam }) =>
+      listDocumentosByProcesso(fetcher, {
+        processoId,
+        limit: 30,
+        cursor: pageParam || undefined,
+      }),
+    initialPageParam: "",
+    getNextPageParam: (page) => page.page.next_cursor,
     enabled: !!processoId,
     refetchInterval: (q) => {
-      const docs = q.state.data?.data ?? [];
+      const docs = q.state.data?.pages.flatMap((p) => p.data) ?? [];
       return docs.some((d) => PROCESSING.has(d.status)) ? 4000 : false;
     },
   });
@@ -45,7 +51,7 @@ export function useDocumentosDoProcesso(processoId: string) {
   const excluir = useExcluirDocumento(processoId);
   const baixar = useBaixarDocumento();
 
-  const documentos = query.data?.data ?? [];
+  const documentos = query.data?.pages.flatMap((p) => p.data) ?? [];
 
   return {
     documentos,
@@ -53,6 +59,10 @@ export function useDocumentosDoProcesso(processoId: string) {
     isPending: query.isPending,
     isError: query.isError,
     error: query.error,
+    refetch: query.refetch,
+    hasNextPage: query.hasNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
+    fetchNextPage: query.fetchNextPage,
     upload,
     excluir,
     baixar,

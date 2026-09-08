@@ -35,11 +35,11 @@ export const ONBOARDING_STEPS_COPY: Record<
 > = {
   sources_connected: {
     id: "sources_connected",
-    title: "Conecte suas OABs e fontes",
+    title: "Prepare sua primeira importação",
     description:
-      "Suas publicações passam a chegar sozinhas do DJEN e do DATAJUD.",
-    ctaLabel: "Configurar termos",
-    href: "/configuracoes",
+      "Prepare o certificado e o 2FA do tribunal antes de ativar a OAB.",
+    ctaLabel: "Preparar importação",
+    href: "/primeira-importacao",
   },
   members_invited: {
     id: "members_invited",

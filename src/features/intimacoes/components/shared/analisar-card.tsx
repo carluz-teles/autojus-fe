@@ -1,5 +1,4 @@
 "use client";
-
 // AnalisarCard — o card "Analisar esta intimação" (3 estados: pré-análise/loading/
 // pós-análise com providências) + ProvidenciaRow. Extraído de intimacao-detail.tsx
 // (Regra nº1): o master-detail (print 2 da spec) reusa EXATAMENTE o estado de
@@ -32,18 +31,20 @@
 // globals.css o slot shadcn `--accent` foi mantido neutro (cinza) e é `--primary`
 // quem recebeu o teal vibrante do mockup na migração da casca (ver comentário em
 // src/app/globals.css). `var(--gold)`/`var(--green)` batem 1:1 com o mock.
-
 import { Check, Loader2, Plus, RotateCcw, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode } from "react";
 import { toast } from "sonner";
 
+import { TeorContent } from "@/components/teor-content";
 import { Button } from "@/components/ui/button";
 // Rótulo do status de trabalho: fonte única (Regra nº1) em action-items/lib/status-pill;
 // não redefinir localmente (o board e a fila consomem o MESMO mapa).
-import { STATUS_LABEL } from "@/features/action-items/lib/status-pill";
-import { useCriarPeca } from "@/features/pecas/hooks/use-peca";
+import {
+  STATUS_LABEL,
+  STATUS_PILL,
+} from "@/features/action-items/lib/status-pill";
 import { formatarData, formatarDataHora } from "@/lib/utils";
 
 import {
@@ -474,23 +475,11 @@ export function codigoProvidencia(id: string, prefix = "PRV-"): string {
   return `${prefix}${id.replace(/-/g, "").slice(0, 4).toUpperCase()}`;
 }
 
-/** Botão de ação da linha de providência — "Iniciar providência" e "Gerar minuta"
- *  são o MESMO botão (mesmo tamanho/forma), diferindo APENAS na cor (aplicada via
- *  `style` inline). Padding 7px 12px / radius 7px / 12px / ícone 13px. */
+/** Estilo das ações de confirmar e iniciar uma providência sugerida. */
 const ACAO_BTN_CLASS =
-  "inline-flex shrink-0 items-center gap-1.5 rounded-[7px] border px-3 py-[7px] text-[12px] font-medium transition-[filter] hover:brightness-95 disabled:opacity-60";
+  "focus-visible:ring-ring inline-flex w-fit max-w-full shrink-0 items-center justify-center gap-1.5 rounded-[7px] border px-3 py-[7px] text-sm font-medium transition-[filter] outline-none hover:brightness-95 focus-visible:ring-2 disabled:opacity-60";
 
-/**
- * Uma providência no card de análise. Endereçada por `id` (o id do action_item).
- * Dois estados (docs/design-card-providencias-v2.md §4):
- *  • NÃO INICIADA (status === "SUGGESTED") — botão "+ Iniciar providência" (chama
- *    POST /iniciar; SUGGESTED→TODO). É o "Iniciar providência", distinto do gate de
- *    tipo "Confirmar tipo" (que mora no card de leitura).
- *  • INICIADA (status !== "SUGGESTED") — pílula verde "✓ PRV-xxxx" (link pra
- *    /providencias/:id) e, se `gera_peca`, o botão "Gerar minuta"; senão (Ciência),
- *    texto simples "no fluxo".
- *  Erro de iniciar → toast + role=alert.
- */
+/** Confirma o tipo sugerido, inicia o trabalho e oferece a próxima ação da providência. */
 export function ProvidenciaRow({
   intimacaoId,
   providencia: p,
@@ -499,8 +488,14 @@ export function ProvidenciaRow({
   providencia: IntimacaoProvidencia;
 }) {
   const iniciar = useIniciarProvidencia(intimacaoId);
+  const confirmar = useConfirmarActionItem(intimacaoId);
+  const onConfirmarTipo = () =>
+    confirmar.mutate(p.id, {
+      onError: () =>
+        toast.error("Não foi possível confirmar o tipo. Tente novamente."),
+    });
   const emVoo = iniciar.isPending;
-  const erro = iniciar.isError;
+  const erro = iniciar.isError || confirmar.isError;
 
   const onIniciar = () =>
     iniciar.mutate(p.id, {
@@ -515,15 +510,16 @@ export function ProvidenciaRow({
 
   return (
     // Grid 1fr auto — fiel ao .dc.html (Prazos-Linear, bloco <sc-for as="pv">).
-    <li className="border-line2 hover:bg-hover grid grid-cols-[1fr_auto] items-center gap-3 border-b px-4 py-3">
+    <li className="border-line2 hover:bg-hover grid grid-cols-1 items-center gap-3 border-b py-4 sm:grid-cols-[1fr_auto]">
       <div className="min-w-0">
-        <span className="text-foreground block text-[13px] font-medium">
+        <span className="text-foreground block text-sm font-medium">
           {titulo}
         </span>
         {descricao ? (
-          <span className="text-fg3 mt-[3px] block text-[11.5px] leading-[1.45]">
-            {descricao}
-          </span>
+          <TeorContent
+            content={descricao}
+            className="text-muted-foreground mt-1"
+          />
         ) : null}
 
         <span className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -537,36 +533,29 @@ export function ProvidenciaRow({
             </RowBadge>
           ) : (
             <RowBadge cor="var(--fg3)" fundo="var(--hover)">
-              Ciência
+              {rotuloTipo(p.tipo)}
             </RowBadge>
           )}
-          {!p.gera_peca ? (
-            <RowBadge cor="var(--fg3)" fundo="var(--hover)">
-              fluxo curto
-            </RowBadge>
-          ) : null}
           <RowBadge
             cor={selo.cor}
             fundo={`color-mix(in oklch, ${selo.cor} 12%, transparent)`}
             dot
           >
-            {selo.label}
+            {p.tipo_status === "a_confirmar"
+              ? "Tipo a confirmar"
+              : p.tipo_origem === "declarado"
+                ? "Tipo declarado"
+                : "Tipo revisado"}
           </RowBadge>
           {/* Chip da providência iniciada — leva a /providencias/:id. */}
           {iniciada ? (
             <Link
               href={`/providencias/${p.id}`}
-              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[9.5px] font-medium tabular-nums transition-[filter] hover:brightness-95"
-              style={{
-                borderColor:
-                  "color-mix(in oklch, var(--green) 38%, transparent)",
-                background: "color-mix(in oklch, var(--green) 9%, transparent)",
-                color: "var(--green)",
-              }}
+              className={`focus-visible:ring-ring inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium outline-none focus-visible:ring-2 ${STATUS_PILL[p.status]}`}
               title={STATUS_LABEL[p.status]}
             >
-              <Check className="size-[11px]" strokeWidth={2.4} />
-              {codigoProvidencia(p.id, "PRV-")}
+              {p.status === "DONE" ? <Check className="size-3" /> : null}
+              {STATUS_LABEL[p.status]}
             </Link>
           ) : null}
         </span>
@@ -585,14 +574,30 @@ export function ProvidenciaRow({
       {iniciada ? (
         <span className="inline-flex items-center gap-2">
           {p.gera_peca ? (
-            <GerarMinutaDaProvidencia providencia={p} />
+            <GerarPecaDaProvidencia providencia={p} intimacaoId={intimacaoId} />
           ) : (
-            <span className="text-fg3 text-[11.5px]">no fluxo</span>
+            <Button
+              variant="outline"
+              size="sm"
+              render={<Link href={`/providencias/${p.id}`} />}
+              nativeButton={false}
+            >
+              Acompanhar providência
+            </Button>
           )}
         </span>
+      ) : p.tipo_status === "a_confirmar" ? (
+        <button
+          type="button"
+          onClick={onConfirmarTipo}
+          disabled={confirmar.isPending}
+          className={ACAO_BTN_CLASS}
+        >
+          {confirmar.isPending
+            ? "Confirmando…"
+            : "Confirmar tipo da providência"}
+        </button>
       ) : (
-        // "Iniciar providência" — MESMO botão/tamanho do "Gerar minuta"
-        // (ACAO_BTN_CLASS); cor accent (borda primary / texto primary).
         <button
           type="button"
           onClick={onIniciar}
@@ -616,65 +621,28 @@ export function ProvidenciaRow({
   );
 }
 
-/**
- * Gera a minuta a partir da providência — POST /v1/pecas com `action_item_id` (a
- * peça herda piece_profile_key/piece_type da providência). Só aparece quando a
- * providência já foi iniciada E gera peça (docs/design-card-providencias-v2.md §5 —
- * a ação mora só aqui, NÃO existe card "Minuta" separado). Cria e navega direto
- * pro draft (idempotente por action_item_id no BE).
- */
-function GerarMinutaDaProvidencia({
+/** Abre as teses da providência iniciada, preservando seu vínculo e a rota de retorno. */
+function GerarPecaDaProvidencia({
+  intimacaoId,
   providencia: p,
 }: {
   providencia: IntimacaoProvidencia;
+  intimacaoId: string;
 }) {
   const router = useRouter();
-  const criarPeca = useCriarPeca();
+  const params = useSearchParams();
 
   if (!p.gera_peca || p.status === "SUGGESTED") return null;
 
   const onClick = () =>
-    criarPeca.mutate(
-      { action_item_id: p.id },
-      {
-        onSuccess: (peca) => router.push(`/pecas/${peca.id}`),
-        onError: () =>
-          toast.error("Não foi possível gerar a minuta. Tente novamente."),
-      },
+    router.push(
+      `/pecas/nova?intimacao=${intimacaoId}&providencia=${p.id}&retorno=${encodeURIComponent(params.get("retorno") ?? "/intimacoes")}`,
     );
 
   return (
-    // MESMO botão/tamanho do "Iniciar providência" (ACAO_BTN_CLASS); accent.
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={criarPeca.isPending}
-      className={ACAO_BTN_CLASS}
-      style={{
-        borderColor: "color-mix(in oklch, var(--primary) 45%, transparent)",
-        background: "color-mix(in oklch, var(--primary) 7%, transparent)",
-        color: "var(--primary)",
-      }}
-    >
-      {criarPeca.isPending ? (
-        <Loader2 className="size-[13px] animate-spin" strokeWidth={1.9} />
-      ) : (
-        <svg
-          width="13"
-          height="13"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.9}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden
-        >
-          <path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3m12 0h3M18.4 5.6l-2.1 2.1M12 18v3M7.7 16.3l-2.1 2.1m12.8 0-2.1-2.1" />
-          <circle cx="12" cy="12" r="4" />
-        </svg>
-      )}
-      Gerar minuta
-    </button>
+    <Button type="button" size="sm" onClick={onClick}>
+      <Sparkles data-icon="inline-start" aria-hidden />
+      Gerar peça
+    </Button>
   );
 }

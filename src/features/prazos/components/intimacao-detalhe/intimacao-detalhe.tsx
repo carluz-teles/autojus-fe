@@ -1,816 +1,711 @@
 "use client";
-
 import { Menu } from "@base-ui/react/menu";
 import {
-  ArrowRight,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  FileText,
-  Sparkles,
+  Copy,
+  ExternalLink,
+  MoreHorizontal,
   TriangleAlert,
 } from "lucide-react";
 import Link from "next/link";
-import { Fragment, useState } from "react";
+import { useState } from "react";
 
-import { Avatar } from "@/components/mock-ui/data-display";
+import { DetailCard as Card } from "@/components/shell/detail-card";
+import { PageFrame, ShellBackLink } from "@/components/shell/page-frame";
+import { TeorContent } from "@/components/teor-content";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  AnalisarLoading,
-  LeituraDoTeorCard,
-  ProvidenciaRow,
-  ProvidenciasBanner,
-  ProvidenciasLinhaLegal,
-} from "@/features/intimacoes/components/shared/analisar-card";
-import { nomeExibicao } from "@/features/organization/lib/labels";
-import { sanitizeContentHtml } from "@/lib/html/sanitize-content";
-import { cn } from "@/lib/utils";
+import { ProvidenciasSection } from "@/features/action-items/components/providencias-section";
+import {} from "@/features/intimacoes/components/shared/analisar-card";
+import { useFilaNavigation } from "@/features/intimacoes/hooks/use-fila-navigation";
+import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
+import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
+import { formatarData } from "@/lib/utils";
 
-import {
-  type MemoriaCalculoVM,
-  useIntimacaoDetalhe,
-} from "../../hooks/use-intimacao-detalhe";
+import { useIntimacaoDetalhe } from "../../hooks/use-intimacao-detalhe";
+import { dataEscolhidaNaApuracao } from "../../lib/detalhe-apresentacao";
+import { ConfirmacaoPrazo } from "./confirmacao-prazo";
 
 const POPUP_CLASS =
-  "bg-popover text-popover-foreground ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 z-50 max-h-72 min-w-48 origin-(--transform-origin) overflow-y-auto rounded-lg p-1 shadow-md ring-1 duration-100 outline-none";
-
+  "bg-popover text-popover-foreground ring-foreground/10 max-h-72 min-w-48 overflow-y-auto rounded-lg p-1 shadow-md ring-1 outline-none";
 const ITEM_CLASS =
-  "focus:bg-accent focus:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-md py-1.5 pr-2 pl-2 text-[13px] outline-none select-none data-disabled:pointer-events-none data-disabled:opacity-50";
+  "focus:bg-accent focus:text-accent-foreground data-highlighted:bg-accent relative flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-disabled:opacity-50";
+const DISCLOSURE = "group border-border rounded-lg border bg-card";
+const SUMMARY =
+  "focus-visible:ring-ring flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm font-medium outline-none focus-visible:ring-2 [&::-webkit-details-marker]:hidden";
 
-// Detalhe da intimação, ligado ao backend real via useIntimacaoDetalhe. Faixa de
-// identidade + stepper de ciclo de vida + ação rápida (responsável); 2 colunas:
-// providências (sob demanda) à esquerda, teor + trilha à direita.
+type Detalhe = ReturnType<typeof useIntimacaoDetalhe>;
+
 export function IntimacaoDetalhe({ id }: { id: string }) {
   const det = useIntimacaoDetalhe(id);
+  const fila = useFilaNavigation(id);
   const m = det.model;
 
-  if (det.isPending) {
-    return (
-      <div className="text-fg3 flex flex-1 items-center justify-center text-[13px]">
-        Carregando intimação…
-      </div>
-    );
-  }
-
-  if (det.isError || !m) {
-    return (
-      <div
-        className="text-fg3 flex flex-1 items-center justify-center text-[13px]"
-        role="alert"
+  const shellHeader = (
+    <>
+      <ShellBackLink href={fila.retorno} label={fila.label} />
+      <h1 className="shrink-0 text-[13px] font-medium">Intimação</h1>
+      <span className="text-fg3 min-w-0 truncate font-mono text-[11px]">
+        {m?.cnj}
+      </span>
+      <nav
+        aria-label="Navegação da intimação"
+        className="ml-auto flex shrink-0 items-center gap-1"
       >
-        Não foi possível carregar esta intimação.
-      </div>
+        {fila.anterior ? (
+          <Link
+            href={fila.anterior}
+            aria-label="Intimação anterior"
+            title="Intimação anterior"
+            className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+          >
+            <ChevronLeft />
+          </Link>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            disabled
+            aria-label="Intimação anterior"
+          >
+            <ChevronLeft />
+          </Button>
+        )}
+        {fila.proxima ? (
+          <Link
+            href={fila.proxima}
+            aria-label="Próxima intimação"
+            title="Próxima intimação"
+            className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+          >
+            <ChevronRight />
+          </Link>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            disabled
+            aria-label="Próxima intimação"
+          >
+            <ChevronRight />
+          </Button>
+        )}
+      </nav>
+    </>
+  );
+
+  if (det.isPending)
+    return (
+      <PageFrame header={shellHeader}>
+        <p role="status" className="text-muted-foreground p-6">
+          Carregando intimação…
+        </p>
+      </PageFrame>
     );
-  }
+  if (det.isError || !m)
+    return (
+      <PageFrame header={shellHeader}>
+        <div className="flex flex-col items-start gap-3 p-6">
+          <p role="alert">Não foi possível carregar esta intimação.</p>
+          <Button variant="outline" onClick={det.recarregar}>
+            Tentar novamente
+          </Button>
+          <Link href={fila.retorno}>{fila.label}</Link>
+        </div>
+      </PageFrame>
+    );
 
   return (
-    <div className="text-foreground flex min-h-0 min-w-0 flex-1 flex-col text-[13px]">
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1080px] px-8 pt-4 pb-10">
-          <div className="mb-3.5 flex items-center gap-2">
-            <Link
-              href="/intimacoes"
-              className="navi text-fg2 hover:bg-hover inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px]"
-            >
-              <ChevronLeft className="size-3.5" strokeWidth={2} />
-              Intimações
-            </Link>
-            <span className="text-fg3">·</span>
+    <PageFrame header={shellHeader}>
+      <div className="mx-auto flex max-w-[1320px] flex-col gap-4 px-4 py-4">
+        <section
+          aria-label="Identificação da intimação"
+          className="border-line flex flex-col gap-3 border-b pb-5"
+        >
+          <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+            <span>
+              {m.tipoLabel} · {m.fonte || "Fonte não informada"}
+            </span>
+            <span>Publicada em {m.publicadoEm}</span>
+            <Badge variant="outline">
+              Intimação {m.statusLabel.toLowerCase()}
+            </Badge>
+            <div className="ml-auto">
+              <AcoesIntimacao det={det} />
+            </div>
+          </div>
+          <h2 className="max-w-4xl text-xl leading-tight font-medium text-balance break-words sm:text-[22px]">
+            {m.titulo}
+          </h2>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <Link
               href={`/processos/${encodeURIComponent(m.courtRecordId)}`}
-              className="navi text-primary hover:bg-hover inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px]"
+              className="text-primary focus-visible:ring-ring rounded font-mono text-sm underline-offset-4 hover:underline focus-visible:ring-2"
             >
-              <FileText className="size-3.5" strokeWidth={1.8} />
               {m.cnj}
             </Link>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={det.onCopiarCNJ}
+              aria-label="Copiar número do processo"
+            >
+              <Copy />
+            </Button>
+            <span className="text-muted-foreground text-xs">{m.orgao}</span>
           </div>
-
-          {/* faixa de identidade */}
-          <div className="border-line bg-panel overflow-hidden rounded-[14px] border">
-            <div className="flex items-start gap-6 px-[22px] py-5">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  {m.urgencia ? (
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-md px-[9px] py-[3px] text-[11.5px] font-medium"
-                      style={{
-                        background: m.urgencia.fundo,
-                        color: m.urgencia.cor,
-                      }}
-                    >
-                      {m.urgencia.label}
-                    </span>
-                  ) : null}
-                  {/* origem + selo — dimensões do motor de prazos (memória de
-                      cálculo). Só aparecem quando há prazo derivado. */}
-                  {det.memoria?.origem ? (
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-md px-[9px] py-[3px] text-[11.5px] font-medium"
-                      style={{
-                        background: det.memoria.origem.fundo,
-                        color: det.memoria.origem.cor,
-                      }}
-                      title="Origem — de onde veio a data"
-                      aria-label={`Origem da data: ${det.memoria.origem.label}`}
-                    >
-                      {det.memoria.origem.label}
-                    </span>
-                  ) : null}
-                  {det.memoria?.selo ? (
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-md border border-dashed px-[9px] py-[3px] text-[11px] font-medium"
-                      style={{
-                        borderColor: det.memoria.selo.cor,
-                        color: det.memoria.selo.cor,
-                        background: det.memoria.selo.fundo,
-                      }}
-                      title={det.memoria.selo.descricao}
-                      aria-label={`Selo de confiança: ${det.memoria.selo.label} — ${det.memoria.selo.descricao}`}
-                    >
-                      {det.memoria.selo.label}
-                    </span>
-                  ) : null}
-                  <span className="text-fg3 text-[11.5px]">{m.orgao}</span>
-                </div>
-                <h1 className="font-display mt-2.5 text-[27px] leading-[1.1] tracking-[-0.01em]">
-                  {m.titulo}
-                </h1>
-                <div className="mt-2 flex items-center gap-2">
-                  <p className="text-fg3 text-[12px]">
-                    publicado em {m.publicadoEm}
-                  </p>
-                </div>
-              </div>
-              <div className="border-line2 flex shrink-0 flex-col items-start gap-2 border-l pl-[22px]">
-                <div className="flex items-baseline gap-2.5">
-                  <span
-                    className="text-[40px] leading-none font-semibold tabular-nums"
-                    style={{ color: m.prazoCor }}
-                  >
-                    {m.prazoNum}
-                  </span>
-                  <span className="text-fg3 text-[12px] leading-[1.5]">
-                    {m.prazoFrase}
-                    {m.fatalData ? (
-                      <>
-                        <br />
-                        fatal{" "}
-                        <strong className="text-foreground font-medium">
-                          {m.fatalData}
-                        </strong>
-                      </>
-                    ) : null}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-fg3 text-[12px]">Responsável:</span>
-                  <ResponsavelMenu
-                    value={m.responsavelId}
-                    nome={m.responsavelNome}
-                    membros={det.membros}
-                    emVoo={det.assignEmVoo}
-                    onAssign={det.onAssign}
-                  />
-                </div>
-              </div>
+          <dl className="grid gap-3 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-muted-foreground text-xs">
+                Autor / polo ativo
+              </dt>
+              <dd className="mt-1 break-words">{m.autor || "Não informado"}</dd>
             </div>
-            {/* stepper do ciclo de trabalho (recebida → protocolado) */}
-            <div className="border-line2 bg-bg flex items-center border-t px-[22px] py-3.5">
-              {m.stepper.map((s) => {
-                const cor =
-                  s.estado === "todo" ? "var(--fg3)" : "var(--foreground)";
-                return (
-                  <div
-                    key={s.key}
-                    className="flex items-center"
-                    style={{ flex: s.flex }}
-                  >
-                    <div className="flex shrink-0 items-center gap-2">
-                      <StepMarcador estado={s.estado} />
-                      <span
-                        className="text-[10.5px] leading-[1.2]"
-                        style={{
-                          color: cor,
-                          fontWeight: s.estado === "current" ? 500 : 400,
-                        }}
-                      >
-                        {s.label}
-                      </span>
-                    </div>
-                    {s.temLinha ? (
-                      <span
-                        className="mx-2 h-0.5 flex-1"
-                        style={{
-                          background: s.linhaFeita
-                            ? "var(--primary)"
-                            : "var(--line)",
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                );
-              })}
+            <div>
+              <dt className="text-muted-foreground text-xs">
+                Réu / polo passivo
+              </dt>
+              <dd className="mt-1 break-words">{m.reu || "Não informado"}</dd>
             </div>
-          </div>
+          </dl>
+          <p className="text-muted-foreground text-xs">
+            {[m.classe, m.assunto, m.tribunalGrau]
+              .filter((value) => value && !m.titulo.includes(value))
+              .join(" · ")}
+          </p>
+        </section>
 
-          {/* memória de cálculo ("por que essa data?") */}
-          <MemoriaCalculoCard
-            memoria={det.memoria}
-            pending={det.memoriaPending}
-            erro={det.memoriaErro}
-            emVoo={det.memoriaEmVoo}
-            onAceitarDeclarado={det.onAceitarDeclarado}
-            onAceitarCalculado={det.onAceitarCalculado}
-            onAjusteManual={det.onAjusteManual}
-          />
-
-          {/* 2 colunas */}
-          <div className="mt-5 grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] items-start gap-5">
-            {/* PRIMÁRIA: providências (sob demanda) */}
-            <div className="border-line bg-panel overflow-hidden rounded-xl border">
-              <div className="border-line2 flex items-center gap-2 border-b px-4 pt-3.5 pb-3">
-                <Sparkles
-                  className="text-primary size-[15px]"
-                  strokeWidth={1.8}
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_410px]">
+          <div className="flex min-w-0 flex-col gap-4">
+            {m.resumo ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <h2>O que foi determinado</h2>
+                  </CardTitle>
+                  <CardDescription>
+                    Resumo sugerido · confira o documento original.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm leading-relaxed">{m.resumo}</p>
+                </CardContent>
+              </Card>
+            ) : null}
+            <Card id="teor-intimacao" className="scroll-mt-6">
+              <CardHeader>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle>
+                    <h2>Teor da intimação</h2>
+                  </CardTitle>
+                  {m.documentoUrl ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      render={
+                        <a
+                          href={m.documentoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        />
+                      }
+                      nativeButton={false}
+                    >
+                      Documento de origem
+                      <ExternalLink data-icon="inline-end" />
+                    </Button>
+                  ) : null}
+                </div>
+                <CardDescription>
+                  Publicação de {m.publicadoEm} ·{" "}
+                  {m.fonte || "Fonte não informada"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TeorContent
+                  content={m.teor}
+                  emptyMessage={`Teor integral indisponível. ${m.documentoUrl ? "Consulte o documento de origem." : "Não há documento de origem disponível."}`}
                 />
-                <span className="text-[13px] font-semibold">Providências</span>
-                {m.analisada && !m.degradado ? (
-                  <>
-                    <span className="text-fg3 text-[11.5px]">
-                      revise antes de iniciar
-                    </span>
-                    <span className="text-fg3 ml-auto font-mono text-[11px]">
-                      {m.nProvidencias}
-                    </span>
-                  </>
-                ) : null}
-              </div>
-
-              {det.analisando ? <AnalisarLoading /> : null}
-
-              {!det.analisando && !m.analisada ? (
-                <div className="px-[22px] py-[26px] text-center">
-                  <div className="bg-selected mx-auto mb-3 grid size-10 place-items-center rounded-[10px]">
-                    <Sparkles
-                      className="text-primary size-5"
-                      strokeWidth={1.8}
-                    />
-                  </div>
-                  <div className="font-display mb-1.5 text-[16px]">
-                    Gerar providências
-                  </div>
-                  <p className="text-fg3 mx-auto mb-4 max-w-[330px] text-[12px] leading-[1.55]">
-                    Lê o teor, classifica o ato, deriva o prazo e sugere as
-                    providências. Geração sob demanda para controlar custo.
-                  </p>
-                  {det.analiseErro ? (
-                    <p
-                      role="alert"
-                      className="text-destructive mb-3 text-[12px]"
-                    >
-                      Não foi possível gerar a análise. Tente novamente.
-                    </p>
-                  ) : null}
-                  <button
-                    onClick={det.onAnalisar}
-                    className="bg-primary text-primary-foreground inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-[13px] font-medium"
-                  >
-                    <Sparkles className="size-[15px]" strokeWidth={1.8} />
-                    Gerar providências
-                  </button>
-                  <div className="text-fg3 mt-2.5 text-[10.5px]">
-                    Consome 1 crédito de análise · ~15s
-                  </div>
-                </div>
-              ) : null}
-
-              {!det.analisando && m.analisada ? (
-                <>
-                  {m.degradado ? (
-                    <p
-                      role="alert"
-                      className="text-fg3 px-4 py-6 text-[12.5px] leading-[1.6]"
-                    >
-                      Análise indisponível no momento. Tente gerar novamente.
-                    </p>
-                  ) : m.providencias.length === 0 ? (
-                    <p className="text-fg3 px-4 py-6 text-[12.5px] leading-[1.6]">
-                      Nenhuma providência sugerida para esta intimação.
-                    </p>
-                  ) : (
-                    <>
-                      {/* Linha de detalhe legal (SEM breadcrumb — removido por
-                          decisão explícita, v2.1) + o banner das providências —
-                          docs/design-card-providencias-v2.md §2-3
-                          (compartilhados com <AnalisarCard/>, Regra nº1). */}
-                      <ProvidenciasLinhaLegal intimacao={det.intimacao!} />
-                      <ProvidenciasBanner
-                        intimacao={det.intimacao!}
-                        itens={m.providencias}
-                      />
-                      <ul>
-                        {m.providencias.map((p) => (
-                          <ProvidenciaRow
-                            key={p.id}
-                            intimacaoId={m.id}
-                            providencia={p}
-                          />
-                        ))}
-                      </ul>
-                    </>
-                  )}
-                  <div className="border-line2 text-fg3 flex items-center justify-between gap-3 border-t px-4 py-3 text-[11.5px]">
-                    <span>Gerado em {m.analisadaEm}</span>
-                    <button
-                      onClick={det.onAnalisar}
-                      className="navi text-fg2 hover:bg-hover rounded-md px-2 py-1 text-[11.5px] font-medium"
-                    >
-                      Gerar novamente
-                    </button>
-                  </div>
-                </>
-              ) : null}
-            </div>
-
-            {/* SECUNDÁRIA: leitura do teor (= card "Análise" fundido, v2.1) +
-                teor + trilha */}
-            <div className="flex flex-col gap-3.5">
-              {m.analisada && !m.degradado && m.providencias.length > 0 ? (
-                <LeituraDoTeorCard
-                  intimacaoId={m.id}
-                  ato={m.ato}
-                  resumo={m.resumo}
-                  itens={m.providencias}
-                />
-              ) : null}
-
-              <div className="border-line bg-panel overflow-hidden rounded-xl border">
-                <div className="border-line2 border-b px-3.5 py-2.5">
-                  <span className="text-fg2 text-[11px] font-semibold tracking-[0.03em] uppercase">
-                    Teor da intimação
-                  </span>
-                </div>
-                {m.teor ? (
-                  // O teor vem em HTML (DJEN). sanitizeContentHtml remove
-                  // scripts/handlers/URIs perigosas antes de renderizar — sem
-                  // isso apareciam as tags cruas (<html><head>…).
-                  <div
-                    className="prose-intimacao text-fg2 px-3.5 py-3 text-[12.5px] leading-[1.6]"
-                    dangerouslySetInnerHTML={{
-                      __html: sanitizeContentHtml(m.teor),
-                    }}
+              </CardContent>
+            </Card>
+            <details className={DISCLOSURE}>
+              <summary className={SUMMARY}>
+                Publicação e destinatários
+                <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="flex flex-col gap-5 px-4 pb-4">
+                <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+                  <Dado label="Disponibilização" value={m.disponibilizadoEm} />
+                  <Dado label="Publicação" value={m.publicadoEm} />
+                  <Dado
+                    label="Início informado da contagem"
+                    value={m.inicioContagem}
                   />
-                ) : (
-                  <p className="text-fg3 px-3.5 py-3 text-[12.5px] leading-[1.6]">
-                    Teor integral indisponível — publicação capturada do DJEN.
-                  </p>
-                )}
-              </div>
-
-              <div className="border-line bg-panel overflow-hidden rounded-xl border">
-                <div className="border-line2 border-b px-3.5 py-2.5">
-                  <span className="text-fg2 text-[11px] font-semibold tracking-[0.03em] uppercase">
-                    Trilha
-                  </span>
-                </div>
-                <div className="px-3.5 pt-1 pb-2.5">
-                  {m.trilha.length === 0 ? (
-                    <p className="text-fg3 py-2 text-[11.5px]">
-                      Sem eventos ainda.
-                    </p>
+                </dl>
+                <div>
+                  <h3 className="mb-2 text-sm font-medium">
+                    Destinatários da publicação
+                  </h3>
+                  {m.destinatarios.length ? (
+                    <ul className="flex flex-col gap-3">
+                      {m.destinatarios.map((r, index) => (
+                        <li
+                          key={`${r.nome}:${r.oab}:${index}`}
+                          className="flex flex-wrap items-center gap-2 text-sm"
+                        >
+                          <span>{r.nome}</span>
+                          {r.oab ? (
+                            <span className="text-muted-foreground">
+                              OAB {r.oab}
+                            </span>
+                          ) : null}
+                          {r.matched ? (
+                            <Badge variant="secondary">OAB monitorada</Badge>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
                   ) : (
-                    m.trilha.map((t, i) => (
-                      <div
-                        key={i}
-                        className="border-line2 grid grid-cols-[58px_1fr] gap-2.5 border-t py-[7px] first:border-t-0"
-                      >
-                        <span className="text-fg3 font-mono text-[10.5px]">
-                          {t.data}
-                        </span>
-                        <span className="text-fg2 text-[11.5px]">
-                          {t.label}
-                        </span>
-                      </div>
-                    ))
+                    <p className="text-muted-foreground text-sm">
+                      Destinatários não informados na captura.
+                    </p>
                   )}
                 </div>
               </div>
-            </div>
+            </details>
           </div>
+          <aside
+            id="prazo-decisao"
+            aria-label="Prazo e decisão"
+            className="order-first flex min-w-0 flex-col gap-4 lg:order-last"
+          >
+            <PainelPrazo det={det} />
+            <a
+              href="#teor-intimacao"
+              className="text-primary focus-visible:ring-ring rounded text-sm underline underline-offset-4 focus-visible:ring-2 lg:hidden"
+            >
+              Ler o teor da intimação
+            </a>
+            {det.memoria?.divergencia?.pendente ? (
+              <ApuracaoPrazo key={id} det={det} />
+            ) : null}
+            {det.prazoDetalhe ? (
+              <ConfirmacaoPrazo
+                key={`${det.prazoDetalhe.id}:${det.prazoDetalhe.confirmed_at ?? "pending"}`}
+                id={id}
+                prazo={det.prazoDetalhe}
+                estado={det.intimacao?.estado ?? ""}
+              />
+            ) : null}
+            <CalculoDetalhado det={det} />
+          </aside>
         </div>
+
+        <Providencias det={det} />
+
+        <details className={DISCLOSURE}>
+          <summary className={SUMMARY}>
+            <span>
+              Histórico da intimação
+              <span className="text-muted-foreground ml-2 font-normal">
+                {m.trilha.length} registros
+              </span>
+            </span>
+            <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" />
+          </summary>
+          <ol className="flex flex-col px-4 pb-4">
+            {m.trilha.length ? (
+              m.trilha.map((t, index) => (
+                <li
+                  key={index}
+                  className="border-border grid gap-1 border-t py-3 text-sm sm:grid-cols-[110px_1fr]"
+                >
+                  <span className="text-muted-foreground tabular-nums">
+                    {t.data}
+                  </span>
+                  <span>{t.label}</span>
+                </li>
+              ))
+            ) : (
+              <li className="text-muted-foreground text-sm">
+                Sem eventos registrados.
+              </li>
+            )}
+          </ol>
+        </details>
       </div>
+    </PageFrame>
+  );
+}
+
+function Dado({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="mt-1">{value}</dd>
     </div>
   );
 }
 
-/** Card "Por que essa data?" — memória de cálculo (proveniência auditável).
- *  Some enquanto não houver prazo derivado da intimação (pending=erro=false
- *  e memoria=null); degrada pra mensagem simples quando o prazo é pré-V1
- *  (memoria.temCalcMemory=false, mas badges de origem/selo continuam na faixa
- *  de identidade acima). */
-function MemoriaCalculoCard({
-  memoria,
-  pending,
-  erro,
-  emVoo,
-  onAceitarDeclarado,
-  onAceitarCalculado,
-  onAjusteManual,
-}: {
-  memoria: MemoriaCalculoVM | null;
-  pending: boolean;
-  erro: boolean;
-  emVoo: boolean;
-  onAceitarDeclarado: () => void;
-  onAceitarCalculado: () => void;
-  onAjusteManual: (endDate: string) => void;
-}) {
-  const [ajustando, setAjustando] = useState(false);
-  const [dataAjuste, setDataAjuste] = useState("");
-
-  if (!pending && !erro && !memoria) return null;
-
+function PainelPrazo({ det }: { det: Detalhe }) {
+  const m = det.model!;
+  const p = det.prazoDetalhe;
+  const hasDate = !!m.fatalData;
   return (
-    <div className="border-line bg-panel mt-5 overflow-hidden rounded-[14px] border">
-      <div className="border-line2 flex items-center gap-2.5 border-b px-[18px] py-3.5">
-        <Sparkles
-          className="text-primary size-[17px] shrink-0"
-          strokeWidth={1.7}
-        />
-        <div className="min-w-0">
-          <div className="text-[13.5px] font-semibold">Por que essa data?</div>
-          <div className="text-fg3 text-[11px]">
-            Memória de cálculo · proveniência auditável e defensável
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <h2>Prazo e responsável</h2>
+        </CardTitle>
+        <CardDescription>
+          {det.memoria?.origem?.label ??
+            (det.intimacao?.estado === "a_classificar"
+              ? "Classificação pendente"
+              : "Intimação sem prazo definido")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-5">
+        <div>
+          <p className="text-muted-foreground text-xs">
+            {hasDate && det.revisao.pendente
+              ? "Vencimento registrado · sujeito à revisão"
+              : "Vencimento"}
+          </p>
+          <p
+            className="mt-1 text-2xl leading-tight font-semibold tabular-nums"
+            style={{ color: hasDate ? m.prazoCor : undefined }}
+          >
+            {m.fatalData ||
+              (det.intimacao?.estado === "a_classificar"
+                ? "Prazo a definir"
+                : "Sem prazo")}
+          </p>
+          {hasDate ? (
+            <p className="text-muted-foreground mt-1 text-sm">
+              {m.prazoNum} {m.prazoFrase}
+            </p>
+          ) : null}
+        </div>
+        {p ? (
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <Dado
+              label="Tipo do ato"
+              value={p.tipo_ato ? tipoAtoLabel(p.tipo_ato) : "A definir"}
+            />
+            <Dado
+              label="Contagem"
+              value={
+                p.status === "NO_DEADLINE"
+                  ? det.intimacao?.estado === "a_classificar"
+                    ? "A definir"
+                    : "Não se aplica"
+                  : dataEscolhidaNaApuracao(p)
+                    ? "Data escolhida na apuração"
+                    : `${p.days} dias ${p.counting === "BUSINESS" ? "úteis" : "corridos"}`
+              }
+            />
+          </dl>
+        ) : null}
+        {det.memoriaPending ? (
+          <p role="status" className="text-muted-foreground text-sm">
+            Carregando situação do prazo…
+          </p>
+        ) : det.memoriaErro ? (
+          <div role="alert">
+            <p className="text-sm">Não foi possível consultar o prazo.</p>
+            <Button variant="outline" size="sm" onClick={det.recarregarPrazo}>
+              Tentar novamente
+            </Button>
+          </div>
+        ) : (
+          <div className="border-border border-t pt-4">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              {det.revisao.pendente ? (
+                <TriangleAlert className="text-gold-foreground size-4" />
+              ) : (
+                <Check className="text-primary size-4" />
+              )}
+              {det.revisao.label}
+            </p>
+            {p?.confirmed_at ? (
+              <p className="text-muted-foreground mt-1 text-xs">
+                {p.confirmed_by_name ? `${p.confirmed_by_name} · ` : ""}
+                {formatarData(p.confirmed_at)}
+                {det.memoria?.divergencia?.decisaoLabel
+                  ? ` · ${det.memoria.divergencia.decisaoLabel}`
+                  : ""}
+              </p>
+            ) : null}
+          </div>
+        )}
+        <div className="border-border border-t pt-4">
+          <p className="text-muted-foreground mb-1 text-xs">
+            Responsável pela intimação
+          </p>
+          <ResponsavelMenu
+            label="Responsável pela intimação"
+            value={m.responsavelId}
+            nome={m.responsavelNome}
+            membros={det.membros}
+            emVoo={det.assignEmVoo}
+            onAssign={det.onAssign}
+          />
+        </div>
+        <a
+          href="#providencias-intimacao"
+          className="text-primary focus-visible:ring-ring rounded text-sm underline underline-offset-4 focus-visible:ring-2"
+        >
+          {m.providencias.length
+            ? "Acompanhar providências"
+            : "Ver próximas ações"}
+        </a>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ApuracaoPrazo({ det }: { det: Detalhe }) {
+  const [ajustando, setAjustando] = useState(false);
+  const [data, setData] = useState("");
+  const cv = det.memoria!.divergencia!;
+  return (
+    <Card role="region" aria-label="Apuração do vencimento">
+      <CardHeader>
+        <CardTitle>
+          <h2>Revisar vencimento</h2>
+        </CardTitle>
+        <CardDescription>
+          Há uma diferença de {cv.difDias} dias. Confira a determinação no
+          documento antes de escolher.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+          <div className="border-border rounded-lg border p-3">
+            <p className="text-muted-foreground text-xs">
+              Pelo prazo informado no ato
+            </p>
+            <p className="mt-2 text-lg font-semibold tabular-nums">
+              {cv.declarada}
+            </p>
+          </div>
+          <div className="border-border rounded-lg border p-3">
+            <p className="text-muted-foreground text-xs">
+              Pela regra de cálculo
+            </p>
+            <p className="mt-2 text-lg font-semibold tabular-nums">
+              {cv.calculada}
+            </p>
           </div>
         </div>
-      </div>
-
-      {pending ? (
-        <p className="text-fg3 px-[18px] py-6 text-[12.5px]">
-          Carregando memória de cálculo…
-        </p>
-      ) : null}
-
-      {erro ? (
-        <p
-          role="alert"
-          className="text-destructive px-[18px] py-6 text-[12.5px]"
-        >
-          Não foi possível carregar a memória de cálculo.
-        </p>
-      ) : null}
-
-      {memoria ? (
-        <>
-          {/* APURAÇÃO: divergência (declarado × calculado) */}
-          {memoria.divergencia?.pendente ? (
-            <div
-              className="border-line2 border-b px-[18px] py-[15px]"
-              style={{
-                background: "color-mix(in oklch, var(--gold) 6%, transparent)",
-              }}
+        <div className="flex flex-col gap-2">
+          <Button
+            variant="outline"
+            disabled={det.memoriaEmVoo}
+            onClick={det.onAceitarDeclarado}
+          >
+            Usar prazo informado no ato
+          </Button>
+          <Button
+            variant="outline"
+            disabled={det.memoriaEmVoo}
+            onClick={det.onAceitarCalculado}
+          >
+            Usar data calculada pela regra
+          </Button>
+        </div>
+        {ajustando ? (
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (data) det.onAjusteManual(data);
+            }}
+          >
+            <Field>
+              <FieldLabel htmlFor="data-apuracao">
+                Vencimento escolhido
+              </FieldLabel>
+              <Input
+                id="data-apuracao"
+                type="date"
+                required
+                value={data}
+                onChange={(e) => setData(e.target.value)}
+                disabled={det.memoriaEmVoo}
+              />
+            </Field>
+            <Button disabled={!data || det.memoriaEmVoo} type="submit">
+              Registrar data escolhida
+            </Button>
+            <Button
+              variant="ghost"
+              type="button"
+              disabled={det.memoriaEmVoo}
+              onClick={() => setAjustando(false)}
             >
-              <div className="mb-3 flex items-center gap-2">
-                <TriangleAlert
-                  className="size-[15px]"
-                  style={{ color: "var(--gold)" }}
-                  strokeWidth={1.8}
-                />
-                <span
-                  className="text-[12.5px] font-semibold"
-                  style={{ color: "var(--gold)" }}
-                >
-                  Divergência — declarado ≠ calculado
-                </span>
-                <span
-                  className="ml-auto font-mono text-[11px]"
-                  style={{ color: "var(--gold)" }}
-                >
-                  Δ {memoria.divergencia.difDias} dias
-                </span>
-              </div>
-              <div className="mb-[11px] grid grid-cols-2 gap-2.5">
-                <div className="border-line bg-panel rounded-[9px] border px-3 py-2.5">
-                  <div className="text-fg3 text-[10px] tracking-[0.04em] uppercase">
-                    Declarado na intimação
-                  </div>
-                  <div className="mt-[3px] font-mono text-[18px] font-medium">
-                    {memoria.divergencia.declarada}
-                  </div>
-                </div>
-                <div className="border-line bg-panel rounded-[9px] border px-3 py-2.5">
-                  <div className="text-fg3 text-[10px] tracking-[0.04em] uppercase">
-                    Calculado por regra
-                  </div>
-                  <div className="mt-[3px] font-mono text-[18px] font-medium">
-                    {memoria.divergencia.calculada}
-                  </div>
-                </div>
-              </div>
-              <p className="text-fg2 mb-3 text-[12px] leading-[1.55]">
-                <strong className="font-semibold">Causa provável:</strong>{" "}
-                {memoria.divergencia.causa}
-              </p>
+              Cancelar ajuste
+            </Button>
+          </form>
+        ) : (
+          <Button
+            variant="ghost"
+            onClick={() => setAjustando(true)}
+            disabled={det.memoriaEmVoo}
+          >
+            Escolher outra data
+          </Button>
+        )}
+        {det.apuracaoErro ? (
+          <p role="alert" className="text-destructive text-sm">
+            Não foi possível registrar a decisão. Tente novamente.
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
 
-              {!ajustando ? (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={onAceitarDeclarado}
-                    disabled={emVoo}
-                    className="border-line bg-panel text-foreground hover:bg-hover rounded-lg border px-[13px] py-2 text-[12.5px] font-medium disabled:opacity-60"
-                  >
-                    Aceitar declarado · {memoria.divergencia.declarada}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onAceitarCalculado}
-                    disabled={emVoo}
-                    className="bg-primary text-primary-foreground rounded-lg px-[13px] py-2 text-[12.5px] font-medium disabled:opacity-60"
-                  >
-                    Aceitar calculado · {memoria.divergencia.calculada}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAjustando(true)}
-                    disabled={emVoo}
-                    className="text-fg2 hover:bg-hover rounded-lg border border-transparent px-[13px] py-2 text-[12.5px] disabled:opacity-60"
-                  >
-                    Ajuste manual
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-end gap-2">
-                  <label className="flex flex-col gap-1">
-                    <span className="text-fg3 text-[11px]">
-                      Data fatal (ajuste manual)
-                    </span>
-                    <Input
-                      type="date"
-                      value={dataAjuste}
-                      onChange={(e) => setDataAjuste(e.target.value)}
-                      aria-label="Data fatal do ajuste manual"
-                      className="h-8 w-40 text-[12.5px]"
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    disabled={emVoo || dataAjuste === ""}
-                    onClick={() => {
-                      onAjusteManual(dataAjuste);
-                      setAjustando(false);
-                      setDataAjuste("");
-                    }}
-                    className="bg-primary text-primary-foreground rounded-lg px-[13px] py-2 text-[12.5px] font-medium disabled:opacity-60"
-                  >
-                    Confirmar ajuste
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAjustando(false)}
-                    disabled={emVoo}
-                    className="text-fg3 hover:bg-hover rounded-lg px-[13px] py-2 text-[12.5px] disabled:opacity-60"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              )}
-            </div>
+function CalculoDetalhado({ det }: { det: Detalhe }) {
+  const memoria = det.memoria;
+  const p = det.prazoDetalhe;
+  if (!memoria || !p) return null;
+  return (
+    <details className={DISCLOSURE}>
+      <summary className={SUMMARY}>
+        Ver cálculo do prazo
+        <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="flex flex-col gap-4 px-4 pb-4">
+        <dl className="flex flex-col gap-4">
+          {memoria.cadeia
+            .filter((item) => item.kicker !== "SEM DOBRA")
+            .map((item) => (
+              <div key={item.kicker}>
+                <dt className="text-muted-foreground text-xs">{item.kicker}</dt>
+                <dd className="mt-1 text-sm font-medium">{item.valor}</dd>
+                <dd className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                  {item.sub}
+                </dd>
+              </div>
+            ))}
+        </dl>
+        {!memoria.temCalcMemory ? (
+          <p className="text-muted-foreground text-sm">
+            Memória detalhada não disponível para este prazo.
+          </p>
+        ) : null}
+        {p.manual_extra_days ? (
+          <p className="text-sm">
+            {p.manual_extra_days} dia(s) adicional(is) na contagem.
+          </p>
+        ) : null}
+        {memoria.notaInterna ? (
+          <p className="text-sm">{memoria.notaInterna}</p>
+        ) : null}
+        {p.legal_citation ? (
+          <p className="text-muted-foreground text-xs">
+            Referência registrada: {p.legal_citation}
+          </p>
+        ) : null}
+        <div className="border-border border-t pt-3">
+          <h3 className="text-sm font-medium">Feriados e suspensões</h3>
+          {dataEscolhidaNaApuracao(p) ? (
+            <p className="text-muted-foreground mt-1 text-xs">
+              Registros do cálculo anterior à escolha da data.
+            </p>
           ) : null}
-
-          {memoria.divergencia?.resolvida ? (
-            <div className="border-line2 border-b px-[18px] py-[15px]">
-              <div
-                role="status"
-                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px]"
-                style={{
-                  background:
-                    "color-mix(in oklch, var(--green) 10%, transparent)",
-                  color: "var(--green)",
-                }}
-              >
-                <Check className="size-3.5 shrink-0" strokeWidth={2.2} />
-                Apurado — {memoria.divergencia.decisaoLabel}. Selo agora
-                Confiável; decisão registrada na trilha.
-              </div>
-            </div>
-          ) : null}
-
-          {/* CADEIA DE CÁLCULO */}
-          {memoria.temCalcMemory ? (
-            <>
-              <div className="flex flex-nowrap items-stretch gap-1 overflow-x-auto px-[18px] py-[17px]">
-                {memoria.cadeia.map((c, idx) => (
-                  <Fragment key={c.kicker}>
-                    {idx > 0 ? (
-                      <div className="text-fg3 flex items-center px-0.5">
-                        <ChevronRight
-                          className="size-[15px]"
-                          strokeWidth={1.8}
-                        />
-                      </div>
-                    ) : null}
-                    <div className="border-line2 bg-bg min-w-[140px] flex-1 rounded-[10px] border px-3 py-[11px]">
-                      <div className="text-fg3 text-[10px] tracking-[0.05em] uppercase">
-                        {c.kicker}
-                      </div>
-                      <div className="my-1 font-mono text-[16px] font-medium">
-                        {c.valor}
-                      </div>
-                      <div className="text-fg3 text-[10.5px] leading-[1.45]">
-                        {c.sub}
-                      </div>
-                    </div>
-                  </Fragment>
-                ))}
-                <div className="text-fg3 flex items-center px-0.5">
-                  <ArrowRight className="size-4" strokeWidth={2} />
-                </div>
-                <div
-                  className="min-w-[160px] flex-1 rounded-[10px] border px-[13px] py-[11px]"
-                  style={{
-                    borderColor:
-                      "color-mix(in oklch, var(--red) 35%, transparent)",
-                    background:
-                      "color-mix(in oklch, var(--red) 6%, transparent)",
-                  }}
-                >
-                  <div
-                    className="text-[10px] tracking-[0.05em] uppercase"
-                    style={{ color: "var(--red)" }}
-                  >
-                    Resultado
-                  </div>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span
-                      className="font-mono text-[20px] font-semibold"
-                      style={{ color: "var(--red)" }}
-                    >
-                      {memoria.resultadoFatal}
+          {memoria.feriados.length ? (
+            <ul className="mt-2 flex flex-col gap-3">
+              {memoria.feriados.map((f, i) => (
+                <li key={`${f.data}:${i}`} className="text-sm">
+                  <span className="text-muted-foreground mr-2 tabular-nums">
+                    {f.data}
+                  </span>
+                  {f.nome}
+                  {f.ambito !== "—" ? (
+                    <span className="text-muted-foreground block text-xs">
+                      {f.ambito}
                     </span>
-                    <span className="text-fg3 text-[11px]">fatal</span>
-                  </div>
-                  {memoria.notaInterna ? (
-                    <div className="text-fg2 mt-[5px] text-[11px]">
-                      {memoria.notaInterna}
-                    </div>
                   ) : null}
-                </div>
-              </div>
-
-              {/* FERIADOS APLICADOS (snapshot congelado) */}
-              <div className="px-[18px] pb-[15px]">
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="text-fg2 text-[10.5px] font-semibold tracking-[0.04em] uppercase">
-                    Feriados e suspensões aplicados
-                  </span>
-                  <span className="text-fg3 text-[10.5px]">
-                    snapshot congelado
-                  </span>
-                </div>
-                {memoria.feriados.length === 0 ? (
-                  <p className="text-fg3 border-line2 rounded-[10px] border px-[13px] py-2.5 text-[11.5px]">
-                    Nenhum feriado ou suspensão aplicado neste cálculo.
-                  </p>
-                ) : (
-                  <div className="border-line2 overflow-hidden rounded-[10px] border">
-                    {memoria.feriados.map((f, idx) => (
-                      <div
-                        key={`${f.data}-${idx}`}
-                        className="border-line2 grid grid-cols-[88px_1fr_auto] items-center gap-3 border-b px-[13px] py-2.5 last:border-b-0"
-                      >
-                        <span className="text-fg2 font-mono text-[12px]">
-                          {f.data}
-                        </span>
-                        <span className="text-[12.5px]">{f.nome}</span>
-                        <span className="bg-hover text-fg3 rounded-full px-2 py-0.5 text-[10px] font-medium">
-                          {f.ambito}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
+                </li>
+              ))}
+            </ul>
           ) : (
-            <p className="text-fg3 px-[18px] py-6 text-[12.5px] leading-[1.6]">
-              Memória de cálculo indisponível para este prazo.
+            <p className="text-muted-foreground mt-1 text-xs">
+              Nenhum feriado ou suspensão aplicado.
             </p>
           )}
-        </>
-      ) : null}
-    </div>
+        </div>
+      </div>
+    </details>
   );
 }
 
-/** Marcador de um passo do stepper: concluído (círculo cheio + check), atual
- *  (anel vazado destacado) ou pendente (círculo tracejado). */
-function StepMarcador({ estado }: { estado: "done" | "current" | "todo" }) {
-  if (estado === "done") {
-    return (
-      <span
-        className="grid size-[15px] place-items-center rounded-full"
-        style={{ background: "var(--primary)" }}
-      >
-        <Check
-          className="size-[9px]"
-          strokeWidth={3}
-          style={{ color: "var(--primary-foreground)" }}
-        />
-      </span>
-    );
-  }
+function Providencias({ det }: { det: Detalhe }) {
+  const m = det.model!;
   return (
-    <span
-      className="size-[15px] rounded-full"
-      style={{
-        border:
-          estado === "current"
-            ? "2px solid var(--primary)"
-            : "1.5px dashed var(--line)",
-        background: "transparent",
-      }}
+    <ProvidenciasSection
+      processId={m.courtRecordId}
+      intimationId={m.id}
+      analyzing={det.analisando}
+      analysisError={det.analiseErro}
+      analyzed={m.analisada}
+      onAnalyze={det.onAnalisar}
     />
   );
 }
 
-/** Menu de atribuição do responsável (papel único 0057) — ligado a onAssign.
- *  Trigger discreto (avatar + anel sutil no hover), mesmo padrão visual de
- *  `AtribuirResponsavelProcesso` (src/features/processos/components/atribuir-responsavel.tsx). */
-function ResponsavelMenu({
-  value,
-  nome,
-  membros,
-  emVoo,
-  onAssign,
-}: {
-  value: string | null;
-  nome: string;
-  membros: { id: string; name: string; email: string }[];
-  emVoo: boolean;
-  onAssign: (assigneeUserId: string | null) => void;
-}) {
-  const avatarSize = 28;
-
+function AcoesIntimacao({ det }: { det: Detalhe }) {
+  const m = det.model!;
   return (
     <Menu.Root>
       <Menu.Trigger
-        disabled={emVoo}
-        aria-label={nome ? `Responsável: ${nome}` : "Atribuir responsável"}
-        title={nome || "Atribuir responsável"}
-        className="hover:ring-border flex cursor-pointer items-center gap-2.5 rounded-full outline-none hover:ring-2 disabled:pointer-events-none disabled:opacity-60"
+        render={<Button variant="ghost" size="icon-sm" />}
+        aria-label="Mais ações da intimação"
       >
-        {nome ? (
-          <Avatar nome={nome} size={avatarSize} />
-        ) : (
-          <span
-            aria-hidden
-            className="border-muted-foreground/40 hover:border-primary shrink-0 rounded-full border border-dashed"
-            style={{ width: avatarSize, height: avatarSize }}
-          />
-        )}
+        <MoreHorizontal />
       </Menu.Trigger>
-
       <Menu.Portal>
-        <Menu.Positioner
-          side="bottom"
-          align="start"
-          sideOffset={6}
-          className="z-50"
-        >
+        <Menu.Positioner side="bottom" align="end" sideOffset={6}>
           <Menu.Popup className={POPUP_CLASS}>
-            <Menu.RadioGroup
-              value={value ?? ""}
-              onValueChange={(v) =>
-                onAssign(typeof v === "string" && v ? v : null)
-              }
-            >
-              <Menu.RadioItem value="" className={cn(ITEM_CLASS, "gap-2")}>
-                <span className="border-muted-foreground/40 size-6 shrink-0 rounded-full border border-dashed" />
-                <span className="text-muted-foreground flex-1 truncate">
-                  Ninguém
-                </span>
-                <Menu.RadioItemIndicator className="ml-auto">
-                  <Check className="size-4" />
-                </Menu.RadioItemIndicator>
-              </Menu.RadioItem>
-              {membros.map((mem) => {
-                const label = nomeExibicao(mem.name, mem.email);
-                return (
-                  <Menu.RadioItem
-                    key={mem.id}
-                    value={mem.id}
-                    className={cn(ITEM_CLASS, "gap-2")}
-                  >
-                    <Avatar nome={label} size={22} />
-                    <span className="flex-1 truncate">{label}</span>
-                    <Menu.RadioItemIndicator className="ml-auto">
-                      <Check className="size-4" />
-                    </Menu.RadioItemIndicator>
-                  </Menu.RadioItem>
-                );
-              })}
-            </Menu.RadioGroup>
+            {m.podeReabrir ? (
+              <Menu.Item
+                className={ITEM_CLASS}
+                disabled={det.triagemEmVoo}
+                onClick={det.onReabrir}
+              >
+                Reabrir intimação
+              </Menu.Item>
+            ) : (
+              <>
+                <Menu.Item
+                  className={ITEM_CLASS}
+                  disabled={det.triagemEmVoo}
+                  onClick={det.onResolver}
+                >
+                  Marcar intimação como resolvida
+                </Menu.Item>
+                <Menu.Item
+                  className={ITEM_CLASS}
+                  disabled={det.triagemEmVoo}
+                  onClick={det.onIgnorar}
+                >
+                  Ignorar intimação
+                </Menu.Item>
+              </>
+            )}
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>

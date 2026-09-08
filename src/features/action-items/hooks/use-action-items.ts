@@ -100,6 +100,11 @@ export function useActionItemDetalhe(id: string) {
   return useQuery({
     queryKey: actionItemsKeys.detail(id),
     queryFn: () => getActionItem(fetcher, id),
+    refetchInterval: (query) =>
+      query.state.data?.draft_id &&
+      ["TODO", "WORKING"].includes(query.state.data.status)
+        ? 5000
+        : false,
     enabled: !!id,
   });
 }

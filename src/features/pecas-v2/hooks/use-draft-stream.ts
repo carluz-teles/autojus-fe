@@ -24,14 +24,13 @@
 import { useAuth } from "@clerk/nextjs";
 import { useEffect, useRef } from "react";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+import { GenerationStreamBuffer } from "../lib/generation-stream-buffer";
 
-// Marcador de reset publicado pelo BE (generate.go StreamResetMarker) como 1º
-// chunk de cada geração. Ao recebê-lo, zeramos o buffer acumulado.
-const STREAM_RESET_MARKER = "␞";
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 interface Options {
   enabled: boolean;
+  startedAt: string;
   /** Recebe o markdown FULL acumulado (não delta) — throttled por rAF, uma
    *  flush por frame. O consumer converte markdown → HTML (via marked) e
    *  aplica com setHtml(). */
@@ -99,28 +98,22 @@ export function useDraftStream(draftId: string, opts: Options): void {
       // (no pior caso é limitado a 1x/seg em aba em background pelo spec,
       // nunca suspenso por completo), garantindo que o streaming progrida
       // de verdade independente de a aba estar em foco.
-      // resetSeen: só renderizamos DEPOIS do marcador de reset desta geração. Os
-      // chunks que chegam antes são o replay stale da geração anterior (o cliente
-      // costuma conectar antes de o worker resetar o stream Redis) — ignorá-los
-      // elimina o flash da peça antiga. Auto-reconnect do EventSource preserva este
-      // flag (mesma closure), então um resume no meio da geração segue renderizando.
-      let resetSeen = false;
+      // The generation event identifies the persisted start timestamp. Replay
+      // from an older run is ignored, including its old reset marker.
+      const buffer = new GenerationStreamBuffer(opts.startedAt);
+      es.addEventListener("generation", (e: MessageEvent) =>
+        buffer.identify(e.data),
+      );
       let pending = false;
       es.addEventListener("chunk", (e: MessageEvent) => {
-        const data = e.data as string;
-        if (data.includes(STREAM_RESET_MARKER)) {
-          resetSeen = true;
-          accRef.current = data.split(STREAM_RESET_MARKER).pop() ?? "";
-          onProgressRef.current(accRef.current);
-          return;
-        }
-        if (!resetSeen) return; // descarta replay stale pré-reset
-        accRef.current += data;
+        const markdown = buffer.append(e.data as string);
+        if (markdown === null) return;
+        accRef.current = markdown;
         if (pending) return;
         pending = true;
         setTimeout(() => {
           pending = false;
-          onProgressRef.current(accRef.current);
+          if (!cancelled) onProgressRef.current(accRef.current);
         }, 16);
       });
 
@@ -140,5 +133,5 @@ export function useDraftStream(draftId: string, opts: Options): void {
       cancelled = true;
       es?.close();
     };
-  }, [draftId, opts.enabled, getToken]);
+  }, [draftId, opts.enabled, opts.startedAt, getToken]);
 }

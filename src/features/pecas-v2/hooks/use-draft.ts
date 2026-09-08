@@ -21,9 +21,10 @@ export function useDraft(id: string) {
     // Enquanto a geração está em curso (saga CREATED/EXTRACTING), o worker
     // já persistiu content_html no fim; polling curto garante que o FE veja
     // a transição pra EXTRACTING (ativando o SSE) e depois DRAFTED (parando).
+    refetchIntervalInBackground: true,
     refetchInterval: (query) => {
       const saga = (query.state.data as Draft | undefined)?.sagaState;
-      if (saga === "CREATED" || saga === "EXTRACTING") return 1000;
+      if (saga === "EXTRACTING") return 1000;
       return false;
     },
   });

@@ -16,6 +16,8 @@ export type PrazoCounting = "BUSINESS" | "CALENDAR";
 
 // Prazo base (o que a aba do processo entrega).
 export interface PrazoView {
+  intimation_user_status?: "PENDING" | "RESOLVED" | "IGNORED";
+  intimation_status?: "ACTIVE" | "CANCELLED";
   id: string;
   /** Tipo do ato que o prazo exige (snake_case: "manifestacao"|"apelacao"|…; "" quando não há). */
   tipo_ato: string;
@@ -58,6 +60,7 @@ export interface PrazoAgendaView extends PrazoView {
 
 // Detalhe (o "por quê" completo): como o prazo foi computado.
 export interface PrazoDetalheView extends PrazoAgendaView {
+  reopened_for_review?: boolean;
   start_date: string;
   days: number;
   source: string;
@@ -137,20 +140,7 @@ export interface PrazoApurarDivergenciaResult {
   decisao: PrazoApurarDivergenciaDecisao;
 }
 
-// ── F2: confirmar prazo ("Aprovar tudo") ──
-// POST /v1/prazos/confirm — o advogado ajusta o prazo derivado e monta as tarefas;
-// numa tacada o deadline vira OPEN + N tasks. Idempotente por intimation_id.
-
-/** Tarefa a criar junto do prazo. Só `title` é obrigatório. */
-export interface PrazoConfirmTask {
-  title: string;
-  kind?: string;
-  /** Vencimento no formato "YYYY-MM-DD" (date input); omitido = sem prazo. */
-  due_date?: string;
-  description?: string;
-  /** Id INTERNO do responsável (Me.user_id) — nunca org_id/tenant_id. */
-  assignee_user_id?: string;
-}
+// Confirmação humana do tipo e prazo; providências têm ciclo independente.
 
 /** Prazo ajustado pelo advogado antes de abrir. */
 export interface PrazoConfirmDeadline {
@@ -197,13 +187,17 @@ export interface PrazoPreviewResult {
 export interface PrazoConfirmInput {
   intimation_id: string;
   deadline: PrazoConfirmDeadline;
-  tasks: PrazoConfirmTask[];
 }
 
-/** Resposta 200: o prazo agora OPEN (confirmado) + as tarefas criadas. */
+/** Resposta 200: prazo confirmado. O detalhe completo é recarregado após salvar. */
 export interface PrazoConfirmResult {
-  deadline: PrazoDetalheView & { confirmed_by?: string };
-  tasks: Array<{ id: string; title: string; due_date: string | null }>;
+  deadline: {
+    id: string;
+    status: PrazoStatus;
+    tipo_ato: string;
+    end_date: string;
+    confirmed_by: string;
+  };
 }
 
 /**

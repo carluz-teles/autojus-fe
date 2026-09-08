@@ -9,6 +9,8 @@ export type ProcessoPhase =
   "CONHECIMENTO" | "INSTRUCAO" | "SENTENCA" | "RECURSO" | "EXECUCAO";
 
 export interface ProcessoView {
+  autor: string;
+  reu: string;
   id: string;
   case_id: string;
   cnj_number: string;
@@ -33,6 +35,17 @@ export interface ProcessoView {
   filed_at: string | null;
   secrecy: ProcessoSecrecy;
   lifecycle: string;
+  lifecycle_evidence?: {
+    source: string;
+    method: "STATE_MOVEMENT" | "MOVEMENT_ONLY" | "UNKNOWN";
+    reason: string;
+    movement_code?: number;
+    movement_text?: string;
+    movement_at?: string;
+    observed_at?: string;
+    evaluated_at?: string;
+    source_updated_at?: string;
+  } | null;
   completeness: number;
   /** Fase EFETIVA do processo (override manual vence a derivada); null até derivar/definir. */
   phase: ProcessoPhase | null;

@@ -36,7 +36,12 @@ let propostaSeq = 0;
  *  o trecho não foi encontrado (não corrompe). Vem da construction-page (editorRef). */
 export function useAssistente(
   id: string,
-  applyToEditor: (sectionRoman: string, newParagraphs: string[]) => boolean,
+  applyToEditor: (
+    sectionRoman: string,
+    newParagraphs: string[],
+    expectedParagraphs?: string[],
+  ) => boolean,
+  beforeRequest?: () => Promise<void>,
 ) {
   const iterate = useIterate(id);
   const quick = useQuickAdjust(id);
@@ -59,43 +64,48 @@ export function useAssistente(
     setPropostas((prev) => [...novas, ...prev]);
   };
 
-  const enviar = (
+  const enviar = async (
     instruction: string,
     scope: IterateScope = { kind: "whole" },
   ) => {
     const t = instruction.trim();
-    if (!t || pensando) return;
-    iterate.mutate(
-      { scope, instruction: t },
-      {
-        onSuccess: (r) => onResult(r.changes, t),
-        onError: () =>
-          toast.error("Não foi possível gerar a proposta. Tente de novo."),
-      },
-    );
+    if (!t || pensando) return false;
+    try {
+      await beforeRequest?.();
+      const r = await iterate.mutateAsync({ scope, instruction: t });
+      onResult(r.changes, t);
+      return true;
+    } catch {
+      toast.error("Não foi possível gerar a proposta. Seu pedido foi mantido.");
+      return false;
+    }
   };
-
-  const usarChip = (
+  const usarChip = async (
     kind: QuickAdjustKind,
     scope: IterateScope = { kind: "whole" },
   ) => {
     if (pensando) return;
-    const label = ASSISTENTE_CHIPS.find((c) => c.kind === kind)?.label ?? "";
-    quick.mutate(
-      { scope, kind },
-      {
-        onSuccess: (r) => onResult(r.changes, label),
-        onError: () =>
-          toast.error("Não foi possível gerar a proposta. Tente de novo."),
-      },
-    );
+    try {
+      await beforeRequest?.();
+      const r = await quick.mutateAsync({ scope, kind });
+      onResult(
+        r.changes,
+        ASSISTENTE_CHIPS.find((c) => c.kind === kind)?.label ?? "",
+      );
+    } catch {
+      toast.error("Salve o texto e tente novamente.");
+    }
   };
 
   const aceitar = (p: Proposta) => {
-    const aplicou = applyToEditor(p.sectionRoman, p.newParagraphs);
+    const aplicou = applyToEditor(
+      p.sectionRoman,
+      p.newParagraphs,
+      p.oldParagraphs,
+    );
     if (!aplicou) {
       toast.error(
-        "Não encontrei essa seção no texto atual — recarregue a peça.",
+        "Não foi possível aplicar esta proposta com segurança: o trecho mudou ou contém formatação complexa. Suas edições foram mantidas; revise o trecho no editor.",
       );
       return; // mantém o card
     }

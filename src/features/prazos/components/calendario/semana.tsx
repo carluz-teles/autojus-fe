@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
-
 import type { CalModel } from "./calendario-view";
+import { EventoCalendario } from "./evento";
 
 // Semana: 7 cards de dia (dom–sáb), cada um com seus prazos e providências.
 export function Semana({ cal }: { cal: CalModel }) {
@@ -38,20 +37,7 @@ export function Semana({ cal }: { cal: CalModel }) {
               </div>
             ) : (
               d.evs.map((e) => (
-                <Link
-                  key={e.id}
-                  href={e.href}
-                  className="bg-bg block w-full rounded-[7px] border px-2.5 py-[7px] text-left"
-                  style={{ borderLeft: `3px solid ${e.urgCor}` }}
-                >
-                  <span className="block truncate text-[12px] font-medium">
-                    {e.titulo}
-                  </span>
-                  <span className="text-fg3 mt-px block truncate text-[10.5px]">
-                    {e.tipo === "prazo" ? "fatal" : "providência"}
-                    {e.sub ? ` · ${e.sub}` : ""}
-                  </span>
-                </Link>
+                <EventoCalendario key={e.id} evento={e} densidade="semana" />
               ))
             )}
           </div>

@@ -8,8 +8,10 @@ import type { ActionItemStatus } from "../types";
 export const STATUS_LABEL: Record<ActionItemStatus, string> = {
   SUGGESTED: "Sugerida",
   TODO: "A Fazer",
-  WORKING: "Em elaboração",
+  WORKING: "Em andamento",
   DONE: "Concluída",
+  CANCELLED: "Cancelada",
+  DISMISSED: "Dispensada",
 };
 
 /** Classe do chip por status de trabalho — fundo/texto por semântica. */
@@ -18,4 +20,6 @@ export const STATUS_PILL: Record<ActionItemStatus, string> = {
   TODO: "bg-muted text-muted-foreground",
   WORKING: "bg-gold/15 text-gold",
   DONE: "bg-primary/10 text-primary",
+  CANCELLED: "bg-muted text-muted-foreground",
+  DISMISSED: "bg-muted text-muted-foreground",
 };

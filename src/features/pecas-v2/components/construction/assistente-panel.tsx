@@ -1,289 +1,200 @@
 "use client";
 
-// Painel Assistente (à direita da Construção, só quando a peça está pronta).
-// DOIS modos, alternados no topo:
-//   • Ajustar   → dirige o /iterate: pede um ajuste (texto/chip) com ESCOPO
-//                 (peça inteira ou uma seção) e recebe PROPOSTAS (diff), que
-//                 aplicam no editor vivo ao Aceitar.
-//   • Perguntar → dirige o /chat: conversa de Q&A sobre a peça e os autos, com
-//                 respostas ancoradas (citações dos documentos).
-
 import { Link2, MessageSquare, Send, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import type { Proposta } from "../../hooks/use-assistente";
+import { useChatThread, useSendChatMessage } from "../../hooks/use-chat";
+import type { ChatCitation, ChatMessage } from "../../types";
 
-import { type Proposta, useAssistente } from "../../hooks/use-assistente";
-import {
-  useChatThread,
-  useRunQuickAction,
-  useSendChatMessage,
-} from "../../hooks/use-chat";
-import type {
-  ChatCitation,
-  ChatMessage,
-  DraftSection,
-  IterateScope,
-  QuickActionKind,
-} from "../../types";
-
-type Mode = "ajustar" | "perguntar";
-
-const CHAT_ACTIONS: { label: string; kind: QuickActionKind }[] = [
-  { label: "Resumir os autos", kind: "summarize_case" },
-  { label: "Sugerir teses", kind: "suggest_theses" },
-  { label: "Conferir prazo", kind: "check_deadline" },
-  { label: "Precedentes", kind: "find_precedents" },
-];
+const EMPTY_MESSAGES: ChatMessage[] = [];
+const CHAT_ACTIONS = ["Resumir os autos", "Deixar a peça mais concisa"];
 
 export function AssistentePanel({
   draftId,
   applyToEditor,
-  sections,
+  beforeRequest,
   onSource,
 }: {
   draftId: string;
-  /** Aplica a proposta (troca o corpo da seção) no editor vivo; false se não achar. */
-  applyToEditor: (sectionRoman: string, newParagraphs: string[]) => boolean;
-  /** Seções da peça — alimentam o seletor de escopo do modo Ajustar. */
-  sections: DraftSection[];
-  /** Destaca o documento na "Fundada em" (mesmo mecanismo do "ver fonte" das
-   *  teses) — usado ao clicar numa citação de uma resposta do chat. */
-  onSource: (documentId: string) => void;
-}) {
-  const [mode, setMode] = useState<Mode>("ajustar");
-
-  return (
-    <aside className="border-line bg-panel hidden w-80 flex-none flex-col border-l lg:flex">
-      {/* header + toggle de modo */}
-      <div className="border-line flex flex-none flex-col gap-2.5 border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Sparkles className="text-primary size-[15px]" strokeWidth={1.8} />
-          <span className="text-[13px] font-semibold">Assistente</span>
-        </div>
-        <div className="border-line bg-background flex rounded-[8px] border p-0.5">
-          <ModeTab
-            active={mode === "ajustar"}
-            onClick={() => setMode("ajustar")}
-          >
-            Ajustar
-          </ModeTab>
-          <ModeTab
-            active={mode === "perguntar"}
-            onClick={() => setMode("perguntar")}
-          >
-            Perguntar
-          </ModeTab>
-        </div>
-      </div>
-
-      {mode === "ajustar" ? (
-        <AjustarMode
-          draftId={draftId}
-          applyToEditor={applyToEditor}
-          sections={sections}
-        />
-      ) : (
-        <PerguntarMode draftId={draftId} onSource={onSource} />
-      )}
-    </aside>
-  );
-}
-
-function ModeTab({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        "flex-1 rounded-[6px] px-2 py-1 text-[11.5px] font-medium transition-colors " +
-        (active
-          ? "bg-primary text-primary-foreground"
-          : "text-fg2 hover:text-foreground")
-      }
-    >
-      {children}
-    </button>
-  );
-}
-
-// ── Modo AJUSTAR (iterate) ───────────────────────────────────────────────────
-
-function AjustarMode({
-  draftId,
-  applyToEditor,
-  sections,
-}: {
-  draftId: string;
-  applyToEditor: (sectionRoman: string, newParagraphs: string[]) => boolean;
-  sections: DraftSection[];
-}) {
-  const { propostas, pensando, chips, enviar, usarChip, aceitar, rejeitar } =
-    useAssistente(draftId, applyToEditor);
-  const [msg, setMsg] = useState("");
-  // Escopo: "whole" ou o id de uma seção. Guardamos o id ("" = peça inteira).
-  const [scopeId, setScopeId] = useState("");
-  const scope: IterateScope = scopeId
-    ? { kind: "section", sectionId: scopeId }
-    : { kind: "whole" };
-
-  // Se a seção selecionada some do conjunto atual (ex.: a peça foi regerada e as
-  // seções mudaram), volta pra "peça inteira" — senão o Select mostraria "peça
-  // inteira" mas ainda mandaria o sectionId antigo (escopo inválido).
-  const idsKey = sections.map((s) => s.id).join(",");
-  useEffect(() => {
-    setScopeId((cur) =>
-      cur && !sections.some((s) => s.id === cur) ? "" : cur,
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idsKey]);
-
-  const submit = () => {
-    if (!msg.trim() || pensando) return;
-    enviar(msg, scope);
-    setMsg("");
-  };
-
-  return (
-    <>
-      <div className="min-h-0 flex-1 overflow-y-auto p-3.5">
-        {pensando && <PensandoCard />}
-        {propostas.map((p) => (
-          <PropostaCard
-            key={p.key}
-            proposta={p}
-            onAceitar={() => aceitar(p)}
-            onRejeitar={() => rejeitar(p)}
-          />
-        ))}
-        {!pensando && propostas.length === 0 && (
-          <Vazio texto="Nenhuma proposta pendente. Peça um ajuste abaixo e ele aparece aqui." />
-        )}
-      </div>
-
-      <div className="border-line flex-none border-t px-3.5 py-3">
-        <div className="text-fg3 mb-2 flex items-center gap-1.5 text-[10.5px]">
-          <span className="flex-none">Ajustando:</span>
-          <Select
-            value={scopeId || "whole"}
-            onValueChange={(v) => setScopeId(!v || v === "whole" ? "" : v)}
-          >
-            <SelectTrigger className="h-auto min-h-0 w-auto rounded-full border px-2 py-[3px] text-[10.5px] font-medium">
-              <SelectValue>
-                {scopeId
-                  ? (() => {
-                      const s = sections.find((x) => x.id === scopeId);
-                      return s
-                        ? `${s.roman} — ${s.shortTitle || s.title}`
-                        : "peça inteira";
-                    })()
-                  : "peça inteira"}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="whole">peça inteira</SelectItem>
-              {sections.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.roman} — {s.shortTitle || s.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Composer
-          msg={msg}
-          setMsg={setMsg}
-          onSubmit={submit}
-          disabled={pensando}
-          placeholder="Peça um ajuste…"
-        />
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {chips.map((c) => (
-            <ChipButton
-              key={c.kind}
-              disabled={pensando}
-              onClick={() => usarChip(c.kind, scope)}
-            >
-              {c.label}
-            </ChipButton>
-          ))}
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ── Modo PERGUNTAR (chat Q&A) ────────────────────────────────────────────────
-
-function PerguntarMode({
-  draftId,
-  onSource,
-}: {
-  draftId: string;
-  onSource: (documentId: string) => void;
+  applyToEditor: (
+    sectionRoman: string,
+    newParagraphs: string[],
+    expectedParagraphs?: string[],
+  ) => boolean;
+  beforeRequest?: () => Promise<void>;
+  onSource: (documentId: string, page?: number) => void;
 }) {
   const thread = useChatThread(draftId);
   const send = useSendChatMessage(draftId);
-  const quick = useRunQuickAction(draftId);
   const [msg, setMsg] = useState("");
-  const pensando = send.isPending || quick.isPending;
-  const mensagens = thread.data ?? [];
+  const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
+  const scroll = useRef<HTMLDivElement>(null);
+  const follow = useRef(true);
+  // Store only UI decisions, never the draft or conversation text.
+  const storageKey = `chat-proposal-decisions:${draftId}`;
+  const [decisions, setDecisions] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(storageKey) || "{}");
+    } catch {
+      return {};
+    }
+  });
+  const resolve = (key: string, value: string) => {
+    const next = { ...decisions, [key]: value };
+    setDecisions(next);
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(next));
+    } catch {}
+  };
+  const messages = thread.data ?? EMPTY_MESSAGES;
+  useEffect(() => {
+    if (follow.current && scroll.current)
+      scroll.current.scrollTop = scroll.current.scrollHeight;
+  }, [messages, busy]);
 
-  const submit = () => {
-    if (!msg.trim() || pensando) return;
-    send.mutate(msg.trim());
-    setMsg("");
+  const submit = async (prompt = msg) => {
+    if (!prompt.trim() || lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    follow.current = true;
+    const sent = msg;
+    try {
+      await beforeRequest?.();
+      await send.mutateAsync(prompt.trim());
+      if (prompt === sent)
+        setMsg((current) => (current === sent ? "" : current));
+    } catch {
+      toast.error(
+        "Não foi possível enviar ao assistente. Seu pedido foi mantido.",
+      );
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
+  };
+
+  const accept = async (proposal: Proposta) => {
+    if (lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    try {
+      await beforeRequest?.();
+      if (
+        !applyToEditor(
+          proposal.sectionRoman,
+          proposal.newParagraphs,
+          proposal.oldParagraphs,
+        )
+      ) {
+        toast.error(
+          "O trecho mudou ou contém formatação complexa. Peça uma nova proposta; suas edições foram preservadas.",
+        );
+        return;
+      }
+      resolve(proposal.key, "Aplicada no editor");
+      await beforeRequest?.();
+      toast.success("Ajuste aplicado e salvo.");
+    } catch {
+      toast.error(
+        "Não foi possível salvar o texto. Confira o estado de salvamento da peça.",
+      );
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
   };
 
   return (
-    <>
-      <div className="min-h-0 flex-1 overflow-y-auto p-3.5">
-        {mensagens.length === 0 && !pensando && (
-          <Vazio texto="Pergunte sobre a peça, o teor da intimação ou os autos. As respostas se apoiam nos documentos do processo." />
+    <aside className="border-line bg-panel flex h-full min-h-0 w-full flex-col">
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b px-4">
+        <Sparkles className="text-primary size-4" aria-hidden />
+        <h2 className="text-sm font-medium">Assistente</h2>
+      </div>
+      <div
+        ref={scroll}
+        className="min-h-0 flex-1 overflow-y-auto p-3.5"
+        onScroll={(event) => {
+          const el = event.currentTarget;
+          follow.current =
+            el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }}
+      >
+        {thread.isPending && (
+          <p role="status" className="text-muted-foreground text-xs">
+            Carregando conversa…
+          </p>
         )}
-        <div className="flex flex-col gap-2.5">
-          {mensagens.map((m) => (
-            <ChatBubble key={m.id} msg={m} onSource={onSource} />
+        {thread.isError && (
+          <p role="alert" className="text-xs">
+            Não foi possível carregar a conversa.{" "}
+            <button
+              type="button"
+              onClick={() => void thread.refetch()}
+              className="underline"
+            >
+              Tentar novamente
+            </button>
+          </p>
+        )}
+        {!thread.isPending &&
+          !thread.isError &&
+          messages.length === 0 &&
+          !busy && (
+            <Vazio texto="Tire dúvidas, peça uma análise ou sugira ajustes à peça. As propostas aparecem aqui e só alteram o texto quando você aceitar." />
+          )}
+        <div
+          className="flex flex-col gap-2.5"
+          aria-label="Conversa com o assistente"
+        >
+          {messages.map((message) => (
+            <div key={message.id} className="space-y-2.5">
+              <ChatBubble msg={message} onSource={onSource} />
+              {message.role === "assistant" &&
+                message.changes?.map((change, index) => {
+                  const key = `${message.id}:${index}`;
+                  const proposal: Proposta = { ...change, key, pedido: "" };
+                  return (
+                    <PropostaCard
+                      key={key}
+                      proposta={proposal}
+                      disabled={busy}
+                      resolution={decisions[key]}
+                      onAceitar={() => void accept(proposal)}
+                      onRejeitar={() => resolve(key, "Proposta rejeitada")}
+                    />
+                  );
+                })}
+            </div>
           ))}
-          {pensando && <PensandoBubble />}
+          {busy && <PensandoBubble />}
         </div>
       </div>
-
       <div className="border-line flex-none border-t px-3.5 py-3">
         <Composer
           msg={msg}
           setMsg={setMsg}
-          onSubmit={submit}
-          disabled={pensando}
-          placeholder="Faça uma pergunta…"
+          onSubmit={() => void submit()}
+          disabled={busy || thread.isPending || thread.isError}
+          placeholder="Pergunte ou peça uma alteração…"
         />
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {CHAT_ACTIONS.map((a) => (
-            <ChipButton
-              key={a.kind}
-              disabled={pensando}
-              onClick={() => quick.mutate(a.kind)}
-            >
-              {a.label}
-            </ChipButton>
-          ))}
-        </div>
+        {messages.length === 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {CHAT_ACTIONS.map((prompt) => (
+              <ChipButton
+                key={prompt}
+                disabled={busy || thread.isPending || thread.isError}
+                onClick={() => void submit(prompt)}
+              >
+                {prompt}
+              </ChipButton>
+            ))}
+          </div>
+        )}
       </div>
-    </>
+    </aside>
   );
 }
 
@@ -292,7 +203,7 @@ function ChatBubble({
   onSource,
 }: {
   msg: ChatMessage;
-  onSource: (documentId: string) => void;
+  onSource: (documentId: string, page?: number) => void;
 }) {
   const isUser = msg.role === "user";
   return (
@@ -312,7 +223,7 @@ function ChatBubble({
               <button
                 key={i}
                 type="button"
-                onClick={() => c.documentId && onSource(c.documentId)}
+                onClick={() => c.documentId && onSource(c.documentId, c.page)}
                 disabled={!c.documentId}
                 title={c.documentId ? "Ver fonte nos autos" : undefined}
                 className="text-fg3 hover:text-primary flex items-start gap-1.5 text-left text-[10.5px] leading-[1.4] disabled:cursor-default disabled:hover:text-inherit"
@@ -347,14 +258,9 @@ function groupCitations(
     // teor citado a partir de autos distintos costuma vir com excerpts de tamanho/
     // espaçamento levemente diferentes; o prefixo agrupa esses casos sem colar
     // trechos realmente distintos.
-    const norm = (c.quote || "")
-      .toLowerCase()
-      .replace(/\s+/g, "") // remove TODO espaço (o mesmo teor às vezes vem com
-      // espaçamento diferente entre autos, ex.: "tornem conclusos"/"tornemconclusos")
-      .slice(0, 80);
-    const key = `${norm}|${c.page}`;
+    const key = `${c.documentId}|${c.page}|${c.quote}`;
     const g = byKey.get(key);
-    if (g) g.count += 1;
+    if (g) continue;
     else byKey.set(key, { ...c, count: 1 });
   }
   return [...byKey.values()];
@@ -365,7 +271,7 @@ function PensandoBubble() {
     <div className="flex justify-start">
       <div className="border-line bg-background flex items-center gap-2 rounded-[10px] border px-3 py-2 text-[11.5px]">
         <span className="border-primary/40 border-t-primary size-3.5 animate-spin rounded-full border-2" />
-        <span className="text-fg3">Consultando os autos…</span>
+        <span className="text-fg3">Analisando a peça e as fontes…</span>
       </div>
     </div>
   );
@@ -389,10 +295,11 @@ function Composer({
   return (
     <div className="flex items-end gap-1.5">
       <textarea
+        aria-label="Mensagem ao assistente"
         value={msg}
         onChange={(e) => setMsg(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
+          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             onSubmit();
           }
@@ -440,10 +347,14 @@ function PropostaCard({
   proposta,
   onAceitar,
   onRejeitar,
+  disabled,
+  resolution,
 }: {
   proposta: Proposta;
   onAceitar: () => void;
   onRejeitar: () => void;
+  disabled: boolean;
+  resolution?: string;
 }) {
   const rotulo =
     proposta.pedido ||
@@ -484,35 +395,30 @@ function PropostaCard({
           ))}
         </div>
       </div>
-      <div className="flex gap-1.5 px-3 pb-3">
-        <button
-          type="button"
-          onClick={onAceitar}
-          className="bg-primary text-primary-foreground inline-flex flex-1 items-center justify-center gap-1.5 rounded-[7px] px-3 py-[7px] text-[12px] font-medium"
-        >
-          Aceitar
-        </button>
-        <button
-          type="button"
-          onClick={onRejeitar}
-          className="border-line bg-panel text-fg2 hover:bg-hover rounded-[7px] border px-3 py-[7px] text-[12px]"
-        >
-          Rejeitar
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PensandoCard() {
-  return (
-    <div className="border-line mb-2.5 rounded-[10px] border p-3">
-      <div className="text-primary mb-2.5 flex items-center gap-2 text-[11.5px]">
-        <span className="border-primary/40 border-t-primary size-3.5 animate-spin rounded-full border-2" />
-        Analisando a peça…
-      </div>
-      <div className="bg-hover mb-2 h-2.5 w-[90%] animate-pulse rounded" />
-      <div className="bg-hover h-2.5 w-[70%] animate-pulse rounded" />
+      {resolution ? (
+        <p className="text-muted-foreground px-3 pb-3 text-xs" role="status">
+          {resolution}
+        </p>
+      ) : (
+        <div className="flex gap-1.5 px-3 pb-3">
+          <button
+            type="button"
+            onClick={onAceitar}
+            disabled={disabled}
+            className="bg-primary text-primary-foreground inline-flex flex-1 items-center justify-center gap-1.5 rounded-[7px] px-3 py-[7px] text-[12px] font-medium"
+          >
+            Aceitar
+          </button>
+          <button
+            type="button"
+            onClick={onRejeitar}
+            disabled={disabled}
+            className="border-line bg-panel text-fg2 hover:bg-hover rounded-[7px] border px-3 py-[7px] text-[12px]"
+          >
+            Rejeitar
+          </button>
+        </div>
+      )}
     </div>
   );
 }

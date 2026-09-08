@@ -54,6 +54,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { tabTriggerClassName } from "@/components/ui/tab-styles";
 import { cn } from "@/lib/utils";
 
 // Protótipo do peticionamento com IA — tela "Construção" (Construção + Revisão na
@@ -667,12 +668,8 @@ function EditorTabBtn({
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        "-mb-px flex items-center gap-1.5 border-b-2 px-2 py-3 text-sm font-medium transition-colors",
-        active
-          ? "border-primary text-foreground"
-          : "text-muted-foreground hover:text-foreground border-transparent",
-      )}
+      aria-pressed={active}
+      className={tabTriggerClassName(active)}
     >
       {children}
     </button>

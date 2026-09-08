@@ -11,19 +11,18 @@
 // _private: useDraft (saga polling), useThesesController (contrato Teses) e
 // useGenerateDraft (POST /generate).
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import type { SagaState, Thesis } from "../types";
+import { detalheNaFila } from "@/features/intimacoes/lib/fila-navigation";
+import { htmlToText } from "@/lib/html/html-to-text";
+
+import type { SagaState } from "../types";
 import { useDraft } from "./use-draft";
-import {
-  isSelectedForGeneration,
-  useGenerateDraft,
-  useThesesController,
-} from "./use-theses";
+import { useGenerateDraft, useThesesController } from "./use-theses";
 
 /** Estágio do CENTRO da tela — a barra e o rail não mudam entre estágios. */
-export type CenterStage = "pregen" | "gerando" | "pronta";
+export type CenterStage = "pregen" | "gerando" | "pronta" | "falha";
 
 /** Deriva o estágio do centro a partir do saga_state + um flag local de
  *  "acabei de clicar Gerar". O flag existe porque, entre o POST /generate e o
@@ -36,7 +35,7 @@ export function deriveStage(
 ): CenterStage {
   if (saga === "DRAFTED" || saga === "REVIEWED") return "pronta";
   if (saga === "CREATED" || saga === "EXTRACTING" || saga === "FAILED") {
-    if (saga === "FAILED") return "pronta";
+    if (saga === "FAILED") return "falha";
     // REGERAÇÃO de uma peça que JÁ tem conteúdo (mudou o conjunto de teses):
     // permanece na tela PRONTA e streama o novo texto DENTRO da folha — nada do
     // shell (rails, toolbar, assistente) some. O estágio "gerando" (centro cheio)
@@ -52,8 +51,11 @@ export function deriveStage(
 
 export function useConstruction(id: string) {
   const router = useRouter();
+  const params = useSearchParams();
   const draftQuery = useDraft(id);
-  const theses = useThesesController(id);
+  const hasOrigin = !!draftQuery.data?.intimation.id;
+  const hasTeor = !!htmlToText(draftQuery.data?.intimation.teor || "").trim();
+  const theses = useThesesController(id, hasOrigin && hasTeor);
   const generate = useGenerateDraft(id);
 
   // Auto (documento dos autos) aberto no drawer: o viewer embute o PDF original
@@ -63,6 +65,7 @@ export function useConstruction(id: string) {
     id: string;
     titulo: string;
     meta: string;
+    initialPage?: number;
   } | null>(null);
 
   // Provenance: attachment (Fundada em) destacado por "ver fonte" numa tese.
@@ -87,38 +90,65 @@ export function useConstruction(id: string) {
 
   // Abre o PDF original de um auto num drawer com viewer embutido (fiel ao
   // documento — sem texto reconstruído). O viewer busca os bytes sob demanda.
-  const verAuto = (doc: { id: string; name: string; meta: string }) => {
-    setAutoDrawer({ id: doc.id, titulo: doc.name, meta: doc.meta });
+  const verAuto = (doc: {
+    id: string;
+    name: string;
+    meta: string;
+    initialPage?: number;
+  }) => {
+    setAutoDrawer({
+      id: doc.id,
+      titulo: doc.name,
+      meta: doc.meta,
+      initialPage: doc.initialPage,
+    });
   };
 
   const fecharAuto = () => setAutoDrawer(null);
 
+  const regenerateWithTheses = async (
+    thesisIds: string[],
+    revision: string,
+  ) => {
+    if (!hasOrigin || !hasTeor || generate.isPending || saga === "EXTRACTING")
+      throw new Error("Geração indisponível");
+    setFiredGenerate(true);
+    try {
+      await generate.mutateAsync({ thesisIds, revision });
+    } catch (error) {
+      setFiredGenerate(false);
+      throw error;
+    }
+  };
+
   const gerarMinuta = () => {
-    if (generate.isPending) return;
+    if (
+      !hasOrigin ||
+      !hasTeor ||
+      generate.isPending ||
+      theses.isLoading ||
+      theses.isRegenerating ||
+      theses.isTogglingId ||
+      theses.isError
+    )
+      return;
     setFiredGenerate(true);
     generate.mutate(theses.selectedIds, {
       onError: () => setFiredGenerate(false),
     });
   };
 
-  // Commit de uma mudança de tese pelo popover de confirmação do rail. Alterna o
-  // estado COMMITTED direto (included↔off) — sem passo intermediário de moldura —
-  // e REGENERA a peça pelo profile (recortar o trecho na unha quebraria coesão E a
-  // estrutura do template; a geração lê o estado persistido e reescreve coesa).
-  const commitThesisToggle = (thesis: Thesis) => {
-    if (generate.isPending) return;
-    const isRemoval = isSelectedForGeneration(thesis.state);
-    theses.setState(thesis.id, isRemoval ? "off" : "included", {
-      onSuccess: () => {
-        setFiredGenerate(true);
-        generate.mutate(theses.selectedIds, {
-          onError: () => setFiredGenerate(false),
-        });
-      },
-    });
-  };
-
-  const voltar = () => router.push("/pecas");
+  const voltar = () =>
+    router.push(
+      params.get("retorno")?.startsWith("/providencias/")
+        ? params.get("retorno")!
+        : draftQuery.data?.intimation.id
+          ? detalheNaFila(
+              draftQuery.data.intimation.id,
+              params.get("retorno") ?? "/intimacoes",
+            )
+          : "/fila",
+    );
 
   const hasContent =
     !!draftQuery.data?.contentHtml && draftQuery.data.contentHtml.trim() !== "";
@@ -142,9 +172,11 @@ export function useConstruction(id: string) {
     autoDrawer,
     fecharAuto,
     gerarMinuta,
-    commitThesisToggle,
+    regenerateWithTheses,
     contentEdited: !!draftQuery.data?.contentEdited,
     isGenerating: generate.isPending,
+    hasOrigin,
+    hasTeor,
     voltar,
   };
 }

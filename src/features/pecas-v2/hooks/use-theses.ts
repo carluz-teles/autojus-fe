@@ -9,20 +9,20 @@
 // A geração usa as teses em `included` ∪ `pending_add`.
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
 
 import { useApi } from "@/lib/api/use-api";
 
+import { isSelectedForGeneration } from "../lib/thesis-selection";
+export { isSelectedForGeneration } from "../lib/thesis-selection";
 import * as svc from "../services/pecas-v2.service";
-import type { Thesis, ThesisState } from "../types";
+import type { Draft, Thesis, ThesisState } from "../types";
 import { draftKeys } from "./use-draft";
 
-const thesesKey = (id: string) => [...draftKeys.all, "theses", id] as const;
+const sourcesKey = (id: string) =>
+  [...draftKeys.all, "thesis-sources", id] as const;
 
-/** Estados que contam como "selecionada para a geração". */
-export function isSelectedForGeneration(state: ThesisState): boolean {
-  return state === "included" || state === "pending_add";
-}
+export const thesesKey = (id: string) =>
+  [...draftKeys.all, "theses", id] as const;
 
 /** Próximo estado no clique do rail (só as transições de propor). Estados
  *  terminais do editor (que o rail não alcança) caem no toggle equivalente. */
@@ -83,8 +83,8 @@ function useTheses(id: string) {
     queryKey: thesesKey(id),
     queryFn: () => svc.getTheses(fetcher, id),
     enabled: !!id,
-    // Teses só mudam por PATCH (setQueryData cirúrgico) ou "Regenerar" explícito —
-    // nunca por refetch. Evita refetch/regeneração acidental ao revisitar a tela.
+    // Selection updates and source refreshes update this cache explicitly.
+    // Reading the list never starts another generation.
     // (Precedente do slice: useDraft escopa o comportamento de refetch por-query.)
     staleTime: Infinity,
     refetchOnWindowFocus: false,
@@ -96,7 +96,10 @@ function useGenerateTheses(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => svc.generateTheses(fetcher, id),
-    onSuccess: (theses) => qc.setQueryData<Thesis[]>(thesesKey(id), theses),
+    onSuccess: (theses) => {
+      qc.setQueryData<Thesis[]>(thesesKey(id), theses);
+      void qc.invalidateQueries({ queryKey: sourcesKey(id) });
+    },
   });
 }
 
@@ -121,11 +124,28 @@ function useGenerateDraft(id: string) {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (thesisIds: string[]) =>
-      svc.generateDraft(fetcher, id, thesisIds),
-    onSuccess: () => {
-      // O saga entra em CREATED/EXTRACTING; o useDraft assume o polling.
-      qc.invalidateQueries({ queryKey: draftKeys.detail(id) });
+    mutationFn: (
+      input: string[] | { thesisIds: string[]; revision: string },
+    ) =>
+      Array.isArray(input)
+        ? svc.generateDraft(fetcher, id, input)
+        : svc.generateDraft(fetcher, id, input.thesisIds, undefined, {
+            revision: input.revision,
+          }),
+    onSuccess: (result, input) => {
+      const selected = new Set(Array.isArray(input) ? input : input.thesisIds);
+      qc.setQueryData<Thesis[]>(thesesKey(id), (list) =>
+        list?.map((thesis) => ({
+          ...thesis,
+          state: selected.has(thesis.id) ? "included" : "off",
+        })),
+      );
+      // Start polling/streaming immediately, including before the first refetch.
+      qc.setQueryData(draftKeys.detail(id), (d: Draft | undefined) =>
+        d ? { ...d, sagaState: "EXTRACTING", updatedAt: result.updated_at } : d,
+      );
+      void qc.invalidateQueries({ queryKey: draftKeys.detail(id) });
+      void qc.invalidateQueries({ queryKey: thesesKey(id) });
     },
   });
 }
@@ -166,34 +186,41 @@ export interface ThesesController {
 
 /** Hook público — compõe os sub-hooks _private de teses. O componente chama só
  *  isto. `useGenerateDraft` é exposto à parte (a página o usa no "Gerar minuta"). */
-export function useThesesController(id: string): ThesesController {
+export function useThesesController(
+  id: string,
+  autoSuggest = false,
+): ThesesController {
+  const api = useApi();
+  const qc = useQueryClient();
   const list = useTheses(id);
   const regen = useGenerateTheses(id);
   const patch = useUpdateThesisState(id);
-  const autoGenRef = useRef(false);
-
-  // Gera as teses no LOAD quando ainda não há nenhuma (sem botão manual — a geração
-  // acontece sozinha na primeira vez; depois persistem e o GET as devolve). Como o
-  // GET agora devolve as teses persistidas, uma revisita NÃO cai neste ramo
-  // (data.length > 0) → a geração roda no MÁXIMO 1x por escopo (guard por autoGenRef
-  // de mount + o próprio load persistido). O effect depende só do estado da LISTA
-  // (data/isLoading/isError), nunca do objeto de mutation — que muda de identidade a
-  // cada render e re-dispararia o effect à toa. regen.isPending é lido sem entrar nas
-  // deps (o ref já sela o disparo único).
-  useEffect(() => {
-    if (
-      !list.isLoading &&
-      !list.isError &&
-      (list.data?.length ?? 0) === 0 &&
-      !regen.isPending &&
-      !autoGenRef.current
-    ) {
-      autoGenRef.current = true;
-      regen.mutate();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list.isLoading, list.isError, list.data]);
-
+  const sources = useQuery({
+    queryKey: sourcesKey(id),
+    queryFn: () => svc.getThesisSources(api, id),
+    enabled: !!id && autoSuggest,
+    refetchInterval: 15000,
+    staleTime: 0,
+    retry: false,
+  });
+  const needsSuggestions =
+    autoSuggest &&
+    list.isSuccess &&
+    !!sources.data?.needs_refresh &&
+    !!sources.data.can_refresh;
+  const automatic = useQuery({
+    queryKey: [...thesesKey(id), "automatic", sources.data?.revision],
+    enabled: needsSuggestions,
+    queryFn: async () => {
+      const result = await svc.generateTheses(api, id, true);
+      qc.setQueryData(thesesKey(id), result);
+      void qc.invalidateQueries({ queryKey: sourcesKey(id) });
+      return result;
+    },
+    staleTime: Infinity,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
   const theses = list.data ?? [];
   const selected = theses.filter((t) => isSelectedForGeneration(t.state));
   const direito = theses
@@ -203,7 +230,11 @@ export function useThesesController(id: string): ThesesController {
   return {
     theses,
     isLoading: list.isLoading,
-    isError: list.isError,
+    isError:
+      list.isError ||
+      sources.isError ||
+      (needsSuggestions && automatic.isError) ||
+      regen.isError,
     selectedCount: selected.length,
     selectedIds: selected.map((t) => t.id),
     direito,
@@ -216,8 +247,17 @@ export function useThesesController(id: string): ThesesController {
       if (target === null) return;
       patch.mutate({ thesisId: thesis.id, state: target }, opts);
     },
-    regenerate: () => regen.mutate(),
-    isRegenerating: regen.isPending,
+    regenerate: () => {
+      if (!regen.isPending && !automatic.isFetching) {
+        regen.mutate();
+        void sources.refetch();
+      }
+    },
+    isRegenerating:
+      sources.isLoading ||
+      regen.isPending ||
+      automatic.isFetching ||
+      (needsSuggestions && automatic.isPending),
     isTogglingId: patch.isPending ? (patch.variables?.thesisId ?? null) : null,
   };
 }

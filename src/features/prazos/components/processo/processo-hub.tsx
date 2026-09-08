@@ -1,626 +1,727 @@
 "use client";
-
-import { Menu } from "@base-ui/react/menu";
-import { ChevronLeft, Circle, FileText } from "lucide-react";
+import {
+  ArrowRight,
+  Copy,
+  FileText,
+  FolderOpen,
+  Loader2,
+  Pencil,
+  Upload,
+} from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { type ReactNode, useRef } from "react";
 
-import { useProcessoHub } from "../../hooks/use-processo-hub";
+import { PageFrame, ShellBackLink } from "@/components/shell/page-frame";
+import { TeorContent } from "@/components/teor-content";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ProcessProvidencias } from "@/features/action-items/components/providencias-section";
+import { SyncAutosButton } from "@/features/configuracoes/components/sync-autos-button";
+import { PdfDrawer } from "@/features/documentos/components/pdf-drawer";
+import { CourtAccessNotice } from "@/features/onboarding/components/court-access-notice";
+import { Responsavel } from "@/features/organization/components/responsavel";
+import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
+import { ProcessoSituacao } from "@/features/processos/components/situacao-processo";
+import { FASE_STEPS } from "@/features/processos/lib/apresentacao";
+import type { ProcessoPhase } from "@/features/processos/types";
+import { formatDate } from "@/lib/format";
 
-// Barrinhas de sinal de urgência (0 tranquilo → 3 vencido) ao lado dos cards de
-// intimação/prazo, como no design. Três colunas de altura crescente; as acesas usam
-// a cor de urgência, as apagadas ficam esmaecidas.
-function SinalUrgencia({ nivel, cor }: { nivel: number; cor: string }) {
-  const alturas = [5, 8, 11];
+import {
+  type RegistroProcesso,
+  useProcessoHub,
+} from "../../hooks/use-processo-hub";
+
+interface QueryState {
+  isPending: boolean;
+  isError: boolean;
+  refetch: () => unknown;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  fetchNextPage?: () => unknown;
+}
+
+function Colecao({
+  query,
+  count,
+  empty,
+  children,
+}: {
+  query: QueryState;
+  count: number;
+  empty: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <span className="flex h-3 items-end gap-[2px]" aria-hidden>
-      {alturas.map((h, i) => (
-        <span
-          key={i}
-          className="w-[3px] rounded-[1px]"
-          style={{
-            height: h,
-            background: cor,
-            opacity: i < nivel ? 1 : 0.22,
-          }}
-        />
-      ))}
-    </span>
+    <>
+      {query.isPending && (
+        <p
+          role="status"
+          className="text-muted-foreground flex items-center gap-2 py-10 text-sm"
+        >
+          <Loader2 className="size-4 animate-spin" /> Carregando registros…
+        </p>
+      )}
+      {query.isError && (
+        <div
+          role="alert"
+          className="bg-destructive/5 my-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4 text-sm"
+        >
+          <p>Não foi possível carregar os registros.</p>
+          <Button variant="outline" onClick={() => void query.refetch()}>
+            Tentar novamente
+          </Button>
+        </div>
+      )}
+      {!query.isPending &&
+        !query.isError &&
+        count === 0 &&
+        (typeof empty === "string" ? (
+          <p className="text-muted-foreground py-10 text-sm leading-relaxed">
+            {empty}
+          </p>
+        ) : (
+          empty
+        ))}
+      {children}
+      {!query.isPending && (count > 0 || query.hasNextPage) && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+          <p className="text-muted-foreground text-xs">
+            {count} {count === 1 ? "registro exibido" : "registros exibidos"}
+            {query.hasNextPage ? " · Há mais registros para consultar" : ""}
+          </p>
+          {query.hasNextPage && (
+            <Button
+              variant="outline"
+              disabled={query.isFetchingNextPage}
+              onClick={() => void query.fetchNextPage?.()}
+            >
+              {query.isFetchingNextPage ? "Carregando…" : "Carregar mais"}
+            </Button>
+          )}
+        </div>
+      )}
+    </>
   );
 }
 
-// PROCESSO · HUB — cockpit do caso ligado ao BACKEND REAL. Faixa de identidade
-// (cliente/CNJ/tags + fatos-chave + responsável) e 2 colunas: à esquerda a ação
-// (intimações e prazos); à direita a referência (AUTOS, PEÇAS, PARTES, ANDAMENTOS).
-// Componente = JSX + binding (regra do CLAUDE.md): toda derivação mora no hook.
-export function ProcessoHub({ numero }: { numero: string }) {
-  const hub = useProcessoHub(numero);
-  const {
-    isLoading,
-    isError,
-    naoEncontrado,
-    identity,
-    stepper,
-    salvarValor,
-    salvandoManual,
-    responsavel,
-    members,
-    assign,
-    isAssigning,
-    partes,
-    partesPending,
-    autos,
-    pecas,
-    andamentos,
-    andamentosTotal,
-    andamentosPending,
-    andamentosHasMore,
-    andamentosLoadingMore,
-    andamentosLoadMore,
-    intimacoes,
-    prazos,
-    referenciasPending,
-    voltarLabel,
-    voltarHref,
-  } = hub;
-
-  const [valorEditando, setValorEditando] = useState(false);
-  const [valorInput, setValorInput] = useState("");
-  // Andamentos: mostra 4 por padrão; "Ver mais" expande (e aí paginação normal segue).
-  const [andamentosExpandido, setAndamentosExpandido] = useState(false);
-
-  // Rótulo da fase atual = o passo "current" do stepper (ou "—" quando não há fase).
-  const faseLabel = stepper.find((s) => s.estado === "current")?.label ?? "—";
-
-  function abrirEdicaoValor() {
-    setValorInput(identity?.valorRaw != null ? String(identity.valorRaw) : "");
-    setValorEditando(true);
-  }
-  function confirmarValor() {
-    const v = Number(valorInput.replace(/\./g, "").replace(",", "."));
-    if (!Number.isNaN(v) && v >= 0) salvarValor(v);
-    setValorEditando(false);
-  }
-
+function Registros({ items }: { items: RegistroProcesso[] }) {
   return (
-    <div className="bg-bg flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1140px] px-8 pt-4 pb-12">
-          <Link
-            href={voltarHref}
-            className="text-fg2 hover:bg-hover mb-[14px] -ml-[9px] inline-flex items-center gap-1.5 rounded-md px-[9px] py-[5px] text-xs"
-          >
-            <ChevronLeft className="size-[13px]" strokeWidth={2} />
-            {voltarLabel}
-          </Link>
-
-          {isLoading && (
-            <div className="flex flex-col gap-4">
-              <div className="border-line bg-panel h-[168px] animate-pulse rounded-[14px] border" />
-              <div className="mt-1 grid grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] items-start gap-5">
-                <div className="border-line bg-panel h-[220px] animate-pulse rounded-xl border" />
-                <div className="border-line bg-panel h-[220px] animate-pulse rounded-xl border" />
-              </div>
+    <div className="divide-y">
+      {items.map((item) => (
+        <Link
+          key={item.id}
+          href={item.href || "#"}
+          className="hover:bg-muted/50 focus-visible:ring-ring/50 -mx-2 flex flex-col gap-3 rounded-lg p-3 outline-none focus-visible:ring-3 sm:flex-row sm:items-start sm:justify-between"
+        >
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-medium">{item.titulo}</h3>
+              <Badge variant={item.variant}>{item.status}</Badge>
             </div>
-          )}
-
-          {isError && !isLoading && (
-            <div className="text-fg3 py-24 text-center text-[13px]">
-              Não foi possível carregar o processo. Tente novamente.
-            </div>
-          )}
-
-          {naoEncontrado && (
-            <div className="text-fg3 py-24 text-center text-[13px]">
-              Processo não encontrado.
-            </div>
-          )}
-
-          {identity && (
-            <>
-              {/* FAIXA DE IDENTIDADE */}
-              <div className="border-line bg-panel overflow-hidden rounded-[14px] border">
-                <div className="flex items-start gap-6 px-[22px] py-5">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-fg3 font-mono text-xs">
-                      {identity.cnj}
-                    </div>
-                    <h1 className="font-display mt-[5px] mb-[9px] text-[22px] leading-[1.15] font-medium tracking-[-0.01em]">
-                      {identity.titulo}
-                    </h1>
-                    <div className="flex flex-wrap gap-1.5">
-                      {identity.tags.map((t, i) => (
-                        <span
-                          key={i}
-                          className="rounded-md px-[9px] py-[3px] text-[11.5px]"
-                          style={{ background: t.fundo, color: t.cor }}
-                        >
-                          {t.label}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  {/* fatos-chave, densos e horizontais (VALOR editável · FASE · ATIVAS) */}
-                  <div className="border-line2 grid flex-none grid-cols-[repeat(3,auto)] gap-x-[26px] gap-y-3 border-l pl-6">
-                    <div>
-                      <div className="text-fg3 text-[10px] tracking-[.04em] uppercase">
-                        Valor
-                      </div>
-                      {valorEditando ? (
-                        <input
-                          autoFocus
-                          value={valorInput}
-                          onChange={(e) => setValorInput(e.target.value)}
-                          onBlur={confirmarValor}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") confirmarValor();
-                            if (e.key === "Escape") setValorEditando(false);
-                          }}
-                          placeholder="0,00"
-                          className="border-line bg-bg text-foreground mt-1 w-[120px] rounded-md border px-1.5 py-0.5 text-[13px] font-normal outline-none"
-                        />
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={abrirEdicaoValor}
-                          disabled={salvandoManual}
-                          className="hover:bg-hover mt-1 -ml-1 block rounded-md px-1 text-[13px] font-normal disabled:opacity-60"
-                          style={{
-                            color: identity.valor ? undefined : "var(--fg3)",
-                          }}
-                        >
-                          {identity.valor ?? "Definir"}
-                        </button>
-                      )}
-                    </div>
-                    <div>
-                      <div className="text-fg3 text-[10px] tracking-[.04em] uppercase">
-                        Fase
-                      </div>
-                      <div className="mt-1 text-[13px] font-normal">
-                        {faseLabel}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-fg3 text-[10px] tracking-[.04em] uppercase">
-                        Ativas
-                      </div>
-                      <div
-                        className="mt-1 text-[13px] font-normal"
-                        style={{ color: "var(--primary)" }}
-                      >
-                        {intimacoes.length}{" "}
-                        {intimacoes.length === 1 ? "intimação" : "intimações"}
-                      </div>
-                    </div>
-                    <div className="border-line2 col-span-full flex items-center gap-2 border-t pt-2.5">
-                      <span className="border-line text-fg3 grid size-[22px] place-items-center rounded-full border text-[9px]">
-                        {responsavel.iniciais}
-                      </span>
-                      <Menu.Root>
-                        <Menu.Trigger
-                          disabled={isAssigning}
-                          className="hover:bg-hover text-fg2 rounded-md px-1.5 py-0.5 text-xs disabled:opacity-60"
-                        >
-                          Responsável · {responsavel.nome}
-                        </Menu.Trigger>
-                        <Menu.Portal>
-                          {/* Portaled: escapa o `overflow-hidden` da faixa de
-                              identidade (senão o menu ficava cortado dentro do card)
-                              e sobe pra z-50, acima de todo o conteúdo. */}
-                          <Menu.Positioner
-                            side="bottom"
-                            align="start"
-                            sideOffset={6}
-                            className="z-50"
-                          >
-                            <Menu.Popup className="border-line bg-panel z-50 max-h-[240px] w-[240px] overflow-y-auto rounded-lg border py-1 shadow-lg outline-none">
-                              <Menu.Item
-                                onClick={() => assign(null)}
-                                className="hover:bg-hover data-highlighted:bg-hover text-fg3 block w-full cursor-default px-3 py-1.5 text-left text-xs outline-none select-none"
-                              >
-                                Remover responsável
-                              </Menu.Item>
-                              {members.map((m) => (
-                                <Menu.Item
-                                  key={m.id}
-                                  onClick={() => assign(m.id)}
-                                  className="hover:bg-hover data-highlighted:bg-hover block w-full cursor-default px-3 py-1.5 text-left text-xs outline-none select-none"
-                                >
-                                  {m.label}
-                                </Menu.Item>
-                              ))}
-                              {members.length === 0 && (
-                                <div className="text-fg3 px-3 py-1.5 text-xs">
-                                  Sem membros no escritório.
-                                </div>
-                              )}
-                            </Menu.Popup>
-                          </Menu.Positioner>
-                        </Menu.Portal>
-                      </Menu.Root>
-                      <span className="text-fg3 ml-auto text-[11.5px]">
-                        Distribuído {identity.distribuido}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+            {item.descricao && (
+              <TeorContent
+                content={item.descricao}
+                allowLinks={false}
+                className="text-muted-foreground mt-1 line-clamp-2 text-[13px] leading-relaxed"
+              />
+            )}
+            <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+              {item.meta}
+            </p>
+            {item.responsavel && (
+              <Responsavel
+                className="mt-2"
+                value={item.responsavel.id}
+                nome={item.responsavel.nome}
+              />
+            )}
+          </div>
+          <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-end">
+            {item.prazo && (
+              <div className="space-y-1 sm:text-right">
+                <p className="text-sm font-medium tabular-nums">
+                  {item.prazo.data}
+                </p>
+                <Badge variant={item.prazo.variant}>{item.prazo.label}</Badge>
               </div>
-
-              {/* STEPPER DE FASE — clicável (define o override manual) */}
-              <div className="border-line bg-panel mt-2.5 flex items-center overflow-hidden rounded-[14px] border px-[22px] py-[13px]">
-                {stepper.map((s, i) => (
-                  <div
-                    key={s.key}
-                    className="flex items-center last:flex-none"
-                    style={{ flex: i < stepper.length - 1 ? 1 : "none" }}
-                  >
-                    <button
-                      type="button"
-                      onClick={s.onClick}
-                      disabled={salvandoManual}
-                      className="hover:bg-hover flex flex-none items-center gap-2 rounded-md px-1.5 py-0.5 disabled:opacity-60"
-                    >
-                      <span
-                        className="size-[12px] flex-none rounded-full"
-                        style={{
-                          borderWidth: s.estado === "current" ? 2 : 1.5,
-                          borderStyle: "solid",
-                          borderColor:
-                            s.estado === "todo"
-                              ? "var(--line)"
-                              : "var(--primary)",
-                          background:
-                            s.estado === "done"
-                              ? "var(--primary)"
-                              : "transparent",
-                        }}
-                      />
-                      <span
-                        className="text-[11px] whitespace-nowrap"
-                        style={{
-                          color:
-                            s.estado === "current"
-                              ? "var(--primary)"
-                              : s.estado === "done"
-                                ? "var(--fg2)"
-                                : "var(--fg3)",
-                          fontWeight: s.estado === "current" ? 500 : 400,
-                        }}
-                      >
-                        {s.label}
-                      </span>
-                    </button>
-                    {i < stepper.length - 1 && (
-                      <span
-                        className="mx-2 h-px flex-1"
-                        style={{ background: "var(--line2)" }}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* CORPO EM 2 COLUNAS */}
-              <div className="mt-5 grid grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] items-start gap-5">
-                {/* COLUNA PRIMÁRIA — ação */}
-                <div className="flex flex-col gap-5">
-                  {/* Intimações do processo */}
-                  <div>
-                    <div className="mb-2.5 flex items-baseline justify-between">
-                      <span className="text-[13px] font-semibold">
-                        Intimações deste processo
-                      </span>
-                      <span className="text-fg3 font-mono text-[11px]">
-                        {intimacoes.length}
-                      </span>
-                    </div>
-                    {referenciasPending && (
-                      <div className="text-fg3 py-4 text-center text-xs">
-                        Carregando intimações…
-                      </div>
-                    )}
-                    {!referenciasPending && intimacoes.length === 0 && (
-                      <div className="border-line text-fg3 rounded-[10px] border border-dashed px-4 py-6 text-center text-xs">
-                        Nenhuma intimação neste processo.
-                      </div>
-                    )}
-                    <div className="flex flex-col gap-[9px]">
-                      {intimacoes.map((i) => (
-                        <Link
-                          key={i.id}
-                          href={`/intimacoes/${i.id}`}
-                          className="border-line bg-panel hover:bg-hover grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-[10px] border py-[13px] pr-[15px] pl-3 text-left transition-colors"
-                          style={{ borderLeft: `3px solid ${i.urgCor}` }}
-                        >
-                          <SinalUrgencia nivel={i.urgNivel} cor={i.urgCor} />
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-medium">
-                              {i.titulo}
-                            </span>
-                            <span className="text-fg3 mt-1 flex items-center gap-1.5 text-[11.5px]">
-                              <Circle className="size-[9px]" strokeWidth={2} />
-                              {i.status}
-                              {i.resp && (
-                                <span className="text-fg3">
-                                  · resp. {i.resp}
-                                </span>
-                              )}
-                            </span>
-                          </span>
-                          <span className="text-right">
-                            {i.prazoCurto && (
-                              <span
-                                className="block font-mono text-[13px] font-medium"
-                                style={{ color: i.urgCor }}
-                              >
-                                {i.prazoCurto}
-                              </span>
-                            )}
-                            {i.fatal && (
-                              <span className="text-fg3 mt-0.5 block text-[11px]">
-                                fatal {i.fatal}
-                              </span>
-                            )}
-                          </span>
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Prazos em aberto */}
-                  <div className="border-line bg-panel overflow-hidden rounded-xl border">
-                    <div className="border-line2 flex items-center justify-between border-b px-4 py-3">
-                      <span className="text-[12.5px] font-semibold">
-                        Prazos em aberto
-                      </span>
-                      <span className="text-fg3 font-mono text-[11px]">
-                        {prazos.length}
-                      </span>
-                    </div>
-                    {!referenciasPending && prazos.length === 0 && (
-                      <div className="text-fg3 px-4 py-6 text-center text-xs">
-                        Sem prazos em aberto.
-                      </div>
-                    )}
-                    {prazos.map((p) => (
-                      <div
-                        key={p.id}
-                        className="border-line2 hover:bg-hover flex items-center gap-3 border-b px-4 py-[11px] transition-colors"
-                      >
-                        <SinalUrgencia nivel={p.urgNivel} cor={p.urgCor} />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[12.5px] font-medium">
-                            {p.kind}
-                          </span>
-                          <span className="text-fg3 mt-px block text-[11px]">
-                            {p.interno ? `interno ${p.interno} · ` : ""}fatal{" "}
-                            {p.fatal}
-                          </span>
-                        </span>
-                        <span
-                          className="ml-auto font-mono text-[12px] font-medium"
-                          style={{ color: p.urgCor }}
-                        >
-                          {p.prazoCurto}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* COLUNA SECUNDÁRIA — referência */}
-                <div className="flex flex-col gap-3.5">
-                  {/* AUTOS */}
-                  <div className="border-line bg-panel overflow-hidden rounded-xl border">
-                    <div className="border-line2 flex items-center justify-between border-b px-3.5 py-[11px]">
-                      <span className="text-fg2 text-[10px] font-medium tracking-[.02em] uppercase">
-                        Autos
-                      </span>
-                      <span className="text-fg3 font-mono text-[10.5px]">
-                        {autos.total}
-                        {autos.folhas > 0 ? ` · ${autos.folhas} fls.` : ""}
-                      </span>
-                    </div>
-                    {autos.isPending && (
-                      <div className="text-fg3 px-3.5 py-5 text-center text-[11px]">
-                        Carregando autos…
-                      </div>
-                    )}
-                    {!autos.isPending && autos.isEmpty && (
-                      <div className="text-fg3 px-3.5 py-5 text-center text-[11px]">
-                        Autos ainda não baixados.
-                      </div>
-                    )}
-                    {!autos.isEmpty && (
-                      <div className="max-h-[228px] overflow-y-auto">
-                        {autos.itens.map((a) => (
-                          <button
-                            key={a.id}
-                            type="button"
-                            onClick={() => autos.abrir(a.id)}
-                            title="Abrir documento"
-                            className="border-line2 hover:bg-hover flex w-full items-center gap-2.5 border-b px-3.5 py-[9px] text-left transition-colors last:border-b-0"
-                          >
-                            <FileText
-                              className="size-[14px] flex-none"
-                              strokeWidth={1.6}
-                              style={{ color: a.cor }}
-                            />
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-[12px]">
-                                {a.titulo}
-                              </span>
-                              <span className="text-fg3 block text-[10.5px]">
-                                {a.sub}
-                                {a.processando ? " · processando…" : ""}
-                              </span>
-                            </span>
-                            {a.fls && (
-                              <span className="text-fg3 flex-none font-mono text-[10px]">
-                                {a.fls}
-                              </span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* PEÇAS */}
-                  <div className="border-line bg-panel overflow-hidden rounded-xl border">
-                    <div className="border-line2 flex items-center justify-between border-b px-3.5 py-[11px]">
-                      <span className="text-fg2 text-[10px] font-medium tracking-[.02em] uppercase">
-                        Peças
-                      </span>
-                      <span className="text-fg3 font-mono text-[10.5px]">
-                        {pecas.total}
-                      </span>
-                    </div>
-                    {pecas.isPending && (
-                      <div className="text-fg3 px-3.5 py-5 text-center text-[11px]">
-                        Carregando peças…
-                      </div>
-                    )}
-                    {!pecas.isPending && pecas.isEmpty && (
-                      <div className="text-fg3 px-3.5 py-5 text-center text-[11px]">
-                        Nenhuma peça neste processo.
-                      </div>
-                    )}
-                    {pecas.itens.map((p) => (
-                      <div
-                        key={p.id}
-                        className="border-line2 flex items-center gap-2.5 border-b px-3.5 py-[10px] last:border-b-0"
-                      >
-                        <FileText
-                          className="size-[14px] flex-none"
-                          strokeWidth={1.6}
-                          style={{ color: p.cor }}
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[12px]">
-                            {p.titulo}
-                          </span>
-                          <span className="text-fg3 block text-[10.5px]">
-                            {p.sub} · {p.data}
-                          </span>
-                        </span>
-                        <span
-                          className="flex-none rounded-full px-2 py-[2px] text-[9.5px] font-medium"
-                          style={{
-                            background: p.statusFundo,
-                            color: p.statusCor,
-                          }}
-                        >
-                          {p.statusLabel}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* PARTES */}
-                  <div className="border-line bg-panel overflow-hidden rounded-xl border">
-                    <div className="border-line2 border-b px-3.5 py-[11px]">
-                      <span className="text-fg2 text-[10px] font-medium tracking-[.02em] uppercase">
-                        Partes
-                      </span>
-                    </div>
-                    {!partesPending && partes.length === 0 && (
-                      <div className="text-fg3 px-3.5 py-5 text-center text-[11px]">
-                        Sem partes identificadas.
-                      </div>
-                    )}
-                    {partes.map((pt, i) => (
-                      <div
-                        key={i}
-                        className="border-line2 border-b px-3.5 py-[9px] last:border-b-0"
-                      >
-                        <div className="text-fg3 text-[10px] tracking-[.04em] uppercase">
-                          {pt.papel}
-                        </div>
-                        <div className="mt-0.5 text-xs font-medium">
-                          {pt.nome}
-                        </div>
-                        {pt.documento && (
-                          <div className="text-fg3 mt-px font-mono text-[10px]">
-                            {pt.documento}
-                          </div>
-                        )}
-                        {pt.proc && (
-                          <div className="text-fg3 mt-px text-[10.5px]">
-                            {pt.proc}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* ANDAMENTOS */}
-                  <div className="border-line bg-panel overflow-hidden rounded-xl border">
-                    <div className="border-line2 flex items-center justify-between border-b px-3.5 py-[11px]">
-                      <span className="text-fg2 text-[10px] font-medium tracking-[.02em] uppercase">
-                        Andamentos
-                      </span>
-                      <span className="text-fg3 font-mono text-[10.5px]">
-                        {andamentosTotal}
-                      </span>
-                    </div>
-                    <div className="px-3.5 pt-1 pb-2.5">
-                      {andamentosPending && (
-                        <div className="text-fg3 py-4 text-center text-[11px]">
-                          Carregando…
-                        </div>
-                      )}
-                      {!andamentosPending && andamentos.length === 0 && (
-                        <div className="text-fg3 py-4 text-center text-[11px]">
-                          Sem andamentos.
-                        </div>
-                      )}
-                      {(andamentosExpandido
-                        ? andamentos
-                        : andamentos.slice(0, 4)
-                      ).map((a) => (
-                        <div
-                          key={a.id}
-                          className="border-line2 grid grid-cols-[64px_1fr] gap-2.5 border-t py-[7px]"
-                        >
-                          <span className="text-fg3 font-mono text-[10.5px]">
-                            {a.data}
-                          </span>
-                          <span className="text-fg2 text-[11.5px] leading-[1.45]">
-                            {a.texto}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    {!andamentosExpandido && andamentos.length > 4 && (
-                      <button
-                        type="button"
-                        onClick={() => setAndamentosExpandido(true)}
-                        className="border-line2 text-fg2 hover:bg-hover w-full border-t px-3.5 py-2 text-[11px]"
-                      >
-                        Ver mais ({andamentosTotal - 4})
-                      </button>
-                    )}
-                    {andamentosExpandido && andamentosHasMore && (
-                      <button
-                        type="button"
-                        onClick={andamentosLoadMore}
-                        disabled={andamentosLoadingMore}
-                        className="border-line2 text-fg2 hover:bg-hover w-full border-t px-3.5 py-2 text-[11px] disabled:opacity-60"
-                      >
-                        {andamentosLoadingMore
-                          ? "Carregando…"
-                          : "Carregar mais"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+            )}
+            <ArrowRight
+              aria-hidden="true"
+              className="text-muted-foreground size-4 shrink-0"
+            />
+          </div>
+        </Link>
+      ))}
     </div>
+  );
+}
+
+function Fato({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0 space-y-1">
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="text-sm leading-relaxed break-words">{children}</dd>
+    </div>
+  );
+}
+
+export function ProcessoHub({ numero }: { numero: string }) {
+  const h = useProcessoHub(numero);
+  const uploadInput = useRef<HTMLInputElement>(null);
+  const p = h.processo;
+  const identity = h.identity;
+  return (
+    <PageFrame
+      header={
+        <>
+          <ShellBackLink href={h.voltarHref} label="Voltar para processos" />
+          <h1 className="shrink-0 text-[13px] font-medium">Processo</h1>
+          <span className="text-fg3 min-w-0 truncate font-mono text-[11px]">
+            {identity?.cnj}
+          </span>
+        </>
+      }
+    >
+      <div className="mx-auto max-w-[1320px] space-y-4 px-4 py-4">
+        {h.processoQ.isPending && (
+          <div
+            role="status"
+            aria-label="Carregando processo"
+            className="bg-muted h-56 animate-pulse rounded-lg"
+          />
+        )}
+        {h.processoQ.isError && (
+          <div role="alert" className="bg-card space-y-4 rounded-xl border p-8">
+            <p>Não foi possível carregar o processo.</p>
+            <Button
+              variant="outline"
+              onClick={() => void h.processoQ.refetch()}
+            >
+              Tentar novamente
+            </Button>
+          </div>
+        )}
+        {p && identity && (
+          <>
+            <section
+              aria-label="Identificação do processo"
+              className="border-line border-b pb-4"
+            >
+              <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
+                <div className="min-w-0 space-y-2">
+                  <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+                    <span>PROCESSO</span>
+                    <span aria-hidden="true">/</span>
+                    <span>{identity.tribunal}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className="font-mono text-sm tabular-nums sm:text-base">
+                      {identity.cnj}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label="Copiar CNJ"
+                      onClick={() => void h.copiarCNJ()}
+                    >
+                      <Copy />
+                    </Button>
+                  </div>
+                  <h2 className="max-w-3xl text-xl leading-tight font-medium tracking-tight break-words sm:text-[22px]">
+                    {identity.title}
+                  </h2>
+                  {identity.partes && (
+                    <p className="text-muted-foreground max-w-3xl text-sm leading-relaxed">
+                      {identity.partes}
+                    </p>
+                  )}
+                  <ProcessoSituacao situacao={identity.situacaoDetalhe} />
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={h.abrirEdicao}>
+                    <Pencil />
+                    Editar dados
+                  </Button>
+                  <Button size="sm" onClick={h.verAutos}>
+                    <FolderOpen />
+                    Consultar autos
+                  </Button>
+                </div>
+              </div>
+              <dl className="mt-4 grid gap-3 border-t pt-3 sm:grid-cols-3">
+                <Fato label="Classe processual">
+                  {p.class || "Não informada"}
+                </Fato>
+                <Fato label="Órgão julgador">{identity.orgao}</Fato>
+                <Fato label="Fase processual">
+                  {identity.fase || "Não informada"}
+                </Fato>
+              </dl>
+            </section>
+
+            {identity.prazo && (
+              <section
+                aria-label="Prazo em atenção"
+                className="bg-gold/5 border-gold/25 flex flex-col justify-between gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center"
+              >
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-xs font-medium">
+                    Prazo mais próximo em aberto
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-lg font-semibold tabular-nums">
+                      {identity.prazo.data}
+                    </span>
+                    <Badge variant={identity.prazo.variant}>
+                      {identity.prazo.resumo}
+                    </Badge>
+                  </div>
+                  <p className="text-sm">{identity.prazo.ato}</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={h.irParaTrabalho}>
+                  Conferir prazos
+                  <ArrowRight />
+                </Button>
+              </section>
+            )}
+
+            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="border-line min-w-0 space-y-4 lg:border-l lg:pl-5">
+                <section
+                  id="processo-trabalho"
+                  tabIndex={-1}
+                  className="border-line scroll-mt-4 border-b pb-4 outline-none"
+                  aria-labelledby="trabalho-title"
+                >
+                  <div className="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                    <div>
+                      <h2 id="trabalho-title" className="text-sm font-medium">
+                        Trabalho do escritório
+                      </h2>
+                      <p className="text-muted-foreground mt-1 text-sm">
+                        Revise intimações, confira prazos e acompanhe
+                        providências.
+                      </p>
+                    </div>
+                    <NativeSelect
+                      size="sm"
+                      aria-label="Exibir registros de trabalho"
+                      value={h.historico ? "todos" : "pendentes"}
+                      onChange={(e) =>
+                        h.setHistorico(e.target.value === "todos")
+                      }
+                      className="shrink-0"
+                    >
+                      <option value="pendentes">Pendências</option>
+                      <option value="todos">Todos, incluindo encerrados</option>
+                    </NativeSelect>
+                  </div>
+                  <Tabs
+                    defaultValue="intimacoes"
+                    value={h.trabalhoTab}
+                    onValueChange={h.setTrabalhoTab}
+                  >
+                    <div className="mb-4 overflow-x-auto pb-1">
+                      <TabsList aria-label="Trabalho do processo">
+                        <TabsTrigger value="intimacoes">Intimações</TabsTrigger>
+                        <TabsTrigger value="prazos">Prazos</TabsTrigger>
+                        <TabsTrigger value="providencias">
+                          Providências
+                        </TabsTrigger>
+                      </TabsList>
+                    </div>
+                    <TabsContent className="animate-none" value="intimacoes">
+                      <Colecao
+                        query={h.intQ}
+                        count={h.intimacoes.length}
+                        empty={
+                          h.historico
+                            ? "Nenhuma intimação vinculada a este processo."
+                            : "Nenhuma intimação pendente entre os registros carregados. Consulte Todos para ver o histórico."
+                        }
+                      >
+                        <Registros items={h.intimacoes} />
+                      </Colecao>
+                    </TabsContent>
+                    <TabsContent className="animate-none" value="prazos">
+                      <Colecao
+                        query={h.prazoQ}
+                        count={h.prazos.length}
+                        empty={
+                          h.historico
+                            ? "Nenhum prazo vinculado a este processo."
+                            : "Nenhum prazo em aberto entre os registros carregados. Consulte Todos para ver os encerrados."
+                        }
+                      >
+                        <Registros items={h.prazos} />
+                      </Colecao>
+                    </TabsContent>
+                    <TabsContent className="animate-none" value="providencias">
+                      <ProcessProvidencias
+                        processId={numero}
+                        history={h.historico}
+                      />
+                    </TabsContent>
+                  </Tabs>
+                </section>
+
+                <section
+                  id="processo-acervo"
+                  tabIndex={-1}
+                  className="border-line scroll-mt-4 border-b pb-4 outline-none"
+                  aria-labelledby="acervo-title"
+                >
+                  <div className="mb-3">
+                    <h2 id="acervo-title" className="text-sm font-medium">
+                      Documentos e histórico
+                    </h2>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      Consulte as fontes e o histórico deste processo.
+                    </p>
+                  </div>
+                  <Tabs
+                    defaultValue="autos"
+                    value={h.acervoTab}
+                    onValueChange={h.setAcervoTab}
+                  >
+                    <div className="mb-4 overflow-x-auto pb-1">
+                      <TabsList aria-label="Acervo do processo">
+                        <TabsTrigger value="autos">Autos</TabsTrigger>
+                        <TabsTrigger value="andamentos">Andamentos</TabsTrigger>
+                        <TabsTrigger value="pecas">Peças</TabsTrigger>
+                        <TabsTrigger value="partes">Partes</TabsTrigger>
+                      </TabsList>
+                    </div>
+                    <TabsContent
+                      className="flex animate-none flex-col gap-4"
+                      value="autos"
+                    >
+                      <CourtAccessNotice
+                        court={h.processo?.court}
+                        degree={h.processo?.degree}
+                      />
+                      <SyncAutosButton
+                        court={h.processo?.court}
+                        courtRecordId={h.processo?.id}
+                        degree={h.processo?.degree}
+                        description="Consulte os autos sem sair do processo."
+                      >
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={h.autos.upload.isUploading}
+                          onClick={() => uploadInput.current?.click()}
+                        >
+                          <Upload data-icon="inline-start" aria-hidden />
+                          {h.autos.upload.isUploading
+                            ? "Enviando…"
+                            : "Adicionar PDF"}
+                        </Button>
+                      </SyncAutosButton>
+                      <input
+                        ref={uploadInput}
+                        type="file"
+                        accept="application/pdf,.pdf"
+                        aria-label="Adicionar PDF aos autos"
+                        disabled={h.autos.upload.isUploading}
+                        className="hidden"
+                        onChange={(e) => {
+                          h.enviarDocumento(e.target.files?.[0]);
+                          e.target.value = "";
+                        }}
+                      />
+                      {(h.uploadError || h.autos.upload.uploadError) && (
+                        <p
+                          role="alert"
+                          className="text-destructive pb-3 text-sm"
+                        >
+                          {h.uploadError ||
+                            "Não foi possível enviar o PDF. Tente selecionar o arquivo novamente."}
+                        </p>
+                      )}
+                      {h.autos.upload.isUploading && (
+                        <p
+                          role="status"
+                          className="text-muted-foreground pb-3 text-sm"
+                        >
+                          Enviando documento
+                          {h.autos.upload.progress !== null
+                            ? ` · ${h.autos.upload.progress}%`
+                            : ""}
+                          …
+                        </p>
+                      )}
+                      <Colecao
+                        query={h.autos}
+                        count={h.docs.length}
+                        empty={
+                          <EmptyState
+                            icon={FolderOpen}
+                            title="Os autos ainda não estão disponíveis"
+                            description="Sincronize com o tribunal ou adicione um PDF do escritório para consultar os documentos aqui."
+                            className="bg-card"
+                          />
+                        }
+                      >
+                        <div className="divide-y">
+                          {h.docs.map((doc) => (
+                            <div
+                              key={doc.id}
+                              className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center"
+                            >
+                              <div className="bg-primary/10 text-primary hidden size-10 shrink-0 place-items-center rounded-lg sm:grid">
+                                <FileText className="size-5" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium break-words">
+                                  {doc.titulo}
+                                </p>
+                                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                                  {doc.meta}
+                                </p>
+                                <Badge className="mt-2" variant={doc.variant}>
+                                  {doc.status}
+                                </Badge>
+                              </div>
+                              <Button
+                                variant="outline"
+                                disabled={
+                                  !doc.podeAbrir ||
+                                  (!doc.visualizavel &&
+                                    h.autos.baixar.isPending)
+                                }
+                                onClick={() =>
+                                  doc.visualizavel
+                                    ? h.abrirDocumento(doc)
+                                    : h.autos.baixar.mutate(doc.id)
+                                }
+                                aria-label={`${doc.visualizavel ? "Abrir" : "Baixar"} ${doc.titulo}`}
+                              >
+                                {doc.visualizavel
+                                  ? "Abrir documento"
+                                  : "Baixar arquivo"}
+                                <ArrowRight />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </Colecao>
+                    </TabsContent>
+                    <TabsContent className="animate-none" value="andamentos">
+                      <Colecao
+                        query={h.andQ}
+                        count={h.andQ.andamentos.length}
+                        empty="Nenhum andamento disponível na fonte consultada."
+                      >
+                        <ol className="divide-y">
+                          {h.andQ.andamentos.map((a) => (
+                            <li
+                              key={a.id}
+                              className="flex flex-col gap-2 py-4 sm:flex-row sm:gap-5"
+                            >
+                              <time
+                                className="text-muted-foreground shrink-0 text-xs tabular-nums"
+                                dateTime={a.occurred_at}
+                              >
+                                {formatDate(a.occurred_at)}
+                              </time>
+                              <p className="text-sm leading-relaxed">
+                                {a.text}
+                              </p>
+                            </li>
+                          ))}
+                        </ol>
+                      </Colecao>
+                    </TabsContent>
+                    <TabsContent className="animate-none" value="pecas">
+                      <Colecao
+                        query={h.pecasQ}
+                        count={h.pecas.length}
+                        empty="Nenhuma peça vinculada. Abra uma intimação ou providência para iniciar a elaboração com o contexto do processo."
+                      >
+                        <Registros items={h.pecas} />
+                      </Colecao>
+                    </TabsContent>
+                    <TabsContent className="animate-none" value="partes">
+                      <Colecao
+                        query={h.partesQ}
+                        count={h.partes.length}
+                        empty="As partes ainda não foram identificadas nos dados consultados."
+                      >
+                        <div className="divide-y">
+                          {h.partes.map((parte) => (
+                            <div key={parte.key} className="space-y-2 py-4">
+                              <Badge variant="secondary">{parte.papel}</Badge>
+                              <p className="text-sm font-medium">
+                                {parte.name}
+                              </p>
+                              {parte.document && (
+                                <p className="text-muted-foreground text-xs">
+                                  CPF/CNPJ: {parte.document}
+                                </p>
+                              )}
+                              <p className="text-muted-foreground text-xs leading-relaxed">
+                                {parte.counsels.length
+                                  ? parte.counsels
+                                      .map(
+                                        (c) =>
+                                          `${c.name}${c.oab ? ` · OAB/${c.uf} ${c.oab}` : ""}`,
+                                      )
+                                      .join("; ")
+                                  : "Advogados não informados"}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </Colecao>
+                    </TabsContent>
+                  </Tabs>
+                </section>
+              </div>
+
+              <aside
+                className="border-line min-w-0 space-y-4 lg:border-l lg:pl-5"
+                aria-label="Informações do processo"
+              >
+                <section className="border-line space-y-4 border-b pb-4">
+                  <h2 className="text-sm font-medium">Ficha do processo</h2>
+                  <div className="space-y-2">
+                    <p className="text-muted-foreground text-xs">
+                      Responsável no escritório
+                    </p>
+                    <ResponsavelMenu
+                      label="Responsável pelo processo"
+                      value={p.assigned_user_id}
+                      nome={h.responsavel}
+                      membros={h.members}
+                      emVoo={h.assigning}
+                      onAssign={h.assign}
+                    />
+                  </div>
+                  <dl className="space-y-3 border-t pt-3">
+                    <Fato label="Assunto">{p.subject || "Não informado"}</Fato>
+                    <Fato label="Distribuição">{h.distribuido}</Fato>
+                    <Fato label="Valor da causa">{h.valorFormatado}</Fato>
+                    <Fato label="Publicidade">{h.segredo}</Fato>
+                  </dl>
+                </section>
+                <section className="space-y-3">
+                  <h2 className="text-sm font-medium">
+                    Último andamento conhecido
+                  </h2>
+                  <p className="text-muted-foreground text-xs tabular-nums">
+                    {identity.movimentoData}
+                  </p>
+                  <p className="text-sm leading-relaxed">
+                    {identity.movimento}
+                  </p>
+                  <p className="text-muted-foreground border-t pt-3 text-xs leading-relaxed">
+                    A situação do processo é inferida dos dados disponíveis.
+                    Prazos e providências são acompanhados separadamente.
+                  </p>
+                </section>
+              </aside>
+            </div>
+          </>
+        )}
+      </div>
+      <PdfDrawer doc={h.documento} onClose={h.fecharDocumento} />
+      <Sheet open={h.editando} onOpenChange={h.setEditando}>
+        <SheetContent
+          title="Editar dados do processo"
+          description="Organize a identificação e os dados usados pelo escritório."
+          footer={
+            <>
+              <Button
+                variant="outline"
+                disabled={h.salvando}
+                onClick={() => h.setEditando(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                form="editar-processo"
+                disabled={h.salvando}
+              >
+                {h.salvando ? "Salvando…" : "Salvar alterações"}
+              </Button>
+            </>
+          }
+        >
+          <form
+            id="editar-processo"
+            className="space-y-6"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void h.salvar();
+            }}
+          >
+            <div className="space-y-2">
+              <label htmlFor="processo-label" className="text-sm font-medium">
+                Título do processo
+              </label>
+              <Input
+                id="processo-label"
+                value={h.label}
+                onChange={(e) => h.setLabel(e.target.value)}
+                placeholder={identity?.title}
+                maxLength={200}
+              />
+              <p className="text-muted-foreground text-xs">
+                Deixe vazio para usar o título gerado pelos dados do processo.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="processo-phase" className="text-sm font-medium">
+                Fase processual
+              </label>
+              <NativeSelect
+                id="processo-phase"
+                className="w-full"
+                value={h.phase}
+                onChange={(e) =>
+                  h.setPhase(e.target.value as ProcessoPhase | "")
+                }
+              >
+                <option value="" disabled>
+                  Não informada
+                </option>
+                {FASE_STEPS.map((s) => (
+                  <option value={s.key} key={s.key}>
+                    {s.label}
+                  </option>
+                ))}
+              </NativeSelect>
+              <p className="text-muted-foreground text-xs">
+                O ajuste manual passa a prevalecer na fase exibida.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="processo-valor" className="text-sm font-medium">
+                Valor da causa (R$)
+              </label>
+              <Input
+                id="processo-valor"
+                inputMode="decimal"
+                value={h.valor}
+                onChange={(e) => h.setValor(e.target.value)}
+                placeholder="Ex.: 1.500,00"
+              />
+            </div>
+            {h.formError && (
+              <p role="alert" className="text-destructive text-sm">
+                {h.formError}
+              </p>
+            )}
+          </form>
+        </SheetContent>
+      </Sheet>
+    </PageFrame>
   );
 }

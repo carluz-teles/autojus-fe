@@ -19,17 +19,17 @@ export interface UrgenciaTab {
 
 export const URGENCIA_TABS: UrgenciaTab[] = [
   { value: "atraso", label: "Em atraso", bucketKey: "atraso" },
-  { value: "hoje", label: "Vence hoje", bucketKey: "hoje" },
+  { value: "hoje", label: "Hoje", bucketKey: "hoje" },
   {
     value: "proximos_dois_dias",
-    label: "Próximos dois dias",
+    label: "Próximos 2 dias",
     bucketKey: "proximos_dois_dias",
   },
   { value: "semana", label: "Esta semana", bucketKey: "esta_semana" },
   { value: "este_mes", label: "Este mês", bucketKey: "este_mes" },
   {
     value: "sem_data_definida",
-    label: "Sem data definida",
+    label: "Sem data",
     bucketKey: "sem_data_definida",
   },
 ];

@@ -23,6 +23,9 @@ interface DataEnvelope<T> {
 // Não conhece React nem cache — isso é responsabilidade do hook.
 
 export interface ListIntimacoesParams {
+  group_by?: "cnj";
+  sort?: "recent" | "deadline";
+  cnj?: string;
   limit?: number;
   /** Cursor opaco: eco do next_cursor recebido para pedir a próxima página. */
   cursor?: string;
@@ -42,6 +45,8 @@ export interface ListIntimacoesParams {
    * como "sem filtro" para deep-links legados.
    */
   urgencia?: string;
+  due_from?: string;
+  due_to?: string;
   /** Filtro server-side de Status = work_stage (RECEIVED|AWAITING_CONFIRMATION|
    *  CONFIRMED|DRAFTING|PARTNER_REVIEW|FILED). Estágio derivado no BE. Aceita
    *  múltiplos valores (array) — serializados como CSV (`work_stage=A,B,C`) na
@@ -73,6 +78,9 @@ export interface ListIntimacoesParams {
 export async function listIntimacoes(
   fetcher: ApiFetcher,
   {
+    group_by,
+    sort,
+    cnj,
     limit = 20,
     cursor,
     search,
@@ -80,14 +88,21 @@ export async function listIntimacoes(
     user_status,
     court,
     urgencia,
+    due_from,
+    due_to,
     work_stage,
     origem,
     nao_confirmado,
     assignee,
   }: ListIntimacoesParams = {},
+  signal?: AbortSignal,
 ): Promise<IntimacaoBucketsEnvelope> {
   return fetcher<IntimacaoBucketsEnvelope>(ENDPOINT, {
+    signal,
     query: {
+      group_by,
+      sort,
+      cnj,
       limit,
       cursor,
       search,
@@ -95,6 +110,8 @@ export async function listIntimacoes(
       user_status,
       court,
       urgencia,
+      due_from,
+      due_to,
       origem,
       // Array vira CSV pro BE (que hoje aceita 1 valor mas está sendo
       // estendido em paralelo pra aceitar múltiplos separados por vírgula) —

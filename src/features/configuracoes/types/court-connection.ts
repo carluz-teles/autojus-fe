@@ -59,3 +59,14 @@ export interface MfaNeedsSelection {
 export type MfaSeedResult =
   | { kind: "connected"; connection: CourtConnectionView }
   | { kind: "needs_selection"; candidates: MfaSelectionCandidate[] };
+
+export interface CourtCatalogEntry {
+  court: string;
+  name: string;
+  system: string;
+  available: boolean;
+  scope?: string;
+  source_url: string;
+  connection_mode?: "PERSISTENT" | "PER_OPERATION";
+  capabilities?: ("SYNC_AUTOS" | "PREPARE_FILING")[];
+}

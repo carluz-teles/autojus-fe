@@ -3,10 +3,12 @@
 import { useAuth } from "@clerk/nextjs";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { toast } from "sonner";
 
 import { notificationKeys } from "./notification-keys";
+import { notificationHref } from "./notification-presentation";
 import type { NotificationView } from "./types";
 
 const STREAM_PATH = "/v1/notifications/stream";
@@ -21,11 +23,13 @@ const EVENT_STREAM = "text/event-stream";
 // expiram, então uma reconexão pós-expiração pega um token novo sozinha. Heartbeats do
 // servidor (comentários `: ping`) não chegam como onmessage: o parser SSE os ignora.
 export function useNotificationStream() {
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, isSignedIn, orgId, userId } = useAuth();
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (!isSignedIn || !orgId || !userId) return;
+    const seen = new Set<string>();
 
     const url = `${process.env.NEXT_PUBLIC_API_URL ?? ""}${STREAM_PATH}`;
     const ctrl = new AbortController();
@@ -62,7 +66,24 @@ export function useNotificationStream() {
         } catch {
           return; // payload malformado nunca trava o stream
         }
-        toast(n.title, { description: n.body });
+        if (
+          !n ||
+          typeof n.id !== "string" ||
+          typeof n.title !== "string" ||
+          typeof n.body !== "string"
+        )
+          return;
+        if (seen.has(n.id)) return;
+        seen.add(n.id);
+        if (seen.size > 200) seen.delete(seen.values().next().value!);
+        const href = notificationHref(n);
+        toast(n.title, {
+          id: n.id,
+          description: n.body,
+          action: href
+            ? { label: "Abrir", onClick: () => router.push(href) }
+            : undefined,
+        });
         void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
       },
       onerror: () => {
@@ -74,5 +95,5 @@ export function useNotificationStream() {
     });
 
     return () => ctrl.abort();
-  }, [isSignedIn, getToken, queryClient]);
+  }, [isSignedIn, orgId, userId, getToken, queryClient, router]);
 }

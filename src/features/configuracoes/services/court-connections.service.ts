@@ -5,10 +5,11 @@
 // trafega de volta: o submit envia o print (imagem do QR) ou o código colado, e o BE
 // sela o seed — a resposta traz só o estado da conexão (ou a lista de contas pra
 // escolher, quando o QR tem várias).
-
 import type { ApiFetcher } from "@/lib/api/use-api";
 
+import type { AutosSyncStatus } from "../lib/autos-sync";
 import type {
+  CourtCatalogEntry,
   CourtConnectionView,
   MfaNeedsSelection,
   MfaSeedResult,
@@ -98,4 +99,33 @@ export async function submitMfaSeed(
     return { kind: "needs_selection", candidates: raw.candidates };
   }
   return { kind: "connected", connection: raw as CourtConnectionView };
+}
+
+export async function listCourtCatalog(fetcher: ApiFetcher) {
+  return fetcher<{
+    data: CourtCatalogEntry[];
+    reviewed_at: string;
+  }>("/v1/court-catalog");
+}
+
+/** Schedules a new check of existing records; completion happens in the worker. */
+export function syncCourtAutos(
+  fetcher: ApiFetcher,
+  id: string,
+  courtRecordId?: string,
+) {
+  return fetcher<AutosSyncStatus>(`${ENDPOINT}/${id}/sync-autos`, {
+    method: "POST",
+    body: courtRecordId ? { court_record_id: courtRecordId } : {},
+  });
+}
+
+export function getCourtAutosSyncStatus(
+  fetcher: ApiFetcher,
+  id: string,
+  courtRecordId?: string,
+) {
+  return fetcher<AutosSyncStatus>(`${ENDPOINT}/${id}/sync-autos`, {
+    query: courtRecordId ? { court_record_id: courtRecordId } : undefined,
+  });
 }

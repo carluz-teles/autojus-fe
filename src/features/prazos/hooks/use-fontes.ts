@@ -22,9 +22,6 @@ export interface FontesTabItem {
   key: FontesTab;
   label: string;
   ativo: boolean;
-  fg: string;
-  borda: string;
-  peso: number;
   onClick: () => void;
 }
 
@@ -153,8 +150,8 @@ function relativo(iso: string | null): string {
 
 const nf = (n: number) => n.toLocaleString("pt-BR");
 
-export function useFontes() {
-  const [fontesTab, setFontesTab] = useState<FontesTab>("tribunais");
+export function useFontes(initialTab: FontesTab = "tribunais") {
+  const [fontesTab, setFontesTab] = useState<FontesTab>(initialTab);
 
   const oabsQuery = useWatchedOabs();
   const capturesQuery = useCaptures();
@@ -173,9 +170,6 @@ export function useFontes() {
         key: it.key,
         label: it.label,
         ativo,
-        fg: ativo ? "var(--fg)" : "var(--fg3)",
-        borda: ativo ? "var(--primary)" : "transparent",
-        peso: ativo ? 500 : 400,
         onClick: () => setFontesTab(it.key),
       };
     });

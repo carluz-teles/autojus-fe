@@ -17,6 +17,9 @@ export interface DataEnvelope<T> {
 // ── Draft detail (GET /v1/pecas/:id) ─────────────────────────────────────────
 
 export interface PecaDetailAPI {
+  content_revision?: string;
+  instructions?: string;
+  action_item_id?: string;
   id: string;
   piece_type: string;
   title: string;
@@ -82,6 +85,7 @@ export interface StructuredContentAPI {
 }
 
 export interface IntimationAPI {
+  published_at?: string;
   id: string;
   type: string;
   content: string;
@@ -214,6 +218,7 @@ export interface ChatCitationAPI {
 }
 
 export interface ChatMessageAPI {
+  changes?: SectionChangeAPI[];
   id: string;
   draft_id: string;
   role: "user" | "assistant";

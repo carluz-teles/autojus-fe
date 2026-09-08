@@ -3,8 +3,14 @@
 import { Plus } from "lucide-react";
 
 import { OabInput } from "@/components/ui/oab-input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CourtAccessNotice } from "@/features/onboarding/components/court-access-notice";
 
-import { type ResumoCard, useFontes } from "../../hooks/use-fontes";
+import {
+  type FontesTab,
+  type ResumoCard,
+  useFontes,
+} from "../../hooks/use-fontes";
 import { ConfigToggle } from "./config-toggle";
 import { ConfigTribunais } from "./config-tribunais";
 
@@ -61,8 +67,14 @@ function Erro({ texto }: { texto: string }) {
 
 // Aba Fontes de dados — port do template 1369-1453, ligada ao BE (ingestão):
 // Tribunais (court connections) / Termos (watched-oabs) / Ingestões (captures).
-export function ConfigFontes() {
-  const fon = useFontes();
+export function ConfigFontes({
+  initialTab,
+  onPrepareAccess,
+}: {
+  initialTab?: FontesTab;
+  onPrepareAccess?: () => void;
+}) {
+  const fon = useFontes(initialTab);
 
   return (
     <>
@@ -70,32 +82,34 @@ export function ConfigFontes() {
         Fontes de dados
       </div>
       <p className="text-fg3 mt-0 mb-4 text-[12.5px]">
-        De onde as intimações chegam — tribunais conectados, o que o sistema
-        vigia e o registro de cada varredura.
+        Acessos aos sistemas dos tribunais, OABs monitoradas e histórico de
+        importações.
       </p>
 
-      {/* sub-abas */}
-      <div className="border-line mb-[22px] flex gap-0.5 border-b">
-        {fon.fontesTabs.map((ft) => (
-          <button
-            key={ft.key}
-            onClick={ft.onClick}
-            className="-mb-px border-b-2 border-none bg-transparent px-2.5 pt-2 pb-2.5 text-[13px]"
-            style={{
-              color: ft.fg,
-              borderBottomColor: ft.borda,
-              fontWeight: ft.peso,
-            }}
-          >
-            {ft.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        defaultValue={initialTab ?? "tribunais"}
+        value={fon.fontesTab}
+        onValueChange={(value) =>
+          fon.fontesTabs.find((tab) => tab.key === value)?.onClick()
+        }
+      >
+        <div className="mb-5">
+          <TabsList aria-label="Fontes de dados">
+            {fon.fontesTabs.map((tab) => (
+              <TabsTrigger key={tab.key} value={tab.key}>
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+        <TabsContent value="tribunais">
+          <ConfigTribunais />
+        </TabsContent>
 
-      {fon.fontesTab === "tribunais" ? <ConfigTribunais /> : null}
-
-      {fon.fontesTab === "termos" ? (
-        <>
+        <TabsContent value="termos">
+          <div className="mb-4">
+            <CourtAccessNotice onPrepare={onPrepareAccess} />
+          </div>
           <div className="mb-[18px] flex items-start justify-between gap-4">
             <p className="text-fg3 m-0 max-w-[440px] text-[12.5px]">
               OABs que o sistema vigia no DJEN. Toda intimação chega porque
@@ -111,7 +125,7 @@ export function ConfigFontes() {
           </div>
 
           {fon.addAberto ? (
-            <div className="border-line bg-panel mb-[18px] flex items-center gap-2 rounded-xl border p-3">
+            <div className="border-line bg-panel mb-[18px] flex flex-wrap items-center gap-2 rounded-xl border p-3">
               <OabInput
                 autoFocus
                 value={fon.addValor}
@@ -119,7 +133,7 @@ export function ConfigFontes() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") fon.addTermoSubmit();
                 }}
-                className="border-line bg-bg text-foreground flex-1 rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+                className="border-line bg-bg text-foreground min-w-0 flex-1 rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
               />
               <button
                 onClick={fon.addTermoSubmit}
@@ -193,11 +207,11 @@ export function ConfigFontes() {
               </p>
             </>
           )}
-        </>
-      ) : null}
-
-      {fon.fontesTab === "ingest" ? (
-        <>
+        </TabsContent>
+        <TabsContent value="ingest">
+          <div className="mb-4">
+            <CourtAccessNotice onPrepare={onPrepareAccess} />
+          </div>
           <p className="text-fg3 mt-0 mb-4 max-w-[440px] text-[12.5px]">
             Cada varredura do DJEN — o que foi lido, o que casou com seus termos
             e o que virou intimação.
@@ -261,8 +275,8 @@ export function ConfigFontes() {
               )}
             </>
           )}
-        </>
-      ) : null}
+        </TabsContent>
+      </Tabs>
     </>
   );
 }

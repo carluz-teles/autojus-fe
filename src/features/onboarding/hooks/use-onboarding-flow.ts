@@ -9,15 +9,14 @@ import { useApi } from "@/lib/api/use-api";
 
 import { useOnboarding } from "./use-onboarding";
 
-// Fluxo de onboarding "Linear" (port de Atjus - Onboarding.dc.html): 4 passos
-// welcome → org → oab → done. A UI é nova, mas a MECÂNICA de conclusão é a mesma
+// Fluxo guiado: welcome → org → access → oab → done. A UI é nova, mas a MECÂNICA de conclusão é a mesma
 // do wizard antigo: cria a Clerk Organization → aguarda o BE provisionar o tenant
 // (poll /identity/me) → grava o perfil (updateOrgProfile marca onboarding_completed_at).
-export type OnbStep = "welcome" | "org" | "oab" | "done";
+export type OnbStep = "welcome" | "org" | "access" | "oab" | "done";
 export type OnbRole = "novo" | "solo";
 type Phase = "idle" | "creating" | "provisioning" | "saving";
 
-const ORDER: OnbStep[] = ["welcome", "org", "oab", "done"];
+const ORDER: OnbStep[] = ["welcome", "org", "access", "oab", "done"];
 const digits = (s: string) => s.replace(/\D/g, "");
 
 // Normaliza a OAB digitada ("OAB/SP 214.885", "SP 214885", "214885/SP") pra
@@ -57,16 +56,6 @@ function useOabs() {
   return { oab, setOab, oabs, setOabs, add, remove };
 }
 
-// ── sub-hook: checklist de próximos passos (passo done) ────────────────────────
-function useChecklist() {
-  const [chk, setChk] = useState<Record<string, boolean>>({});
-  const toggle = useCallback(
-    (k: string) => setChk((c) => ({ ...c, [k]: !c[k] })),
-    [],
-  );
-  return { chk, toggle, reset: () => setChk({}) };
-}
-
 export function useOnboardingFlow() {
   const router = useRouter();
   const { isLoaded, createOrganization, setActive } = useOrganizationList();
@@ -74,11 +63,11 @@ export function useOnboardingFlow() {
 
   const [step, setStep] = useState<OnbStep>("welcome");
   const [phase, setPhase] = useState<Phase>("idle");
+  const [capturasAtivadas, setCapturasAtivadas] = useState(0);
   const [erro, setErro] = useState<string | null>(null);
 
   const dados = useDados();
   const oabs = useOabs();
-  const checklist = useChecklist();
   const api = useApi();
 
   const { tenantReady, updateOrgProfile } = useOnboarding({
@@ -99,6 +88,7 @@ export function useOnboardingFlow() {
         const res = await Promise.allSettled(
           paraVigiar.map((oab) => addWatchedOab(api, oab)),
         );
+        setCapturasAtivadas(res.filter((r) => r.status === "fulfilled").length);
         const falhou = res.filter((r) => r.status === "rejected").length;
         setPhase("idle");
         setStep("done");
@@ -114,40 +104,50 @@ export function useOnboardingFlow() {
       });
   }, [dados.nome, dados.doc, oabs.oabs, updateOrgProfile, api]);
 
-  const concluir = useCallback(() => {
-    if (oabs.oabs.length === 0) return;
+  const prepararAcesso = useCallback(async () => {
+    if (phase !== "idle") return;
     setErro(null);
-    // Org já provisionada (usuário voltou) → grava direto.
-    if (tenantReady || activeOrg) {
-      salvarPerfil();
+    if (tenantReady) {
+      setStep("access");
+      return;
+    }
+    if (activeOrg) {
+      setPhase("provisioning");
       return;
     }
     if (!isLoaded || !createOrganization || !setActive) return;
     setPhase("creating");
-    createOrganization({ name: dados.nome.trim() || "Meu escritório" })
-      .then((org) => setActive({ organization: org.id }))
-      .then(() => setPhase("provisioning"))
-      .catch(() => {
-        setPhase("idle");
-        setErro("Não foi possível criar a organização. Tente de novo.");
+    try {
+      const org = await createOrganization({
+        name: dados.nome.trim() || "Meu escritório",
       });
+      await setActive({ organization: org.id });
+      setPhase("provisioning");
+    } catch {
+      setPhase("idle");
+      setErro("Não foi possível preparar o escritório. Tente novamente.");
+    }
   }, [
-    oabs.oabs.length,
+    phase,
     tenantReady,
     activeOrg,
     isLoaded,
     createOrganization,
     setActive,
     dados.nome,
-    salvarPerfil,
   ]);
 
-  // Tenant provisionado durante o "provisioning" → grava o perfil e avança.
-  useEffect(() => {
-    if (phase !== "provisioning" || !tenantReady) return;
+  const concluir = useCallback(() => {
+    if (oabs.oabs.length === 0 || phase !== "idle" || !tenantReady) return;
+    setErro(null);
     salvarPerfil();
-    // salvarPerfil é estável o bastante; evita re-disparo em loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oabs.oabs.length, phase, tenantReady, salvarPerfil]);
+
+  useEffect(() => {
+    if (phase === "provisioning" && tenantReady) {
+      setPhase("idle");
+      setStep("access");
+    }
   }, [phase, tenantReady]);
 
   // Teto do provisionamento (~40s) — devolve o controle em vez de pollar pra sempre.
@@ -182,6 +182,7 @@ export function useOnboardingFlow() {
       dados.setRole(null);
       setStep("welcome");
     },
+    prepararAcesso,
     irOab: () => setStep("oab"),
     // oab
     oab: oabs.oab,
@@ -189,26 +190,25 @@ export function useOnboardingFlow() {
     oabs: oabs.oabs,
     addOab: oabs.add,
     removeOab: oabs.remove,
-    voltarOrg: () => setStep("org"),
+    voltarOrg: () => setStep("access"),
     podeConcluir: oabs.oabs.length > 0,
     preparando: phase !== "idle",
     erro,
     concluir,
     // done
-    chk: checklist.chk,
-    toggleChk: checklist.toggle,
-    abrirApp: () => router.push("/"),
+    capturasAtivadas,
+    abrirApp: () => router.push("/triagem"),
     // topbar
     reiniciar: () => {
       setStep("welcome");
       setPhase("idle");
       setErro(null);
+      setCapturasAtivadas(0);
       dados.setRole(null);
       dados.setNome("");
       dados.setDoc("");
       oabs.setOab("");
       oabs.setOabs([]);
-      checklist.reset();
     },
   };
 }

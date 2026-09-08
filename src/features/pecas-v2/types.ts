@@ -122,6 +122,9 @@ export type Authorship = "assistant" | "human_taken";
 
 /** Peça completa que a tela consome. */
 export interface Draft {
+  contentRevision?: string;
+  instructions?: string;
+  actionItemId?: string;
   id: string;
   pieceType: string;
   /** Nome curto exibido no header do sidebar ("Defesa", "Petição"). */
@@ -227,6 +230,7 @@ export interface ChatCitation {
 }
 
 export interface ChatMessage {
+  changes?: PendingChange[];
   id: string;
   role: ChatRole;
   content: string;

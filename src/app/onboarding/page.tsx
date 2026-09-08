@@ -9,7 +9,7 @@ import { apiFetch } from "@/lib/api/client";
 // fora do grupo (app), portanto sem o shell nem o gating de org. Experiência
 // "Linear" full-screen (port de Atjus - Onboarding.dc.html).
 export default async function OnboardingPage() {
-  // Quem já concluiu o onboarding não deve ver o fluxo — manda pra Inbox.
+  // Quem já concluiu o onboarding não deve ver o fluxo — manda para Notificações.
   // Contrapartida do gating fail-closed do (app): evita prender o usuário aqui.
   // /identity/me fora do ar → mostra o fluxo (idempotente, sem lockout).
   const { userId, getToken } = await auth();

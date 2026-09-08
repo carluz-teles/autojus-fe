@@ -11,6 +11,7 @@ import { useState } from "react";
 
 import { useApi } from "@/lib/api/use-api";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useInfinitePageBuffer } from "@/lib/hooks/use-infinite-page-buffer";
 
 const PAGE_SIZE = 30;
 
@@ -40,6 +41,7 @@ export const processosKeys = {
 
 export interface ProcessosFiltersAtivos extends ProcessoFilters {
   lifecycle?: string;
+  search?: string;
 }
 
 /**
@@ -49,7 +51,8 @@ export interface ProcessosFiltersAtivos extends ProcessoFilters {
  */
 export function useProcessos(filters: ProcessosFiltersAtivos = {}) {
   const fetcher = useApi();
-  const [search, setSearch] = useState("");
+  const [localSearch, setSearch] = useState("");
+  const search = filters.search ?? localSearch;
   const debouncedSearch = useDebounce(search, 400);
 
   const params = {
@@ -60,23 +63,26 @@ export function useProcessos(filters: ProcessosFiltersAtivos = {}) {
     assignee: filters.assignee || undefined,
   };
 
-  // Leitura por cursor ACUMULADA (useInfiniteQuery) — "Mostrar mais" pede a próxima
-  // página sem derrubar as carregadas; troca de aba/filtro mantém a anterior no ar
-  // via keepPreviousData. Mesmo idioma de useIntimacoes (master-detail).
+  const queryKey = processosKeys.list(params);
   const query = useInfiniteQuery({
-    queryKey: processosKeys.list(params),
-    queryFn: ({ pageParam }) =>
-      listProcessos(fetcher, {
-        ...params,
-        limit: PAGE_SIZE,
-        cursor: pageParam || undefined,
-      }),
+    queryKey,
+    queryFn: ({ pageParam, signal }) =>
+      listProcessos(
+        fetcher,
+        {
+          ...params,
+          limit: PAGE_SIZE,
+          cursor: pageParam || undefined,
+        },
+        signal,
+      ),
     initialPageParam: "",
-    getNextPageParam: (lastPage) => lastPage.page.next_cursor,
+    getNextPageParam: (lastPage) => lastPage.page.next_cursor || undefined,
     placeholderData: keepPreviousData,
   });
 
-  const pages = query.data?.pages ?? [];
+  const pagination = useInfinitePageBuffer(queryKey, query);
+  const pages = pagination.pages;
   const first = pages[0];
 
   return {
@@ -86,13 +92,16 @@ export function useProcessos(filters: ProcessosFiltersAtivos = {}) {
     isPending: query.isPending,
     isFetching: query.isFetching,
     error: query.error,
+    refetch: query.refetch,
+    isSearchPending: search !== debouncedSearch,
+    isFetchNextPageError: query.isFetchNextPageError,
     // busca
     search,
     setSearch,
-    // paginação incremental ("Mostrar mais")
-    hasMore: query.hasNextPage,
+    paginationKey: pagination.paginationKey,
+    hasMore: pagination.hasMore,
     isLoadingMore: query.isFetchingNextPage,
-    loadMore: query.fetchNextPage,
+    loadMore: pagination.loadMore,
   };
 }
 

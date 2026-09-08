@@ -44,6 +44,9 @@ const ENDPOINT = "/v1/pecas";
 // ── Criação (POST /v1/pecas) ─────────────────────────────────────────────────
 
 export interface CreateDraftInput {
+  actionItemId?: string;
+  instructions?: string;
+  title?: string;
   /** Id da intimação de origem — o BE resolve case_id/court_record_id dela. */
   intimationId: string;
   /** Tipo da peça (opcional; o BE infere do tipo da intimação quando ausente). */
@@ -53,25 +56,31 @@ export interface CreateDraftInput {
   thesisIds?: string[];
 }
 
-/** Materializa a peça a partir de uma intimação — POST /v1/pecas. Chamado SÓ no
- *  "Gerar minuta" (a peça não existe antes). O BE devolve 201 (nova) ou 200 (já
+/** Materializa a peça a partir de uma intimação — POST /v1/pecas. Chamado ao abrir
+ *  a construção. O BE devolve 201 (nova) ou 200 (já
  *  existia) com o draft; retornamos o id. */
 export async function createDraft(
   fetcher: ApiFetcher,
   input: CreateDraftInput,
-): Promise<{ id: string }> {
-  const res = await fetcher<DataEnvelope<{ id: string }>>(ENDPOINT, {
-    method: "POST",
-    body: {
-      source: "intimation",
-      intimation_id: input.intimationId,
-      ...(input.pieceType ? { piece_type: input.pieceType } : {}),
-      ...(input.thesisIds && input.thesisIds.length
-        ? { thesis_ids: input.thesisIds }
-        : {}),
+): Promise<{ id: string; isNew: boolean }> {
+  const res = await fetcher<DataEnvelope<{ id: string; is_new: boolean }>>(
+    ENDPOINT,
+    {
+      method: "POST",
+      body: {
+        source: "intimation",
+        intimation_id: input.intimationId,
+        action_item_id: input.actionItemId,
+        instructions: input.instructions,
+        title: input.title,
+        ...(input.pieceType ? { piece_type: input.pieceType } : {}),
+        ...(input.thesisIds && input.thesisIds.length
+          ? { thesis_ids: input.thesisIds }
+          : {}),
+      },
     },
-  });
-  return { id: res.data.id };
+  );
+  return { id: res.data.id, isNew: res.data.is_new };
 }
 
 // ── Teses da PARTIDA (intimation-scoped, sem draft) ──────────────────────────
@@ -135,13 +144,36 @@ export async function getTheses(
 
 /** POST /v1/pecas/:id/theses — (re)gera sugestões via IA, ancoradas nos
  *  attachments; PERSISTE. Novas sugestões nascem em state="off". */
+export interface ThesisSources {
+  revision: string;
+  analyzed_revision: string;
+  refreshed_at: string | null;
+  indexed_documents: number;
+  needs_refresh: boolean;
+  can_refresh: boolean;
+}
+
+export async function getThesisSources(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<ThesisSources> {
+  const res = await fetcher<DataEnvelope<ThesisSources>>(
+    `${ENDPOINT}/${id}/theses/sources`,
+  );
+  return res.data;
+}
+
 export async function generateTheses(
   fetcher: ApiFetcher,
   id: string,
+  onlyIfStale = false,
 ): Promise<Thesis[]> {
   const res = await fetcher<DataEnvelope<ThesisAPI[]>>(
     `${ENDPOINT}/${id}/theses`,
-    { method: "POST" },
+    {
+      method: "POST",
+      query: onlyIfStale ? { only_if_stale: true } : undefined,
+    },
   );
   return (res.data ?? []).map(mapThesisFromApi);
 }
@@ -170,11 +202,23 @@ export async function generateDraft(
   fetcher: ApiFetcher,
   id: string,
   thesisIds: string[],
-): Promise<void> {
-  await fetcher(`${ENDPOINT}/${id}/generate`, {
-    method: "POST",
-    body: { thesis_ids: thesisIds },
-  });
+  instructions?: string,
+  replacement?: { revision: string },
+): Promise<{ updated_at: string }> {
+  const response = await fetcher<DataEnvelope<{ updated_at: string }>>(
+    `${ENDPOINT}/${id}/generate`,
+    {
+      method: "POST",
+      body: {
+        thesis_ids: thesisIds,
+        instructions,
+        ...(replacement
+          ? { replace_existing: true, revision: replacement.revision }
+          : {}),
+      },
+    },
+  );
+  return response.data;
 }
 
 // ── Autosave (PATCH /pecas/:id — dual write) ─────────────────────────────────

@@ -2,6 +2,8 @@
 
 import { AlertTriangle } from "lucide-react";
 
+import { TeorContent } from "@/components/teor-content";
+
 import { OrigemIcon, PrioIcon } from "../icons";
 import type { InboxModel } from "./inbox-view";
 
@@ -73,10 +75,11 @@ export function PeekPane({ inbox }: { inbox: InboxModel }) {
         <div className="text-fg3 text-[10.5px] font-medium tracking-[0.05em] uppercase">
           Intimação de origem
         </div>
-        <p className="text-foreground mt-[9px] text-[13px] leading-[1.6]">
-          {f.trecho ||
-            "Publicação capturada do DJEN. Teor integral disponível nos autos do processo."}
-        </p>
+        <TeorContent
+          content={f.trecho}
+          emptyMessage="Publicação capturada do DJEN. Teor integral disponível nos autos do processo."
+          className="mt-[9px]"
+        />
         <div className="text-fg3 mt-2.5 text-[11.5px]">
           Publicado {f.publicacao} · resp. {f.resp}
         </div>

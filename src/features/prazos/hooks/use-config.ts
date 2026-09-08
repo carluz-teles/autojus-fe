@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMemo } from "react";
 
-// Aba ativa da tela de configurações. (Notificações saiu por ora; Plano &
-// cobrança está como "Em breve".)
+// Aba ativa da tela de configurações.
 export type ConfigTab =
-  "perfil" | "org" | "plano" | "equipe" | "fontes" | "cert";
+  "perfil" | "org" | "plano" | "equipe" | "fontes" | "cert" | "notificacoes";
 
 // Item da sub-nav esquerda (Perfil / Organização / Plano & cobrança / ...).
 export interface ConfigNavItem {
@@ -33,12 +33,16 @@ const TABS: { key: ConfigTab; label: string }[] = [
   { key: "equipe", label: "Equipe" },
   { key: "fontes", label: "Fontes de dados" },
   { key: "cert", label: "Certificados digitais" },
+  { key: "notificacoes", label: "Notificações" },
 ];
 
 // Hook público da tela de Configurações — guarda só a aba ativa (UI local).
 // Cada aba puxa o próprio estado real do respectivo hook/feature.
 export function useConfig() {
-  const [tab, setTab] = useState<ConfigTab>("perfil");
+  const params = useSearchParams();
+  const router = useRouter();
+  const raw = params.get("tab");
+  const tab = TABS.find((t) => t.key === raw)?.key ?? "perfil";
 
   const nav = useMemo<ConfigNavItem[]>(
     () =>
@@ -51,10 +55,11 @@ export function useConfig() {
           bg: ativo ? "var(--selected)" : "transparent",
           fg: ativo ? "var(--fg)" : "var(--fg2)",
           peso: ativo ? 500 : 400,
-          onClick: () => setTab(t.key),
+          onClick: () =>
+            router.replace(`/configuracoes?tab=${t.key}`, { scroll: false }),
         };
       }),
-    [tab],
+    [tab, router],
   );
 
   return { tab, nav };

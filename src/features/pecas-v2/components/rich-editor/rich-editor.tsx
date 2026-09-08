@@ -24,7 +24,6 @@ import {
   FontSize,
   TextStyle,
 } from "@tiptap/extension-text-style";
-import { Underline } from "@tiptap/extension-underline";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
@@ -54,7 +53,11 @@ export interface RichEditorHandle {
   /** Aplica uma proposta do Assistente NO EDITOR VIVO: troca o corpo da SEÇÃO
    *  (ancorada pelo heading do romano) pelos novos parágrafos, e emite update
    *  (→ autosave). Devolve false quando a seção não foi encontrada — não corrompe. */
-  applySectionChange(sectionRoman: string, newParagraphs: string[]): boolean;
+  applySectionChange(
+    sectionRoman: string,
+    newParagraphs: string[],
+    expectedParagraphs?: string[],
+  ): boolean;
 }
 
 interface Props {
@@ -118,7 +121,6 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
           // deixamos undo/redo padrão do StarterKit; heading H1-H3 já embutido.
           heading: { levels: [1, 2, 3] },
         }),
-        Underline,
         TextStyle,
         Color,
         FontFamily,
@@ -174,7 +176,8 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
 
     useEffect(() => {
       if (!editor) return;
-      editor.setEditable(!readOnly);
+      // Toggling read-only is not a content edit (notably when streaming ends).
+      editor.setEditable(!readOnly, false);
     }, [editor, readOnly]);
 
     // Marca no texto os trechos das teses em pending_remove (Decorations, via meta
@@ -217,13 +220,14 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(
               behavior: "smooth",
             });
         },
-        applySectionChange(sectionRoman, newParagraphs) {
+        applySectionChange(sectionRoman, newParagraphs, expectedParagraphs) {
           if (!editor) return false;
           const current = editor.getHTML();
           const next = applySectionChangeToHtml(
             current,
             sectionRoman,
             newParagraphs,
+            expectedParagraphs,
           );
           if (next === current) return false;
           // emitUpdate → onUpdate → onChange do parent → autosave do content_html.

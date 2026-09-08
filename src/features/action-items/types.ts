@@ -13,7 +13,8 @@
 
 // Status do TRABALHO — ciclo linear sem saída. SUGGESTED é só diagnóstico
 // (nunca vem no board/fila/summary); a UI de trabalho lida com TODO/WORKING/DONE.
-export type ActionItemStatus = "SUGGESTED" | "TODO" | "WORKING" | "DONE";
+export type ActionItemStatus =
+  "SUGGESTED" | "TODO" | "WORKING" | "DONE" | "CANCELLED" | "DISMISSED";
 
 // Prioridade — flag de triagem HIGH|MEDIUM|LOW, ou ausente ("sem prioridade").
 // Espelha o priority do BE (text nullable). Os rótulos em PT vivem na UI; o wire
@@ -67,6 +68,17 @@ export interface ActionItemView {
   court?: string;
   created_at: string;
   updated_at: string;
+  source_kind?: "manual" | "analysis";
+  process_title?: string;
+  judicial_due_date?: string | null;
+  judicial_status?: string | null;
+  judicial_review_status?: string | null;
+  effective_due_date?: string | null;
+  draft_id?: string | null;
+  draft_state?: string | null;
+  draft_title?: string | null;
+  intimation_text?: string | null;
+  activity?: WorkActivity[];
 }
 
 /**
@@ -101,3 +113,22 @@ export interface ActionItemsSummary {
 
 // Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
 export type { PageEnvelope } from "@/lib/api/types";
+
+export interface WorkActivity {
+  id: string;
+  actor_user_id: string | null;
+  kind: string;
+  changes: Record<string, { before: unknown; after: unknown }>;
+  created_at: string;
+}
+export interface CreateWorkInput {
+  court_record_id: string;
+  intimation_id?: string;
+  title: string;
+  description: string;
+  tipo: ActionItemTipo;
+  piece_profile_key: string;
+  assignee_user_id: string;
+  priority: string;
+  due_date: string;
+}

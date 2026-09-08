@@ -1,18 +1,18 @@
 import { redirect } from "next/navigation";
 
-import { PartidaPage } from "@/features/pecas-v2/components/pregen/partida-page";
+import { ConstructionEntry } from "@/features/pecas-v2/components/pregen/construction-entry";
 
 export const metadata = { title: "Nova peça · Construção · jus·assessoria" };
 
-// PARTIDA (/pecas/nova?intimacao=<id>): a Construção ANTES da peça existir. A peça
-// só é criada no "Gerar minuta". Sem intimação na query não há o que construir →
-// volta pra lista de intimações. Next.js 16: searchParams é assíncrono (Promise).
+// Both routes resolve the intimation and open the construction directly.
 export default async function NovaPecaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ intimacao?: string }>;
+  searchParams: Promise<{ intimacao?: string; providencia?: string }>;
 }) {
-  const { intimacao } = await searchParams;
+  const { intimacao, providencia } = await searchParams;
+  if (providencia)
+    return <ConstructionEntry key={providencia} actionItemId={providencia} />;
   if (!intimacao) redirect("/intimacoes");
-  return <PartidaPage intimacaoId={intimacao} />;
+  return <ConstructionEntry key={intimacao} intimationId={intimacao} />;
 }

@@ -3,7 +3,7 @@ export type CaptureKind =
   "DAILY_CAPTURE" | "ENRICHMENT" | "INITIAL_LOAD" | "CATCH_UP";
 export type CaptureDisplayStatus =
   "Concluída" | "Concluída com avisos" | "Falha parcial" | "Em andamento";
-export type CaptureTriggerReason = "OAB_ADDED" | "OAB_REENABLED";
+export type CaptureTriggerReason = "OAB_ADDED" | "OAB_REENABLED" | "OAB_DAILY";
 
 export interface CaptureRunView {
   id: string;
@@ -24,8 +24,8 @@ export interface CaptureRunView {
   duration_sec: number | null;
   oab_count: number;
   // trigger_reason/trigger_oabs atribuem a captura à OAB que a disparou — presente
-  // só em INITIAL_LOAD (OAB_ADDED) e CATCH_UP (OAB_REENABLED); ausente em
-  // DAILY_CAPTURE/ENRICHMENT, que nunca são disparadas por uma OAB específica.
+  // em INITIAL_LOAD (OAB_ADDED), CATCH_UP (OAB_REENABLED) e descoberta diária
+  // por OAB (OAB_DAILY); ausente na captura nacional e no enriquecimento.
   trigger_reason: CaptureTriggerReason | null;
   trigger_oabs: string[] | null;
 }

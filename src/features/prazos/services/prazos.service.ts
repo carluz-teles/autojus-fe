@@ -91,7 +91,7 @@ export async function getPrazosSummary(
   return fetcher<PrazosSummary>(`${ENDPOINT}/summary`);
 }
 
-/** F2 — "Aprovar tudo": abre o prazo (PENDING→OPEN) e cria as tarefas numa tacada. */
+/** Registra a confirmação humana do tipo e prazo. */
 export async function confirmarPrazo(
   fetcher: ApiFetcher,
   body: PrazoConfirmInput,

@@ -13,6 +13,7 @@ import { useState } from "react";
 import { iniciarActionItem } from "@/features/action-items/services/action-items.service";
 import { useApi } from "@/lib/api/use-api";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useInfinitePageBuffer } from "@/lib/hooks/use-infinite-page-buffer";
 
 import {
   analisarIntimacao,
@@ -70,11 +71,17 @@ export const intimacoesKeys = {
 };
 
 export interface IntimacoesFilters {
+  groupBy?: "cnj";
+  sort?: "recent" | "deadline";
+  cnj?: string;
+  search?: string;
   type?: string;
   user_status?: string;
   court?: string;
   /** atraso|hoje|proximos_dois_dias|semana|este_mes|mais_adiante|sem_data_definida */
   urgencia?: string;
+  dueFrom?: string;
+  dueTo?: string;
   /** Status = work_stage (RECEIVED|AWAITING_CONFIRMATION|CONFIRMED|DRAFTING|
    *  PARTNER_REVIEW|FILED). Estágio derivado no BE. Aceita um valor único ou
    *  uma lista (ex.: a fila de Triagem filtra por 3 estágios de uma vez) — o
@@ -91,30 +98,30 @@ export interface IntimacoesFilters {
   /** Default true. false pula o fetch — ex: NovaPecaModal no contexto de um
    *  processo específico usa useIntimacoesByProcesso em vez desta lista geral. */
   enabled?: boolean;
-  /** Tamanho de página customizado — default PAGE_SIZE (20). Ex.: a fila de
-   *  Triagem busca 100 de uma vez, sem "mostrar mais" (leitura de página única). */
+  /** Antecipa uma página nas listagens; consultas de contagem não fazem prefetch. */
+  prefetchNextPage?: boolean;
+  /** Tamanho de página customizado — default PAGE_SIZE (20). */
   limit?: number;
 }
 
-/**
- * Hook público da feature — inbox de intimações do master-detail: leitura por cursor
- * ACUMULADA via useInfiniteQuery (mesmo idioma de useAndamentosDoProcesso) — cada tab de
- * urgência dispara um fetch real (?urgencia=...) e "Mostrar mais" só pede a próxima
- * página, sem perder as já carregadas. Busca server-side (debounce por cnj_number/
- * classe/órgão). `buckets` traz as contagens reais por urgência (independem de
- * `urgencia`, mas NÃO de `assignee` — limitação conhecida do BE).
- */
+/** Lista por cursor, com filtros no servidor e buffer opcional de uma página. */
 export function useIntimacoes(filters: IntimacoesFilters = {}) {
   const fetcher = useApi();
-  const [search, setSearch] = useState("");
+  const [localSearch, setSearch] = useState("");
+  const search = filters.search ?? localSearch;
   const debouncedSearch = useDebounce(search, 400);
 
   const params = {
+    group_by: filters.groupBy,
+    sort: filters.sort,
+    cnj: filters.cnj,
     search: debouncedSearch || undefined,
     type: filters.type || undefined,
     user_status: filters.user_status || undefined,
     court: filters.court || undefined,
     urgencia: filters.urgencia || undefined,
+    due_from: filters.dueFrom || undefined,
+    due_to: filters.dueTo || undefined,
     work_stage: filters.workStage || undefined,
     origem: filters.origem || undefined,
     nao_confirmado: filters.naoConfirmado || undefined,
@@ -122,15 +129,20 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     limit: filters.limit ?? PAGE_SIZE,
   };
 
+  const queryKey = intimacoesKeys.list(params);
   const query = useInfiniteQuery({
-    queryKey: intimacoesKeys.list(params),
-    queryFn: ({ pageParam }) =>
-      listIntimacoes(fetcher, {
-        ...params,
-        cursor: pageParam || undefined,
-      }),
+    queryKey,
+    queryFn: ({ pageParam, signal }) =>
+      listIntimacoes(
+        fetcher,
+        {
+          ...params,
+          cursor: pageParam || undefined,
+        },
+        signal,
+      ),
     initialPageParam: "",
-    getNextPageParam: (lastPage) => lastPage.page.next_cursor,
+    getNextPageParam: (lastPage) => lastPage.page.next_cursor || undefined,
     enabled: filters.enabled ?? true,
     // Mantém os dados da faixa/filtro anterior enquanto a nova query carrega, pra
     // trocar tab/filtro NÃO derrubar a página inteira no skeleton (isPending só é
@@ -138,11 +150,19 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     placeholderData: keepPreviousData,
   });
 
-  const pages = query.data?.pages ?? [];
+  const pagination = useInfinitePageBuffer(
+    queryKey,
+    query,
+    !!filters.prefetchNextPage && (filters.enabled ?? true),
+  );
+  const pages = pagination.pages;
   const first = pages[0];
 
   return {
     intimacoes: pages.flatMap((p) => p.data),
+    groups: pages.flatMap((p) => p.groups ?? []),
+    processCount: first?.process_count ?? 0,
+    totalWithoutUrgency: first?.total_without_urgency ?? 0,
     filters: first?.filters ?? {},
     buckets: first?.buckets ?? EMPTY_BUCKETS,
     origemFacets: first?.origem_facets ?? EMPTY_ORIGEM_FACETS,
@@ -150,14 +170,18 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     total: first?.page.total ?? 0,
     isPending: query.isPending,
     isFetching: query.isFetching,
+    isSearchPending: search !== debouncedSearch,
     error: query.error,
+    refetch: query.refetch,
+    isPlaceholderData: query.isPlaceholderData,
+    isFetchNextPageError: query.isFetchNextPageError,
     // busca
     search,
     setSearch,
-    // paginação incremental ("Mostrar mais")
-    hasMore: query.hasNextPage,
+    paginationKey: pagination.paginationKey,
+    hasMore: pagination.hasMore,
     isLoadingMore: query.isFetchingNextPage,
-    loadMore: query.fetchNextPage,
+    loadMore: pagination.loadMore,
   };
 }
 

@@ -1,9 +1,9 @@
 import {
+  Bell,
   CalendarDays,
   Clock,
   Columns3,
   FolderOpen,
-  Inbox,
   ListChecks,
   ListOrdered,
   type LucideIcon,
@@ -29,7 +29,7 @@ export interface NavSection {
 
 // Estrutura de navegação AUTORITATIVA do design (Claude Design · Prazos Linear).
 // 4 seções: ESPAÇO (a caixa de trabalho), VISTAS (recortes das providências),
-// ACERVO (o material) e SISTEMA. Inbox e Providências são destinos distintos do
+// ACERVO (o material) e SISTEMA. Notificações e Providências são destinos distintos do
 // nav — não tabs do topo. Todas as telas portadas do rebranding moram sob
 // /prazos/*; os itens apontam para as versões "Linear" (as rotas antigas seguem
 // intactas). A rota do board segue /pipeline (só o rótulo virou "Providências").
@@ -37,7 +37,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     titulo: "Espaço",
     itens: [
-      { href: "/", label: "Inbox", icon: Inbox },
+      { href: "/", label: "Notificações", icon: Bell },
       { href: "/triagem", label: "Triagem", icon: ListChecks },
       { href: "/meus-prazos", label: "Meus Prazos", icon: Clock },
     ],
@@ -70,7 +70,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
 // Lista PLANA de todas as rotas conhecidas — fonte dos rótulos do breadcrumb
 // (SEG_LABEL em breadcrumb-context) e dos comandos da paleta ⌘K.
 export const NAV_ITEMS: readonly NavItem[] = [
-  { href: "/", label: "Inbox", icon: Inbox },
+  { href: "/", label: "Notificações", icon: Bell },
   { href: "/triagem", label: "Triagem", icon: ListChecks },
   { href: "/meus-prazos", label: "Meus Prazos", icon: Clock },
   { href: "/pipeline", label: "Providências", icon: Columns3 },

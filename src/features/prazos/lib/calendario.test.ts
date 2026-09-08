@@ -76,7 +76,7 @@ describe("buildMes", () => {
     expect(hoje[0].num).toBe(15);
   });
 
-  it("agrupa prazos e providências no dia certo (máx 3 chips + extra)", () => {
+  it("preserva todos os eventos e informa quantos ficam recolhidos", () => {
     const eventos: CalEvento[] = [
       ev({ id: "p1", dia: "2026-09-15" }),
       ev({
@@ -93,7 +93,7 @@ describe("buildMes", () => {
     const dias = buildMes(eventos, REF, HOJE).flatMap((w) => w.dias);
     const d15 = dias.find((d) => d.num === 15)!;
     expect(d15.temEv).toBe(true);
-    expect(d15.evs).toHaveLength(3);
+    expect(d15.evs).toHaveLength(5);
     expect(d15.temExtra).toBe(true);
     expect(d15.extra).toBe("2");
 
@@ -153,4 +153,12 @@ describe("buildDia", () => {
     // A vista não expõe eventos por horário — só a grade de horas.
     expect(dia).not.toHaveProperty("eventos");
   });
+});
+
+it("não trunca dias e semanas com muitos vencimentos", () => {
+  const events = Array.from({ length: 15 }, (_, i) => ev({ id: `prazo-${i}` }));
+  expect(buildDia(events, REF).allday).toHaveLength(15);
+  expect(
+    buildSemana(events, REF, HOJE).find((d) => d.data === "15/09")?.evs,
+  ).toHaveLength(15);
 });

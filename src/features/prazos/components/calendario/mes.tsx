@@ -1,12 +1,16 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
+
+import { Button } from "@/components/ui/button";
 
 import type { CalModel } from "./calendario-view";
+import { EventoCalendario } from "./evento";
 
 // Grade do mês (7 colunas, semanas), fiel ao template. Dia com evento mostra até
 // 3 chips + "+N mais"; o dia de HOJE (dinâmico) fica destacado.
 export function Mes({ cal }: { cal: CalModel }) {
+  const [expandidos, setExpandidos] = useState<Set<string>>(() => new Set());
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="border-line grid shrink-0 grid-cols-7 border-b">
@@ -19,16 +23,22 @@ export function Mes({ cal }: { cal: CalModel }) {
           </div>
         ))}
       </div>
-      <div className="flex flex-1 flex-col overflow-y-auto">
+      <div
+        className="grid min-h-0 flex-1 overflow-hidden"
+        style={{
+          gridTemplateRows: `repeat(${cal.mes.length}, minmax(0, 1fr))`,
+        }}
+      >
         {cal.mes.map((wk, wi) => (
           <div
             key={wi}
-            className="border-line2 grid min-h-[116px] flex-1 grid-cols-7 border-b"
+            className="border-line2 grid min-h-0 grid-cols-7 overflow-hidden border-b"
           >
             {wk.dias.map((d, di) => (
               <div
                 key={di}
-                className="border-line2 min-w-0 border-r px-[5px] py-1"
+                data-calendar-day={d.dataISO}
+                className="border-line2 flex min-h-0 min-w-0 flex-col overflow-hidden border-r px-[5px] py-1"
                 style={{
                   background: d.hoje
                     ? "color-mix(in oklch, var(--primary) 5%, transparent)"
@@ -37,7 +47,7 @@ export function Mes({ cal }: { cal: CalModel }) {
               >
                 {d.vazia ? null : (
                   <>
-                    <div className="flex justify-end px-1 py-0.5">
+                    <div className="flex shrink-0 justify-end px-1 py-0.5">
                       <span
                         className="grid size-[22px] place-items-center rounded-full text-[12px] tabular-nums"
                         style={{
@@ -51,29 +61,44 @@ export function Mes({ cal }: { cal: CalModel }) {
                       </span>
                     </div>
                     {d.temEv ? (
-                      <div className="flex flex-col gap-[3px]">
-                        {d.evs?.map((e) => (
-                          <Link
-                            key={e.id}
-                            href={e.href}
-                            title={e.sub ? `${e.titulo} · ${e.sub}` : e.titulo}
-                            className="flex w-full items-center gap-1.5 rounded-[5px] px-1.5 py-0.5 text-left"
-                            style={{ background: e.chipFundo }}
-                          >
-                            <span
-                              className="size-[5px] shrink-0 rounded-full"
-                              style={{ background: e.urgCor }}
+                      <div className="flex min-h-0 flex-1 flex-col gap-1">
+                        <div
+                          id={`eventos-${d.dataISO}`}
+                          className="flex min-h-0 flex-1 flex-col gap-1 overflow-x-hidden overflow-y-auto overscroll-contain"
+                        >
+                          {(expandidos.has(d.dataISO!)
+                            ? d.evs
+                            : d.evs?.slice(0, 3)
+                          )?.map((e) => (
+                            <EventoCalendario
+                              key={e.id}
+                              evento={e}
+                              densidade="mes"
                             />
-                            <span className="text-foreground truncate text-[11px]">
-                              {e.titulo}
-                            </span>
-                          </Link>
-                        ))}
-                        {d.temExtra ? (
-                          <span className="text-fg3 pl-1.5 text-[10.5px]">
-                            +{d.extra} mais
-                          </span>
-                        ) : null}
+                          ))}
+                        </div>
+                        {d.temExtra && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-full shrink-0 justify-start overflow-hidden px-1.5 text-[11px]"
+                            aria-expanded={expandidos.has(d.dataISO!)}
+                            aria-controls={`eventos-${d.dataISO}`}
+                            onClick={() =>
+                              setExpandidos((current) => {
+                                const next = new Set(current);
+                                if (next.has(d.dataISO!))
+                                  next.delete(d.dataISO!);
+                                else next.add(d.dataISO!);
+                                return next;
+                              })
+                            }
+                          >
+                            {expandidos.has(d.dataISO!)
+                              ? "Recolher"
+                              : `+${d.extra} ${d.evs?.every((e) => e.tipo === "prazo") ? "prazos" : "itens"}`}
+                          </Button>
+                        )}
                       </div>
                     ) : null}
                   </>

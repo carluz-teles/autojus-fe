@@ -25,6 +25,10 @@ export interface CalEvento {
   titulo: string;
   /** Sublinha opcional (CNJ curto / órgão) — pode ser vazia. */
   sub: string;
+  processo?: string;
+  situacao?: string;
+  contagem?: string;
+  responsavel?: string;
   /** "YYYY-MM-DD" do dia em que cai o evento (fatal do prazo / vencimento da providência). */
   dia: string;
   /** Dias restantes contra HOJE (negativo = vencido) — base da cor de urgência. */
@@ -42,6 +46,7 @@ export interface CalEventoUI extends CalEvento {
 export interface CalCelula {
   vazia: boolean;
   num?: number;
+  dataISO?: string;
   hoje?: boolean;
   temEv?: boolean;
   temExtra?: boolean;
@@ -187,11 +192,12 @@ export function buildMes(
     cells.push({
       vazia: false,
       num: d,
+      dataISO: iso,
       hoje: iso === hojeISO,
       temEv: evs.length > 0,
       temExtra: evs.length > 3,
       extra: (evs.length - 3).toLocaleString("pt-BR"),
-      evs: evs.slice(0, 3),
+      evs,
     });
   }
   while (cells.length % 7 !== 0) cells.push({ vazia: true });
@@ -214,10 +220,7 @@ export function buildSemana(
   for (let i = 0; i < 7; i++) {
     const d = new Date(dom.getFullYear(), dom.getMonth(), dom.getDate() + i);
     const iso = toISODate(d);
-    const evs = eventos
-      .filter((e) => e.dia === iso)
-      .slice(0, 6)
-      .map(decorar);
+    const evs = eventos.filter((e) => e.dia === iso).map(decorar);
     out.push({
       dow: DOW_CURTO[d.getDay()],
       data: `${String(d.getDate()).padStart(2, "0")}/${String(
@@ -236,10 +239,7 @@ export function buildSemana(
 // horas fica sem eventos posicionados — audiências fora de escopo.
 export function buildDia(eventos: CalEvento[], ref: Date) {
   const iso = toISODate(ref);
-  const allday = eventos
-    .filter((e) => e.dia === iso)
-    .slice(0, 8)
-    .map(decorar);
+  const allday = eventos.filter((e) => e.dia === iso).map(decorar);
 
   const horas: CalHora[] = [];
   for (let h = H0; h <= H1; h++)

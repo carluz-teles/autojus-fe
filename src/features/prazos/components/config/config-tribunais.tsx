@@ -1,166 +1,282 @@
 "use client";
 
-import { Landmark, Plus } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
-
 import {
-  useConnectCourtConnection,
+  AlertCircle,
+  CheckCircle2,
+  ExternalLink,
+  Landmark,
+  Search,
+} from "lucide-react";
+import { useState } from "react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { EsajAccess } from "@/features/configuracoes/components/esaj-access";
+import {
+  useCourtCatalog,
   useCourtConnections,
 } from "@/features/configuracoes/hooks/use-court-connections";
+import {
+  connectionForSystem,
+  courtConnectionLabels,
+  courtSystemName,
+  groupCourtCatalog,
+} from "@/features/configuracoes/lib/court-catalog";
 import type {
-  CourtConnectionStatus,
+  CourtCatalogEntry,
   CourtConnectionView,
 } from "@/features/configuracoes/types/court-connection";
-import { ApiError } from "@/lib/api/errors";
-import { formatDate } from "@/lib/format";
 
 import { ConexaoWizard } from "./conexao-wizard";
 
-function errorMessage(err: unknown): string {
-  if (err instanceof ApiError) return err.message;
-  return "Não foi possível concluir a operação. Tente novamente.";
-}
+type Selection = { entry: CourtCatalogEntry; connection?: CourtConnectionView };
 
-// Rótulo + cores do status (mesma paleta dos badges de certificado).
-function statusVM(status: CourtConnectionStatus): {
-  label: string;
-  fundo: string;
-  cor: string;
-} {
-  const ok = {
-    fundo: "color-mix(in oklch, var(--primary) 12%, transparent)",
-    cor: "var(--primary)",
-  };
-  const warn = {
-    fundo: "color-mix(in oklch, var(--gold) 16%, transparent)",
-    cor: "var(--gold)",
-  };
-  const danger = {
-    fundo: "color-mix(in oklch, var(--destructive) 12%, transparent)",
-    cor: "var(--destructive)",
-  };
-  const neutral = { fundo: "var(--hover)", cor: "var(--fg3)" };
-  switch (status) {
-    case "CONNECTED":
-      return { label: "Conectado", ...ok };
-    case "AUTHENTICATING":
-      return { label: "Conectando…", ...neutral };
-    case "MFA_ENROLLMENT_REQUIRED":
-      return { label: "Falta o segundo fator", ...warn };
-    case "MFA_REQUIRED":
-    case "REAUTH_REQUIRED":
-      return { label: "Precisa reconectar", ...warn };
-    case "CERTIFICATE_REQUIRED":
-      return { label: "Certificado pendente", ...warn };
-    case "ERROR":
-      return { label: "Erro", ...danger };
-    default:
-      return { label: "Desconectado", ...neutral };
-  }
-}
-
-// Aba "Tribunais" (Configurações): conexões eproc para ler os autos
-// automaticamente. Certificado + segundo fator capturado uma única vez.
-export function ConfigTribunais() {
-  const { data: conexoes, isLoading, error } = useCourtConnections();
-  const connectMut = useConnectCourtConnection();
-  const [aberto, setAberto] = useState(false);
-
-  async function reconectar(c: CourtConnectionView) {
-    try {
-      await connectMut.mutateAsync(c.id);
-    } catch (e) {
-      toast.error(errorMessage(e));
-    }
-  }
-
-  return (
-    <>
-      <div className="mb-3.5 flex items-start justify-between gap-4">
-        <p className="text-fg3 text-[12.5px]">
-          Conecte-se ao tribunal para ler os autos automaticamente. Usa o seu
-          certificado e um segundo fator capturado uma única vez.
-        </p>
-        <button
-          onClick={() => setAberto(true)}
-          className="bg-primary text-primary-foreground inline-flex flex-none items-center gap-[7px] rounded-[9px] px-3.5 py-2 text-[12.5px] font-medium"
+function SystemRow({
+  entry,
+  connection,
+  onConnect,
+}: Selection & { onConnect: () => void }) {
+  const perOperation = entry.connection_mode === "PER_OPERATION";
+  const connected =
+    !perOperation && entry.available && connection?.status === "CONNECTED";
+  const needsAttention =
+    !perOperation &&
+    entry.available &&
+    connection &&
+    [
+      "MFA_REQUIRED",
+      "MFA_ENROLLMENT_REQUIRED",
+      "REAUTH_REQUIRED",
+      "CERTIFICATE_REQUIRED",
+      "ERROR",
+    ].includes(connection.status);
+  const status = !entry.available
+    ? "Em preparação"
+    : perOperation
+      ? "Acesso por operação"
+      : connection
+        ? courtConnectionLabels[connection.status]
+        : "Não conectado";
+  const system = courtSystemName(entry.system);
+  const actions = (
+    <div className="flex max-w-full flex-wrap items-center gap-2">
+      {entry.available ? (
+        perOperation ? (
+          <EsajAccess court={entry.court} />
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={connection?.status === "AUTHENTICATING"}
+            onClick={onConnect}
+            aria-label={`${connected ? "Ver conexão" : "Conectar"} ${system} · ${entry.court}`}
+          >
+            {connected
+              ? "Ver conexão"
+              : connection?.status === "AUTHENTICATING"
+                ? "Conectando…"
+                : needsAttention
+                  ? "Retomar conexão"
+                  : "Conectar"}
+          </Button>
+        )
+      ) : (
+        <Button
+          size="sm"
+          variant="ghost"
+          nativeButton={false}
+          render={
+            <a href={entry.source_url} target="_blank" rel="noreferrer" />
+          }
+          aria-label={`Fonte oficial sobre ${system} no ${entry.court}`}
         >
-          <Plus className="size-3.5" strokeWidth={2} />
-          Conectar tribunal
-        </button>
+          Fonte oficial
+          <ExternalLink data-icon="inline-end" aria-hidden />
+        </Button>
+      )}
+    </div>
+  );
+  const description = (
+    <div className="min-w-0 flex-1 basis-56">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-foreground text-sm font-medium">{system}</h3>
+        {entry.scope && (
+          <span className="text-muted-foreground text-xs">{entry.scope}</span>
+        )}
+        <Badge
+          variant={
+            connected ? "success" : needsAttention ? "warning" : "outline"
+          }
+        >
+          {connected && <CheckCircle2 data-icon="inline-start" aria-hidden />}
+          {needsAttention && (
+            <AlertCircle data-icon="inline-start" aria-hidden />
+          )}
+          {status}
+        </Badge>
       </div>
+      <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+        {entry.system === "ESAJ"
+          ? "Preparação de peticionamento com peça e anexos."
+          : "Consulta e sincronização de autos."}
+      </p>
+      {entry.available && (
+        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+          {perOperation
+            ? "Certificado A1 · 2FA se solicitado pelo portal."
+            : "Certificado A1 e segundo fator (2FA)."}
+        </p>
+      )}
+    </div>
+  );
+  return (
+    <section
+      aria-label={`${entry.court} · ${system}`}
+      className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0"
+    >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        {description}
+        {actions}
+      </div>
+    </section>
+  );
+}
 
-      {error ? (
-        <p className="text-destructive text-[12.5px]">
-          Não foi possível carregar as conexões.
+export function ConfigTribunais() {
+  const catalog = useCourtCatalog();
+  const connections = useCourtConnections();
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Selection | null>(null);
+  const groups = groupCourtCatalog(catalog.data?.data ?? [], search);
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-muted-foreground text-sm leading-relaxed">
+        Cada sistema tem seu próprio acesso. Conectar o eproc de um tribunal não
+        conecta o e-SAJ.
+      </p>
+      <div className="border-line flex items-center gap-2 border-y py-2">
+        <Search className="text-muted-foreground size-4 shrink-0" aria-hidden />
+        <Input
+          aria-label="Buscar tribunal ou sistema"
+          placeholder="Buscar tribunal, estado ou sistema…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="h-9 min-w-0 border-0 bg-transparent shadow-none"
+        />
+      </div>
+      {catalog.isError || connections.isError ? (
+        <Alert variant="destructive">
+          <AlertCircle aria-hidden />
+          <AlertTitle>Não foi possível carregar os tribunais</AlertTitle>
+          <AlertDescription>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={catalog.isFetching || connections.isFetching}
+              onClick={() => {
+                void catalog.refetch();
+                void connections.refetch();
+              }}
+            >
+              Tentar novamente
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : catalog.isPending || connections.isPending ? (
+        <p
+          role="status"
+          className="text-muted-foreground py-6 text-center text-sm"
+        >
+          Carregando tribunais…
         </p>
       ) : (
-        <div className="border-line bg-panel overflow-hidden rounded-xl border">
-          {isLoading ? (
-            Array.from({ length: 2 }).map((_, i) => (
-              <div
-                key={i}
-                className="border-line2 flex items-center gap-3 border-b px-4 py-3.5 last:border-b-0"
+        <>
+          <div className="flex flex-col gap-4">
+            {groups.map((group) => (
+              <Card
+                key={group.court}
+                size="sm"
+                role="region"
+                aria-labelledby={`court-${group.court}`}
               >
-                <span className="bg-hover size-[18px] flex-none animate-pulse rounded" />
-                <span className="min-w-0 flex-1">
-                  <span className="bg-hover mb-1.5 block h-3 w-32 animate-pulse rounded" />
-                  <span className="bg-hover block h-2.5 w-44 animate-pulse rounded" />
-                </span>
-              </div>
-            ))
-          ) : (conexoes?.length ?? 0) === 0 ? (
-            <div className="text-fg3 px-4 py-8 text-center text-[12.5px]">
-              Nenhum tribunal conectado ainda.
-            </div>
-          ) : (
-            conexoes!.map((c) => {
-              const vm = statusVM(c.status);
-              const podeReconectar =
-                c.status !== "CONNECTED" && c.status !== "AUTHENTICATING";
-              return (
-                <div
-                  key={c.id}
-                  className="border-line2 flex items-center gap-3 border-b px-4 py-3 last:border-b-0"
-                >
-                  <Landmark
-                    className="text-primary size-[18px] flex-none"
-                    strokeWidth={1.7}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] font-medium">
-                      {c.court} · {c.system}
-                    </span>
-                    <span className="text-fg3 block text-[11.5px]">
-                      {c.last_authenticated_at
-                        ? `Última conexão em ${formatDate(c.last_authenticated_at)}`
-                        : "Nunca conectado"}
-                    </span>
-                  </span>
-                  <span
-                    className="flex-none rounded-full px-2.5 py-0.5 text-[10px] font-medium"
-                    style={{ background: vm.fundo, color: vm.cor }}
+                <CardHeader>
+                  <CardTitle id={`court-${group.court}`}>
+                    <div className="flex items-center gap-2">
+                      <Landmark
+                        className="text-primary size-4 shrink-0"
+                        aria-hidden
+                      />
+                      <h2 className="min-w-0">
+                        <span>{group.court}</span>
+                        <span className="text-muted-foreground font-normal">
+                          {" "}
+                          · {group.name}
+                        </span>
+                      </h2>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <Separator />
+                <CardContent className="divide-border divide-y">
+                  {group.systems.map((entry) => {
+                    const connection = connectionForSystem(
+                      entry,
+                      connections.data ?? [],
+                    );
+                    return (
+                      <SystemRow
+                        key={entry.system}
+                        entry={entry}
+                        connection={connection}
+                        onConnect={() => setSelected({ entry, connection })}
+                      />
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            ))}
+            {!groups.length && (
+              <div
+                role="status"
+                className="flex flex-col items-center gap-3 py-8"
+              >
+                <p className="text-muted-foreground text-sm">
+                  Nenhum tribunal encontrado.
+                </p>
+                {search && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSearch("")}
                   >
-                    {vm.label}
-                  </span>
-                  {podeReconectar && (
-                    <button
-                      onClick={() => reconectar(c)}
-                      disabled={connectMut.isPending}
-                      className="border-line bg-panel text-fg2 hover:bg-hover flex-none rounded-[7px] border px-2.5 py-[5px] text-[11.5px] disabled:opacity-50"
-                    >
-                      Reconectar
-                    </button>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
+                    Limpar busca
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            A disponibilidade vale para a função e o grau indicados em cada
+            sistema. Integrações em preparação ainda não podem ser conectadas.
+          </p>
+        </>
       )}
-
-      <ConexaoWizard aberto={aberto} onFechar={() => setAberto(false)} />
-    </>
+      {selected && (
+        <ConexaoWizard
+          key={
+            selected.connection?.id ??
+            `${selected.entry.court}:${selected.entry.system}`
+          }
+          aberto
+          court={selected.entry.court}
+          existingConnection={selected.connection}
+          onFechar={() => setSelected(null)}
+        />
+      )}
+    </div>
   );
 }

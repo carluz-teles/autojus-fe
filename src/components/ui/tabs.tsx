@@ -4,10 +4,9 @@ import { createContext, useContext, useId, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
-// Tabs acessíveis feitas à mão (mesmo molde headless do NotificationBell/UserMenu:
-// sem dependência nova). Estilo "segmented" de propósito — o SettingsNav acima já
-// usa underline, então as abas internas usam pílulas para marcar outra hierarquia.
-// Teclado: setas movem e selecionam (roving tabindex).
+import { tabListClassName, tabTriggerClassName } from "./tab-styles";
+
+// Abas do design system: indicador verde, navegação por teclado e painéis associados.
 
 interface TabsCtx {
   value: string;
@@ -46,7 +45,7 @@ export function Tabs({
 
   return (
     <Ctx.Provider value={{ value, setValue, baseId }}>
-      <div className={className}>{children}</div>
+      <div className={cn("min-w-0", className)}>{children}</div>
     </Ctx.Provider>
   );
 }
@@ -77,7 +76,7 @@ export function TabsList({
         next.focus();
         next.click();
       }}
-      className="bg-muted/60 inline-flex items-center gap-1 rounded-lg border p-1"
+      className={tabListClassName}
     >
       {children}
     </div>
@@ -102,12 +101,7 @@ export function TabsTrigger({
       aria-controls={`${ctx.baseId}-panel-${value}`}
       tabIndex={selected ? 0 : -1}
       onClick={() => ctx.setValue(value)}
-      className={cn(
-        "flex items-center gap-2 rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors",
-        selected
-          ? "bg-card text-foreground border shadow-xs"
-          : "text-muted-foreground hover:text-foreground border border-transparent",
-      )}
+      className={tabTriggerClassName(selected)}
     >
       {children}
     </button>
@@ -118,20 +112,25 @@ export function TabsContent({
   value,
   children,
   className,
+  keepMounted = false,
 }: {
   value: string;
   children: React.ReactNode;
   className?: string;
+  keepMounted?: boolean;
 }) {
   const ctx = useTabsCtx("TabsContent");
-  if (ctx.value !== value) return null;
+  const selected = ctx.value === value;
+  if (!selected && !keepMounted) return null;
   return (
     <div
       role="tabpanel"
+      hidden={!selected}
+      data-active={selected}
       id={`${ctx.baseId}-panel-${value}`}
       aria-labelledby={`${ctx.baseId}-tab-${value}`}
       tabIndex={0}
-      className={cn("reveal outline-none", className)}
+      className={cn("outline-none", className)}
     >
       {children}
     </div>

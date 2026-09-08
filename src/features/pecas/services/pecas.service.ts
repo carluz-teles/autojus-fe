@@ -1,3 +1,5 @@
+import { blocksNewFiling } from "@/features/filing/presentation";
+import { getFilingAttempt } from "@/features/filing/service";
 import type { PageEnvelope } from "@/lib/api/types";
 import type { ApiFetcher } from "@/lib/api/use-api";
 
@@ -166,12 +168,18 @@ export interface FilePecaParams {
   filed_at?: string;
 }
 
-/** Protocola a peça — POST /v1/pecas/:id/file. */
+/** Registra protocolo manual existente; não envia ao e-SAJ. */
 export async function filePeca(
   fetcher: ApiFetcher,
   id: string,
   params: FilePecaParams = {},
 ): Promise<PecaFileResult> {
+  const attempt = await getFilingAttempt(fetcher, id);
+  if (blocksNewFiling(attempt)) {
+    throw new Error(
+      "Já existe uma tentativa de protocolo. Confira o acompanhamento e o recibo no tribunal antes de qualquer novo envio.",
+    );
+  }
   const res = await fetcher<DataEnvelope<PecaFileResult>>(
     `${ENDPOINT}/${id}/file`,
     { method: "POST", body: params },

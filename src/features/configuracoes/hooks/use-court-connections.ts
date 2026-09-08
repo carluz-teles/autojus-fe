@@ -8,6 +8,7 @@ import {
   connectCourtConnection,
   createCourtConnection,
   type CreateCourtConnectionInput,
+  listCourtCatalog,
   listCourtConnections,
   submitMfaSeed,
   type SubmitMfaSeedInput,
@@ -76,5 +77,14 @@ export function useSubmitMfaSeed() {
         queryClient.invalidateQueries({ queryKey: QUERY_KEY });
       }
     },
+  });
+}
+
+export function useCourtCatalog() {
+  const fetcher = useApi();
+  return useQuery({
+    queryKey: ["court-catalog"],
+    queryFn: () => listCourtCatalog(fetcher),
+    staleTime: 300_000,
   });
 }

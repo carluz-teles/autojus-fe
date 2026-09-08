@@ -1,352 +1,566 @@
 "use client";
 
-import { ArrowUpRight } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ArrowUpRight, Pencil } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useId, useState } from "react";
 
-import { Avatar } from "@/components/mock-ui/data-display";
-import { DatePicker } from "@/components/mock-ui/date-picker";
-import { Chip, StatusBadge, type Tom } from "@/components/mock-ui/status-badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { PageFrame, ShellBackLink } from "@/components/shell/page-frame";
+import { TeorContent } from "@/components/teor-content";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
-import { nomeExibicao } from "@/features/organization/lib/labels";
+import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
+import { usePartes } from "@/features/processos/hooks/use-processos";
+import { useApi } from "@/lib/api/use-api";
+import { formatDate } from "@/lib/format";
 
 import { useActionItemDetalhe } from "../hooks/use-action-items";
-import {
-  useComecarActionItem,
-  useConcluirActionItem,
-  useIniciarActionItem,
-  useUpdateActionItem,
-} from "../hooks/use-update-action-item";
+import { useWorkMutation } from "../hooks/use-workspace";
 import { STATUS_LABEL } from "../lib/status-pill";
-import type { ActionItemPriority, ActionItemStatus } from "../types";
+import type { ActionItemPriority, ActionItemView } from "../types";
+import { InternalDueDate } from "./internal-due-date";
+import { NewProvidencia, PIECE_PROFILES, WORK_TYPES } from "./new-providencia";
+import { WorkActions } from "./work-actions";
 
-// Detalhe REAL da providência (GET /v1/action-items/:id), fiel ao design isTarefa:
-// MAIN (título + descrição + origem) à esquerda, ASIDE (Propriedades) à direita.
-// SEM abas de checklist/comentários/atividade — o BE removeu esses endpoints; a
-// providência é a unidade atômica de trabalho, sem sub-itens. Nada de "IA" no
-// texto (diretiva app-wide): a origem é comunicada pela ação ("derivada da
-// intimação"), não pela tecnologia.
-
-// Status de trabalho → tom do StatusBadge.
-const TOM_STATUS: Record<ActionItemStatus, Tom> = {
-  SUGGESTED: "neutral",
-  TODO: "neutral",
-  WORKING: "info",
-  DONE: "success",
-};
-
-// Prioridade: rótulo PT ↔ enum do BE, com a cor do dot.
-export const PRIORIDADE_LABEL: Record<ActionItemPriority, string> = {
-  HIGH: "Alta",
-  MEDIUM: "Média",
-  LOW: "Baixa",
-};
-export const PRIORIDADE_COR: Record<ActionItemPriority, string> = {
-  HIGH: "var(--destructive)",
-  MEDIUM: "var(--gold)",
-  LOW: "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
-};
-const PRIORIDADE_OPCOES: ActionItemPriority[] = ["HIGH", "MEDIUM", "LOW"];
-// Valor-sentinela do Select para "sem prioridade" (o Select não aceita value="").
-const SEM_PRIORIDADE = "__none__";
-
-// Transições de trabalho ALCANÇÁVEIS a partir do status atual (ciclo linear:
-// SUGGESTED → TODO → WORKING → DONE). Cada valor mapeia para o endpoint de domínio.
-const TRANSICOES: Record<
-  ActionItemStatus,
-  { value: string; label: string; cor: string }[]
-> = {
-  SUGGESTED: [
-    { value: "iniciar", label: "A Fazer", cor: "var(--muted-foreground)" },
-  ],
-  TODO: [{ value: "comecar", label: "Em elaboração", cor: "var(--gold)" }],
-  WORKING: [{ value: "concluir", label: "Concluída", cor: "var(--success)" }],
-  DONE: [],
-};
-
-const STATUS_DOT: Record<ActionItemStatus, string> = {
-  SUGGESTED: "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
-  TODO: "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
-  WORKING: "var(--gold)",
-  DONE: "var(--success)",
-};
-
-// Código curto derivado do id (o read model não tem um "codigo" próprio) — PRV-XXXX.
-function codigoCurto(id: string): string {
-  return `PRV-${id.replace(/-/g, "").slice(0, 4).toUpperCase()}`;
+export function ProvidenciaDetail({ id }: { id: string }) {
+  const query = useActionItemDetalhe(id);
+  const p = query.data;
+  return (
+    <PageFrame
+      header={
+        <>
+          <ShellBackLink href="/pipeline" label="Voltar às providências" />
+          <span className="font-medium">Providência</span>
+        </>
+      }
+    >
+      {query.isPending ? (
+        <div className="p-6">
+          <Skeleton className="h-8 w-64" />
+        </div>
+      ) : query.error || !p ? (
+        <div className="flex flex-col items-start gap-4 p-6">
+          <p role="alert">Não foi possível carregar esta providência.</p>
+          <Button variant="outline" onClick={() => query.refetch()}>
+            Tentar novamente
+          </Button>
+        </div>
+      ) : (
+        <WorkDetailContent key={p.id} p={p} />
+      )}
+    </PageFrame>
+  );
 }
 
-/** Detalhe da providência no estilo Linear: título à esquerda, propriedades à direita. */
-export function ProvidenciaDetail({ id }: { id: string }) {
-  const { data: p, isPending, error } = useActionItemDetalhe(id);
-  const { members } = useOrgMembersDirectory();
-
-  const update = useUpdateActionItem();
-  const iniciar = useIniciarActionItem();
-  const comecar = useComecarActionItem();
-  const concluir = useConcluirActionItem();
-
-  if (isPending) {
-    return (
-      <div className="p-10">
-        <div className="bg-muted h-8 w-80 animate-pulse rounded" />
-      </div>
-    );
-  }
-
-  if (error || !p) {
-    return (
-      <div className="p-10">
-        <p role="alert" className="text-destructive text-sm">
-          Não foi possível carregar esta providência. Tente novamente.
-        </p>
-      </div>
-    );
-  }
-
-  const dueISO = p.due_date ? p.due_date.slice(0, 10) : "";
-  const transicoes = TRANSICOES[p.status];
-
-  const aplicarTransicao = (v: string) => {
-    if (v === "iniciar") iniciar.mutate(p.id);
-    else if (v === "comecar") comecar.mutate(p.id);
-    else if (v === "concluir") concluir.mutate(p.id);
-  };
-
+function WorkDetailContent({ p }: { p: ActionItemView }) {
+  const directory = useOrgMembersDirectory();
+  const parties = usePartes(p.court_record_id || "");
+  const save = useWorkMutation();
+  const [edit, setEdit] = useState(false);
+  const [classification, setClassification] = useState(false);
+  const terminal = ["DONE", "CANCELLED", "DISMISSED"].includes(p.status);
   return (
-    <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_320px]">
-      <div className="overflow-y-auto px-10 pt-8 pb-10">
-        <div className="flex items-center gap-2.5">
-          <Chip>{codigoCurto(p.id)}</Chip>
-          <StatusBadge tone={TOM_STATUS[p.status]}>
-            {STATUS_LABEL[p.status]}
-          </StatusBadge>
-          {p.gera_peca ? (
-            <span
-              className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
-              style={{
-                color: "var(--gold)",
-                background: "color-mix(in oklch, var(--gold) 12%, transparent)",
-              }}
-            >
-              Peça
-            </span>
-          ) : null}
-        </div>
-
-        <h1 className="font-display mt-3.5 max-w-160 text-3xl leading-tight font-normal tracking-tight">
-          {p.title}
-        </h1>
-        {p.description ? (
-          <p className="mt-4 max-w-160 text-[15px] leading-relaxed text-pretty">
-            {p.description}
-          </p>
-        ) : null}
-        {p.intimation_id ? (
-          <p className="text-muted-foreground mt-3 text-[12.5px]">
-            Derivada da intimação · vinculada à{" "}
-            <Link href={`/intimacoes/${p.intimation_id}`}>
-              intimação de origem
-            </Link>
-          </p>
-        ) : null}
-      </div>
-
-      <aside className="border-border overflow-y-auto border-l px-6 pt-8 pb-10">
-        <p className="text-muted-foreground text-[11px] font-medium tracking-[0.08em] uppercase">
-          Propriedades
-        </p>
-
-        <div className="mt-3.5 flex flex-col">
-          <Propriedade rotulo="Status">
-            {transicoes.length > 0 ? (
-              <Select value="" onValueChange={(v) => v && aplicarTransicao(v)}>
-                <SelectTrigger
-                  className="w-46"
-                  aria-label="Status da providência"
-                >
-                  <SelectValue placeholder={STATUS_LABEL[p.status]}>
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="size-[7px] shrink-0 rounded-full"
-                        style={{ background: STATUS_DOT[p.status] }}
-                      />
-                      {STATUS_LABEL[p.status]}
-                    </span>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent align="end">
-                  {transicoes.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      <span
-                        className="size-[7px] shrink-0 rounded-full"
-                        style={{ background: t.cor }}
-                      />
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <span className="flex items-center gap-2 text-[13px]">
-                <span
-                  className="size-[7px] shrink-0 rounded-full"
-                  style={{ background: STATUS_DOT[p.status] }}
-                />
-                {STATUS_LABEL[p.status]}
-              </span>
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex w-full min-w-0 flex-1 flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">{STATUS_LABEL[p.status]}</Badge>
+            {p.tipo_status === "a_confirmar" && (
+              <Badge variant="warning">Tipo a revisar</Badge>
             )}
-          </Propriedade>
-
-          <Propriedade rotulo="Responsável">
-            <Select
-              value={p.assignee_user_id ?? ""}
-              onValueChange={(v) =>
-                v != null &&
-                update.updateActionItem({
+          </div>
+          <h1 className="font-display text-2xl leading-tight break-words sm:text-3xl">
+            {p.title}
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            {p.process_title || "Processo vinculado"}
+            {p.cnj_number ? ` · ${formatarCNJ(p.cnj_number)}` : ""}
+          </p>
+        </div>
+        <WorkActions item={p} />
+      </div>
+      <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="flex min-w-0 flex-col gap-6">
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-medium">O que precisa ser feito</h2>
+              <Button variant="ghost" size="sm" onClick={() => setEdit(true)}>
+                <Pencil data-icon="inline-start" />
+                Editar
+              </Button>
+            </div>
+            <TeorContent
+              content={p.description}
+              emptyMessage="Adicione orientações para executar esta providência."
+            />
+          </section>
+          <Tabs defaultValue="context">
+            <TabsList>
+              <TabsTrigger value="context">Contexto</TabsTrigger>
+              <TabsTrigger value="activity">Histórico</TabsTrigger>
+            </TabsList>
+            <TabsContent value="context">
+              <div className="flex flex-col gap-5 py-4">
+                <section className="flex flex-col gap-2">
+                  <h2 className="font-medium">Processo</h2>
+                  <Link
+                    className="text-primary inline-flex items-center gap-2 text-sm underline underline-offset-4"
+                    href={`/processos/${p.court_record_id}`}
+                  >
+                    {formatarCNJ(p.cnj_number || "") || "Abrir processo"}
+                    <ArrowUpRight className="size-4" />
+                  </Link>
+                  <p className="text-muted-foreground text-sm">
+                    {p.process_title} · {p.court}
+                  </p>
+                  {parties.data && (
+                    <div className="text-sm">
+                      <p>
+                        <span className="text-muted-foreground">
+                          Polo ativo:{" "}
+                        </span>
+                        {parties.data.autor.map((x) => x.name).join(", ") ||
+                          "Não informado"}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">
+                          Polo passivo:{" "}
+                        </span>
+                        {parties.data.reu.map((x) => x.name).join(", ") ||
+                          "Não informado"}
+                      </p>
+                    </div>
+                  )}
+                  {p.court_record_id && (
+                    <div className="mt-2">
+                      <NewProvidencia
+                        processId={p.court_record_id}
+                        intimationId={p.intimation_id}
+                      />
+                    </div>
+                  )}
+                </section>
+                {p.intimation_id ? (
+                  <section className="flex flex-col gap-2 border-t pt-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <h2 className="font-medium">Intimação de origem</h2>
+                      <Link
+                        className="text-primary text-sm underline"
+                        href={`/intimacoes/${p.intimation_id}`}
+                      >
+                        Abrir intimação
+                      </Link>
+                    </div>
+                    <TeorContent
+                      content={p.intimation_text}
+                      emptyMessage="Consulte o documento na intimação de origem."
+                      className="max-h-80 overflow-y-auto"
+                    />
+                  </section>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    Providência criada manualmente no processo.
+                  </p>
+                )}
+                {p.draft_id && (
+                  <section className="flex flex-col gap-2 border-t pt-5">
+                    <h2 className="font-medium">Peça vinculada</h2>
+                    <Link
+                      className="text-primary text-sm underline"
+                      href={`/pecas/${p.draft_id}?retorno=${encodeURIComponent(`/providencias/${p.id}`)}`}
+                    >
+                      {p.draft_title || p.title}
+                    </Link>
+                    <p className="text-muted-foreground text-xs">
+                      A peça permanece vinculada ao histórico deste trabalho.
+                    </p>
+                  </section>
+                )}
+              </div>
+            </TabsContent>
+            <TabsContent value="activity">
+              {p.activity?.length === 100 && (
+                <p className="text-muted-foreground text-xs">
+                  Últimas 100 alterações.
+                </p>
+              )}
+              <ol className="divide-y">
+                {p.activity?.length ? (
+                  p.activity.map((event) => (
+                    <li key={event.id} className="flex flex-col gap-1 py-4">
+                      <p className="text-sm">
+                        {event.kind === "created"
+                          ? "Providência criada"
+                          : Object.keys(event.changes)
+                              .map(
+                                (key) =>
+                                  ({
+                                    title: "Título",
+                                    description: "Descrição",
+                                    status: "Status",
+                                    assignee_user_id: "Responsável",
+                                    due_date: "Entrega interna",
+                                    priority: "Prioridade",
+                                    tipo: "Tipo",
+                                    tipo_status: "Revisão do tipo",
+                                    piece_profile_key: "Tipo de peça",
+                                  })[key] || key,
+                              )
+                              .join(", ") + " atualizado"}
+                      </p>
+                      {event.kind !== "created" && (
+                        <dl className="space-y-2">
+                          {Object.entries(event.changes).map(
+                            ([key, change]) => (
+                              <div key={key} className="text-xs">
+                                <dt className="font-medium">
+                                  {ACTIVITY_FIELDS[key] || key}
+                                </dt>
+                                <dd className="text-muted-foreground mt-1 break-words whitespace-pre-wrap">
+                                  {activityValue(
+                                    key,
+                                    change.before,
+                                    directory.nameFor,
+                                  )}{" "}
+                                  →{" "}
+                                  {activityValue(
+                                    key,
+                                    change.after,
+                                    directory.nameFor,
+                                  )}
+                                </dd>
+                              </div>
+                            ),
+                          )}
+                        </dl>
+                      )}
+                      <p className="text-muted-foreground text-xs">
+                        {event.actor_user_id
+                          ? directory.nameFor(event.actor_user_id) ||
+                            "Membro do escritório"
+                          : "Sistema"}{" "}
+                        · {new Date(event.created_at).toLocaleString("pt-BR")}
+                      </p>
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-muted-foreground py-5 text-sm">
+                    As próximas alterações serão registradas aqui.
+                  </li>
+                )}
+              </ol>
+            </TabsContent>
+          </Tabs>
+        </div>
+        <aside className="flex min-w-0 flex-col gap-5 rounded-xl border p-5 lg:self-start">
+          <section className="flex flex-col gap-2">
+            <h2 className="text-muted-foreground text-xs">
+              Prazo judicial vinculado
+            </h2>
+            <p className="text-lg font-medium">
+              {p.judicial_due_date
+                ? formatDate(p.judicial_due_date)
+                : "Sem prazo judicial vinculado"}
+            </p>
+            {p.judicial_due_date && (
+              <p className="text-muted-foreground text-xs">
+                {p.judicial_status === "OPEN" || p.judicial_status === "PENDING"
+                  ? "Prazo ativo · confira a contagem na intimação."
+                  : "Prazo encerrado ou sem obrigação ativa."}
+              </p>
+            )}
+            {p.judicial_review_status === "a_confirmar" && (
+              <Badge variant="warning">Prazo a revisar</Badge>
+            )}
+          </section>
+          <Field>
+            <FieldLabel>Entrega interna</FieldLabel>
+            <div
+              aria-busy={save.isPending}
+              className={save.isPending ? "pointer-events-none opacity-60" : ""}
+            >
+              <InternalDueDate
+                disabled={save.isPending}
+                valor={p.due_date?.slice(0, 10) || ""}
+                onChange={(date) =>
+                  save.mutate({ id: p.id, patch: { due_date: date } })
+                }
+              />
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Data de organização do trabalho. Não altera o prazo judicial.
+            </p>
+          </Field>
+          <Field>
+            <FieldLabel>Responsável</FieldLabel>
+            <ResponsavelMenu
+              value={p.assignee_user_id}
+              nome={directory.nameFor(p.assignee_user_id)}
+              membros={directory.members}
+              emVoo={save.isPending}
+              onAssign={(value) =>
+                save.mutate({
                   id: p.id,
-                  patch: { assignee_user_id: v },
+                  patch: { assignee_user_id: value || "" },
                 })
               }
-            >
-              <SelectTrigger
-                className="w-46"
-                aria-label="Responsável pela providência"
-              >
-                {/* children explícito — sem isso o Select (base-ui) mostra o
-                    value cru (o uuid) no estado fechado. */}
-                <SelectValue>
-                  {(() => {
-                    const m = members.find((m) => m.id === p.assignee_user_id);
-                    return m ? nomeExibicao(m.name, m.email) || "—" : "Ninguém";
-                  })()}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent align="end">
-                {members.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {nomeExibicao(m.name, m.email) || "—"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Propriedade>
-
-          <Propriedade rotulo="Prioridade">
-            <Select
-              value={p.priority ?? SEM_PRIORIDADE}
-              onValueChange={(v) =>
-                v != null &&
-                update.updateActionItem({
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="work-priority">Prioridade</FieldLabel>
+            <NativeSelect
+              id="work-priority"
+              disabled={save.isPending}
+              value={p.priority || ""}
+              onChange={(e) =>
+                save.mutate({
                   id: p.id,
                   patch: {
-                    priority:
-                      v === SEM_PRIORIDADE ? "" : (v as ActionItemPriority),
+                    priority: e.target.value as ActionItemPriority | "",
                   },
                 })
               }
             >
-              <SelectTrigger
-                className="w-46"
-                aria-label="Prioridade da providência"
-              >
-                <SelectValue>
-                  <span className="flex items-center gap-2">
-                    {p.priority ? (
-                      <span
-                        className="size-[7px] shrink-0 rounded-full"
-                        style={{ background: PRIORIDADE_COR[p.priority] }}
-                      />
-                    ) : null}
-                    {p.priority
-                      ? PRIORIDADE_LABEL[p.priority]
-                      : "Sem prioridade"}
-                  </span>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent align="end">
-                <SelectItem value={SEM_PRIORIDADE}>Sem prioridade</SelectItem>
-                {PRIORIDADE_OPCOES.map((pr) => (
-                  <SelectItem key={pr} value={pr}>
-                    <span
-                      className="size-[7px] shrink-0 rounded-full"
-                      style={{ background: PRIORIDADE_COR[pr] }}
-                    />
-                    {PRIORIDADE_LABEL[pr]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Propriedade>
-
-          <Propriedade rotulo="Vencimento">
-            <DatePicker
-              valor={dueISO}
-              onChange={(iso) =>
-                update.updateActionItem({ id: p.id, patch: { due_date: iso } })
-              }
-            />
-          </Propriedade>
-        </div>
-
-        {p.assignee_user_id ? (
-          <div className="mt-6 flex items-center gap-2.5">
-            <Avatar
-              nome={(() => {
-                const m = members.find((m) => m.id === p.assignee_user_id);
-                return m ? nomeExibicao(m.name, m.email) || "—" : "—";
-              })()}
-              size={28}
-            />
-            <span className="text-muted-foreground text-[12.5px]">
-              responsável pela providência
-            </span>
-          </div>
-        ) : null}
-
-        {p.intimation_id ? (
-          <>
-            <p className="text-muted-foreground mt-7 text-[11px] font-medium tracking-[0.08em] uppercase">
-              Origem
+              <option value="">Sem prioridade</option>
+              <option value="HIGH">Alta</option>
+              <option value="MEDIUM">Média</option>
+              <option value="LOW">Baixa</option>
+            </NativeSelect>
+          </Field>
+          <section className="flex flex-col gap-2 border-t pt-4">
+            <h2 className="text-muted-foreground text-xs">
+              Tipo de providência
+            </h2>
+            <p className="text-sm">{WORK_TYPES[p.tipo]}</p>
+            <p className="text-muted-foreground text-xs">
+              {PIECE_PROFILES[p.piece_profile_key || ""]}
             </p>
-            <div className="mt-3.5 flex flex-col">
-              <Link
-                href={`/intimacoes/${p.intimation_id}`}
-                className="border-border flex flex-col gap-1 border-b py-2.5 no-underline hover:no-underline"
+            {!terminal && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setClassification(true)}
               >
-                <span className="text-muted-foreground text-[12.5px]">
-                  Intimação
-                </span>
-                <span className="text-primary inline-flex items-center gap-1.5 text-[13px]">
-                  Abrir intimação
-                  <ArrowUpRight className="size-2.5" strokeWidth={2.4} />
-                </span>
-              </Link>
-            </div>
-          </>
-        ) : null}
-      </aside>
+                Ajustar tipo
+              </Button>
+            )}
+          </section>
+          {save.isError && (
+            <p role="alert" className="text-destructive text-xs">
+              Não foi possível salvar a alteração. Tente novamente.
+            </p>
+          )}
+        </aside>
+      </div>
+      <Sheet open={edit} onOpenChange={setEdit}>
+        <EditWork p={p} open={edit} onSaved={() => setEdit(false)} />
+      </Sheet>
+      <Sheet open={classification} onOpenChange={setClassification}>
+        <EditClassification p={p} onSaved={() => setClassification(false)} />
+      </Sheet>
     </div>
   );
 }
-
-function Propriedade({
-  rotulo,
-  children,
+function EditWork({
+  p,
+  open,
+  onSaved,
 }: {
-  rotulo: string;
-  children: React.ReactNode;
+  p: ActionItemView;
+  open: boolean;
+  onSaved: () => void;
 }) {
+  const id = useId();
+  const save = useWorkMutation();
+  const [title, setTitle] = useState(p.title);
+  const [description, setDescription] = useState(p.description || "");
+  useEffect(() => {
+    const dirty = title !== p.title || description !== (p.description || "");
+    if (!dirty || !open) return;
+    const prevent = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", prevent);
+    return () => window.removeEventListener("beforeunload", prevent);
+  }, [title, description, p.title, p.description, open]);
   return (
-    <div className="border-border flex items-center justify-between gap-3 border-b py-2.5">
-      <span className="text-muted-foreground text-[12.5px]">{rotulo}</span>
-      {children}
-    </div>
+    <SheetContent
+      title="Editar providência"
+      footer={
+        <Button form={id} type="submit" disabled={save.isPending}>
+          Salvar alterações
+        </Button>
+      }
+    >
+      <form
+        id={id}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!save.isPending)
+            save.mutate(
+              { id: p.id, patch: { title, description } },
+              { onSuccess: onSaved },
+            );
+        }}
+      >
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor={`${id}-title`}>Título</FieldLabel>
+            <Input
+              id={`${id}-title`}
+              required
+              maxLength={300}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={`${id}-description`}>Descrição</FieldLabel>
+            <Textarea
+              id={`${id}-description`}
+              maxLength={10000}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </Field>
+          {save.isError && (
+            <p role="alert">
+              Não foi possível salvar. Suas alterações foram mantidas.
+            </p>
+          )}
+        </FieldGroup>
+      </form>
+    </SheetContent>
   );
+}
+function EditClassification({
+  p,
+  onSaved,
+}: {
+  p: ActionItemView;
+  onSaved: () => void;
+}) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const [tipo, setTipo] = useState(p.tipo);
+  const [profile, setProfile] = useState(
+    p.intimation_id ? p.piece_profile_key || "" : "",
+  );
+  const save = useMutation({
+    mutationFn: () =>
+      api(`/v1/action-items/${p.id}/reclassificar`, {
+        method: "POST",
+        body: { tipo, piece_profile_key: profile },
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["action-items"] }),
+        qc.invalidateQueries({ queryKey: ["intimacoes"] }),
+      ]);
+      onSaved();
+    },
+  });
+  return (
+    <SheetContent
+      title="Ajustar tipo da providência"
+      description="Ao salvar, você confirma a classificação deste trabalho."
+      footer={
+        <Button disabled={save.isPending} onClick={() => save.mutate()}>
+          Salvar e confirmar tipo
+        </Button>
+      }
+    >
+      <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor="classification-type">Tipo</FieldLabel>
+          <NativeSelect
+            id="classification-type"
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value as typeof tipo)}
+          >
+            {Object.entries(WORK_TYPES).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+        {p.intimation_id ? (
+          <Field>
+            <FieldLabel htmlFor="classification-profile">Peça</FieldLabel>
+            <NativeSelect
+              id="classification-profile"
+              value={profile}
+              onChange={(e) => setProfile(e.target.value)}
+            >
+              {Object.entries(PIECE_PROFILES).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            Para construir uma peça, crie a providência dentro da intimação de
+            origem.
+          </p>
+        )}
+        {p.draft_id && (
+          <p className="text-muted-foreground text-sm">
+            Alterar o tipo substitui a versão vigente da peça. A versão anterior
+            será preservada no histórico. Peças protocoladas não podem ser
+            reclassificadas.
+          </p>
+        )}
+        {save.isError && (
+          <p role="alert" className="text-destructive text-sm">
+            Não foi possível alterar o tipo. Confira se a peça já foi
+            protocolada.
+          </p>
+        )}
+      </FieldGroup>
+    </SheetContent>
+  );
+}
+
+const ACTIVITY_FIELDS: Record<string, string> = {
+  title: "Título",
+  description: "Descrição",
+  status: "Status",
+  assignee_user_id: "Responsável",
+  due_date: "Entrega interna",
+  priority: "Prioridade",
+  tipo: "Tipo",
+  tipo_status: "Revisão do tipo",
+  piece_profile_key: "Tipo de peça",
+};
+function activityValue(
+  key: string,
+  value: unknown,
+  nameFor: (id?: string | null) => string | null | undefined,
+) {
+  if (value === null || value === undefined || value === "")
+    return "Não definido";
+  const text = String(value);
+  if (key === "status")
+    return STATUS_LABEL[text as keyof typeof STATUS_LABEL] || text;
+  if (key === "assignee_user_id")
+    return nameFor(text) || "Membro do escritório";
+  if (key === "due_date") return formatDate(text);
+  if (key === "priority")
+    return { HIGH: "Alta", MEDIUM: "Média", LOW: "Baixa" }[text] || text;
+  if (key === "tipo")
+    return WORK_TYPES[text as keyof typeof WORK_TYPES] || text;
+  if (key === "piece_profile_key") return PIECE_PROFILES[text] || text;
+  if (key === "tipo_status")
+    return text === "confiavel" ? "Confirmado" : "A revisar";
+  return text;
 }

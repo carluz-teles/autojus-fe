@@ -1,13 +1,11 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useActionItems } from "@/features/action-items/hooks/use-action-items";
-import type { ActionItemView } from "@/features/action-items/types";
+import { useWorkspaceList } from "@/features/action-items/hooks/use-workspace";
+import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { hojeISO } from "@/features/shared/db";
-import { diasRestantes } from "@/features/shared/prazo";
 import { useApi } from "@/lib/api/use-api";
 
 import {
@@ -20,8 +18,11 @@ import {
   tituloMes,
   toISODate,
 } from "../lib/calendario";
+import {
+  prazoParaEvento,
+  providenciaParaEvento,
+} from "../lib/calendario-eventos";
 import { listPrazos } from "../services/prazos.service";
-import type { PrazoAgendaView } from "../types";
 
 // Modos do calendário (estilo Google). O NAV traz pra rota /calendario; aqui o
 // toggle Mês/Semana/Dia é UI local efêmera (useState), não server state.
@@ -35,44 +36,6 @@ const PAGE_SIZE = 300;
 // Prazo entra na DATA FATAL (end_date), com os dias já calculados pelo BE
 // (days_left). Providência entra no VENCIMENTO (due_date) quando houver — sem
 // due_date não tem onde cair no calendário (só aparece na Fila).
-
-function cnjCurto(cnj: string | undefined): string {
-  return cnj ? cnj.slice(0, 11) + "." : "";
-}
-
-function subDe(cnj: string | undefined, court: string | undefined): string {
-  return [cnjCurto(cnj), court].filter(Boolean).join(" · ");
-}
-
-function prazoParaEvento(p: PrazoAgendaView): CalEvento | null {
-  if (!p.end_date) return null;
-  return {
-    id: `prazo-${p.id}`,
-    tipo: "prazo",
-    titulo: "Prazo fatal",
-    sub: subDe(p.cnj_number, p.court),
-    dia: p.end_date.slice(0, 10),
-    dias: p.days_left,
-    href: `/intimacoes/${p.intimation_id}`,
-  };
-}
-
-function providenciaParaEvento(
-  p: ActionItemView,
-  hoje: string,
-): CalEvento | null {
-  if (!p.due_date) return null;
-  const dia = p.due_date.slice(0, 10);
-  return {
-    id: `prov-${p.id}`,
-    tipo: "providencia",
-    titulo: p.title,
-    sub: subDe(p.cnj_number, p.court),
-    dia,
-    dias: diasRestantes(dia, hoje),
-    href: `/providencias/${p.id}`,
-  };
-}
 
 // ── sub-hook: modo (Mês / Semana / Dia) ───────────────────────────────────────
 function useModo() {
@@ -114,48 +77,6 @@ function useReferencia(modo: CalModo) {
   };
 }
 
-// ── sub-hook: conexão Google Agenda (MOCK, máquina de estado local) ───────────
-// Era mock no design; segue mock (sem integração real). Máquina de estado
-// puramente client-side — nenhuma chamada de rede.
-type GoogleEstado = "idle" | "conectando" | "conectado";
-
-function useGoogle() {
-  const [aberto, setAberto] = useState(false);
-  const [estado, setEstado] = useState<GoogleEstado>("idle");
-  const [sync, setSync] = useState(true);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
-
-  const conectar = useCallback(() => {
-    setEstado("conectando");
-    timer.current = setTimeout(() => setEstado("conectado"), 1100);
-  }, []);
-
-  return {
-    aberto,
-    idle: estado === "idle",
-    conectando: estado === "conectando",
-    conectado: estado === "conectado",
-    sync,
-    abrir: useCallback(() => setAberto(true), []),
-    fechar: useCallback(() => setAberto(false), []),
-    conectar,
-    toggleSync: useCallback(() => setSync((s) => !s), []),
-    adicionarTodos: useCallback(
-      () => toast.success("Prazos enviados para a Google Agenda"),
-      [],
-    ),
-    exportarIcs: useCallback(() => toast("Arquivo .ics exportado"), []),
-    desconectar: useCallback(() => setEstado("idle"), []),
-  };
-}
-
 // Hook público do Calendário — compõe os sub-hooks e devolve tudo bindável.
 // Datas dinâmicas (mês/semana/dia correntes) e dado REAL: prazos (GET /v1/prazos
 // numa janela ampla ao redor de hoje) + providências (GET /v1/action-items).
@@ -163,42 +84,57 @@ export function usePrazosCalendario() {
   const fetcher = useApi();
   const modo = useModo();
   const referencia = useReferencia(modo.modo);
-  const google = useGoogle();
+  const { nameFor } = useOrgMembersDirectory();
 
   const hoje = hojeISO();
 
-  // Janela ampla ao redor de hoje (±6 meses) — cobre a navegação sem refetch a
-  // cada troca de mês. Fixa no mount (não em cada render) pra a queryKey ser estável.
+  // Fetch the visible month and adjacent days; navigation changes the query.
   const janela = useMemo(() => {
-    const de = new Date();
-    de.setMonth(de.getMonth() - 6);
-    const ate = new Date();
-    ate.setMonth(ate.getMonth() + 6);
-    return { from: toISODate(de), to: toISODate(ate) };
-  }, []);
-
-  const prazosQuery = useQuery({
+    const ref = referencia.ref;
+    return {
+      from: toISODate(new Date(ref.getFullYear(), ref.getMonth(), -6)),
+      to: toISODate(new Date(ref.getFullYear(), ref.getMonth() + 1, 7)),
+    };
+  }, [referencia.ref]);
+  const prazosQuery = useInfiniteQuery({
     queryKey: ["calendario", "prazos", janela],
-    queryFn: () =>
+    queryFn: ({ pageParam }) =>
       listPrazos(fetcher, {
-        from: janela.from,
-        to: janela.to,
+        ...janela,
         limit: PAGE_SIZE,
+        cursor: pageParam || undefined,
       }),
+    initialPageParam: "",
+    getNextPageParam: (page) => page.page.next_cursor || undefined,
   });
-
-  const providenciasQuery = useActionItems({ pageSize: PAGE_SIZE });
+  const providenciasQuery = useWorkspaceList({ ...janela, status: "ACTIVE" });
+  const { hasNextPage, isFetching, isError, fetchNextPage } = prazosQuery;
+  const {
+    hasMore,
+    isFetching: fetchingWork,
+    isError: errorWork,
+    loadMore,
+  } = providenciasQuery;
+  useEffect(() => {
+    if (hasNextPage && !isFetching && !isError)
+      void fetchNextPage({ cancelRefetch: false });
+  }, [hasNextPage, isFetching, isError, fetchNextPage]);
+  useEffect(() => {
+    if (hasMore && !fetchingWork && !errorWork) loadMore();
+  }, [hasMore, fetchingWork, errorWork, loadMore]);
 
   const eventos = useMemo<CalEvento[]>(() => {
-    const dePrazos = (prazosQuery.data?.data ?? [])
+    const dePrazos = (
+      prazosQuery.data?.pages.flatMap((page) => page.data) ?? []
+    )
       .map(prazoParaEvento)
       .filter((e): e is CalEvento => e !== null);
-    const deProvidencias = providenciasQuery.providencias
+    const deProvidencias = providenciasQuery.items
       .filter((p) => p.status !== "DONE")
-      .map((p) => providenciaParaEvento(p, hoje))
+      .map((p) => providenciaParaEvento(p, hoje, nameFor(p.assignee_user_id)))
       .filter((e): e is CalEvento => e !== null);
     return [...dePrazos, ...deProvidencias];
-  }, [prazosQuery.data, providenciasQuery.providencias, hoje]);
+  }, [prazosQuery.data, providenciasQuery.items, hoje, nameFor]);
 
   const mes = useMemo(
     () => buildMes(eventos, referencia.ref, hoje),
@@ -236,6 +172,5 @@ export function usePrazosCalendario() {
     mes,
     semana,
     dia,
-    google,
   };
 }

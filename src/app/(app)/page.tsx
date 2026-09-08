@@ -1,10 +1,7 @@
-import { PrazosView } from "@/features/prazos/components/prazos-view";
+import { NotificationsPage } from "@/features/notifications/notifications-page";
 
-export const metadata = { title: "Prazos · jus·assessoria" };
+export const metadata = { title: "Notificações · Atjus" };
 
-// Superfície de triagem (Inbox) + quadro (Pipeline). Full-bleed: o ShellContent
-// detecta /prazos e entrega a área sem header/padding globais, então a tela usa
-// sua própria top-bar de 44px (casca "Linear" do rebranding).
-export default function PrazosPage() {
-  return <PrazosView />;
+export default function HomePage() {
+  return <NotificationsPage />;
 }

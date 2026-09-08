@@ -11,10 +11,14 @@
 // Componente = JSX + binding: o streaming é orquestrado por useDraftStream (o
 // único I/O), a conversão markdown→HTML é a única transformação de apresentação.
 
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Sparkles } from "lucide-react";
 import { marked } from "marked";
 import { useEffect, useRef, useState } from "react";
 
+import { sanitizeContentHtml } from "@/lib/html/sanitize-content";
+
+import { draftKeys } from "../../hooks/use-draft";
 import { useDraftStream } from "../../hooks/use-draft-stream";
 
 // GFM ligado (tables), breaks OFF — o LLM já separa parágrafos com linha em
@@ -29,17 +33,28 @@ interface Props {
   tesesLabel: string;
   /** Ativa o SSE (tipicamente saga EXTRACTING). */
   streamEnabled: boolean;
+  startedAt: string;
 }
 
-export function GerandoCenter({ draftId, tesesLabel, streamEnabled }: Props) {
+export function GerandoCenter({
+  draftId,
+  tesesLabel,
+  streamEnabled,
+  startedAt,
+}: Props) {
+  const qc = useQueryClient();
   const [html, setHtml] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useDraftStream(draftId, {
     enabled: streamEnabled,
+    startedAt,
+    onDone: () => {
+      void qc.invalidateQueries({ queryKey: draftKeys.detail(draftId) });
+    },
     onProgress: (fullMarkdown) => {
       const parsed = marked.parse(fullMarkdown, { async: false }) as string;
-      setHtml(parsed);
+      setHtml(sanitizeContentHtml(parsed));
     },
   });
 

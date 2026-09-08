@@ -335,7 +335,16 @@ export type OrigemFacets = Record<IntimacaoOrigem, number>;
  * de contagem por urgência e as facets de origem do prazo (retornados pelo BE
  * junto à página).
  */
+export interface IntimacaoGroup {
+  cnj_number: string;
+  matching_count: number;
+  total_count: number;
+}
+
 export interface IntimacaoBucketsEnvelope extends PageEnvelope<IntimacaoView> {
+  groups: IntimacaoGroup[] | null;
+  process_count: number;
+  total_without_urgency: number;
   buckets: IntimacoesBuckets;
   origem_facets: OrigemFacets;
 }

@@ -8,15 +8,17 @@ import {
   User,
   X,
 } from "lucide-react";
+import Link from "next/link";
 
 import { CnpjInput } from "@/components/ui/cnpj-input";
 import { OabInput } from "@/components/ui/oab-input";
 import { formatOabDisplay } from "@/features/shared/lib/diario";
 
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
+import { CourtAccessNotice } from "./court-access-notice";
+import { ImportPreparation } from "./import-preparation";
 
-// Onboarding "Linear" full-screen (port de Atjus - Onboarding.dc.html): 4 passos
-// welcome → org → oab → done. Componente = JSX + binding; a lógica/conclusão vive
+// Onboarding guiado: welcome → org → access → oab → done. Componente = JSX + binding; a lógica/conclusão vive
 // no hook. Mapeamentos de token: var(--accent)→var(--primary), var(--serif)→
 // font-display, var(--mono)→font-mono; --bg/--panel/--line/--fg2/--fg3/--green/
 // --selected/--hover são tokens da casca.
@@ -45,6 +47,7 @@ export function OnboardingFlow() {
         ) : null}
         <button
           onClick={f.reiniciar}
+          disabled={f.preparando}
           className="border-line bg-panel text-fg3 hover:bg-hover ml-auto rounded-[7px] border px-2.5 py-[5px] text-[11.5px]"
         >
           Reiniciar
@@ -56,6 +59,9 @@ export function OnboardingFlow() {
         <div className="w-[520px] max-w-full">
           {f.step === "welcome" ? <Welcome f={f} /> : null}
           {f.step === "org" ? <Org f={f} solo={solo} /> : null}
+          {f.step === "access" ? (
+            <ImportPreparation onContinue={f.irOab} />
+          ) : null}
           {f.step === "oab" ? <Oab f={f} /> : null}
           {f.step === "done" ? <Done f={f} /> : null}
         </div>
@@ -168,16 +174,7 @@ function Org({ f, solo }: { f: F; solo: boolean }) {
           }
         />
       </div>
-      {solo ? (
-        <>
-          <label className="text-fg3 mb-1.5 block text-[11.5px]">Sua OAB</label>
-          <OabInput
-            value={f.doc}
-            onChange={f.setDoc}
-            className="border-line bg-panel text-foreground placeholder:text-fg3 w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
-          />
-        </>
-      ) : (
+      {!solo && (
         <>
           <label className="text-fg3 mb-1.5 block text-[11.5px]">CNPJ</label>
           <CnpjInput
@@ -187,6 +184,11 @@ function Org({ f, solo }: { f: F; solo: boolean }) {
           />
         </>
       )}
+      {f.erro && (
+        <p role="alert" className="text-destructive mt-3 text-[12px]">
+          {f.erro}
+        </p>
+      )}
       <div className="mt-[26px] flex gap-2.5">
         <button
           onClick={f.voltarWelcome}
@@ -195,10 +197,13 @@ function Org({ f, solo }: { f: F; solo: boolean }) {
           Voltar
         </button>
         <button
-          onClick={f.irOab}
+          onClick={f.prepararAcesso}
+          disabled={f.preparando || !f.nome.trim()}
           className="bg-primary text-primary-foreground flex-1 rounded-[9px] px-4 py-2.5 text-[13px] font-medium"
         >
-          Continuar
+          {f.preparando
+            ? "Preparando escritório…"
+            : "Preparar acesso aos autos"}
         </button>
       </div>
     </>
@@ -209,12 +214,15 @@ function Oab({ f }: { f: F }) {
   return (
     <>
       <div className="font-display mb-1 text-[21px] font-medium">
-        Capture direto do DJEN
+        Ative sua primeira captura
       </div>
       <p className="text-fg3 mb-[18px] text-[12.5px] leading-[1.5]">
-        Adicione as OABs que o Atjus vai vigiar. Toda intimação chega porque
-        casou com uma delas.
+        Confira as OABs que o Atjus vai monitorar no DJEN. A busca começa ao
+        confirmar abaixo.
       </p>
+      <div className="mb-4">
+        <CourtAccessNotice onPrepare={f.voltarOrg} />
+      </div>
       <div className="mb-3.5 flex gap-2">
         <OabInput
           value={f.oab}
@@ -293,97 +301,35 @@ function Oab({ f }: { f: F }) {
 }
 
 function Done({ f }: { f: F }) {
-  const itens = [
-    {
-      k: "cert",
-      t: "Enviar certificado digital",
-      d: "Para assinar e protocolar peças",
-    },
-    {
-      k: "equipe",
-      t: "Convidar a equipe",
-      d: "Dê acesso aos advogados do escritório",
-    },
-    {
-      k: "regras",
-      t: "Regras de prazo",
-      d: "Buffer interno e base de feriados",
-    },
-  ];
   return (
-    <>
-      <div className="mb-[22px] text-center">
-        <div
-          className="mx-auto mb-3.5 grid size-[52px] place-items-center rounded-full"
-          style={{
-            background: "color-mix(in oklch, var(--green) 14%, transparent)",
-          }}
-        >
-          <Check
-            className="size-[26px]"
-            style={{ color: "var(--green)" }}
-            strokeWidth={2.2}
-          />
-        </div>
-        <div className="font-display text-[23px] font-medium">Tudo pronto</div>
-        <p className="text-fg3 mx-auto mt-[7px] max-w-[380px] text-[12.5px] leading-[1.5]">
-          Estamos varrendo o DJEN em segundo plano — as primeiras intimações
-          aparecem na sua Inbox em instantes. Configure o resto quando quiser.
+    <div className="space-y-5">
+      <Check className="text-primary size-8" />
+      <div>
+        <h1 className="text-[22px] font-semibold">Captura solicitada</h1>
+        <p className="text-fg3 mt-2 text-[13px] leading-relaxed">
+          {f.capturasAtivadas > 0
+            ? "A busca de publicações será processada em segundo plano. As intimações encontradas aparecerão na triagem. Os autos dependem do acesso ao tribunal de cada processo."
+            : "Nenhuma OAB pôde ser ativada. Revise os dados em Fontes de dados para iniciar sua primeira captura."}
         </p>
-        {f.erro ? (
-          <p
-            className="text-fg2 border-line bg-panel mx-auto mt-3 max-w-[380px] rounded-[9px] border px-3 py-2 text-[11.5px] leading-[1.45]"
-            role="status"
-          >
-            {f.erro}
-          </p>
-        ) : null}
-        <button
-          onClick={f.abrirApp}
-          className="bg-primary text-primary-foreground mt-[18px] rounded-[9px] px-5 py-[11px] text-[13px] font-medium"
-        >
-          Abrir o Atjus
-        </button>
       </div>
-      <div className="text-fg3 mx-0.5 mb-2.5 text-[10.5px] font-medium tracking-[0.05em] uppercase">
-        Próximos passos
-      </div>
-      <div className="flex flex-col gap-2">
-        {itens.map((c) => {
-          const done = !!f.chk[c.k];
-          return (
-            <button
-              key={c.k}
-              onClick={() => f.toggleChk(c.k)}
-              className="row-hover border-line bg-panel flex items-center gap-3 rounded-[10px] border p-[12px_14px] text-left"
-            >
-              <span
-                className="grid size-5 flex-none place-items-center rounded-md border"
-                style={{
-                  borderColor: done ? "var(--primary)" : "var(--line)",
-                  background: done ? "var(--primary)" : "var(--panel)",
-                }}
-              >
-                {done ? (
-                  <Check
-                    className="text-primary-foreground size-3"
-                    strokeWidth={3}
-                  />
-                ) : null}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span
-                  className="block text-[13px] font-medium"
-                  style={{ color: done ? "var(--fg3)" : "var(--fg)" }}
-                >
-                  {c.t}
-                </span>
-                <span className="text-fg3 block text-[11.5px]">{c.d}</span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </>
+      {f.erro && (
+        <p role="alert" className="text-destructive text-[12px]">
+          {f.erro}
+        </p>
+      )}
+      <CourtAccessNotice />
+      <button
+        onClick={f.abrirApp}
+        className="bg-primary text-primary-foreground h-9 w-full rounded-lg font-medium"
+      >
+        Abrir triagem
+      </button>
+      <Link
+        className="text-primary block text-center text-[12px] hover:underline"
+        href="/primeira-importacao"
+      >
+        Revisar preparação e acompanhar importação
+      </Link>
+    </div>
   );
 }

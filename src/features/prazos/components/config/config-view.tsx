@@ -2,6 +2,8 @@
 
 import { Clock } from "lucide-react";
 
+import { NotificationPreferences } from "@/features/notifications/notification-preferences";
+
 import { useConfig } from "../../hooks/use-config";
 import { ConfigCert } from "./config-cert";
 import { ConfigEquipe } from "./config-equipe";
@@ -17,17 +19,17 @@ export function ConfigView() {
   const cfg = useConfig();
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:flex-row">
       {/* sub-nav de configurações */}
-      <div className="border-line bg-panel w-[232px] flex-none overflow-y-auto border-r px-2.5 py-4">
-        <div className="text-fg3 px-2.5 pt-1 pb-2.5 text-[10.5px] font-medium tracking-[0.05em] uppercase">
+      <div className="border-line bg-panel flex shrink-0 gap-1 overflow-x-auto border-b px-2.5 py-2 md:block md:w-[232px] md:overflow-y-auto md:border-r md:border-b-0 md:py-4">
+        <div className="text-fg3 hidden px-2.5 pt-1 pb-2.5 text-[10.5px] font-medium tracking-[0.05em] uppercase md:block">
           Configurações
         </div>
         {cfg.nav.map((t) => (
           <button
             key={t.key}
             onClick={t.onClick}
-            className="mb-0.5 flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px]"
+            className="mb-0.5 flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] whitespace-nowrap md:w-full"
             style={{ background: t.bg, color: t.fg, fontWeight: t.peso }}
           >
             {t.label}
@@ -37,7 +39,7 @@ export function ConfigView() {
 
       {/* conteúdo */}
       <div className="min-w-0 flex-1 overflow-y-auto">
-        <div className="max-w-[680px] px-8 pt-7 pb-12">
+        <div className="max-w-[680px] px-4 pt-7 pb-28 sm:px-8">
           {cfg.tab === "perfil" ? <ConfigPerfil /> : null}
           {cfg.tab === "org" ? <ConfigOrg /> : null}
 
@@ -65,6 +67,7 @@ export function ConfigView() {
           {cfg.tab === "equipe" ? <ConfigEquipe /> : null}
           {cfg.tab === "fontes" ? <ConfigFontes /> : null}
           {cfg.tab === "cert" ? <ConfigCert /> : null}
+          {cfg.tab === "notificacoes" ? <NotificationPreferences /> : null}
         </div>
       </div>
     </div>

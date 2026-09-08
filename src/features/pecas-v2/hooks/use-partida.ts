@@ -1,206 +1,268 @@
 "use client";
 
-// Orquestração da PARTIDA — a tela de Construção ANTES da peça existir. Escopada à
-// INTIMAÇÃO (não há draft ainda). Compõe: teses da intimação (GET; auto-gera na
-// primeira visita se vazio), seleção EFÊMERA client-side, e o "Gerar minuta" que
-// MATERIALIZA a peça (POST /v1/pecas com os thesis_ids selecionados) e navega pra
-// /pecas/[draftId]. O componente chama só este hook público.
-
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { toast } from "sonner";
 
+import type { ActionItemView } from "@/features/action-items/types";
+import { useDocumentosDoProcesso } from "@/features/documentos/hooks/use-documentos-do-processo";
+import { rotuloTipoAuto } from "@/features/documentos/lib/tipo-autos";
+import { detalheNaFila } from "@/features/intimacoes/lib/fila-navigation";
 import { useIntimacaoDetalhe } from "@/features/prazos/hooks/use-intimacao-detalhe";
+import { usePartes } from "@/features/processos/hooks/use-processos";
+import type { PageEnvelope } from "@/lib/api/types";
 import { useApi } from "@/lib/api/use-api";
 
 import type { PecaContexto } from "../lib/peca-contexto";
+import { partyOptions, representedParty } from "../lib/piece-intent";
 import {
   createDraft,
   generateDraft,
   generateIntimationTheses,
+  getDraft,
   getIntimationTheses,
 } from "../services/pecas-v2.service";
 import type { Thesis } from "../types";
-import { isSelectedForGeneration } from "./use-theses";
 
-/** Detalhe da intimação (model do useIntimacaoDetalhe) → contexto do rail. Na partida
- *  ainda não há draft: valor da causa desconhecido ("") e sem anexos (só o Teor). */
-function intimacaoToPecaContexto(
-  m: NonNullable<ReturnType<typeof useIntimacaoDetalhe>["model"]>,
-): PecaContexto {
-  return {
-    processo: {
-      cnj: m.cnj,
-      classe: m.classe,
-      assunto: m.assunto,
-      orgao: m.orgao,
-      tribunalGrau: m.tribunalGrau,
-      valor: "",
-    },
-    intimacao: {
-      id: m.id,
-      tipoLabel: m.tipoLabel,
-      publishedAt: m.publicadoEm,
-      prazoLabel: `${m.prazoNum} ${m.prazoFrase}`.trim(),
-      teor: m.teor,
-    },
-    partes: m.destinatarios.map((d) => ({
-      roleLabel: "Advogado(a)",
-      name: d.nome,
-      counselLabel: d.oab ? `OAB ${d.oab}` : "",
-      isClient: d.matched,
-    })),
-    autos: [],
-  };
+export interface Preparation {
+  objective: string;
+  client: string;
+  role: string;
+  facts: string;
+  missing: string;
+  pieceType: string;
+  actionItemId: string;
 }
-
-const thesesKey = (intimacaoId: string) =>
-  ["intimacao", intimacaoId, "theses"] as const;
-
+export const emptyPreparation: Preparation = {
+  objective: "",
+  client: "",
+  role: "",
+  facts: "",
+  missing: "",
+  pieceType: "MOTION",
+  actionItemId: "",
+};
+export function preparationInstructions(p: Preparation): string {
+  return `OBJETIVO CONFIRMADO: ${p.objective.trim()}\nPARTE REPRESENTADA: ${p.client.trim()}\nPOLO: ${p.role}\nFATOS INFORMADOS PELO ADVOGADO: ${p.facts.trim() || "Nenhum fato adicional confirmado."}\nDADOS PENDENTES: ${p.missing.trim() || "Identificar no texto todo dado necessário não fornecido."}`;
+}
 export function usePartida(intimacaoId: string) {
   const fetcher = useApi();
   const router = useRouter();
+  const params = useSearchParams();
   const qc = useQueryClient();
-
-  // Contexto rico da origem (processo/intimação/teor/partes/prazo/providências),
-  // reusando o detalhe da intimação — mesma fonte da tela de Intimação.
   const detalhe = useIntimacaoDetalhe(intimacaoId);
-
-  // Seleção EFÊMERA (client-side) — quais teses entram na peça. Só vira estado
-  // persistido (draft_thesis) no "Gerar minuta".
+  const parties = usePartes(detalhe.model?.courtRecordId ?? "");
+  const docs = useDocumentosDoProcesso(detalhe.model?.courtRecordId ?? "");
+  const [overrides, setPreparation] = useState<Partial<Preparation>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [highlightedDocId, setHighlightedDocId] = useState<string | null>(null);
-  const seededRef = useRef(false);
-  const autoGenRef = useRef(false);
-
+  const key = ["intimacao", intimacaoId, "theses"];
   const thesesQuery = useQuery({
-    queryKey: thesesKey(intimacaoId),
+    queryKey: key,
     queryFn: () => getIntimationTheses(fetcher, intimacaoId),
-    // Teses persistidas só mudam por "Regenerar" explícito — nunca por refetch.
-    // Evita regeneração/refetch acidental ao revisitar a PARTIDA.
     staleTime: Infinity,
-    refetchOnWindowFocus: false,
   });
-
+  const actions = useQuery({
+    queryKey: ["preparation-actions", detalhe.model?.courtRecordId],
+    enabled: !!detalhe.model?.courtRecordId,
+    queryFn: () =>
+      fetcher<PageEnvelope<ActionItemView>>(
+        `/v1/processos/${detalhe.model!.courtRecordId}/action-items`,
+        { query: { limit: 100 } },
+      ),
+  });
+  const providencias = (actions.data?.data ?? []).filter(
+    (a) => a.intimation_id === intimacaoId && a.status !== "DONE",
+  );
+  const actionItemId =
+    overrides.actionItemId ??
+    params.get("providencia") ??
+    (providencias.length === 1 ? providencias[0].id : "");
+  const action = providencias.find((a) => a.id === actionItemId);
+  const represented = representedParty(
+    parties.data,
+    detalhe.intimacao?.recipients,
+  );
+  const profileType = (
+    {
+      contestacao: "DEFENSE",
+      peticao_inicial: "COMPLAINT",
+      apelacao: "APPEAL",
+      manifestacao: "MOTION",
+    } as Record<string, string>
+  )[action?.piece_profile_key ?? ""];
+  const preparation: Preparation = {
+    ...emptyPreparation,
+    objective: action?.title ?? "",
+    client: represented?.name ?? "",
+    role: represented?.role ?? "",
+    ...overrides,
+    actionItemId,
+    pieceType: profileType ?? overrides.pieceType ?? "MOTION",
+  };
+  const existing = useQuery({
+    queryKey: ["preparation-existing", intimacaoId, actionItemId],
+    enabled: !actions.isPending,
+    queryFn: () =>
+      fetcher<{
+        data: { id: string; title: string; saga_state: string } | null;
+      }>(`/v1/intimacoes/${intimacaoId}/peca`, {
+        query: { action_item_id: actionItemId || undefined },
+      }),
+  });
   const generate = useMutation({
     mutationFn: () => generateIntimationTheses(fetcher, intimacaoId),
-    onSuccess: (theses) => {
-      qc.setQueryData(thesesKey(intimacaoId), theses);
-      // Recém-geradas: semeia a seleção pelo ESTADO persistido do BE (pending_add
-      // = pré-selecionada; off = não). Só grounded/alta nascem marcadas.
-      seededRef.current = true;
-      setSelected(
-        new Set(
-          theses
-            .filter((t) => isSelectedForGeneration(t.state))
-            .map((t) => t.id),
-        ),
-      );
+    onSuccess: (data) => {
+      qc.setQueryData(key, data);
+      setSelected(new Set());
     },
-    onError: () =>
-      toast.error("Não foi possível gerar as teses. Tente de novo."),
+    onError: () => toast.error("Não foi possível sugerir fundamentos."),
   });
-
-  const data = thesesQuery.data;
-  const theses = data ?? [];
-
-  // Primeira visita sem teses persistidas → auto-gera uma vez (idempotente por ref).
-  // Depende só do estado da LISTA (data/isLoading/isError), nunca do objeto de mutation
-  // (muda de identidade a cada render). Como o GET devolve as persistidas, revisitas NÃO
-  // caem aqui (data.length > 0) → a geração roda no MÁXIMO 1x por escopo.
-  useEffect(() => {
-    if (
-      !thesesQuery.isLoading &&
-      !thesesQuery.isError &&
-      (data?.length ?? 0) === 0 &&
-      !generate.isPending &&
-      !autoGenRef.current
-    ) {
-      autoGenRef.current = true;
-      generate.mutate();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [thesesQuery.isLoading, thesesQuery.isError, data]);
-
-  // Teses já persistidas (revisita) → semeia a seleção pelo ESTADO persistido
-  // (included|pending_add = selecionada; off = não), respeitando a regra do BE
-  // (só grounded/alta nascem marcadas). Roda uma vez ao carregar.
-  useEffect(() => {
-    if (!seededRef.current && data && data.length > 0) {
-      seededRef.current = true;
-      setSelected(
-        new Set(
-          data.filter((t) => isSelectedForGeneration(t.state)).map((t) => t.id),
-        ),
-      );
-    }
-  }, [data]);
-
-  const toggle = (t: Thesis) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(t.id)) next.delete(t.id);
-      else next.add(t.id);
-      return next;
-    });
-
-  const onFonte = (sourceDocumentId: string) => {
-    setHighlightedDocId(sourceDocumentId);
-    if (typeof document !== "undefined") {
-      document
-        .getElementById(`fundada-em-${sourceDocumentId}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  };
-
-  // A seleção efêmera é projetada no `state` que a TesesRail entende: selecionada
-  // → "included" (✓ / no texto), senão "off". Sem PATCH — é tudo local até gerar.
-  const railTheses: Thesis[] = theses.map((t) => ({
-    ...t,
-    state: selected.has(t.id) ? "included" : "off",
-  }));
-
-  // "Gerar minuta": materializa o draft (com as teses selecionadas semeadas como
-  // included) E dispara a geração numa tacada — o usuário cai já no estado "gerando"
-  // (streaming) da Construção, sem um segundo clique.
   const create = useMutation({
     mutationFn: async () => {
       const ids = [...selected];
-      const { id } = await createDraft(fetcher, {
+      const { id, isNew } = await createDraft(fetcher, {
         intimationId: intimacaoId,
+        actionItemId: preparation.actionItemId || undefined,
+        pieceType: preparation.pieceType,
+        title: preparation.objective.trim(),
+        instructions: preparationInstructions(preparation),
         thesisIds: ids,
       });
-      await generateDraft(fetcher, id, ids);
-      return { id };
+      const existing = await getDraft(fetcher, id);
+      // Reopening an existing draft never replaces its content.
+      if (!isNew || existing.sagaState !== "CREATED" || existing.contentHtml)
+        return id;
+      try {
+        await generateDraft(fetcher, id, ids);
+      } catch {
+        toast.error("Rascunho salvo. Retome a geração dentro da peça.");
+      }
+      return id;
     },
-    onSuccess: ({ id }) => router.replace(`/pecas/${id}`),
+    onSuccess: (id) =>
+      router.replace(
+        `/pecas/${id}?retorno=${encodeURIComponent(params.get("retorno") ?? "/intimacoes")}`,
+      ),
     onError: () =>
-      toast.error("Não foi possível gerar a minuta. Tente novamente."),
+      toast.error(
+        "Não foi possível criar a peça. Suas escolhas foram mantidas.",
+      ),
   });
-
-  const gerarMinuta = () => {
-    if (create.isPending) return;
-    create.mutate();
-  };
-
-  const voltar = () => router.push(`/intimacoes/${intimacaoId}`);
-
+  const m = detalhe.model;
+  const contexto: PecaContexto | null = m
+    ? {
+        processo: {
+          cnj: m.cnj,
+          classe: m.classe,
+          assunto: m.assunto,
+          orgao: m.orgao,
+          tribunalGrau: m.tribunalGrau,
+          valor: "",
+        },
+        intimacao: {
+          id: m.id,
+          tipoLabel: m.tipoLabel,
+          publishedAt: m.publicadoEm,
+          prazoLabel: m.fatalData || `${m.prazoNum} ${m.prazoFrase}`,
+          teor: m.teor,
+        },
+        partes: parties.data
+          ? [
+              ...parties.data.autor.map((p) => ({ ...p, roleLabel: "Autor" })),
+              ...parties.data.reu.map((p) => ({ ...p, roleLabel: "Réu" })),
+              ...parties.data.terceiros.map((p) => ({
+                ...p,
+                roleLabel: "Terceiro",
+              })),
+            ].map((p) => ({
+              name: p.name,
+              roleLabel: p.roleLabel,
+              isClient: false,
+              counselLabel: p.counsels
+                .map((c) =>
+                  [c.name, c.oab ? `OAB ${c.uf} ${c.oab}` : ""]
+                    .filter(Boolean)
+                    .join(" · "),
+                )
+                .join("; "),
+            }))
+          : [
+              {
+                name: m.autor,
+                roleLabel: "Autor",
+                counselLabel: "",
+                isClient: false,
+              },
+              {
+                name: m.reu,
+                roleLabel: "Réu",
+                counselLabel: "",
+                isClient: false,
+              },
+            ].filter((p) => p.name),
+        autos: docs.documentos.map((d) => ({
+          id: d.id,
+          name: rotuloTipoAuto(d.document_type) || d.title,
+          meta: [d.title, d.pages ? `${d.pages} pág.` : ""]
+            .filter(Boolean)
+            .join(" · "),
+          category: d.origin === "UPLOAD" ? "Anexo" : "Autos",
+          status: d.status,
+        })),
+      }
+    : null;
   return {
-    contexto: detalhe.model ? intimacaoToPecaContexto(detalhe.model) : null,
+    existingDraft: existing.data?.data ?? null,
+    resume: () => {
+      const id = existing.data?.data?.id;
+      if (id)
+        router.push(
+          `/pecas/${id}?retorno=${encodeURIComponent(params.get("retorno") ?? "/intimacoes")}`,
+        );
+    },
+    courtRecordId: m?.courtRecordId ?? "",
+    contexto,
     contextoLoading: detalhe.isPending,
-    teor: detalhe.model?.teor ?? "",
-    theses: railTheses,
+    teor: m?.teor ?? "",
+    preparation,
+    partyOptions: partyOptions(parties.data),
+    loadingContext:
+      detalhe.isPending ||
+      parties.isPending ||
+      actions.isPending ||
+      existing.isPending,
+    setPreparation,
+    providencias,
+    docs,
+    theses: (thesesQuery.data ?? []).map(
+      (t) =>
+        ({ ...t, state: selected.has(t.id) ? "pending_add" : "off" }) as Thesis,
+    ),
     selectedCount: selected.size,
     isLoading: thesesQuery.isLoading,
     isError: thesesQuery.isError,
-    toggle,
-    onFonte,
-    highlightedDocId,
+    toggle: (t: Thesis) =>
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(t.id)) next.delete(t.id);
+        else next.add(t.id);
+        return next;
+      }),
     regenerate: () => generate.mutate(),
     isRegenerating: generate.isPending,
-    gerarMinuta,
+    gerarMinuta: () => {
+      if (
+        preparation.objective.trim() &&
+        preparation.client.trim() &&
+        preparation.role
+      )
+        create.mutate();
+    },
     isGenerating: create.isPending,
-    voltar,
+    voltar: () =>
+      router.push(
+        detalheNaFila(intimacaoId, params.get("retorno") ?? "/intimacoes"),
+      ),
   };
 }

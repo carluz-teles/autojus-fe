@@ -34,8 +34,10 @@ export async function listProcessos(
     lifecycle,
     ...filters
   }: ListProcessosParams = {},
+  signal?: AbortSignal,
 ): Promise<PageEnvelope<ProcessoView>> {
   return fetcher<PageEnvelope<ProcessoView>>(ENDPOINT, {
+    signal,
     query: {
       limit,
       cursor,

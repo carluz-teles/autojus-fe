@@ -33,6 +33,7 @@ export interface PecaContextoParte {
 }
 
 export interface PecaContextoDoc {
+  status?: string;
   id: string;
   name: string;
   /** Linha secundária (tamanho do anexo, "fls. X–Y", etc.). */
@@ -79,13 +80,14 @@ export function draftToPecaContexto(d: Draft): PecaContexto {
     autos: [
       ...d.processDocuments.map((doc) => ({
         id: doc.id,
-        name: doc.label,
+        name: doc.typeLabel || doc.documentType || doc.label,
+        status: doc.status,
         // Tipo (enriquecido) · data do evento · páginas — a data fica AQUI, fora do
         // nome, pra desambiguar documentos do mesmo tipo. Partes vazias são omitidas.
         meta: [
-          doc.typeLabel || doc.documentType,
+          doc.label,
           doc.eventDate,
-          `${doc.pages} pág.`,
+          doc.pages > 0 ? `${doc.pages} pág.` : "",
         ]
           .filter(Boolean)
           .join(" · "),

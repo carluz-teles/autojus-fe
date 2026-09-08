@@ -2,7 +2,7 @@
 // que o FE consome saem daqui. Campos que o BE não expõe hoje (intimation.title,
 // deadline em dias) são derivados aqui pra manter a UI intocada.
 
-import { htmlToText } from "@/lib/html/html-to-text";
+import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
 
 import type {
   ChatMessage,
@@ -42,6 +42,9 @@ import type {
 export function mapPecaDetailToDraft(api: PecaDetailAPI): Draft {
   const structured = api.structured_content;
   return {
+    contentRevision: api.content_revision,
+    instructions: api.instructions,
+    actionItemId: api.action_item_id,
     id: api.id,
     pieceType: api.piece_type,
     title: humanizeTitle(api.title, api.piece_type),
@@ -64,7 +67,7 @@ export function mapPecaDetailToDraft(api: PecaDetailAPI): Draft {
     // Só é usado pelo texto cosmético do EditorBanner ("…e de N teses") no editor
     // pós-geração, onde o controller de teses não está em escopo — derivar aqui exigiria
     // threa­dar uma nova query pelo editor-area. Mantido fixo pra não acoplar/quebrar.
-    thesisCount: 3,
+    thesisCount: 0,
     sentToSigningAt: api.sent_to_signing_at,
     signedAt: api.signed_at,
     filedAt: api.filed_at,
@@ -114,11 +117,11 @@ function mapIntimation(api: IntimationAPI | null): DraftIntimation {
   return {
     id: api.id,
     title: humanizeIntimationType(api.type),
-    publishedAt: formatDatePt(api.made_available_at),
+    publishedAt: formatDatePt(api.published_at ?? ""),
     // O teor do DJEN chega como HTML cru; o card/drawer do pecas-v2 exibem como
     // TEXTO, então extraímos o texto legível aqui (ver htmlToText). Fica no boundary
     // do mapper → cobre card + drawer num ponto só.
-    teor: htmlToText(api.content),
+    teor: api.content,
   };
 }
 
@@ -150,7 +153,7 @@ function mapProcess(api: ProcessAPI | null): DraftProcess {
   }
   return {
     courtRecordId: api.court_record_id,
-    cnj: api.cnj_number,
+    cnj: formatarCNJ(api.cnj_number),
     classe: api.class,
     assunto: api.subject,
     orgao: api.judging_body,
@@ -237,10 +240,7 @@ function mapPartyGroup(api: PartyAPI): DraftPartyGroup {
     roleLabel: roleLabelFromApi(api.role),
     name: api.name,
     counselLabel,
-    // Fallback (BE ainda não confirmou is_client no read model): quando ausente,
-    // o cliente do escritório costuma ser o réu na peça de defesa (contestação).
-    // Ver nota de reconciliação no relatório.
-    isClient: api.is_client ?? api.role === "DEFENDANT",
+    isClient: api.is_client ?? false,
   };
 }
 
@@ -291,6 +291,9 @@ function formatOab(c: { oab: string; uf: string }): string | undefined {
 
 export function mapChatMessageFromApi(api: ChatMessageAPI): ChatMessage {
   return {
+    changes: (api.changes ?? []).map((change) =>
+      mapSectionChangeFromApi(change),
+    ),
     id: api.id,
     role: api.role,
     content: api.content,

@@ -55,6 +55,20 @@ function item(
 }
 
 describe("ordenarPorUrgencia", () => {
+  it("ignora a data de preenchimento de registros NO_DEADLINE", () => {
+    const itens = [
+      item("a-classificar", {
+        prazo: { ...prazo(-30), status: "NO_DEADLINE" },
+      }),
+      item("prazo-real", { prazo: prazo(5) }),
+    ];
+
+    expect(ordenarPorUrgencia(itens).map((i) => i.id)).toEqual([
+      "prazo-real",
+      "a-classificar",
+    ]);
+  });
+
   it("ordena por days_left ascendente (mais urgente primeiro)", () => {
     const itens = [
       item("a", { prazo: prazo(5) }),

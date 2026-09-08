@@ -9,5 +9,5 @@ export default async function PecaPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <ConstructionPage id={id} />;
+  return <ConstructionPage key={id} id={id} />;
 }

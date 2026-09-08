@@ -12,7 +12,7 @@ import {
   Check,
   ChevronDown,
   LogOut,
-  Search,
+  type LucideIcon,
   Settings2,
   User,
   UserPlus,
@@ -20,10 +20,10 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
+import { useUnreadNotifications } from "@/features/notifications/use-notifications";
 import { useTriagemCount } from "@/features/triagem/hooks/use-triagem";
 import { cn } from "@/lib/utils";
 
-import { CommandPalette, useCommandPalette } from "./command-palette";
 import { NAV_SECTIONS } from "./nav-config";
 
 // Fundos com tinta de marca (accent) nos valores exatos do mockup.
@@ -42,54 +42,46 @@ function iniciais(nome: string | null | undefined, fallback = "?") {
 }
 
 // Sidebar Linear-style, port fiel do Claude Design (lâminas 43-109). Largura fixa
-// 224px, sem colapso. Topo: seletor de organização. Abaixo: ⌘K. Meio: navegação
+// 224px, sem colapso. Topo: seletor de organização. Meio: navegação
 // em seções. Rodapé: menu de usuário. Org/usuário vêm do Clerk (auth real); só o
 // visual é portado. "Configurações" NÃO é item de rodapé — vive nos popups.
 export function Sidebar() {
-  const palette = useCommandPalette();
   // Contador ao vivo do item "Triagem" — mesma queryKey da própria tela
   // (React Query dedupe: sidebar + página montadas juntas não dobram o fetch).
   const triagemCount = useTriagemCount();
+  const unreadNotifications = useUnreadNotifications();
 
   return (
-    <>
-      <aside className="border-line bg-sidebar hidden h-full w-56 shrink-0 flex-col border-r p-2.5 md:flex">
-        <OrgSwitcher />
+    <aside className="border-line bg-sidebar hidden h-full w-56 shrink-0 flex-col border-r p-2.5 md:flex">
+      <OrgSwitcher />
 
-        <button
-          onClick={palette.abrir}
-          className="border-line bg-panel text-fg3 hover:bg-hover mb-2.5 flex w-full items-center gap-2 rounded-[7px] border px-[9px] py-[7px] text-[12.5px] transition-colors"
-        >
-          <Search className="size-3.5" strokeWidth={1.9} />
-          Buscar ou comandar
-          <span className="border-line bg-hover text-fg3 ml-auto rounded border px-[5px] py-[2px] font-mono text-[10px] leading-none">
-            ⌘K
-          </span>
-        </button>
-
-        <nav className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
-          {NAV_SECTIONS.map((sec) => (
-            <div key={sec.titulo} className="mt-2">
-              <div className="text-fg3 px-[9px] pt-1.5 pb-1 text-[10.5px] font-medium tracking-[0.06em] uppercase">
-                {sec.titulo}
-              </div>
-              {sec.itens.map((item) => (
-                <NavItemLink
-                  key={item.href}
-                  {...item}
-                  count={item.href === "/triagem" ? triagemCount : undefined}
-                />
-              ))}
+      <nav className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+        {NAV_SECTIONS.map((sec) => (
+          <div key={sec.titulo} className="mt-2">
+            <div className="text-fg3 px-[9px] pt-1.5 pb-1 text-[10.5px] font-medium tracking-[0.06em] uppercase">
+              {sec.titulo}
             </div>
-          ))}
-        </nav>
+            {sec.itens.map((item) => (
+              <NavItemLink
+                key={item.href}
+                {...item}
+                count={
+                  item.href === "/triagem"
+                    ? triagemCount
+                    : item.href === "/"
+                      ? unreadNotifications.data?.count
+                      : undefined
+                }
+              />
+            ))}
+          </div>
+        ))}
+      </nav>
 
-        <div className="border-line flex-none border-t">
-          <UserSwitcher />
-        </div>
-      </aside>
-      <CommandPalette aberto={palette.aberto} fechar={palette.fechar} />
-    </>
+      <div className="border-line flex-none border-t">
+        <UserSwitcher />
+      </div>
+    </aside>
   );
 }
 
@@ -101,7 +93,7 @@ function NavItemLink({
 }: {
   href: string;
   label: string;
-  icon: typeof Search;
+  icon: LucideIcon;
   /** Contador ao vivo (ex.: Triagem) — badge só aparece quando > 0. */
   count?: number;
 }) {

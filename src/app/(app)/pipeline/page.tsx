@@ -1,7 +1,5 @@
-import { PrazosView } from "@/features/prazos/components/prazos-view";
-
-export const metadata = { title: "Providências · jus·assessoria" };
-
-export default function PipelinePage() {
-  return <PrazosView vista="pipeline" />;
+import { WorkList } from "@/features/action-items/components/work-list";
+export const metadata = { title: "Providências · Atjus" };
+export default function Page() {
+  return <WorkList />;
 }
