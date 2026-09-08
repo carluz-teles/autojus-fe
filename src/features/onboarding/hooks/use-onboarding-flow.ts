@@ -1,8 +1,8 @@
 "use client";
 
-import { useOrganization, useOrganizationList } from "@clerk/nextjs";
+import { useAuth, useOrganization, useOrganizationList } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { addWatchedOab } from "@/features/integrations/services/integrations.service";
 import { useApi } from "@/lib/api/use-api";
@@ -17,6 +17,7 @@ export type OnbRole = "novo" | "solo";
 type Phase = "idle" | "creating" | "provisioning" | "saving";
 
 const ORDER: OnbStep[] = ["welcome", "org", "access", "oab", "done"];
+const STORED_STEPS = new Set<OnbStep>(ORDER);
 const digits = (s: string) => s.replace(/\D/g, "");
 
 // Normaliza a OAB digitada ("OAB/SP 214.885", "SP 214885", "214885/SP") pra
@@ -58,13 +59,16 @@ function useOabs() {
 
 export function useOnboardingFlow() {
   const router = useRouter();
-  const { isLoaded, createOrganization, setActive } = useOrganizationList();
+  const { userId, orgId } = useAuth();
+  const { isLoaded, createOrganization, setActive, userMemberships } =
+    useOrganizationList({ userMemberships: { infinite: true } });
   const { organization: activeOrg } = useOrganization();
 
   const [step, setStep] = useState<OnbStep>("welcome");
   const [phase, setPhase] = useState<Phase>("idle");
   const [capturasAtivadas, setCapturasAtivadas] = useState(0);
   const [erro, setErro] = useState<string | null>(null);
+  const restoredStepFor = useRef<string | null>(null);
 
   const dados = useDados();
   const oabs = useOabs();
@@ -73,6 +77,45 @@ export function useOnboardingFlow() {
   const { tenantReady, updateOrgProfile } = useOnboarding({
     poll: phase === "provisioning",
   });
+
+  const stepStorageKey = userId ? `atjus:onboarding-step:${userId}` : null;
+
+  // O progresso visual é local, mas fica isolado por Clerk user. Etapas que
+  // dependem do tenant só são restauradas depois que a organização foi reativada
+  // e seu org_id voltou ao token da sessão.
+  useEffect(() => {
+    if (!stepStorageKey || restoredStepFor.current === stepStorageKey) return;
+    const stored = window.localStorage.getItem(stepStorageKey) as OnbStep | null;
+    if (stored && STORED_STEPS.has(stored)) {
+      if (!orgId && stored !== "welcome" && stored !== "org") return;
+      queueMicrotask(() => setStep(stored));
+    }
+    restoredStepFor.current = stepStorageKey;
+  }, [orgId, stepStorageKey]);
+
+  useEffect(() => {
+    if (!stepStorageKey || restoredStepFor.current !== stepStorageKey) return;
+    window.localStorage.setItem(stepStorageKey, step);
+  }, [step, stepStorageKey]);
+
+  // Clerk allows a personal session even when the user already belongs to an
+  // organization. That is exactly what happens after a hard refresh in this
+  // deployment. Restore the existing membership before the wizard can create a
+  // second organization; /identity/me only starts once the org claim is active.
+  useEffect(() => {
+    if (!isLoaded || orgId || phase !== "idle") return;
+    const membership = userMemberships.data?.[0];
+    if (!membership || !setActive) return;
+    void setActive({ organization: membership.organization.id })
+      .then(() => {
+        setErro(null);
+        setPhase("provisioning");
+      })
+      .catch(() => {
+        setPhase("idle");
+        setErro("Não foi possível restaurar o escritório. Tente novamente.");
+      });
+  }, [isLoaded, orgId, phase, setActive, userMemberships.data]);
 
   // Grava o perfil mínimo → o BE marca onboarding_completed_at → persiste as OABs
   // como watched-oabs → avança pro done. O perfil é o gate do onboarding; as OABs
@@ -198,17 +241,5 @@ export function useOnboardingFlow() {
     // done
     capturasAtivadas,
     abrirApp: () => router.push("/triagem"),
-    // topbar
-    reiniciar: () => {
-      setStep("welcome");
-      setPhase("idle");
-      setErro(null);
-      setCapturasAtivadas(0);
-      dados.setRole(null);
-      dados.setNome("");
-      dados.setDoc("");
-      oabs.setOab("");
-      oabs.setOabs([]);
-    },
   };
 }

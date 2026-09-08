@@ -45,13 +45,6 @@ export function OnboardingFlow() {
             ))}
           </div>
         ) : null}
-        <button
-          onClick={f.reiniciar}
-          disabled={f.preparando}
-          className="border-line bg-panel text-fg3 hover:bg-hover ml-auto rounded-[7px] border px-2.5 py-[5px] text-[11.5px]"
-        >
-          Reiniciar
-        </button>
       </div>
 
       {/* corpo centralizado */}
