@@ -8,9 +8,11 @@ describe("stream da geração atual", () => {
     const buffer = new GenerationStreamBuffer(started);
     buffer.identify(String(Date.parse(started) - 1000));
     expect(buffer.append("␞")).toBeNull();
+    expect(buffer.acceptsStage()).toBe(false);
     expect(buffer.append("Texto antigo")).toBeNull();
     buffer.identify(String(Date.parse(started)));
     expect(buffer.append("␞")).toBe("");
+    expect(buffer.acceptsStage()).toBe(true);
     expect(buffer.append("Texto ")).toBe("Texto ");
     expect(buffer.append("novo")).toBe("Texto novo");
     // A retry of this run replaces its partial output, never concatenates it.

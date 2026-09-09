@@ -22,4 +22,7 @@ export class GenerationStreamBuffer {
     this.markdown += chunk.replace(RESET, "");
     return this.markdown;
   }
+  acceptsStage(): boolean {
+    return this.started;
+  }
 }

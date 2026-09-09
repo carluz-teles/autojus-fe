@@ -36,6 +36,7 @@ interface Options {
    *  aplica com setHtml(). */
   onProgress: (fullMarkdown: string) => void;
   onDone?: (saga: "DRAFTED" | "FAILED" | string) => void;
+  onStage?: (stage: string) => void;
   onError?: (err: unknown) => void;
 }
 
@@ -46,12 +47,14 @@ export function useDraftStream(draftId: string, opts: Options): void {
   const accRef = useRef("");
   const onProgressRef = useRef(opts.onProgress);
   const onDoneRef = useRef(opts.onDone);
+  const onStageRef = useRef(opts.onStage);
   const onErrorRef = useRef(opts.onError);
   useEffect(() => {
     onProgressRef.current = opts.onProgress;
     onDoneRef.current = opts.onDone;
+    onStageRef.current = opts.onStage;
     onErrorRef.current = opts.onError;
-  }, [opts.onProgress, opts.onDone, opts.onError]);
+  }, [opts.onProgress, opts.onDone, opts.onStage, opts.onError]);
 
   useEffect(() => {
     if (!opts.enabled) return;
@@ -115,6 +118,12 @@ export function useDraftStream(draftId: string, opts: Options): void {
           pending = false;
           if (!cancelled) onProgressRef.current(accRef.current);
         }, 16);
+      });
+
+      es.addEventListener("stage", (e: MessageEvent) => {
+        if (!cancelled && buffer.acceptsStage()) {
+          onStageRef.current?.(String(e.data));
+        }
       });
 
       es.addEventListener("done", (e: MessageEvent) => {

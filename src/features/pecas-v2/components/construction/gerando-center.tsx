@@ -27,6 +27,13 @@ marked.setOptions({ gfm: true, breaks: false });
 
 const SKELETON_WIDTHS = [92, 78, 96, 64, 88, 72];
 
+const STAGE_LABELS: Record<string, string> = {
+  analyzing_sources: "Conferindo os autos e os limites da prova…",
+  drafting_sections: "Redigindo as seções em paralelo…",
+  auditing_draft: "Validando fatos, pedidos e coerência…",
+  safe_fallback: "Refazendo a minuta pelo caminho seguro…",
+};
+
 interface Props {
   draftId: string;
   /** N de teses selecionadas — pro rótulo "…e de N teses". */
@@ -44,6 +51,7 @@ export function GerandoCenter({
 }: Props) {
   const qc = useQueryClient();
   const [html, setHtml] = useState("");
+  const [stage, setStage] = useState("analyzing_sources");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useDraftStream(draftId, {
@@ -52,6 +60,7 @@ export function GerandoCenter({
     onDone: () => {
       void qc.invalidateQueries({ queryKey: draftKeys.detail(draftId) });
     },
+    onStage: setStage,
     onProgress: (fullMarkdown) => {
       const parsed = marked.parse(fullMarkdown, { async: false }) as string;
       setHtml(sanitizeContentHtml(parsed));
@@ -72,7 +81,8 @@ export function GerandoCenter({
       <div className="border-line bg-panel min-h-[400px] rounded-md border px-12 py-12 shadow-[0_8px_30px_oklch(0.27_0.012_200/8%)] md:px-16 md:py-14">
         <div className="text-primary mb-6 flex items-center gap-2.5 text-[12.5px]">
           <Loader2 className="size-[15px] animate-spin" />
-          Redigindo a partir da intimação e de {tesesLabel}…
+          {STAGE_LABELS[stage] ??
+            `Redigindo a partir da intimação e de ${tesesLabel}…`}
         </div>
 
         {hasText ? (
