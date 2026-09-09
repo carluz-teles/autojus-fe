@@ -4,6 +4,8 @@ import { Link2, MessageSquare, Send, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
+
 import type { Proposta } from "../../hooks/use-assistente";
 import { useChatThread, useSendChatMessage } from "../../hooks/use-chat";
 import { isProposalStale } from "../../lib/proposal-revision";
@@ -31,6 +33,20 @@ export function AssistentePanel({
 }) {
   const thread = useChatThread(draftId);
   const send = useSendChatMessage(draftId);
+  const lastAnswer = thread.data?.at(-1);
+  const answerVisible = lastAnswer?.role === "assistant" && !send.isPending;
+  useAIExperience(
+    `/v1/pecas/${draftId}/chat`,
+    answerVisible,
+    "first_content",
+    lastAnswer?.id,
+  );
+  useAIExperience(
+    `/v1/pecas/${draftId}/chat`,
+    answerVisible,
+    "complete",
+    lastAnswer?.id,
+  );
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);

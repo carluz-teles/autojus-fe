@@ -8,6 +8,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
+
 import type { IterateScope, PendingChange, QuickAdjustKind } from "../types";
 import { useIterate, useQuickAdjust } from "./use-iterate";
 
@@ -49,6 +51,12 @@ export function useAssistente(
   const [propostas, setPropostas] = useState<Proposta[]>([]);
 
   const pensando = iterate.isPending || quick.isPending;
+  useAIExperience(
+    `/v1/pecas/${id}/iterate`,
+    !pensando && (iterate.isSuccess || quick.isSuccess),
+    "complete",
+    propostas,
+  );
 
   const onResult = (changes: PendingChange[], pedido: string) => {
     if (changes.length === 0) {

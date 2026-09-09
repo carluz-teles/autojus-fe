@@ -14,6 +14,7 @@ import { iniciarActionItem } from "@/features/action-items/services/action-items
 import { useApi } from "@/lib/api/use-api";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useInfinitePageBuffer } from "@/lib/hooks/use-infinite-page-buffer";
+import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
 import {
   analisarIntimacao,
@@ -320,6 +321,14 @@ export function useIntimacaoDetalhe(id: string) {
     tentativasDaJanela(qc, id, janela) < POLL_MAX_ATTEMPTS &&
     algoPendente(query.data, janela);
 
+  const analysisVisible =
+    !!janela?.targetAnalyzedAt && !algoPendente(query.data, janela);
+  useAIExperience(
+    `/v1/intimacoes/${id}/analise`,
+    analysisVisible,
+    "complete",
+    query.dataUpdatedAt,
+  );
   return { ...query, materializandoAnalise };
 }
 

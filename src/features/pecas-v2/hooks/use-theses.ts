@@ -11,6 +11,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useApi } from "@/lib/api/use-api";
+import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
 import { isSelectedForGeneration } from "../lib/thesis-selection";
 export { isSelectedForGeneration } from "../lib/thesis-selection";
@@ -79,7 +80,7 @@ export function editorTargetState(
 
 function useTheses(id: string) {
   const fetcher = useApi();
-  return useQuery({
+  const query = useQuery({
     queryKey: thesesKey(id),
     queryFn: () => svc.getTheses(fetcher, id),
     enabled: !!id,
@@ -89,6 +90,13 @@ function useTheses(id: string) {
     staleTime: Infinity,
     refetchOnWindowFocus: false,
   });
+  useAIExperience(
+    `/v1/pecas/${id}/theses`,
+    query.isSuccess && !query.isFetching,
+    "complete",
+    query.dataUpdatedAt,
+  );
+  return query;
 }
 
 function useGenerateTheses(id: string) {

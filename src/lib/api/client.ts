@@ -1,3 +1,8 @@
+import {
+  isAIRequest,
+  recordAIExperience,
+  rememberAIRequest,
+} from "../telemetry/ai-experience";
 import { apiErrorFromResponse, networkError } from "./errors";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -44,6 +49,7 @@ export async function apiFetch<T>(
   path: string,
   req: ApiRequest = {},
 ): Promise<T> {
+  const started = typeof window === "undefined" ? 0 : performance.now();
   const {
     method = "GET",
     body,
@@ -88,6 +94,20 @@ export async function apiFetch<T>(
     throw networkError(cause);
   }
 
+  if (isAIRequest(path, method)) {
+    const operationId = res.headers.get("X-AI-Operation-ID");
+    if (operationId) rememberAIRequest(path, operationId, started);
+    if (operationId && !res.ok) {
+      recordAIExperience(path, "error", (event) =>
+        fetch(buildUrl("/v1/ai/experience-events"), {
+          method: "POST",
+          headers: { ...finalHeaders, "Content-Type": "application/json" },
+          body: JSON.stringify(event),
+          signal: AbortSignal.timeout(2000),
+        }),
+      );
+    }
+  }
   if (!res.ok) throw await apiErrorFromResponse(res);
 
   if (res.status === 204) return undefined as T;

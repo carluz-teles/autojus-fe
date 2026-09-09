@@ -16,6 +16,7 @@ import { useState } from "react";
 
 import { detalheNaFila } from "@/features/intimacoes/lib/fila-navigation";
 import { htmlToText } from "@/lib/html/html-to-text";
+import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
 import type { SagaState } from "../types";
 import { useDraft } from "./use-draft";
@@ -74,6 +75,19 @@ export function useConstruction(id: string) {
   const [firedGenerate, setFiredGenerate] = useState(false);
 
   const saga = draftQuery.data?.sagaState;
+  const generated = saga === "DRAFTED" || saga === "REVIEWED";
+  useAIExperience(
+    `/v1/pecas/${id}/generate`,
+    generated,
+    "complete",
+    draftQuery.dataUpdatedAt,
+  );
+  useAIExperience(
+    `/v1/pecas/${id}/generate`,
+    saga === "FAILED",
+    "error",
+    draftQuery.dataUpdatedAt,
+  );
 
   // Nota: não precisamos "soltar" firedGenerate quando o saga chega em DRAFTED/
   // REVIEWED — deriveStage já retorna "pronta" por saga, independente do flag.

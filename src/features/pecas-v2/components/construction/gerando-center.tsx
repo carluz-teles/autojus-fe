@@ -17,6 +17,7 @@ import { marked } from "marked";
 import { useEffect, useRef, useState } from "react";
 
 import { sanitizeContentHtml } from "@/lib/html/sanitize-content";
+import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
 import { draftKeys } from "../../hooks/use-draft";
 import { useDraftStream } from "../../hooks/use-draft-stream";
@@ -53,6 +54,11 @@ export function GerandoCenter({
   const [html, setHtml] = useState("");
   const [stage, setStage] = useState("analyzing_sources");
   const scrollRef = useRef<HTMLDivElement>(null);
+  useAIExperience(
+    `/v1/pecas/${draftId}/generate`,
+    html.trim().length > 0,
+    "first_content",
+  );
 
   useDraftStream(draftId, {
     enabled: streamEnabled,
