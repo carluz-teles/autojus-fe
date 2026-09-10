@@ -133,13 +133,19 @@ function useGenerateDraft(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (
-      input: string[] | { thesisIds: string[]; revision: string },
+      input:
+        | string[]
+        | { thesisIds: string[]; revision?: string; instructions?: string },
     ) =>
       Array.isArray(input)
         ? svc.generateDraft(fetcher, id, input)
-        : svc.generateDraft(fetcher, id, input.thesisIds, undefined, {
-            revision: input.revision,
-          }),
+        : svc.generateDraft(
+            fetcher,
+            id,
+            input.thesisIds,
+            input.instructions,
+            input.revision ? { revision: input.revision } : undefined,
+          ),
     onSuccess: (result, input) => {
       const selected = new Set(Array.isArray(input) ? input : input.thesisIds);
       qc.setQueryData<Thesis[]>(thesesKey(id), (list) =>

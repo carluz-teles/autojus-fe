@@ -1,6 +1,7 @@
 import type { ActionItemView } from "../types";
 
 export type PrimaryWorkAction =
+  | "review-origin"
   | "review-suggestion"
   | "open-piece"
   | "generate-piece"
@@ -17,6 +18,13 @@ const TERMINAL_STATUSES = new Set(["DONE", "CANCELLED", "DISMISSED"]);
  * gerar uma nova peça, por outro lado, exige uma intimação de origem e tipo confirmado.
  */
 export function primaryWorkAction(item: ActionItemView): PrimaryWorkAction {
+  if (
+    item.origin_review_required &&
+    item.intimation_id &&
+    !item.draft_id &&
+    !TERMINAL_STATUSES.has(item.status)
+  )
+    return "review-origin";
   if (item.status === "SUGGESTED") return "review-suggestion";
   if (item.draft_id) return "open-piece";
 

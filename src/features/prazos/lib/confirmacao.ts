@@ -30,16 +30,50 @@ export const confirmacaoSchema = z.object({
 
 export type ConfirmacaoForm = z.infer<typeof confirmacaoSchema>;
 
+/** Legacy automatic classifications may contradict an otherwise valid declared date. */
+export function tipoIncompativelComPrazo(p: PrazoDetalheView): boolean {
+  return (
+    !p.confirmed &&
+    ["PENDING", "OPEN", "MISSED"].includes(p.status) &&
+    ["ciencia", "sem_ato"].includes(p.tipo_ato ?? "")
+  );
+}
+
+export function bloqueiaProvidencias(
+  p: PrazoDetalheView | null,
+  estado: string,
+): boolean {
+  if (!p) return estado === "ia" || estado === "a_classificar";
+  if (p.status === "CANCELLED" || p.status === "MET") return false;
+  const divergencia =
+    p.origem !== "declarado" &&
+    p.cross_validation?.resultado === "divergente" &&
+    !p.cross_validation.decisao;
+  if (divergencia) return true;
+  if (p.confirmed) return false;
+  return (
+    precisaConfirmarPrazo(p, estado) ||
+    (p.status !== "NO_DEADLINE" && p.confirmacao_exigida === true)
+  );
+}
+
 export function precisaConfirmarPrazo(
   p: PrazoDetalheView,
   estado: string,
 ): boolean {
   if (p.confirmed || p.status === "CANCELLED" || p.status === "MET")
     return false;
-  // confirmacao_exigida also signals date divergence or tenant policy. Those
-  // requirements do not turn a declared/calculated prazo into an inferred type.
+  // A date divergence has its own decision form; do not bypass it with a type confirmation.
+  if (
+    p.origem !== "declarado" &&
+    p.cross_validation?.resultado === "divergente" &&
+    !p.cross_validation.decisao
+  )
+    return false;
   return (
     p.reopened_for_review === true ||
+    tipoIncompativelComPrazo(p) ||
+    (p.status !== "NO_DEADLINE" && p.confirmacao_exigida === true) ||
     estado === "a_classificar" ||
     estado === "ia"
   );

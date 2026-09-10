@@ -1,9 +1,9 @@
 "use client";
 import { useQueryClient } from "@tanstack/react-query";
-import { Upload } from "lucide-react";
+import { ListPlus, Upload } from "lucide-react";
 import { useRef } from "react";
 
-import { Button } from "@/components/ui/button";
+import { IconAction } from "@/components/ui/icon-action";
 import { useDocumentosDoProcesso } from "@/features/documentos/hooks/use-documentos-do-processo";
 
 import { draftKeys } from "../../hooks/use-draft";
@@ -19,16 +19,17 @@ export function SourceActions({
   const uploadInput = useRef<HTMLInputElement>(null);
   if (!courtRecordId) return null;
   return (
-    <div className="flex flex-col gap-3">
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={docs.upload.isUploading}
+    <div className="flex flex-wrap items-center gap-1">
+      <IconAction
+        icon={Upload}
+        label={
+          docs.upload.isUploading
+            ? "Enviando documento…"
+            : "Anexar PDF ao processo"
+        }
+        loading={docs.upload.isUploading}
         onClick={() => uploadInput.current?.click()}
-      >
-        <Upload data-icon="inline-start" aria-hidden />
-        {docs.upload.isUploading ? "Enviando…" : "Anexar PDF"}
-      </Button>
+      />
       <input
         ref={uploadInput}
         aria-label="Anexar PDF ao processo"
@@ -51,19 +52,17 @@ export function SourceActions({
         }}
       />
       {docs.upload.uploadError && (
-        <p role="alert" className="text-destructive text-xs">
+        <p role="alert" className="text-destructive basis-full text-xs">
           Não foi possível anexar o documento.
         </p>
       )}
       {docs.hasNextPage && (
-        <Button
-          variant="link"
-          size="sm"
-          disabled={docs.isFetchingNextPage}
+        <IconAction
+          icon={ListPlus}
+          label="Carregar mais autos"
+          loading={docs.isFetchingNextPage}
           onClick={() => void docs.fetchNextPage()}
-        >
-          Mostrar mais autos
-        </Button>
+        />
       )}
     </div>
   );

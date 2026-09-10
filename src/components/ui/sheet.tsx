@@ -3,6 +3,8 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 // Slide-over drawer sobre o Dialog do base-ui (foco-trap, scroll-lock, escape e
@@ -32,22 +34,26 @@ export function SheetContent({
 }) {
   return (
     <Dialog.Portal>
-      <Dialog.Backdrop className="bg-foreground/25 fixed inset-0 z-40 backdrop-blur-[2px] transition-opacity duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
+      <Dialog.Backdrop
+        data-slot="sheet-backdrop"
+        className="bg-foreground/25 fixed inset-0 z-40 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0"
+      />
       <Dialog.Popup
+        data-slot="sheet-content"
         className={cn(
           "bg-card text-card-foreground fixed inset-y-0 right-0 z-50 flex w-full max-w-[30rem] flex-col border-l shadow-2xl outline-none",
           "transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] data-[ending-style]:translate-x-full data-[starting-style]:translate-x-full",
           className,
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b px-6 py-5">
+        <div className="flex items-start justify-between gap-3 border-b px-4 py-4 sm:px-6 sm:py-5">
           <div className="min-w-0">
             {eyebrow ? (
               <div className="mb-2 flex flex-wrap items-center gap-1.5">
                 {eyebrow}
               </div>
             ) : null}
-            <Dialog.Title className="font-display truncate text-xl leading-tight tracking-tight tabular-nums">
+            <Dialog.Title className="font-display text-xl leading-tight tracking-tight break-words tabular-nums">
               {title}
             </Dialog.Title>
             {description ? (
@@ -56,20 +62,25 @@ export function SheetContent({
               </Dialog.Description>
             ) : null}
           </div>
-          <Dialog.Close
-            aria-label="Fechar"
-            className="text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:ring-ring/50 -mr-1.5 shrink-0 rounded-md p-1.5 transition-colors outline-none focus-visible:ring-3"
+          <Tooltip
+            label="Fechar painel"
+            render={
+              <Dialog.Close
+                aria-label="Fechar"
+                render={<Button variant="ghost" size="icon-sm" />}
+              />
+            }
           >
-            <X className="size-4" />
-          </Dialog.Close>
+            <X aria-hidden />
+          </Tooltip>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
           {children}
         </div>
 
         {footer ? (
-          <div className="bg-card/85 flex items-center justify-end gap-2 border-t px-6 py-4 backdrop-blur">
+          <div className="bg-card/85 flex flex-wrap items-center justify-end gap-2 border-t px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur sm:px-6">
             {footer}
           </div>
         ) : null}

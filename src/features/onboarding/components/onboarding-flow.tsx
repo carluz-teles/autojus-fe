@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 
 import { CnpjInput } from "@/components/ui/cnpj-input";
+import { IconAction } from "@/components/ui/icon-action";
 import { OabInput } from "@/components/ui/oab-input";
 import { formatOabDisplay } from "@/features/shared/lib/diario";
 
@@ -49,7 +50,7 @@ export function OnboardingFlow() {
 
       {/* corpo centralizado */}
       <div className="grid min-h-0 flex-1 place-items-center overflow-y-auto p-[30px]">
-        <div className="w-[520px] max-w-full">
+        <div className="surface-panel w-[520px] max-w-full p-5 sm:p-7">
           {f.step === "welcome" ? <Welcome f={f} /> : null}
           {f.step === "org" ? <Org f={f} solo={solo} /> : null}
           {f.step === "access" ? (
@@ -121,11 +122,13 @@ function Welcome({ f }: { f: F }) {
 }
 
 function Campo({
+  id,
   label,
   value,
   onChange,
   placeholder,
 }: {
+  id: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
@@ -133,8 +136,11 @@ function Campo({
 }) {
   return (
     <>
-      <label className="text-fg3 mb-1.5 block text-[11.5px]">{label}</label>
+      <label htmlFor={id} className="text-fg3 mb-1.5 block text-[11.5px]">
+        {label}
+      </label>
       <input
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
@@ -157,6 +163,7 @@ function Org({ f, solo }: { f: F; solo: boolean }) {
       </p>
       <div className="mb-4">
         <Campo
+          id="onboarding-name"
           label={solo ? "Nome completo" : "Razão social"}
           value={f.nome}
           onChange={f.setNome}
@@ -169,12 +176,14 @@ function Org({ f, solo }: { f: F; solo: boolean }) {
       </div>
       {!solo && (
         <>
-          <label className="text-fg3 mb-1.5 block text-[11.5px]">CNPJ</label>
-          <CnpjInput
-            value={f.doc}
-            onChange={f.setDoc}
-            className="border-line bg-panel text-foreground placeholder:text-fg3 w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
-          />
+          <label className="text-fg3 mb-1.5 block text-[11.5px]">
+            <span className="mb-1.5 block">CNPJ</span>
+            <CnpjInput
+              value={f.doc}
+              onChange={f.setDoc}
+              className="border-line bg-panel text-foreground placeholder:text-fg3 w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+            />
+          </label>
         </>
       )}
       {f.erro && (
@@ -216,21 +225,29 @@ function Oab({ f }: { f: F }) {
       <div className="mb-4">
         <CourtAccessNotice onPrepare={f.voltarOrg} />
       </div>
-      <div className="mb-3.5 flex gap-2">
-        <OabInput
-          value={f.oab}
-          onChange={f.setOab}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") f.addOab();
-          }}
-          className="border-line bg-panel text-foreground placeholder:text-fg3 flex-1 rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
-        />
-        <button
-          onClick={f.addOab}
-          className="border-primary text-primary flex-none rounded-[9px] border bg-transparent px-[15px] py-2.5 text-[13px] font-medium"
-        >
-          Adicionar
-        </button>
+      <div className="mb-3.5">
+        <span className="text-fg3 mb-1.5 block text-[11.5px]">
+          OAB monitorada
+        </span>
+        <div className="flex gap-2">
+          <label className="min-w-0 flex-1">
+            <span className="sr-only">OAB monitorada</span>
+            <OabInput
+              value={f.oab}
+              onChange={f.setOab}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") f.addOab();
+              }}
+              className="border-line bg-panel text-foreground placeholder:text-fg3 w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+            />
+          </label>
+          <button
+            onClick={f.addOab}
+            className="border-primary text-primary flex-none rounded-[9px] border bg-transparent px-[15px] py-2.5 text-[13px] font-medium"
+          >
+            Adicionar
+          </button>
+        </div>
       </div>
       <div className="flex min-h-[44px] flex-col gap-[7px]">
         {f.oabs.map((o, i) => (
@@ -245,12 +262,12 @@ function Oab({ f }: { f: F }) {
             <span className="flex-1 font-mono text-[13px]">
               {formatOabDisplay(o)}
             </span>
-            <button
+            <IconAction
+              label={`Remover OAB ${formatOabDisplay(o)}`}
+              icon={X}
               onClick={() => f.removeOab(i)}
-              className="text-fg3 hover:bg-hover grid size-[22px] place-items-center rounded-md"
-            >
-              <X className="size-[13px]" strokeWidth={2} />
-            </button>
+              className="pointer-coarse:size-11"
+            />
           </div>
         ))}
         {f.oabs.length === 0 ? (
@@ -295,7 +312,7 @@ function Oab({ f }: { f: F }) {
 
 function Done({ f }: { f: F }) {
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5">
       <Check className="text-primary size-8" />
       <div>
         <h1 className="text-[22px] font-semibold">Captura solicitada</h1>

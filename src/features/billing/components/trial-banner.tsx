@@ -23,15 +23,13 @@ const TONE_CONFIG: Record<
   warning: {
     role: "status",
     icon: AlertTriangle,
-    containerClass:
-      "bg-amber-50 border-amber-300 text-amber-900 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-200",
+    containerClass: "border-gold/30 bg-gold/10 text-foreground",
     ctaVariant: "outline",
   },
   danger: {
     role: "alert",
     icon: AlertCircle,
-    containerClass:
-      "bg-red-50 border-red-300 text-red-900 dark:bg-red-950 dark:border-red-800 dark:text-red-200",
+    containerClass: "border-destructive/30 bg-destructive/10 text-foreground",
     ctaVariant: "destructive",
   },
 };

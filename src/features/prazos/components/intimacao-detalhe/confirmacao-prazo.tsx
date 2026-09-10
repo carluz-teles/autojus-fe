@@ -148,8 +148,8 @@ export function ConfirmacaoPrazo({
                   </NativeSelect>
                 </Field>
               </FieldGroup>
-              <details className="group border-border rounded-lg border">
-                <summary className="focus-visible:ring-ring flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg p-3 text-sm outline-none focus-visible:ring-2 [&::-webkit-details-marker]:hidden">
+              <details className="surface-inset group overflow-hidden">
+                <summary className="focus-visible:ring-ring flex cursor-pointer list-none items-center justify-between gap-2 rounded-xl p-3 text-sm outline-none focus-visible:ring-2 [&::-webkit-details-marker]:hidden">
                   <span>
                     Ajustes de contagem
                     {c.ajustesResumo ? (

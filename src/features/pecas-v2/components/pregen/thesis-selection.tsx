@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
+import { LoaderCircle, Sparkles } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -81,9 +82,18 @@ export function ApplyThesisSelection({
     >
       <PopoverTrigger
         disabled={disabled || applying}
-        render={<Button size="sm" disabled={disabled || applying} />}
+        aria-label="Aplicar alterações nos fundamentos"
+        render={<Button size="xs" disabled={disabled || applying} />}
       >
-        {applying ? "Aplicando…" : "Aplicar alterações"}
+        {applying ? (
+          <LoaderCircle
+            data-icon="inline-start"
+            className="motion-safe:animate-spin"
+          />
+        ) : (
+          <Sparkles data-icon="inline-start" />
+        )}
+        {applying ? "Aplicando…" : "Aplicar"}
       </PopoverTrigger>
       <PopoverContent
         align="start"

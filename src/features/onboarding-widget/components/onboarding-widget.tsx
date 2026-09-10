@@ -85,7 +85,7 @@ function CollapsedPill({ vm }: { vm: OnboardingWidgetViewModel }) {
       type="button"
       onClick={vm.onToggleCollapse}
       aria-label={onboardingWidgetCopy.expandAria}
-      className="bg-card ring-hairline reveal hover:ring-gold/40 text-foreground flex w-full cursor-pointer items-center justify-between gap-2 rounded-full py-2.5 pr-3 pl-4 text-[13px] font-medium transition-shadow"
+      className="surface-panel ring-hairline reveal hover:ring-gold/40 text-foreground flex w-full cursor-pointer items-center justify-between gap-2 rounded-full py-2.5 pr-3 pl-4 text-[13px] font-medium transition-shadow"
     >
       <span className="flex min-w-0 items-center gap-1.5 truncate">
         <span className="tabular-nums">
@@ -103,7 +103,7 @@ function CollapsedPill({ vm }: { vm: OnboardingWidgetViewModel }) {
 
 function ExpandedCard({ vm }: { vm: OnboardingWidgetViewModel }) {
   return (
-    <div className="bg-card ring-hairline reveal max-h-[calc(100vh-2rem)] w-full overflow-y-auto overscroll-contain rounded-xl p-5">
+    <div className="surface-panel ring-hairline reveal max-h-[calc(100vh-2rem)] w-full overflow-y-auto overscroll-contain p-5">
       <div className="flex items-center justify-between gap-2">
         <span className="text-gold-foreground text-[10.5px] font-semibold tracking-[0.12em] uppercase">
           {onboardingWidgetCopy.eyebrow}

@@ -1,7 +1,10 @@
 "use client";
+import { ArrowUpRight, CalendarDays, FileText, FolderOpen } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { IconAction } from "@/components/ui/icon-action";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import type { PecaContexto, PecaContextoDoc } from "../../lib/peca-contexto";
@@ -33,7 +36,7 @@ export function ContextRail({
   return (
     <aside
       aria-label="Contexto da peça"
-      className="bg-background flex min-h-0 w-full flex-col text-sm"
+      className="bg-card flex min-h-0 w-full flex-col text-sm"
     >
       <Tabs
         value={activeTab}
@@ -50,9 +53,12 @@ export function ContextRail({
           {tesesSlot && <TabsTrigger value="grounds">Teses</TabsTrigger>}
         </TabsList>
         <TabsContent value="summary" keepMounted className="m-0 animate-none">
-          <div className="border-b p-4">
-            <p className="text-muted-foreground text-xs">Prazo da intimação</p>
-            <p className="mt-1 font-medium">
+          <div className="bg-muted/50 m-4 rounded-lg border p-4">
+            <p className="text-muted-foreground flex items-center gap-2 text-[10px] font-medium tracking-widest uppercase">
+              <CalendarDays aria-hidden className="size-3.5" />
+              Prazo da intimação
+            </p>
+            <p className="font-display mt-2 text-xl">
               {intimacao.prazoLabel || "Sem prazo confirmado"}
             </p>
           </div>
@@ -61,9 +67,11 @@ export function ContextRail({
             aria-label="Dados do processo"
             className="flex flex-col gap-5 p-4"
           >
-            <h3 className="font-medium">Dados do processo</h3>
-            <div>
-              <p className="font-mono text-xs">{processo.cnj}</p>
+            <h3 className="font-display text-lg">O processo</h3>
+            <div className="rounded-lg border p-3">
+              <p className="text-primary font-mono text-[11px] break-all">
+                {processo.cnj}
+              </p>
               <p className="mt-2">{processo.classe}</p>
               <p className="text-muted-foreground mt-1 text-xs">
                 {[processo.orgao, processo.tribunalGrau]
@@ -84,9 +92,12 @@ export function ContextRail({
               </div>
             </dl>
             <div className="flex flex-col gap-3">
-              <p className="font-medium">Partes do processo</p>
+              <h3 className="font-display text-lg">Partes envolvidas</h3>
               {partes.map((p) => (
-                <div key={`${p.roleLabel}-${p.name}`}>
+                <div
+                  className="border-l-2 pl-3"
+                  key={`${p.roleLabel}-${p.name}`}
+                >
                   <p className="text-muted-foreground text-xs">{p.roleLabel}</p>
                   <p>{p.name}</p>
                   {p.counselLabel && (
@@ -111,75 +122,80 @@ export function ContextRail({
         <TabsContent
           value="sources"
           keepMounted
-          className="m-0 animate-none space-y-3 p-4"
+          className="m-0 animate-none p-4"
         >
-          <p className="text-muted-foreground text-xs">
-            Documentos disponíveis. Uma fonte listada só integra a fundamentação
-            quando citada no texto.
-          </p>
-          {intimacao.id ? (
-            <>
-              <Button
-                variant="outline"
-                className="h-auto w-full justify-start py-3 text-left"
-                onClick={onVerTeor}
-                disabled={!intimacao.teor.trim()}
-              >
-                <span>
-                  Intimação de origem
-                  <span className="text-muted-foreground mt-1 block text-xs">
-                    Publicação: {intimacao.publishedAt || "Não informada"}
-                  </span>
-                </span>
-              </Button>
-              {!intimacao.teor.trim() && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex min-w-0 flex-col gap-1">
+                <h3 className="font-display text-xl">Fontes do processo</h3>
                 <p className="text-muted-foreground text-xs">
-                  O teor desta intimação está indisponível.
+                  {new Set(autos.map((d) => d.id)).size} documentos nos autos
                 </p>
+              </div>
+              {documentActions}
+            </div>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              Consulte os originais. Uma fonte só fundamenta a peça quando
+              citada no texto.
+            </p>
+            {intimacao.id ? (
+              <SourceDocumentRow
+                title="Intimação de origem"
+                meta={`Publicação: ${intimacao.publishedAt || "Não informada"}`}
+                status={
+                  intimacao.teor.trim()
+                    ? "Teor disponível"
+                    : "Teor indisponível"
+                }
+                disabled={!intimacao.teor.trim()}
+                onOpen={onVerTeor}
+              />
+            ) : (
+              <p className="text-muted-foreground text-xs">
+                Sem intimação de origem. Consulte os documentos abaixo.
+              </p>
+            )}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-muted-foreground text-[10px] font-medium tracking-widest uppercase">
+                Biblioteca dos autos
+              </p>
+              <Badge variant="outline">
+                {new Set(autos.map((d) => d.id)).size}
+              </Badge>
+            </div>
+            {autos.length === 0 && (
+              <EmptyState
+                icon={FolderOpen}
+                title="Seus autos, reunidos aqui"
+                description="Confira a integração ou envie um PDF pelo ícone acima."
+                className="min-h-40 px-4 py-6"
+              />
+            )}
+            <div className="flex flex-col gap-2">
+              {Array.from(new Map(autos.map((a) => [a.id, a])).values()).map(
+                (d) => (
+                  <SourceDocumentRow
+                    key={d.id}
+                    title={d.name}
+                    meta={d.meta}
+                    disabled={d.status === "PENDING" || d.status === "FAILED"}
+                    onOpen={() => onVerAuto(d)}
+                    status={
+                      d.status === "FAILED"
+                        ? "Falha no processamento · indisponível"
+                        : d.status === "READY"
+                          ? "Texto disponível"
+                          : d.status === "PENDING"
+                            ? "Aguardando download"
+                            : d.status
+                              ? "Processando · texto indisponível"
+                              : d.category
+                    }
+                  />
+                ),
               )}
-            </>
-          ) : (
-            <p className="text-muted-foreground text-xs">
-              Esta peça não possui intimação de origem. Consulte os documentos
-              do processo abaixo.
-            </p>
-          )}
-          {documentActions}
-          {autos.length === 0 && (
-            <p className="text-muted-foreground text-xs">
-              Nenhum auto disponível. Confira a integração com o tribunal ou
-              anexe os documentos necessários.
-            </p>
-          )}
-          {Array.from(new Map(autos.map((a) => [a.id, a])).values()).map(
-            (d) => (
-              <Button
-                key={d.id}
-                variant="outline"
-                className="h-auto w-full justify-start py-3 text-left whitespace-normal"
-                disabled={d.status === "PENDING" || d.status === "FAILED"}
-                onClick={() => onVerAuto(d)}
-              >
-                <span className="min-w-0 break-words">
-                  {d.name}
-                  <span className="text-muted-foreground mt-1 block text-xs">
-                    {d.meta}
-                  </span>
-                  <span className="text-muted-foreground mt-1 block text-xs">
-                    {d.status === "FAILED"
-                      ? "Falha no processamento · indisponível para fundamentação"
-                      : d.status === "READY"
-                        ? "Texto disponível para consulta"
-                        : d.status === "PENDING"
-                          ? "Aguardando download"
-                          : d.status
-                            ? "Processando · texto ainda indisponível"
-                            : d.category}
-                  </span>
-                </span>
-              </Button>
-            ),
-          )}
+            </div>
+          </div>
         </TabsContent>
         {tesesSlot && (
           <TabsContent
@@ -192,5 +208,46 @@ export function ContextRail({
         )}
       </Tabs>
     </aside>
+  );
+}
+
+function SourceDocumentRow({
+  title,
+  meta,
+  status,
+  disabled,
+  onOpen,
+}: {
+  title: string;
+  meta?: string;
+  status?: string;
+  disabled: boolean;
+  onOpen: () => void;
+}) {
+  return (
+    <article className="bg-card hover:border-primary/25 flex items-start gap-2 rounded-xl border p-3 transition-colors">
+      <span className="bg-muted/60 text-primary mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg">
+        <FileText aria-hidden className="size-4" />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <h4 className="text-sm leading-5 font-medium break-words">{title}</h4>
+        {meta && (
+          <p className="text-muted-foreground text-[11px] leading-4 break-words">
+            {meta}
+          </p>
+        )}
+        {status && (
+          <p className="text-muted-foreground text-[11px] leading-4">
+            {status}
+          </p>
+        )}
+      </div>
+      <IconAction
+        icon={ArrowUpRight}
+        label={`Abrir ${title}`}
+        disabled={disabled}
+        onClick={onOpen}
+      />
+    </article>
   );
 }

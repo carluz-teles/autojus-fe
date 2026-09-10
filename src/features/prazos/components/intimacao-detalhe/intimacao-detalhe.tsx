@@ -16,6 +16,7 @@ import { useState } from "react";
 import { DetailCard as Card } from "@/components/shell/detail-card";
 import { PageFrame, ShellBackLink } from "@/components/shell/page-frame";
 import { TeorContent } from "@/components/teor-content";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -25,25 +26,32 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
+import { IconAction } from "@/components/ui/icon-action";
 import { Input } from "@/components/ui/input";
 import { ProvidenciasSection } from "@/features/action-items/components/providencias-section";
-import {} from "@/features/intimacoes/components/shared/analisar-card";
 import { useFilaNavigation } from "@/features/intimacoes/hooks/use-fila-navigation";
 import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
 import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
 import { formatarData } from "@/lib/utils";
 
 import { useIntimacaoDetalhe } from "../../hooks/use-intimacao-detalhe";
+import {
+  bloqueiaProvidencias,
+  precisaConfirmarPrazo,
+  tipoIncompativelComPrazo,
+} from "../../lib/confirmacao";
 import { dataEscolhidaNaApuracao } from "../../lib/detalhe-apresentacao";
 import { ConfirmacaoPrazo } from "./confirmacao-prazo";
+import { ExplicacaoPrazo } from "./explicacao-prazo";
 
 const POPUP_CLASS =
   "bg-popover text-popover-foreground ring-foreground/10 max-h-72 min-w-48 overflow-y-auto rounded-lg p-1 shadow-md ring-1 outline-none";
 const ITEM_CLASS =
   "focus:bg-accent focus:text-accent-foreground data-highlighted:bg-accent relative flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-disabled:opacity-50";
-const DISCLOSURE = "group border-border rounded-lg border bg-card";
+const DISCLOSURE =
+  "group border-border bg-card rounded-xl border shadow-sm overflow-hidden";
 const SUMMARY =
-  "focus-visible:ring-ring flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm font-medium outline-none focus-visible:ring-2 [&::-webkit-details-marker]:hidden";
+  "focus-visible:ring-ring flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3.5 text-sm font-medium outline-none focus-visible:ring-2 [&::-webkit-details-marker]:hidden";
 
 type Detalhe = ReturnType<typeof useIntimacaoDetalhe>;
 
@@ -51,6 +59,10 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
   const det = useIntimacaoDetalhe(id);
   const fila = useFilaNavigation(id);
   const m = det.model;
+  const reviewBlocked = bloqueiaProvidencias(
+    det.prazoDetalhe,
+    det.intimacao?.estado ?? "",
+  );
 
   const shellHeader = (
     <>
@@ -128,10 +140,10 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
 
   return (
     <PageFrame header={shellHeader}>
-      <div className="mx-auto flex max-w-[1320px] flex-col gap-4 px-4 py-4">
+      <div className="mx-auto flex max-w-[1320px] flex-col gap-5 px-4 py-4 sm:px-6 sm:py-5">
         <section
           aria-label="Identificação da intimação"
-          className="border-line flex flex-col gap-3 border-b pb-5"
+          className="flex min-w-0 flex-col gap-2 border-b pb-4"
         >
           <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
             <span>
@@ -145,7 +157,7 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
               <AcoesIntimacao det={det} />
             </div>
           </div>
-          <h2 className="max-w-4xl text-xl leading-tight font-medium text-balance break-words sm:text-[22px]">
+          <h2 className="font-display max-w-4xl text-xl leading-tight font-medium tracking-tight text-balance break-words sm:text-2xl">
             {m.titulo}
           </h2>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -155,17 +167,14 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
             >
               {m.cnj}
             </Link>
-            <Button
-              variant="ghost"
-              size="icon-xs"
+            <IconAction
+              icon={Copy}
+              label="Copiar número do processo"
               onClick={det.onCopiarCNJ}
-              aria-label="Copiar número do processo"
-            >
-              <Copy />
-            </Button>
+            />
             <span className="text-muted-foreground text-xs">{m.orgao}</span>
           </div>
-          <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
             <div>
               <dt className="text-muted-foreground text-xs">
                 Autor / polo ativo
@@ -186,8 +195,107 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
           </p>
         </section>
 
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_410px]">
-          <div className="flex min-w-0 flex-col gap-4">
+        {reviewBlocked && (
+          <Alert variant="destructive" className="p-4">
+            <TriangleAlert />
+            <AlertTitle>
+              Confirmação obrigatória antes das providências
+            </AlertTitle>
+            <AlertDescription className="flex flex-col items-start gap-3">
+              <p>
+                O tipo ou o prazo desta intimação ainda precisa de revisão. A
+                criação de providências e a geração de sugestões ficam
+                bloqueadas até resolver essa pendência.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                render={<a href="#prazo-decisao" />}
+                nativeButton={false}
+              >
+                Revisar tipo e prazo
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <section
+          aria-label="Publicação e destinatários"
+          className="grid min-w-0 gap-4 border-b pb-4 xl:grid-cols-2 xl:gap-6"
+        >
+          <div className="min-w-0">
+            <h2 className="mb-3 text-sm font-medium">Publicação</h2>
+            <dl className="grid gap-3 text-sm sm:grid-cols-3">
+              <Dado label="Disponibilização" value={m.disponibilizadoEm} />
+              <Dado label="Publicação" value={m.publicadoEm} />
+              <Dado
+                label="Início informado da contagem"
+                value={m.inicioContagem}
+              />
+            </dl>
+          </div>
+          <div className="min-w-0">
+            <h2 className="mb-3 text-sm font-medium">
+              Destinatários da publicação
+            </h2>
+            {m.destinatarios.length ? (
+              <ul className="flex flex-col gap-2">
+                {m.destinatarios.map((r, index) => (
+                  <li
+                    key={`${r.nome}:${r.oab}:${index}`}
+                    className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+                  >
+                    <span className="min-w-0 break-words">{r.nome}</span>
+                    {r.oab ? (
+                      <span className="text-muted-foreground">OAB {r.oab}</span>
+                    ) : null}
+                    {r.matched ? (
+                      <Badge variant="secondary">OAB monitorada</Badge>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                Destinatários não informados na captura.
+              </p>
+            )}
+          </div>
+        </section>
+
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[min-content_1fr] lg:gap-5 xl:grid-cols-[minmax(0,1fr)_410px]">
+          <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+            <Providencias det={det} />
+          </div>
+          <aside
+            id="prazo-decisao"
+            aria-label="Prazo e decisão"
+            className="flex min-w-0 scroll-mt-6 flex-col gap-4 lg:col-start-2 lg:row-span-2 lg:row-start-1"
+          >
+            <a
+              href="#teor-intimacao"
+              className="text-primary focus-visible:ring-ring rounded text-sm underline underline-offset-4 focus-visible:ring-2 lg:hidden"
+            >
+              Ler o teor da intimação
+            </a>
+            {det.memoria?.divergencia?.pendente ? (
+              <ApuracaoPrazo key={id} det={det} />
+            ) : null}
+            {det.prazoDetalhe &&
+            precisaConfirmarPrazo(
+              det.prazoDetalhe,
+              det.intimacao?.estado ?? "",
+            ) ? (
+              <ConfirmacaoPrazo
+                key={`${det.prazoDetalhe.id}:${det.prazoDetalhe.confirmed_at ?? "pending"}`}
+                id={id}
+                prazo={det.prazoDetalhe}
+                estado={det.intimacao?.estado ?? ""}
+              />
+            ) : null}
+            <PainelPrazo det={det} />
+          </aside>
+          <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-2">
             {m.resumo ? (
               <Card>
                 <CardHeader>
@@ -241,109 +349,36 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
             </Card>
             <details className={DISCLOSURE}>
               <summary className={SUMMARY}>
-                Publicação e destinatários
+                <span>
+                  Histórico da intimação
+                  <span className="text-muted-foreground ml-2 font-normal">
+                    {m.trilha.length} registros
+                  </span>
+                </span>
                 <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" />
               </summary>
-              <div className="flex flex-col gap-5 px-4 pb-4">
-                <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
-                  <Dado label="Disponibilização" value={m.disponibilizadoEm} />
-                  <Dado label="Publicação" value={m.publicadoEm} />
-                  <Dado
-                    label="Início informado da contagem"
-                    value={m.inicioContagem}
-                  />
-                </dl>
-                <div>
-                  <h3 className="mb-2 text-sm font-medium">
-                    Destinatários da publicação
-                  </h3>
-                  {m.destinatarios.length ? (
-                    <ul className="flex flex-col gap-3">
-                      {m.destinatarios.map((r, index) => (
-                        <li
-                          key={`${r.nome}:${r.oab}:${index}`}
-                          className="flex flex-wrap items-center gap-2 text-sm"
-                        >
-                          <span>{r.nome}</span>
-                          {r.oab ? (
-                            <span className="text-muted-foreground">
-                              OAB {r.oab}
-                            </span>
-                          ) : null}
-                          {r.matched ? (
-                            <Badge variant="secondary">OAB monitorada</Badge>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-muted-foreground text-sm">
-                      Destinatários não informados na captura.
-                    </p>
-                  )}
-                </div>
-              </div>
+              <ol className="flex flex-col px-4 pb-4">
+                {m.trilha.length ? (
+                  m.trilha.map((t, index) => (
+                    <li
+                      key={index}
+                      className="border-border grid gap-1 border-t py-3 text-sm sm:grid-cols-[110px_1fr]"
+                    >
+                      <span className="text-muted-foreground tabular-nums">
+                        {t.data}
+                      </span>
+                      <span>{t.label}</span>
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-muted-foreground text-sm">
+                    Sem eventos registrados.
+                  </li>
+                )}
+              </ol>
             </details>
           </div>
-          <aside
-            id="prazo-decisao"
-            aria-label="Prazo e decisão"
-            className="order-first flex min-w-0 flex-col gap-4 lg:order-last"
-          >
-            <PainelPrazo det={det} />
-            <a
-              href="#teor-intimacao"
-              className="text-primary focus-visible:ring-ring rounded text-sm underline underline-offset-4 focus-visible:ring-2 lg:hidden"
-            >
-              Ler o teor da intimação
-            </a>
-            {det.memoria?.divergencia?.pendente ? (
-              <ApuracaoPrazo key={id} det={det} />
-            ) : null}
-            {det.prazoDetalhe ? (
-              <ConfirmacaoPrazo
-                key={`${det.prazoDetalhe.id}:${det.prazoDetalhe.confirmed_at ?? "pending"}`}
-                id={id}
-                prazo={det.prazoDetalhe}
-                estado={det.intimacao?.estado ?? ""}
-              />
-            ) : null}
-            <CalculoDetalhado det={det} />
-          </aside>
         </div>
-
-        <Providencias det={det} />
-
-        <details className={DISCLOSURE}>
-          <summary className={SUMMARY}>
-            <span>
-              Histórico da intimação
-              <span className="text-muted-foreground ml-2 font-normal">
-                {m.trilha.length} registros
-              </span>
-            </span>
-            <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" />
-          </summary>
-          <ol className="flex flex-col px-4 pb-4">
-            {m.trilha.length ? (
-              m.trilha.map((t, index) => (
-                <li
-                  key={index}
-                  className="border-border grid gap-1 border-t py-3 text-sm sm:grid-cols-[110px_1fr]"
-                >
-                  <span className="text-muted-foreground tabular-nums">
-                    {t.data}
-                  </span>
-                  <span>{t.label}</span>
-                </li>
-              ))
-            ) : (
-              <li className="text-muted-foreground text-sm">
-                Sem eventos registrados.
-              </li>
-            )}
-          </ol>
-        </details>
       </div>
     </PageFrame>
   );
@@ -375,15 +410,15 @@ function PainelPrazo({ det }: { det: Detalhe }) {
               : "Intimação sem prazo definido")}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5">
-        <div>
+      <CardContent className="flex flex-col gap-4">
+        <div className="surface-inset p-4">
           <p className="text-muted-foreground text-xs">
             {hasDate && det.revisao.pendente
               ? "Vencimento registrado · sujeito à revisão"
               : "Vencimento"}
           </p>
           <p
-            className="mt-1 text-2xl leading-tight font-semibold tabular-nums"
+            className="font-display mt-1 text-2xl leading-tight font-semibold tabular-nums"
             style={{ color: hasDate ? m.prazoCor : undefined }}
           >
             {m.fatalData ||
@@ -397,26 +432,35 @@ function PainelPrazo({ det }: { det: Detalhe }) {
             </p>
           ) : null}
         </div>
-        {p ? (
-          <dl className="grid grid-cols-2 gap-3 text-sm">
-            <Dado
-              label="Tipo do ato"
-              value={p.tipo_ato ? tipoAtoLabel(p.tipo_ato) : "A definir"}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          {p ? (
+            <dl className="text-sm">
+              <Dado
+                label="Tipo do ato"
+                value={
+                  tipoIncompativelComPrazo(p)
+                    ? `${tipoAtoLabel(p.tipo_ato!)} · incompatível com prazo ativo; revise o tipo`
+                    : p.tipo_ato
+                      ? tipoAtoLabel(p.tipo_ato)
+                      : "A definir"
+                }
+              />
+            </dl>
+          ) : null}
+          <div>
+            <p className="text-muted-foreground mb-1 text-xs">
+              Responsável pela intimação
+            </p>
+            <ResponsavelMenu
+              label="Responsável pela intimação"
+              value={m.responsavelId}
+              nome={m.responsavelNome}
+              membros={det.membros}
+              emVoo={det.assignEmVoo}
+              onAssign={det.onAssign}
             />
-            <Dado
-              label="Contagem"
-              value={
-                p.status === "NO_DEADLINE"
-                  ? det.intimacao?.estado === "a_classificar"
-                    ? "A definir"
-                    : "Não se aplica"
-                  : dataEscolhidaNaApuracao(p)
-                    ? "Data escolhida na apuração"
-                    : `${p.days} dias ${p.counting === "BUSINESS" ? "úteis" : "corridos"}`
-              }
-            />
-          </dl>
-        ) : null}
+          </div>
+        </div>
         {det.memoriaPending ? (
           <p role="status" className="text-muted-foreground text-sm">
             Carregando situação do prazo…
@@ -449,27 +493,10 @@ function PainelPrazo({ det }: { det: Detalhe }) {
             ) : null}
           </div>
         )}
-        <div className="border-border border-t pt-4">
-          <p className="text-muted-foreground mb-1 text-xs">
-            Responsável pela intimação
-          </p>
-          <ResponsavelMenu
-            label="Responsável pela intimação"
-            value={m.responsavelId}
-            nome={m.responsavelNome}
-            membros={det.membros}
-            emVoo={det.assignEmVoo}
-            onAssign={det.onAssign}
-          />
-        </div>
-        <a
-          href="#providencias-intimacao"
-          className="text-primary focus-visible:ring-ring rounded text-sm underline underline-offset-4 focus-visible:ring-2"
-        >
-          {m.providencias.length
-            ? "Acompanhar providências"
-            : "Ver próximas ações"}
-        </a>
+        {p && p.status !== "NO_DEADLINE" ? (
+          <ExplicacaoPrazo prazo={p} estado={det.intimacao?.estado ?? ""} />
+        ) : null}
+        <CalculoDetalhado det={det} />
       </CardContent>
     </Card>
   );
@@ -492,7 +519,7 @@ function ApuracaoPrazo({ det }: { det: Detalhe }) {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-          <div className="border-border rounded-lg border p-3">
+          <div className="surface-inset p-3">
             <p className="text-muted-foreground text-xs">
               Pelo prazo informado no ato
             </p>
@@ -500,7 +527,7 @@ function ApuracaoPrazo({ det }: { det: Detalhe }) {
               {cv.declarada}
             </p>
           </div>
-          <div className="border-border rounded-lg border p-3">
+          <div className="surface-inset p-3">
             <p className="text-muted-foreground text-xs">
               Pela regra de cálculo
             </p>
@@ -584,7 +611,7 @@ function CalculoDetalhado({ det }: { det: Detalhe }) {
   return (
     <details className={DISCLOSURE}>
       <summary className={SUMMARY}>
-        Ver cálculo do prazo
+        Memória completa e feriados
         <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" />
       </summary>
       <div className="flex flex-col gap-4 px-4 pb-4">
@@ -661,8 +688,14 @@ function Providencias({ det }: { det: Detalhe }) {
       intimationId={m.id}
       analyzing={det.analisando}
       analysisError={det.analiseErro}
+      analysisProcessingTimeout={det.analiseTimeout}
       analyzed={m.analisada}
       onAnalyze={det.onAnalisar}
+      reviewBlocked={bloqueiaProvidencias(
+        det.prazoDetalhe,
+        det.intimacao?.estado ?? "",
+      )}
+      checkingReview={det.memoriaPending || det.memoriaErro}
     />
   );
 }

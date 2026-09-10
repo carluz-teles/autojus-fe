@@ -482,6 +482,7 @@ export function useIntimacaoDetalhe(id: string) {
     // IA
     analisando: analisar.isPending || query.materializandoAnalise,
     analiseErro: analisar.isError,
+    analiseTimeout: query.analiseTimeout,
     onAnalisar,
 
     // triagem

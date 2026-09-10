@@ -11,7 +11,7 @@ import { useApi } from "@/lib/api/use-api";
 
 import { createDraft } from "../../services/pecas-v2.service";
 
-// Both origins open the same construction, with no intermediate preparation form.
+// Both origins resume the same draft; empty drafts open its preparation canvas.
 export function ConstructionEntry({
   actionItemId = "",
   intimationId = "",
@@ -94,7 +94,7 @@ export function ConstructionEntry({
             </Button>
           </>
         ) : (
-          <p role="status">Abrindo a construção da peça…</p>
+          <p role="status">Abrindo a peça…</p>
         )}
       </div>
     </PageFrame>

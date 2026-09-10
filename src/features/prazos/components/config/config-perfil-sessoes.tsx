@@ -9,7 +9,7 @@ export function ConfigPerfilSessoes() {
   const s = usePerfilSessoes();
 
   return (
-    <div className="border-line bg-panel mt-6 overflow-hidden rounded-xl border">
+    <div className="surface-panel mt-6 overflow-hidden">
       <div className="border-line2 border-b px-4 py-3">
         <div className="text-[13px] font-medium">Sessões ativas</div>
         <p className="text-fg3 mt-px text-[11.5px]">

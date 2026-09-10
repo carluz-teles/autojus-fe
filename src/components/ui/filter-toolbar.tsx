@@ -2,7 +2,7 @@
 
 import { ListFilter } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { IconAction } from "@/components/ui/icon-action";
 import { ListSearchToolbar } from "@/components/ui/list-search-toolbar";
 import { cn } from "@/lib/utils";
 
@@ -52,21 +52,26 @@ export function FilterToolbar({
       </ListSearchToolbar>
 
       {onFilters ? (
-        <Button
-          variant="outline"
-          onClick={onFilters}
-          aria-label="Filtros"
-          title="Filtros"
-          className="relative"
-        >
-          <ListFilter data-icon="inline-start" />
-          Filtros
+        <div className="relative">
+          <IconAction
+            icon={ListFilter}
+            variant="outline"
+            onClick={onFilters}
+            label={
+              activeFilters > 0
+                ? `Filtros · ${activeFilters} ativos`
+                : "Abrir filtros"
+            }
+          />
           {activeFilters > 0 ? (
-            <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full text-[0.625rem] tabular-nums">
+            <span
+              aria-hidden
+              className="bg-primary text-primary-foreground pointer-events-none absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full text-[0.625rem] tabular-nums"
+            >
               {activeFilters}
             </span>
           ) : null}
-        </Button>
+        </div>
       ) : null}
     </div>
   );

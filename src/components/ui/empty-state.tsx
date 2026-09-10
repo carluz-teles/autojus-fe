@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 // Estado vazio rico do DS — ícone + título + descrição, opcionalmente uma
@@ -24,26 +25,24 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex min-h-52 flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 py-10 text-center",
+        "bg-card/60 flex min-h-52 flex-col items-center justify-center gap-4 rounded-xl border px-5 py-10 text-center sm:px-6",
         className,
       )}
     >
-      <span className="bg-muted/60 text-muted-foreground flex size-11 items-center justify-center rounded-full">
-        <Icon className="size-5" />
+      <span className="bg-primary/5 text-primary ring-primary/10 flex size-12 items-center justify-center rounded-2xl ring-1">
+        <Icon aria-hidden className="size-5" strokeWidth={1.6} />
       </span>
       <div className="flex flex-col gap-1">
-        <p className="text-foreground/90 text-sm font-medium">{title}</p>
+        <p className="font-display text-foreground text-xl leading-snug">
+          {title}
+        </p>
         {description ? (
           <p className="text-muted-foreground mx-auto max-w-sm text-sm leading-relaxed">
             {description}
           </p>
         ) : null}
       </div>
-      {phase ? (
-        <span className="border-gold/40 bg-gold/[0.06] text-gold rounded-full border px-2.5 py-0.5 text-xs font-medium">
-          {phase}
-        </span>
-      ) : null}
+      {phase ? <Badge variant="outline">{phase}</Badge> : null}
       {action}
     </div>
   );

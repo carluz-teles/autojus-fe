@@ -1,6 +1,12 @@
 // Espelha o read model do BE: GET /v1/intimacoes → { data: IntimacaoView[], page }.
 // Publicações capturadas do DJEN pelas OABs monitoradas (intimation → read model).
 
+import type {
+  ActionItemTipo,
+  ActionItemTipoStatus,
+  AnalysisSources,
+  ProvidenciaFulfillment,
+} from "@/features/action-items/types";
 import type { PageEnvelope } from "@/lib/api/types";
 
 // Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
@@ -98,6 +104,35 @@ export interface IntimacaoView {
   /** Estágio do ciclo de trabalho (Status) — derivado no BE (prazo + peça).
    *  Alimenta o filtro/pill de Status da inbox e o stepper do detalhe. */
   work_stage: IntimacaoWorkStage;
+  ai_analysis_id?: string | null;
+  ai_analysis_materialized_id?: string | null;
+  ai_analysis_sources?: AnalysisSources | null;
+  /**
+   * Snapshot da 1ª providência SUGGESTED materializada da última análise — a "Ação
+   * recomendada" que o card da Triagem mostra inline (payoff do lifecycle async). null
+   * quando a análise ainda não materializou providência (a linha renderiza "Analisando…",
+   * desde que haja prazo real e não esteja pendente de confirmação). Espelha o BE.
+   */
+  recommended_providencia: RecommendedProvidencia | null;
+  /** Total de providências SUGGESTED da intimação (o snapshot mostra só a 1ª). */
+  suggested_count: number;
+}
+
+// RecommendedProvidencia é o subset enxuto da 1ª providência que a LISTA carrega (o conjunto
+// completo vive no detalhe, IntimacaoProvidencia). Espelha IntimacaoView.recommended_providencia
+// do BE (read.go IntimacaoRecommendedProvidencia).
+export interface RecommendedProvidencia {
+  /** id do action_item — o card da Triagem age (Gerar peça/Concluir/Descartar). */
+  id: string;
+  tipo: ActionItemTipo;
+  title: string | null;
+  gera_peca: boolean;
+  piece_profile_key?: string | null;
+  confianca?: number | null;
+  tipo_status: ActionItemTipoStatus;
+  /** SUGGESTED|TODO|WORKING|DONE — dirige a ação primária da barra. */
+  status: string;
+  fulfillment?: ProvidenciaFulfillment | null;
 }
 
 /**
@@ -172,6 +207,7 @@ export interface IntimacaoProvidencia {
   /** Status de trabalho: SUGGESTED (não iniciada) → TODO → WORKING → DONE. */
   status: IntimacaoProvidenciaStatus;
   deadline_id: string | null;
+  fulfillment?: ProvidenciaFulfillment | null;
 }
 
 /**
@@ -193,6 +229,7 @@ export interface IntimacaoAnaliseCandidate {
   piece_profile_key: string | null;
   declarado: boolean;
   confianca: number | null;
+  fulfillment?: ProvidenciaFulfillment | null;
 }
 
 /**
@@ -207,6 +244,8 @@ export interface IntimacaoAnalise {
   providencias: IntimacaoAnaliseCandidate[];
   /** ISO timestamp de quando a análise foi (re)gerada. */
   analyzed_at: string;
+  analysis_id?: string;
+  sources?: AnalysisSources;
 }
 
 /**

@@ -7,13 +7,13 @@ export function ProcessoSituacao({
   situacao: ReturnType<typeof situacaoProcesso>;
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className="flex flex-col gap-1.5">
       <Badge variant={situacao.variant}>{situacao.label}</Badge>
       <details className="text-muted-foreground text-xs">
         <summary className="focus-visible:ring-ring w-fit cursor-pointer rounded py-1 underline-offset-4 hover:underline focus-visible:ring-2">
           {situacao.resumo} · ver origem
         </summary>
-        <div className="border-border mt-2 space-y-2 border-l-2 pl-3 leading-relaxed">
+        <div className="border-border mt-2 flex flex-col gap-2 border-l-2 pl-3 leading-relaxed">
           <p>{situacao.motivo}</p>
           {situacao.movimento ? (
             <p>

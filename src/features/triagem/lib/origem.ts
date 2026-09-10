@@ -23,6 +23,10 @@ export const ORIGEM_LABEL: Record<IntimacaoOrigem, string> = {
   sem_prazo: "Sem prazo",
 };
 
+export const ORIGEM_DESCRICAO: Partial<Record<IntimacaoOrigem, string>> = {
+  ia: "O tipo de ato foi sugerido por IA a partir da publicação. Quando há regra aplicável, o prazo é calculado pelo sistema. Esta é a origem da sugestão, não uma confirmação do advogado.",
+};
+
 /**
  * Tom do selo de origem inline do card (espelha o `origemFundo`/`origemCor` do
  * design). Regra nº1: uma só fonte de "origem → cor do selo".

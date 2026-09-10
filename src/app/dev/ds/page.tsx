@@ -3,6 +3,7 @@
 import {
   Archive,
   Clock,
+  Copy,
   FileText,
   Gavel,
   ListChecks,
@@ -13,6 +14,13 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   type ChecklistItem,
   ChecklistProgress,
@@ -26,8 +34,10 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { FilterToolbar } from "@/components/ui/filter-toolbar";
 import { IAField, IAPanel } from "@/components/ui/ia-panel";
+import { IconAction } from "@/components/ui/icon-action";
 import { KpiCard, KpiRow } from "@/components/ui/kpi-card";
 import { ListPagination } from "@/components/ui/list-pagination";
+import { RowActions } from "@/components/ui/row-actions";
 import {
   intimacaoTone,
   prazoTone,
@@ -36,7 +46,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Timeline, TimelineItem } from "@/components/ui/timeline";
 
-// Página de referência do Design System (Wave 0 LEXIA). Renderiza cada tijolo
+// Página de referência do Design System. Renderiza cada tijolo
 // compartilhado com dados de exemplo pra revisão visual. NÃO é tela de produto:
 // vive fora do grupo (app) — sem gate de onboarding. Dados hardcoded de propósito.
 
@@ -136,9 +146,7 @@ export default function DesignSystemPage() {
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-10 px-6 py-12">
       <header className="flex flex-col gap-1">
-        <span className="text-gold text-xs font-medium tracking-widest uppercase">
-          LEXIA · Wave 0
-        </span>
+        <span className="section-label">Atjus · Referência visual</span>
         <h1 className="font-display text-4xl leading-none tracking-tight">
           Design System
         </h1>
@@ -147,6 +155,45 @@ export default function DesignSystemPage() {
           referência — cada componente com dados de exemplo pra revisão visual.
         </p>
       </header>
+
+      <Section
+        title="Superfícies e ações"
+        hint="Identidade editorial da bancada: bordas discretas, hierarquia clara e ações secundárias compactas. Os controles abaixo são demonstrações, sem alterar dados."
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle>Contexto do processo</CardTitle>
+            <CardAction className="flex items-center gap-1">
+              <IconAction
+                label="Copiar referência (demonstração)"
+                icon={Copy}
+              />
+              <RowActions
+                label="Ações de demonstração"
+                items={[
+                  { label: "Ver fontes", icon: FileText },
+                  { label: "Ação indisponível", disabled: true },
+                  { label: "Arquivar", icon: Archive, destructive: true },
+                ]}
+              />
+            </CardAction>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              Ícones têm nome acessível e tooltip. Ações importantes mantêm
+              texto; menus suportam teclado e não ficam presos à rolagem dos
+              cards.
+            </p>
+            <div className="surface-inset p-4">
+              <p className="section-label">Fonte de origem</p>
+              <p className="mt-2 text-sm">
+                Conteúdo de apoio em uma camada discreta.
+              </p>
+            </div>
+            <Button>Continuar elaboração</Button>
+          </CardContent>
+        </Card>
+      </Section>
 
       <Section
         title="1 · KpiCard + KpiRow"

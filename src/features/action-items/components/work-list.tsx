@@ -1,6 +1,14 @@
 "use client";
 
-import { CheckSquare, ListFilter, Search, Users, X } from "lucide-react";
+import {
+  CheckSquare,
+  LayoutGrid,
+  List,
+  ListFilter,
+  Search,
+  Users,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
@@ -21,11 +29,13 @@ import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-me
 import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
 import { formatDate } from "@/lib/format";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { cn } from "@/lib/utils";
 
 import { useWorkspaceList } from "../hooks/use-workspace";
 import { STATUS_LABEL } from "../lib/status-pill";
 import type { ActionItemView } from "../types";
 import { NewProvidencia, WORK_TYPES } from "./new-providencia";
+import { ProvidenciaFulfillment } from "./providencia-fulfillment";
 import { WorkActions } from "./work-actions";
 
 const TABS = [
@@ -146,7 +156,7 @@ export function WorkList({
     <PageFrame
       header={
         <>
-          <span className="font-medium">{title}</span>
+          <h1 className="shrink-0 text-[13px] font-medium">{title}</h1>
           <span className="text-muted-foreground text-xs tabular-nums">
             {list.total}
           </span>
@@ -258,15 +268,21 @@ export function WorkList({
                 size="sm"
                 variant="outline"
               >
-                <ToggleGroupItem value="list">Lista</ToggleGroupItem>
-                <ToggleGroupItem value="board">Quadro</ToggleGroupItem>
+                <ToggleGroupItem value="list">
+                  <List aria-hidden />
+                  Lista
+                </ToggleGroupItem>
+                <ToggleGroupItem value="board">
+                  <LayoutGrid aria-hidden />
+                  Quadro
+                </ToggleGroupItem>
               </ToggleGroup>
             </div>
           </div>
         </div>
       }
     >
-      <div className="flex flex-col gap-4 p-4 sm:p-6">
+      <div className="flex w-full min-w-0 flex-col gap-4 px-3 py-4 sm:px-4 sm:py-6">
         {list.isPending ? (
           <>
             <Skeleton className="h-20 w-full" />
@@ -295,10 +311,12 @@ export function WorkList({
             {groups.map((group) => (
               <section key={group.key} className="flex min-w-0 flex-col gap-3">
                 {group.label && (
-                  <h2 className="text-sm font-medium">{group.label}</h2>
+                  <h2 className="font-display text-lg font-medium">
+                    {group.label}
+                  </h2>
                 )}
                 {board ? (
-                  <div className="grid gap-4 lg:grid-cols-3">
+                  <div className="grid items-start gap-4 lg:grid-cols-3">
                     {[
                       "TODO",
                       "WORKING",
@@ -315,9 +333,9 @@ export function WorkList({
                       .map((s) => (
                         <div
                           key={s}
-                          className="flex min-w-0 flex-col gap-3 rounded-xl border p-3"
+                          className="bg-card flex min-w-0 flex-col gap-3 rounded-xl border p-3 shadow-sm"
                         >
-                          <h3 className="text-sm font-medium">
+                          <h3 className="font-display px-1 text-base font-medium">
                             {STATUS_LABEL[s as keyof typeof STATUS_LABEL]}
                           </h3>
                           {group.items
@@ -329,7 +347,7 @@ export function WorkList({
                       ))}
                   </div>
                 ) : (
-                  <div className="divide-y rounded-xl border px-4">
+                  <div className="bg-card @container/worklist divide-y overflow-hidden rounded-xl border px-4 shadow-sm sm:px-5">
                     {group.items.map((p) => (
                       <WorkRow key={p.id} item={p} />
                     ))}
@@ -381,11 +399,16 @@ export function WorkRow({
     date && date < localDate() && ["TODO", "WORKING"].includes(p.status);
   return (
     <article
-      className={`flex min-w-0 flex-col gap-3 py-4 ${card ? "rounded-lg border p-3" : "lg:flex-row lg:items-center"}`}
+      className={cn(
+        "flex min-w-0 flex-col gap-3 py-4",
+        card
+          ? "bg-background rounded-xl border p-4 shadow-sm"
+          : "@4xl/worklist:flex-row @4xl/worklist:items-center",
+      )}
     >
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <Link
-          className="text-sm font-medium break-words hover:underline"
+          className="font-display hover:text-primary text-base leading-snug font-medium break-words underline-offset-4 hover:underline"
           href={`/providencias/${p.id}`}
         >
           {p.title}
@@ -395,6 +418,7 @@ export function WorkRow({
             .filter(Boolean)
             .join(" · ")}
         </p>
+        <ProvidenciaFulfillment fulfillment={p.fulfillment} />
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={p.status === "DONE" ? "success" : "secondary"}>
             {STATUS_LABEL[p.status]}
@@ -408,7 +432,10 @@ export function WorkRow({
         </div>
       </div>
       <div
-        className={`flex flex-wrap items-center gap-3 ${card ? "" : "lg:justify-end"}`}
+        className={cn(
+          "flex flex-wrap items-center justify-between gap-3",
+          !card && "@4xl/worklist:justify-end",
+        )}
       >
         <div className="flex flex-col gap-1">
           <p className={overdue ? "text-destructive text-sm" : "text-sm"}>

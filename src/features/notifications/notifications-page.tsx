@@ -20,6 +20,7 @@ import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 import {
@@ -72,23 +73,27 @@ function NotificationsWorkspace() {
           className="text-fg2 size-4 shrink-0"
           strokeWidth={1.8}
         />
-        <h1 className="font-medium">Notificações</h1>
+        <h1 className="text-[13px] font-medium">Notificações</h1>
         {unread.data ? (
           <span className="text-fg3 font-mono text-[11px]">
             {unread.data.count} não lidas
           </span>
         ) : null}
-        <Button
-          className="ml-auto"
-          variant="ghost"
-          size="icon-sm"
-          nativeButton={false}
-          render={<Link href="/configuracoes?tab=notificacoes" />}
-          aria-label="Preferências de notificações"
-          title="Preferências de notificações"
+        <Tooltip
+          label="Preferências de notificações"
+          render={
+            <Button
+              className="ml-auto pointer-coarse:size-11"
+              variant="ghost"
+              size="icon-sm"
+              nativeButton={false}
+              render={<Link href="/configuracoes?tab=notificacoes" />}
+              aria-label="Preferências de notificações"
+            />
+          }
         >
-          <Settings2 />
-        </Button>
+          <Settings2 aria-hidden />
+        </Tooltip>
       </ShellHeader>
       <Tabs
         defaultValue="all"
@@ -125,7 +130,7 @@ function NotificationsWorkspace() {
           <section
             aria-label="Lista de notificações"
             className={cn(
-              "border-line bg-panel min-h-0 w-full shrink-0 overflow-y-auto pb-24 md:w-[380px] md:border-r md:pb-0 xl:w-[440px]",
+              "surface-panel min-h-0 w-full shrink-0 overflow-y-auto rounded-none border-0 border-r pb-24 md:w-[380px] md:pb-0 xl:w-[440px]",
               current && "hidden md:block",
             )}
           >

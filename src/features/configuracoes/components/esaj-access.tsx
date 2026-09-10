@@ -24,7 +24,9 @@ export function EsajAccess({ court }: { court: string }) {
   const valid = usableCertificates(certificates.data ?? []);
   return (
     <Popover>
-      <PopoverTrigger render={<Button size="sm" variant="outline" />}>
+      <PopoverTrigger
+        render={<Button size="sm" variant="outline" className="pointer-coarse:min-h-11" />}
+      >
         Ver acesso
       </PopoverTrigger>
       <PopoverContent
@@ -56,6 +58,7 @@ export function EsajAccess({ court }: { court: string }) {
                 variant="outline"
                 disabled={certificates.isFetching}
                 onClick={() => void certificates.refetch()}
+                className="pointer-coarse:min-h-11"
               >
                 Tentar novamente
               </Button>
@@ -86,6 +89,7 @@ export function EsajAccess({ court }: { court: string }) {
                 variant="outline"
                 nativeButton={false}
                 render={<Link href="/configuracoes?tab=cert" />}
+                className="pointer-coarse:min-h-11"
               >
                 Adicionar certificado
               </Button>
@@ -103,6 +107,7 @@ export function EsajAccess({ court }: { court: string }) {
           variant="outline"
           nativeButton={false}
           render={<Link href="/processos" />}
+          className="pointer-coarse:min-h-11"
         >
           Abrir processos
           <ArrowRight data-icon="inline-end" />

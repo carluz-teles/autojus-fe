@@ -20,6 +20,7 @@ import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
 import type { SagaState } from "../types";
 import { useDraft } from "./use-draft";
+import { useGenerationPreparation } from "./use-generation-preparation";
 import { useGenerateDraft, useThesesController } from "./use-theses";
 
 /** Estágio do CENTRO da tela — a barra e o rail não mudam entre estágios. */
@@ -73,6 +74,8 @@ export function useConstruction(id: string) {
   const [highlightedDocId, setHighlightedDocId] = useState<string | null>(null);
   // Disparei "Gerar minuta" nesta sessão? Ponte otimista até o saga avançar.
   const [firedGenerate, setFiredGenerate] = useState(false);
+  const [instructionsEdit, setInstructionsEdit] = useState<string | null>(null);
+  const instructions = instructionsEdit ?? draftQuery.data?.instructions ?? "";
 
   const saga = draftQuery.data?.sagaState;
   const generated = saga === "DRAFTED" || saga === "REVIEWED";
@@ -147,9 +150,12 @@ export function useConstruction(id: string) {
     )
       return;
     setFiredGenerate(true);
-    generate.mutate(theses.selectedIds, {
-      onError: () => setFiredGenerate(false),
-    });
+    generate.mutate(
+      { thesisIds: theses.selectedIds, instructions: instructions.trim() },
+      {
+        onError: () => setFiredGenerate(false),
+      },
+    );
   };
 
   const voltar = () =>
@@ -173,6 +179,24 @@ export function useConstruction(id: string) {
     stage === "pronta" &&
     (saga === "EXTRACTING" || (saga === "CREATED" && firedGenerate));
 
+  const preparationStatus = useGenerationPreparation(
+    id,
+    instructions,
+    theses.selectedIds,
+    JSON.stringify([
+      draftQuery.data?.processDocuments,
+      draftQuery.data?.attachments,
+      draftQuery.data?.updatedAt,
+      theses.theses,
+    ]),
+    stage === "pregen" &&
+      hasTeor &&
+      !theses.isLoading &&
+      !theses.isError &&
+      !theses.isRegenerating &&
+      !theses.isTogglingId,
+  );
+
   return {
     draft: draftQuery.data,
     regenerating,
@@ -186,6 +210,10 @@ export function useConstruction(id: string) {
     autoDrawer,
     fecharAuto,
     gerarMinuta,
+    instructions,
+    preparationStatus,
+    setInstructions: setInstructionsEdit,
+    generationError: generate.error?.message,
     regenerateWithTheses,
     contentEdited: !!draftQuery.data?.contentEdited,
     isGenerating: generate.isPending,

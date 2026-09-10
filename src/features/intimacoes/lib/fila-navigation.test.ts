@@ -1,8 +1,31 @@
 import { describe, expect, it } from "vitest";
 
-import { detalheNaFila, retornoDaFila } from "./fila-navigation";
+import {
+  detalheNaFila,
+  retornoDaFila,
+  rotuloRetornoDaFila,
+} from "./fila-navigation";
 
 describe("navegação da fila", () => {
+  it("preserva o retorno à providência com o rótulo correspondente", () => {
+    const retorno = "/providencias/040d0c73-1e19-4446-b25a-e4e925ef8ff5";
+    expect(retornoDaFila(retorno)).toBe(retorno);
+    expect(rotuloRetornoDaFila(retorno)).toBe("Voltar à providência");
+    expect(
+      new URL(
+        detalheNaFila("origin", retorno),
+        "https://local.test",
+      ).searchParams.get("retorno"),
+    ).toBe(retorno);
+    for (const invalid of [
+      "/providencias/../configuracoes",
+      "/providencias/not-an-id",
+      `${retorno}/../../configuracoes`,
+    ]) {
+      expect(retornoDaFila(invalid)).toBe("/intimacoes");
+      expect(rotuloRetornoDaFila(invalid)).toBe("Voltar às intimações");
+    }
+  });
   it("preserva filtros ao abrir o detalhe", () => {
     const retorno = "/triagem?origem=declarado&urgencia=semana";
     expect(

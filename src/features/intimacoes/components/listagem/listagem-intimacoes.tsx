@@ -1,6 +1,15 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  Clock,
+  Inbox,
+  Loader2,
+  PenLine,
+  Sparkles,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 
 import { InfiniteListFooter } from "@/components/shell/infinite-list-footer";
@@ -9,17 +18,28 @@ import { PageFrame } from "@/components/shell/page-frame";
 import { TeorContent } from "@/components/teor-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { WORK_TYPES } from "@/features/action-items/components/new-providencia";
+import { ProvidenciaFulfillment } from "@/features/action-items/components/providencia-fulfillment";
+import {
+  useWorkMutation,
+  type WorkAction,
+} from "@/features/action-items/hooks/use-workspace";
+import { hasActionableFulfillment } from "@/features/action-items/lib/fulfillment";
 import { Responsavel } from "@/features/organization/components/responsavel";
 import { cn } from "@/lib/utils";
 
 import { useListagemIntimacoes } from "../../hooks/use-listagem-intimacoes";
 import type { linhaIntimacao } from "../../lib/listagem";
+import type { RecommendedProvidencia } from "../../types";
 import { FilterTabs } from "../shared/filter-tabs";
 import { UrgenciaFilter } from "../shared/urgencia-filter";
+import { RevisaoOrigem } from "./revisao-origem";
 
 type Lista = ReturnType<typeof useListagemIntimacoes>;
 type Linha = ReturnType<typeof linhaIntimacao>;
@@ -94,7 +114,7 @@ export function ListagemIntimacoes({ triagem = false }: { triagem?: boolean }) {
               {m.lane !== "historical" ? (
                 <FilterTabs
                   label="Origem do prazo"
-                  title="Prazo"
+                  title="Origem do prazo"
                   tabs={m.origemTabs}
                 />
               ) : null}
@@ -103,9 +123,9 @@ export function ListagemIntimacoes({ triagem = false }: { triagem?: boolean }) {
         </>
       }
     >
-      <div className="flex min-w-0 flex-col gap-3 px-4 py-3">
+      <div className="flex w-full min-w-0 flex-col gap-4 px-3 py-4 sm:px-4 sm:py-5">
         {m.bulkAction ? (
-          <div className="border-border bg-muted/30 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3">
+          <div className="border-border bg-card flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 shadow-sm">
             <p className="text-muted-foreground text-xs">
               Revise o recorte e conclua os itens repetitivos de uma só vez.
             </p>
@@ -134,7 +154,7 @@ export function ListagemIntimacoes({ triagem = false }: { triagem?: boolean }) {
         {m.isError && !m.loadMoreError ? (
           <div
             role="alert"
-            className="border-border bg-card flex flex-col items-start gap-3 rounded-lg border p-5"
+            className="border-border bg-card flex flex-col items-start gap-3 rounded-xl border p-5 shadow-sm"
           >
             <p>Não foi possível atualizar as intimações.</p>
             <Button variant="outline" onClick={m.retry}>
@@ -145,42 +165,29 @@ export function ListagemIntimacoes({ triagem = false }: { triagem?: boolean }) {
         {m.isPending ? (
           <div className="flex flex-col gap-3">
             {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="bg-muted h-28 rounded-lg motion-safe:animate-pulse"
-              />
+              <Skeleton key={i} className="h-28 w-full rounded-xl" />
             ))}
           </div>
         ) : !m.rows.length && !m.isError ? (
-          <div className="border-border bg-card flex flex-col items-center gap-3 rounded-lg border px-5 py-12">
-            <h2 className="text-base font-medium">
-              Nenhuma intimação neste recorte
-            </h2>
-            <p className="text-muted-foreground text-center text-sm">
-              Revise a busca ou remova os filtros para consultar outras
-              publicações.
-            </p>
-            <Button variant="outline" onClick={m.clear}>
-              Limpar busca e filtros
-            </Button>
-          </div>
+          <EmptyState
+            icon={Inbox}
+            title="Nenhuma intimação neste recorte"
+            description="Revise a busca ou remova os filtros para consultar outras publicações."
+            action={
+              <Button variant="outline" onClick={m.clear}>
+                Limpar busca e filtros
+              </Button>
+            }
+          />
         ) : (
           <div
             aria-busy={m.updating}
             inert={m.updating}
             className={cn(
-              "border-border bg-card min-w-0 overflow-hidden rounded-lg border",
+              "border-border bg-card min-w-0 overflow-hidden rounded-xl border shadow-sm",
               m.updating && "opacity-60",
             )}
           >
-            <div
-              aria-hidden
-              className="border-border bg-muted/30 text-muted-foreground hidden grid-cols-[minmax(0,1fr)_180px_180px] gap-4 border-b px-4 py-2 text-xs lg:grid"
-            >
-              <span>Intimação / processo</span>
-              <span>Vencimento</span>
-              <span>Responsável / situação</span>
-            </div>
             {m.grouped ? (
               <ul className="divide-border divide-y">
                 {m.groups.map((g) => (
@@ -203,16 +210,16 @@ export function ListagemIntimacoes({ triagem = false }: { triagem?: boolean }) {
                         onToggle={(e) =>
                           m.toggleGroup(g.cnj_number, e.currentTarget.open)
                         }
-                        className="group"
+                        className="group bg-card"
                       >
-                        <summary className="hover:bg-muted/30 focus-visible:ring-ring grid cursor-pointer list-none gap-3 px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset lg:grid-cols-[minmax(0,1fr)_180px_180px] lg:gap-4 [&::-webkit-details-marker]:hidden">
+                        <summary className="hover:bg-muted/30 focus-visible:ring-ring grid cursor-pointer list-none gap-4 px-4 py-4 outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-5 lg:grid-cols-[minmax(0,1fr)_180px_180px] lg:gap-5 [&::-webkit-details-marker]:hidden">
                           <div className="flex min-w-0 gap-2">
                             <ChevronRight
                               className="text-muted-foreground mt-0.5 size-4 shrink-0 group-open:rotate-90"
                               aria-hidden
                             />
                             <div className="min-w-0">
-                              <h2 className="text-sm font-medium break-words">
+                              <h2 className="font-display text-base leading-snug font-medium break-words">
                                 {g.title}
                               </h2>
                               <p className="text-muted-foreground mt-1 font-mono text-xs">
@@ -312,6 +319,103 @@ export function ListagemIntimacoes({ triagem = false }: { triagem?: boolean }) {
   );
 }
 
+// PrazoBadge — pill de vencimento do card (mockup): ⏱ "vence 10/09 · 3 dias" com tom
+// atenção (amber) / atraso (vermelho) / normal. Deriva de vencimentoDaLinha (data/relative/alert).
+function PrazoBadge({ prazo }: { prazo: Linha["prazo"] }) {
+  const semPrazo = prazo.data === "Sem prazo" || prazo.data === "A definir";
+  const atraso = prazo.relative.toLowerCase().includes("atraso");
+  const variant = atraso ? "destructive" : prazo.alert ? "warning" : "outline";
+  const label = semPrazo
+    ? prazo.data
+    : `vence ${prazo.data}${prazo.relative ? ` · ${prazo.relative}` : ""}`;
+  return (
+    <Badge variant={variant}>
+      <Clock data-icon="inline-start" />
+      {label}
+    </Badge>
+  );
+}
+
+// TriageActions — barra de ação DIRETA do mockup (a providência nasce comprometida, sem o
+// passo de curadoria SUGGESTED). Gera peça → /pecas/nova (mesmo href do WorkActions);
+// Concluir/Criar já concluída → POST /v1/action-items/:id/actions {accept_completed};
+// Dispensar → {dismiss}. O onSuccess do useWorkMutation invalida `intimacoes`, então a
+// linha some/atualiza sozinha.
+function TriageActions({
+  rec,
+  r,
+  m,
+}: {
+  rec: RecommendedProvidencia;
+  r: Linha;
+  m: Lista;
+}) {
+  const mutation = useWorkMutation();
+  const busy = mutation.isPending;
+  const run = (action: WorkAction) => {
+    if (!busy) mutation.mutate({ id: rec.id, action });
+  };
+  const pieceHref = `/pecas/nova?providencia=${rec.id}&intimacao=${r.id}&retorno=${encodeURIComponent(m.href(r.id))}`;
+  const cumprimento = hasActionableFulfillment(rec.fulfillment);
+  const ciencia = rec.tipo === "ciencia" || !rec.gera_peca;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {cumprimento ? (
+        <Button
+          size="sm"
+          disabled={busy}
+          onClick={() => run("accept_completed")}
+        >
+          <Check data-icon="inline-start" />
+          Criar já concluída
+        </Button>
+      ) : ciencia ? (
+        <Button
+          size="sm"
+          disabled={busy}
+          onClick={() => run("accept_completed")}
+        >
+          <Check data-icon="inline-start" />
+          Concluir
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          nativeButton={false}
+          render={<Link href={pieceHref} onClick={m.remember} />}
+        >
+          <PenLine data-icon="inline-start" />
+          Gerar peça
+        </Button>
+      )}
+      {!ciencia && !cumprimento ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={busy}
+          onClick={() => run("accept_completed")}
+        >
+          Concluir
+        </Button>
+      ) : null}
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={busy}
+        onClick={() => run("dismiss")}
+      >
+        <X data-icon="inline-start" />
+        Dispensar
+      </Button>
+      {mutation.isError ? (
+        <span role="alert" className="text-destructive text-xs">
+          Não foi possível concluir. Tente novamente.
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function LinhaIntimacao({
   row: r,
   m,
@@ -321,97 +425,98 @@ function LinhaIntimacao({
   m: Lista;
   grouped?: boolean;
 }) {
+  const rec = r.lifecycle.state === "recommended" ? r.lifecycle.rec : null;
   return (
-    <article className="hover:bg-muted/30 grid min-w-0 gap-3 px-4 py-3 transition-colors lg:grid-cols-[minmax(0,1fr)_180px_180px] lg:gap-4">
+    <article className="hover:bg-muted/25 flex min-w-0 flex-col gap-3 px-4 py-4 transition-colors sm:px-5">
+      {/* Header: prazo · situação · responsável */}
+      <div className="flex flex-wrap items-center gap-2">
+        <PrazoBadge prazo={r.prazo} />
+        {r.prazo.alert ? <Badge variant="warning">atenção</Badge> : null}
+        <span className="ml-auto">
+          <Responsavel value={r.responsavelId} nome={r.responsavel} />
+        </span>
+      </div>
+
+      {/* Corpo: título + meta do processo + teor */}
       <div className="min-w-0">
         <Link
           href={m.href(r.id)}
           onClick={m.remember}
-          className="text-foreground focus-visible:ring-ring rounded text-sm font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-2"
+          className="font-display text-foreground focus-visible:ring-ring hover:text-primary rounded text-base leading-snug font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-2"
         >
           {grouped ? r.ato : r.title}
         </Link>
-        {!grouped ? (
-          <>
-            <p className="text-muted-foreground mt-1 font-mono text-xs">
-              {r.cnj} · {r.tribunal}
-            </p>
-            {r.partes ? (
-              <p className="text-muted-foreground mt-1 line-clamp-2 text-sm">
-                {r.partes}
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <p className="text-muted-foreground mt-1 text-xs">{r.tribunal}</p>
-        )}
-        <p className="text-muted-foreground mt-2 text-xs">
-          Publicação: {r.publicado}
+        <p className="text-muted-foreground mt-1 font-mono text-xs">
+          {[grouped ? "" : r.ato, r.cnj, r.tribunal]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {!grouped && r.ato !== r.origem ? (
-            <span className="text-xs">{r.ato}</span>
-          ) : null}
-          {r.origem && (!grouped || r.origem !== r.ato) ? (
-            <Badge variant={r.revisao.pending ? "warning" : "outline"}>
-              {r.origem}
-            </Badge>
-          ) : null}
-          {r.revisao.label ? (
-            <span
-              className={cn(
-                "text-xs",
-                r.revisao.pending
-                  ? "text-gold-foreground font-medium"
-                  : "text-muted-foreground",
-              )}
-            >
-              {r.revisao.label}
-            </span>
-          ) : null}
-        </div>
-        {grouped && r.preview ? (
+        {r.preview ? (
           <TeorContent
             content={r.preview}
             allowLinks={false}
-            className="text-muted-foreground mt-2 line-clamp-2 text-xs leading-relaxed"
+            className="text-foreground/85 mt-1.5 line-clamp-2 text-sm leading-relaxed"
           />
-        ) : null}
-      </div>
-      <div>
-        <p className="text-muted-foreground text-xs lg:sr-only">Vencimento</p>
-        <p
-          className={cn(
-            "text-base font-semibold tabular-nums",
-            r.prazo.alert && "text-destructive",
-          )}
-        >
-          {r.prazo.data}
-        </p>
-        {r.prazo.relative ? (
-          <p className="text-muted-foreground mt-1 text-xs">
-            {r.prazo.relative}
+        ) : r.partes ? (
+          <p className="text-muted-foreground mt-1 line-clamp-1 text-sm">
+            {r.partes}
           </p>
         ) : null}
       </div>
-      <div>
-        <p className="text-muted-foreground text-xs lg:sr-only">Responsável</p>
-        <Responsavel value={r.responsavelId} nome={r.responsavel} />
-        <div className="mt-2">
-          <Badge variant="secondary">{r.situacao}</Badge>
-        </div>
-        {r.etapa ? (
-          <p className="text-muted-foreground mt-2 text-xs">Etapa: {r.etapa}</p>
-        ) : null}
-        <Link
-          href={m.href(r.id)}
-          onClick={m.remember}
-          aria-label={`Abrir intimação de ${r.publicado}, processo ${r.cnj}`}
-          className="text-primary focus-visible:ring-ring mt-3 inline-flex items-center gap-1 rounded text-xs underline-offset-4 outline-none hover:underline focus-visible:ring-2"
-        >
-          Abrir intimação
-          <ChevronRight className="size-3" aria-hidden />
-        </Link>
+
+      {/* Seção de ação (border-t) — analisando / revisar / ação recomendada */}
+      <div className="flex flex-col gap-3 border-t pt-3">
+        {r.lifecycle.state === "analyzing" ? (
+          <p className="text-muted-foreground flex items-center gap-2 text-sm">
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            Analisando… a ação recomendada preenche em instantes
+          </p>
+        ) : r.revisao.pending ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <RevisaoOrigem
+              revisao={r.revisao}
+              origem=""
+              origemDescricao={r.origemDescricao}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              nativeButton={false}
+              render={<Link href={m.href(r.id)} onClick={m.remember} />}
+            >
+              Revisar tipo e prazo
+            </Button>
+          </div>
+        ) : rec ? (
+          <>
+            <p className="section-label flex items-center gap-1.5">
+              <Sparkles className="size-3" aria-hidden />
+              Ação recomendada
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-display text-base font-medium">
+                {WORK_TYPES[rec.tipo]}
+              </span>
+              {rec.gera_peca ? (
+                <Badge variant="secondary">gera peça</Badge>
+              ) : null}
+            </div>
+            {hasActionableFulfillment(rec.fulfillment) ? (
+              <ProvidenciaFulfillment fulfillment={rec.fulfillment} />
+            ) : null}
+            <TriageActions rec={rec} r={r} m={m} />
+          </>
+        ) : (
+          <Link
+            href={m.href(r.id)}
+            onClick={m.remember}
+            aria-label={`Abrir intimação de ${r.publicado}, processo ${r.cnj}`}
+            className="text-primary focus-visible:ring-ring inline-flex items-center gap-1 self-start rounded text-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2"
+          >
+            Abrir intimação
+            <ChevronRight className="size-3" aria-hidden />
+          </Link>
+        )}
       </div>
     </article>
   );

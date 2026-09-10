@@ -3,6 +3,8 @@
 import { ImageUp, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { IconAction } from "@/components/ui/icon-action";
+
 // Captura do segundo fator: o advogado tira um print do QR que o tribunal mostra
 // ao configurar o 2º fator (ou exporta as contas do autenticador) e sobe a imagem;
 // alternativamente cola o código. Controlado pelo pai (precisa reenviar o MESMO
@@ -57,14 +59,13 @@ export function MfaCaptura({
             className="max-h-52 w-full object-contain"
           />
           {!disabled && (
-            <button
+            <IconAction
+              label="Remover imagem"
+              icon={X}
               type="button"
               onClick={() => onFile(null)}
-              className="border-line bg-panel hover:bg-hover absolute top-2 right-2 grid size-7 place-items-center rounded-full border"
-              aria-label="Remover imagem"
-            >
-              <X className="size-3.5" strokeWidth={1.8} />
-            </button>
+              className="border-line bg-panel hover:bg-hover absolute top-2 right-2 rounded-full border pointer-coarse:size-11"
+            />
           )}
         </div>
       ) : (

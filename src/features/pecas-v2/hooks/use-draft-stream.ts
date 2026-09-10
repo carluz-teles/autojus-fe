@@ -67,17 +67,23 @@ export function useDraftStream(draftId: string, opts: Options): void {
       // 1) POST /stream-token com Bearer JWT → recebe token opaco (2min)
       // 2) EventSource com ?stream_token=xxx (token não é JWT — não vaza credencial)
       const jwt = await getToken();
-      if (cancelled || !jwt) return;
+      if (cancelled) return;
+      if (!jwt)
+        throw new Error("Sessão indisponível para acompanhar a geração.");
 
       const tokenRes = await fetch(`${API}/v1/pecas/${draftId}/stream-token`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}` },
       });
-      if (cancelled || !tokenRes.ok) return;
+      if (cancelled) return;
+      if (!tokenRes.ok)
+        throw new Error("Não foi possível abrir o acompanhamento da geração.");
       const { token: streamToken } = (await tokenRes.json()) as {
         token: string;
       };
-      if (cancelled || !streamToken) return;
+      if (cancelled) return;
+      if (!streamToken)
+        throw new Error("Token de acompanhamento indisponível.");
 
       // Zera o buffer por conexão (nova geração reinicia do zero).
       accRef.current = "";
@@ -136,7 +142,9 @@ export function useDraftStream(draftId: string, opts: Options): void {
         // EventSource reconecta sozinho em caso de queda temporária. Só
         // fecha explicitamente no `done`.
       };
-    })();
+    })().catch((error: unknown) => {
+      if (!cancelled) onErrorRef.current?.(error);
+    });
 
     return () => {
       cancelled = true;

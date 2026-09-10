@@ -26,4 +26,17 @@ describe("stream da geração atual", () => {
     expect(buffer.append("␞")).toBeNull();
     expect(buffer.append("Texto")).toBeNull();
   });
+
+  it("preserva a identidade com microssegundos e rejeita outra execução no mesmo segundo", () => {
+    const buffer = new GenerationStreamBuffer("2026-09-09T12:10:56.662788Z");
+    buffer.identify("1788955856000");
+    expect(buffer.append("␞")).toBeNull();
+    expect(buffer.acceptsStage()).toBe(false);
+    buffer.identify("1788955856662");
+    expect(buffer.acceptsStage()).toBe(false);
+    expect(buffer.append("␞")).toBe("");
+    expect(buffer.acceptsStage()).toBe(true);
+    expect(buffer.append("## Manifestação\n\n")).toBe("## Manifestação\n\n");
+    expect(buffer.append("Texto parcial")).toBe("## Manifestação\n\nTexto parcial");
+  });
 });

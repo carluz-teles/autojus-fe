@@ -13,11 +13,14 @@ export function ProvidenceContext({ id }: { id: string }) {
   if (!p) return null;
   const members = directory.members;
   return (
-    <div className="space-y-3 border-b p-4">
+    <section
+      aria-label="Providência de origem"
+      className="mx-4 mb-4 flex flex-col gap-3 rounded-lg border p-4"
+    >
       <p className="text-muted-foreground text-xs">
         Providência de origem · {STATUS_LABEL[p.status]}
       </p>
-      <p className="font-medium">{p.title}</p>
+      <h3 className="font-display text-lg">{p.title}</h3>
       {p.description && (
         <TeorContent
           content={p.description}
@@ -44,6 +47,6 @@ export function ProvidenceContext({ id }: { id: string }) {
             })
           : "Não definido"}
       </p>
-    </div>
+    </section>
   );
 }

@@ -3,15 +3,28 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 /** Barra padrão de Calendário e Fila: fixa, compacta, fora da rolagem do conteúdo. */
-export function ShellHeader({ children }: { children: ReactNode }) {
+export function ShellHeader({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
     <header
       data-slot="shell-header"
-      className="border-line bg-bg flex h-11 min-w-0 shrink-0 items-center gap-2.5 border-b px-4"
+      className={cn(
+        "border-line bg-background/95 flex min-h-11 min-w-0 shrink-0 items-center gap-2.5 border-b px-3 py-1 sm:px-4 md:h-11 md:py-0",
+        className,
+      )}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-2.5">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5 md:flex-nowrap">
+        {children}
+      </div>
     </header>
   );
 }
@@ -24,18 +37,23 @@ export function ShellBackLink({
   label: string;
 }) {
   return (
-    <Link
-      href={href}
-      aria-label={label}
-      title={label}
-      className={buttonVariants({
-        variant: "ghost",
-        size: "icon-sm",
-        className: "-ml-2 shrink-0",
-      })}
+    <Tooltip
+      label={label}
+      render={
+        <Link
+          href={href}
+          aria-label={label}
+          data-slot="button"
+          className={buttonVariants({
+            variant: "ghost",
+            size: "icon-sm",
+            className: "-ml-2 shrink-0",
+          })}
+        />
+      }
     >
-      <ChevronLeft />
-    </Link>
+      <ChevronLeft aria-hidden />
+    </Tooltip>
   );
 }
 
@@ -56,7 +74,7 @@ export function PageFrame({
       {/* Contém também os rótulos sr-only, que usam position: absolute. */}
       <div
         data-slot="page-content"
-        className="relative min-h-0 min-w-0 flex-1 overflow-y-auto"
+        className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain"
       >
         {children}
       </div>

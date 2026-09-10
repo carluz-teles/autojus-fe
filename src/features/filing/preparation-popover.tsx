@@ -2,12 +2,17 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowUp,
   CheckCircle2,
   CircleAlert,
   Clock3,
   ExternalLink,
+  Eye,
+  FileText,
   LoaderCircle,
   Paperclip,
+  Pencil,
+  Plus,
   Send,
   Trash2,
 } from "lucide-react";
@@ -16,7 +21,9 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { IconAction } from "@/components/ui/icon-action";
 import { Input } from "@/components/ui/input";
 import {
   NativeSelect,
@@ -97,18 +104,15 @@ function ChoiceField({
           <p className="mt-1 text-sm break-words">{selected.label}</p>
         </div>
         {(choices.length > 1 || onEdit) && (
-          <Button
-            variant="ghost"
-            size="sm"
+          <IconAction
+            icon={Pencil}
             disabled={disabled}
-            aria-label={`Alterar ${label.toLocaleLowerCase()}`}
+            label={`Alterar ${label.toLocaleLowerCase()}`}
             onClick={() => {
               setEditing(true);
               onEdit?.();
             }}
-          >
-            Alterar
-          </Button>
+          />
         )}
       </div>
     );
@@ -143,6 +147,7 @@ export function PreparationWorkspace({
   pieceType,
   beforePrepare,
   disabled,
+  triggerSize = "sm",
   onOpenAttachments,
   children,
 }: {
@@ -151,6 +156,7 @@ export function PreparationWorkspace({
   pieceType: string;
   beforePrepare: () => Promise<void>;
   disabled?: boolean;
+  triggerSize?: "xs" | "sm";
   onOpenAttachments: () => void;
   children: (slots: {
     trigger: ReactNode;
@@ -391,7 +397,9 @@ export function PreparationWorkspace({
         }
       }}
     >
-      <PopoverTrigger render={<Button size="sm" disabled={disabled} />}>
+      <PopoverTrigger
+        render={<Button size={triggerSize} disabled={disabled} />}
+      >
         <Send data-icon="inline-start" />
         {result ? statusLabel : "Protocolar"}
       </PopoverTrigger>
@@ -722,24 +730,67 @@ export function PreparationWorkspace({
   );
   const attachments = (
     <div className="flex flex-col gap-4">
-      <div>
-        <h3 className="font-medium">Anexos do peticionamento</h3>
-        <p className="text-muted-foreground mt-1 text-xs">
-          Confira os arquivos e a classificação de cada anexo.
-        </p>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h3 className="font-display text-xl">Anexos da peça</h3>
+          <p className="text-muted-foreground text-xs">
+            {showResult || resume
+              ? (result?.documents.filter((d) => !d.principal).length ?? 0)
+              : files.length}{" "}
+            arquivos
+          </p>
+        </div>
+        {!showResult && !resume && (
+          <IconAction
+            icon={Plus}
+            label="Adicionar anexos ao peticionamento"
+            variant="outline"
+            disabled={locked || files.length >= 10}
+            onClick={() => upload.current?.click()}
+          />
+        )}
       </div>
+      <p className="text-muted-foreground text-xs leading-relaxed">
+        Arquivos que acompanharão a peça no peticionamento. Confira a ordem e a
+        classificação.
+      </p>
+      {(showResult || resume
+        ? !result?.documents.some((d) => !d.principal)
+        : files.length === 0) && (
+        <EmptyState
+          icon={Paperclip}
+          title="Nenhum anexo adicional"
+          description={
+            showResult || resume
+              ? "Esta preparação não possui anexos adicionais."
+              : "Use o + acima para incluir até 10 PDFs. A peça principal é incluída separadamente."
+          }
+          className="min-h-40 px-4 py-6"
+        />
+      )}
       {showResult ? (
         <>
           <ul className="flex flex-col gap-3">
             {result.documents
               .filter((d) => !d.principal)
               .map((d) => (
-                <li key={d.id} className="min-w-0 border-b pb-3">
-                  <p className="break-words">{d.name}</p>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    {d.principal ? "Peça principal" : "Anexo"} · {d.type_label}{" "}
-                    · {(d.bytes / 1024).toFixed(1)} KB
-                  </p>
+                <li
+                  key={d.id}
+                  className="bg-card flex min-w-0 items-start gap-3 rounded-xl border p-3"
+                >
+                  <FileText
+                    aria-hidden
+                    className="text-primary mt-0.5 size-4 shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm leading-5 font-medium break-words">
+                      {d.name}
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      {d.principal ? "Peça principal" : "Anexo"} ·{" "}
+                      {d.type_label} · {(d.bytes / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
                 </li>
               ))}
           </ul>
@@ -751,8 +802,13 @@ export function PreparationWorkspace({
               {result?.documents
                 .filter((d) => !d.principal)
                 .map((d) => (
-                  <li key={d.id}>
-                    <p className="break-words">{d.name}</p>
+                  <li
+                    key={d.id}
+                    className="flex flex-col gap-1 rounded-xl border p-3"
+                  >
+                    <p className="text-sm leading-5 font-medium break-words">
+                      {d.name}
+                    </p>
                     <p className="text-muted-foreground text-xs">
                       {d.type_label}
                     </p>
@@ -764,18 +820,29 @@ export function PreparationWorkspace({
               {files.map((f, i) => (
                 <div
                   key={`${i}-${f.file.name}`}
-                  className="flex flex-col gap-2 border-b pb-3"
+                  className="bg-card flex flex-col gap-3 rounded-xl border p-3"
                 >
-                  <p className="break-words">
-                    {i + 1}. {f.file.name}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <span className="text-muted-foreground mr-auto text-xs">
-                      {(f.file.size / 1024).toFixed(1)} KB
+                  <div className="flex items-start gap-2.5">
+                    <span className="bg-muted/60 text-primary grid size-8 shrink-0 place-items-center rounded-lg">
+                      <FileText aria-hidden className="size-4" />
                     </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
+                    <div className="min-w-0">
+                      <p className="text-sm leading-5 font-medium break-words">
+                        {f.file.name}
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-[11px]">
+                        Anexo {String(i + 1).padStart(2, "0")} ·{" "}
+                        {(f.file.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-muted-foreground mr-auto text-[11px]">
+                      Arquivo PDF
+                    </span>
+                    <IconAction
+                      icon={Eye}
+                      label={`Visualizar ${f.file.name}`}
                       disabled={busy}
                       onClick={() => {
                         if (preview) URL.revokeObjectURL(preview.url);
@@ -784,14 +851,11 @@ export function PreparationWorkspace({
                           name: f.file.name,
                         });
                       }}
-                    >
-                      Visualizar
-                    </Button>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
+                    />
+                    <IconAction
+                      icon={ArrowUp}
                       disabled={locked || i === 0}
-                      aria-label={`Mover ${f.file.name} para cima`}
+                      label={`Mover ${f.file.name} para cima`}
                       onClick={() =>
                         setFiles((fs) => {
                           const next = [...fs];
@@ -799,20 +863,15 @@ export function PreparationWorkspace({
                           return next;
                         })
                       }
-                    >
-                      ↑
-                    </Button>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
+                    />
+                    <IconAction
+                      icon={Trash2}
                       disabled={locked}
-                      aria-label={`Remover ${f.file.name}`}
+                      label={`Remover ${f.file.name}`}
                       onClick={() =>
                         setFiles((fs) => fs.filter((_, n) => n !== i))
                       }
-                    >
-                      <Trash2 />
-                    </Button>
+                    />
                   </div>
                   {documentChoices.length > 0 ? (
                     <ChoiceField
@@ -868,14 +927,6 @@ export function PreparationWorkspace({
                   ]);
                 }}
               />
-              <Button
-                variant="outline"
-                disabled={locked || files.length >= 10}
-                onClick={() => upload.current?.click()}
-              >
-                <Paperclip data-icon="inline-start" />
-                Adicionar anexos
-              </Button>
               {fileError && <p role="alert">{fileError}</p>}
             </>
           )}

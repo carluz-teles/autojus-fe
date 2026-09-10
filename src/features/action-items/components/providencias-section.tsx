@@ -6,6 +6,7 @@ import { InfiniteListFooter } from "@/components/shell/infinite-list-footer";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { ANALYSIS_PROCESSING_MESSAGE } from "../../intimacoes/lib/analysis-materialization";
 import { useWorkspaceList } from "../hooks/use-workspace";
 import { NewProvidencia } from "./new-providencia";
 import { WorkRow } from "./work-list";
@@ -17,6 +18,9 @@ export function ProvidenciasSection({
   analyzed,
   onAnalyze,
   analysisError,
+  reviewBlocked = false,
+  checkingReview = false,
+  analysisProcessingTimeout = false,
 }: {
   processId: string;
   intimationId: string;
@@ -24,6 +28,9 @@ export function ProvidenciasSection({
   analyzed: boolean;
   onAnalyze: () => void;
   analysisError?: boolean;
+  reviewBlocked?: boolean;
+  checkingReview?: boolean;
+  analysisProcessingTimeout?: boolean;
 }) {
   const list = useWorkspaceList({ intimacao: intimationId, status: "ALL" });
   const previousAnalysis = useRef(analyzing);
@@ -37,17 +44,31 @@ export function ProvidenciasSection({
   return (
     <section
       id="providencias-intimacao"
-      className="bg-card flex scroll-mt-6 flex-col gap-5 rounded-xl border p-4 sm:p-5"
+      className="surface-panel flex scroll-mt-6 flex-col gap-5 p-4 sm:p-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-medium">Providências</h2>
+          <p className="section-label">Trabalho do escritório</p>
+          <h2 className="font-display mt-1 text-xl font-medium">
+            Providências
+          </h2>
           <p className="text-muted-foreground mt-1 text-sm">
             Organize e acompanhe o trabalho desta intimação.
           </p>
         </div>
-        <NewProvidencia processId={processId} intimationId={intimationId} />
+        <NewProvidencia
+          processId={processId}
+          intimationId={intimationId}
+          disabled={reviewBlocked || checkingReview}
+        />
       </div>
+      {(reviewBlocked || checkingReview) && (
+        <p className="text-muted-foreground text-sm" role="status">
+          {checkingReview
+            ? "Verificando a revisão do tipo e do prazo…"
+            : "Confirme o tipo e o prazo antes de criar providências ou gerar sugestões."}
+        </p>
+      )}
       {list.isPending ? (
         <Skeleton className="h-20 w-full" />
       ) : list.isError ? (
@@ -58,24 +79,39 @@ export function ProvidenciasSection({
           </Button>
         </div>
       ) : work.length ? (
-        <div className="divide-y">
+        <div className="surface-inset @container/worklist divide-y px-4">
           {work.map((p) => (
-            <WorkRow key={p.id} item={p} />
+            <WorkRow
+              key={p.id}
+              item={{
+                ...p,
+                origin_review_required:
+                  reviewBlocked || checkingReview || p.origin_review_required,
+              }}
+            />
           ))}
         </div>
       ) : (
         <p className="text-muted-foreground text-sm">
-          Nenhum trabalho adicionado. Crie uma providência ou revise as
-          sugestões abaixo.
+          {reviewBlocked || checkingReview
+            ? "Nenhuma providência adicionada a esta intimação."
+            : "Nenhum trabalho adicionado. Crie uma providência ou revise as sugestões abaixo."}
         </p>
       )}
       <div className="flex flex-col gap-3 border-t pt-4">
+        {analysisProcessingTimeout ? (
+          <p className="text-muted-foreground text-sm" role="status">
+            {ANALYSIS_PROCESSING_MESSAGE}
+          </p>
+        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-sm font-medium">Sugestões para revisão</h3>
+          <h3 className="font-display text-lg font-medium">
+            Sugestões para revisão
+          </h3>
           <Button
             variant="ghost"
             size="sm"
-            disabled={analyzing}
+            disabled={analyzing || reviewBlocked || checkingReview}
             onClick={onAnalyze}
           >
             <Sparkles data-icon="inline-start" />
@@ -92,9 +128,16 @@ export function ProvidenciasSection({
           </p>
         )}
         {suggestions.length ? (
-          <div className="divide-y">
+          <div className="surface-inset @container/worklist divide-y px-4">
             {suggestions.map((p) => (
-              <WorkRow key={p.id} item={p} />
+              <WorkRow
+                key={p.id}
+                item={{
+                  ...p,
+                  origin_review_required:
+                    reviewBlocked || checkingReview || p.origin_review_required,
+                }}
+              />
             ))}
           </div>
         ) : (
@@ -105,15 +148,17 @@ export function ProvidenciasSection({
           </p>
         )}
       </div>
-      <InfiniteListFooter
-        resetScroll={false}
-        paginationKey={list.paginationKey}
-        hasMore={list.hasMore}
-        loading={list.isFetchingNextPage}
-        paused={list.isPlaceholderData}
-        error={list.isFetchNextPageError}
-        onLoadMore={list.loadMore}
-      />
+      {list.hasMore || list.isFetchingNextPage || list.isFetchNextPageError ? (
+        <InfiniteListFooter
+          resetScroll={false}
+          paginationKey={list.paginationKey}
+          hasMore={list.hasMore}
+          loading={list.isFetchingNextPage}
+          paused={list.isPlaceholderData}
+          error={list.isFetchNextPageError}
+          onLoadMore={list.loadMore}
+        />
+      ) : null}
     </section>
   );
 }
@@ -142,7 +187,7 @@ export function ProcessProvidencias({
           <Button onClick={() => list.refetch()}>Tentar novamente</Button>
         </div>
       ) : list.items.length ? (
-        <div className="divide-y">
+        <div className="surface-inset @container/worklist divide-y px-4">
           {list.items.map((item) => (
             <WorkRow key={item.id} item={item} />
           ))}

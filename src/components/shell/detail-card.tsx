@@ -11,7 +11,7 @@ export function DetailCard({
     <Card
       size="sm"
       {...props}
-      className={cn("border-line rounded-lg border ring-0", className)}
+      className={cn("border-line rounded-xl", className)}
     />
   );
 }

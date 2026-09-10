@@ -36,18 +36,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-
-/** Divider vertical inline — shadcn deste repo não tem Separator ainda. */
-function Separator({
-  orientation = "vertical",
-  className = "",
-}: {
-  orientation?: "vertical" | "horizontal";
-  className?: string;
-}) {
-  const base = orientation === "vertical" ? "w-px h-full" : "h-px w-full";
-  return <div className={`bg-border ${base} ${className}`} aria-hidden />;
-}
+import { Separator } from "@/components/ui/separator";
 
 interface Props {
   editor: Editor | null;
@@ -78,7 +67,11 @@ export function RichToolbar({ editor }: Props) {
     );
   }
   return (
-    <div className="border-border/60 bg-background sticky top-0 z-10 flex flex-wrap items-center gap-1 rounded-lg border px-2 py-1.5 shadow-sm">
+    <div
+      role="group"
+      aria-label="Formatação do documento"
+      className="bg-muted/40 flex items-center gap-1 overflow-x-auto rounded-lg p-1.5 [&>button]:shrink-0 [&>div]:shrink-0 [&>select]:shrink-0"
+    >
       {/* Grupo 1 — Estilo de bloco */}
       <select
         aria-label="Estilo de bloco"
@@ -315,6 +308,7 @@ function ToolBtn({
       variant="ghost"
       size="sm"
       aria-label={label}
+      aria-pressed={active}
       title={label}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}

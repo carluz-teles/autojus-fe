@@ -9,6 +9,7 @@ import { PageFrame } from "@/components/shell/page-frame";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { FilterTabs } from "@/features/intimacoes/components/shared/filter-tabs";
 import { Responsavel } from "@/features/organization/components/responsavel";
 import { ProcessoSituacao } from "@/features/processos/components/situacao-processo";
@@ -52,7 +53,7 @@ export function ProcessosLista() {
         </>
       }
     >
-      <div className="flex min-w-0 flex-col gap-3 px-4 py-3">
+      <div className="flex w-full min-w-0 flex-col gap-4 px-3 py-4 sm:px-4 sm:py-5">
         <p
           role="status"
           aria-live="polite"
@@ -67,7 +68,7 @@ export function ProcessosLista() {
         {m.isError && !m.loadMoreError ? (
           <div
             role="alert"
-            className="border-destructive/20 bg-destructive/5 flex flex-col items-start gap-3 rounded-lg border p-5"
+            className="border-destructive/20 bg-destructive/5 flex flex-col items-start gap-3 rounded-xl border p-5 shadow-sm"
           >
             <p>Não foi possível atualizar os processos.</p>
             <Button variant="outline" onClick={m.retry}>
@@ -78,10 +79,7 @@ export function ProcessosLista() {
         {m.isLoading ? (
           <div className="flex flex-col gap-3">
             {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="bg-muted h-36 rounded-lg motion-safe:animate-pulse"
-              />
+              <Skeleton key={i} className="h-36 w-full rounded-xl" />
             ))}
           </div>
         ) : !m.rows.length && !m.isError ? (
@@ -100,13 +98,13 @@ export function ProcessosLista() {
             aria-busy={m.updating}
             inert={m.updating}
             className={cn(
-              "border-border bg-card min-w-0 overflow-hidden rounded-lg border",
+              "border-border bg-card min-w-0 overflow-hidden rounded-xl border shadow-sm",
               m.updating && "opacity-60",
             )}
           >
             <div
               aria-hidden
-              className="border-border bg-muted/30 text-muted-foreground hidden grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_190px] items-center gap-4 border-b px-4 py-2 text-xs font-medium xl:grid"
+              className="border-border bg-muted/30 text-muted-foreground hidden grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_190px] items-center gap-5 border-b px-5 py-2.5 text-[11px] font-medium tracking-wide uppercase xl:grid"
             >
               <span>Processo e partes</span>
               <span>Acompanhamento</span>
@@ -141,11 +139,11 @@ export function ProcessosLista() {
 
 function LinhaProcesso({ row: r }: { row: Linha }) {
   return (
-    <article className="hover:bg-muted/20 grid min-w-0 gap-3 px-4 py-3 transition-colors xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_190px] xl:gap-4">
+    <article className="hover:bg-muted/25 grid min-w-0 gap-4 px-4 py-4 transition-colors sm:px-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_190px] xl:gap-5">
       <div className="min-w-0">
         <Link
           href={r.href}
-          className="text-foreground focus-visible:ring-ring rounded text-sm font-semibold underline-offset-4 outline-none hover:underline focus-visible:ring-2"
+          className="font-display text-foreground focus-visible:ring-ring hover:text-primary rounded text-base leading-snug font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-2"
         >
           {r.title}
         </Link>
@@ -203,7 +201,7 @@ function LinhaProcesso({ row: r }: { row: Linha }) {
         ) : (
           <p className="mt-1 text-sm">Nenhum prazo ativo registrado</p>
         )}
-        <div className="border-border mt-3 border-t pt-2">
+        <div className="border-border mt-3 border-t pt-3">
           <p className="text-muted-foreground text-xs">
             Última movimentação · {r.movimentoData}
           </p>
@@ -227,7 +225,7 @@ function LinhaProcesso({ row: r }: { row: Linha }) {
         <Link
           href={r.href}
           aria-label={`Abrir processo ${r.cnj}`}
-          className="text-fg2 hover:text-fg focus-visible:ring-ring mt-2 inline-flex h-8 items-center gap-1 rounded text-xs font-medium outline-none hover:underline focus-visible:ring-2"
+          className="text-primary focus-visible:ring-ring mt-3 inline-flex h-8 items-center gap-1 rounded text-xs font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-2"
         >
           Abrir processo
           <ChevronRight className="size-4" aria-hidden />

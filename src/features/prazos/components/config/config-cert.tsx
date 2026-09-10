@@ -18,7 +18,7 @@ export function ConfigCert() {
         </div>
         <button
           onClick={w.abrir}
-          className="bg-primary text-primary-foreground inline-flex flex-none items-center gap-[7px] rounded-[9px] px-3.5 py-2 text-[12.5px] font-medium"
+          className="bg-primary text-primary-foreground inline-flex min-h-9 flex-none items-center gap-[7px] rounded-[9px] px-3.5 py-2 text-[12.5px] font-medium pointer-coarse:min-h-11"
         >
           <Plus className="size-3.5" strokeWidth={2} />
           Adicionar certificado
@@ -33,7 +33,7 @@ export function ConfigCert() {
           Não foi possível carregar os certificados.
         </p>
       ) : (
-        <div className="border-line bg-panel overflow-hidden rounded-xl border">
+        <div className="surface-panel overflow-hidden">
           {w.listaPendente ? (
             Array.from({ length: 2 }).map((_, i) => (
               <div
@@ -79,7 +79,7 @@ export function ConfigCert() {
                 <button
                   onClick={c.remover}
                   disabled={c.removendo}
-                  className="border-line bg-panel text-fg2 hover:bg-hover flex-none rounded-[7px] border px-2.5 py-[5px] text-[11.5px] disabled:opacity-50"
+                  className="border-line bg-panel text-fg2 hover:bg-hover flex min-h-9 flex-none items-center rounded-[7px] border px-2.5 py-[5px] text-[11.5px] disabled:opacity-50 pointer-coarse:min-h-11"
                 >
                   {c.removendo ? "Removendo…" : "Remover"}
                 </button>

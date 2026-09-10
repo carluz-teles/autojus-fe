@@ -39,6 +39,7 @@ import { toast } from "sonner";
 
 import { TeorContent } from "@/components/teor-content";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 // Rótulo do status de trabalho: fonte única (Regra nº1) em action-items/lib/status-pill;
 // não redefinir localmente (o board e a fila consomem o MESMO mapa).
 import {
@@ -268,7 +269,7 @@ export function LeituraDoTeorCard({
 
   return (
     <div
-      className="rounded-xl border px-4 py-3.5"
+      className="rounded-xl border px-4 py-3.5 shadow-sm"
       style={{
         borderColor: "color-mix(in oklch, var(--primary) 26%, transparent)",
         background: "color-mix(in oklch, var(--primary) 5%, transparent)",
@@ -285,20 +286,24 @@ export function LeituraDoTeorCard({
       <p className="font-display mt-2 mb-1 text-[16px]">{ato || "—"}</p>
       <p className="text-fg2 text-[11.5px] leading-relaxed">{resumo}</p>
       {aConfirmar.length > 0 ? (
-        <button
-          type="button"
+        <Button
+          size="sm"
           onClick={onConfirmarTipo}
           disabled={confirmar.isPending}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-[7px] px-3 py-[7px] text-[12px] font-medium text-white transition-[filter] hover:brightness-95 disabled:opacity-60"
+          className="mt-3"
           style={{ background: "var(--primary)" }}
         >
           {confirmar.isPending ? (
-            <Loader2 className="size-[13px] animate-spin" strokeWidth={2.2} />
+            <Loader2
+              data-icon="inline-start"
+              className="animate-spin"
+              strokeWidth={2.2}
+            />
           ) : (
-            <Check className="size-[13px]" strokeWidth={2.2} />
+            <Check data-icon="inline-start" strokeWidth={2.2} />
           )}
           Confirmar tipo
-        </button>
+        </Button>
       ) : null}
     </div>
   );
@@ -358,8 +363,8 @@ export function AnalisarCard({
             Não foi possível gerar a análise. Tente novamente.
           </p>
         ) : null}
-        <Button className="mt-5 gap-1.5" onClick={gerar}>
-          <Sparkles className="size-4" strokeWidth={1.8} />
+        <Button className="mt-5" onClick={gerar}>
+          <Sparkles data-icon="inline-start" strokeWidth={1.8} />
           Gerar análise
         </Button>
       </section>
@@ -372,7 +377,7 @@ export function AnalisarCard({
   const itens = i.ai_providencias;
 
   return (
-    <section className="border-border rounded-xl border px-6 py-6">
+    <section className="surface-panel px-5 py-5 sm:px-6 sm:py-6">
       {degradado ? (
         <p
           role="alert"
@@ -388,7 +393,7 @@ export function AnalisarCard({
           </p>
 
           {itens.length > 0 ? (
-            <div className="border-line bg-panel mt-7 overflow-hidden rounded-xl border">
+            <div className="border-line bg-panel mt-7 overflow-hidden rounded-xl border shadow-sm">
               <div className="border-line2 flex items-center gap-2 border-b px-4 pt-3.5 pb-3">
                 <Sparkles className="text-primary size-4" strokeWidth={1.8} />
                 <span className="text-foreground text-[13px] font-semibold">
@@ -427,10 +432,10 @@ export function AnalisarCard({
         <Button
           variant="ghost"
           size="sm"
-          className="text-muted-foreground gap-1.5"
+          className="text-muted-foreground"
           onClick={gerar}
         >
-          <RotateCcw className="size-3.5" strokeWidth={1.8} />
+          <RotateCcw data-icon="inline-start" strokeWidth={1.8} />
           Gerar novamente
         </Button>
       </div>
@@ -442,7 +447,7 @@ export function AnalisarCard({
 export function AnalisarLoading() {
   return (
     <section
-      className="border-border rounded-xl border px-6 py-6"
+      className="surface-panel px-5 py-5 sm:px-6 sm:py-6"
       role="status"
       aria-live="polite"
     >
@@ -461,9 +466,9 @@ export function AnalisarLoading() {
         </div>
       </div>
       <div className="mt-5 flex flex-col gap-2.5">
-        <span className="bg-muted h-3 w-full animate-pulse rounded" />
-        <span className="bg-muted h-3 w-[85%] animate-pulse rounded" />
-        <span className="bg-muted h-3 w-[60%] animate-pulse rounded" />
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-[85%]" />
+        <Skeleton className="h-3 w-[60%]" />
       </div>
     </section>
   );
@@ -474,10 +479,6 @@ export function AnalisarLoading() {
 export function codigoProvidencia(id: string, prefix = "PRV-"): string {
   return `${prefix}${id.replace(/-/g, "").slice(0, 4).toUpperCase()}`;
 }
-
-/** Estilo das ações de confirmar e iniciar uma providência sugerida. */
-const ACAO_BTN_CLASS =
-  "focus-visible:ring-ring inline-flex w-fit max-w-full shrink-0 items-center justify-center gap-1.5 rounded-[7px] border px-3 py-[7px] text-sm font-medium transition-[filter] outline-none hover:brightness-95 focus-visible:ring-2 disabled:opacity-60";
 
 /** Confirma o tipo sugerido, inicia o trabalho e oferece a próxima ação da providência. */
 export function ProvidenciaRow({
@@ -510,9 +511,9 @@ export function ProvidenciaRow({
 
   return (
     // Grid 1fr auto — fiel ao .dc.html (Prazos-Linear, bloco <sc-for as="pv">).
-    <li className="border-line2 hover:bg-hover grid grid-cols-1 items-center gap-3 border-b py-4 sm:grid-cols-[1fr_auto]">
+    <li className="border-line2 hover:bg-hover grid grid-cols-1 items-center gap-3 border-b px-4 py-4 transition-colors sm:grid-cols-[1fr_auto]">
       <div className="min-w-0">
-        <span className="text-foreground block text-sm font-medium">
+        <span className="font-display text-foreground block text-base font-medium">
           {titulo}
         </span>
         {descricao ? (
@@ -572,13 +573,14 @@ export function ProvidenciaRow({
 
       {/* Coluna de ação (auto) */}
       {iniciada ? (
-        <span className="inline-flex items-center gap-2">
+        <span className="inline-flex w-full items-center gap-2 sm:w-auto">
           {p.gera_peca ? (
             <GerarPecaDaProvidencia providencia={p} intimacaoId={intimacaoId} />
           ) : (
             <Button
               variant="outline"
               size="sm"
+              className="w-full sm:w-auto"
               render={<Link href={`/providencias/${p.id}`} />}
               nativeButton={false}
             >
@@ -587,22 +589,24 @@ export function ProvidenciaRow({
           )}
         </span>
       ) : p.tipo_status === "a_confirmar" ? (
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="sm"
           onClick={onConfirmarTipo}
           disabled={confirmar.isPending}
-          className={ACAO_BTN_CLASS}
+          className="w-full sm:w-auto"
         >
           {confirmar.isPending
             ? "Confirmando…"
             : "Confirmar tipo da providência"}
-        </button>
+        </Button>
       ) : (
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="sm"
           onClick={onIniciar}
           disabled={emVoo}
-          className={ACAO_BTN_CLASS}
+          className="w-full sm:w-auto"
           style={{
             borderColor: "color-mix(in oklch, var(--primary) 45%, transparent)",
             background: "color-mix(in oklch, var(--primary) 7%, transparent)",
@@ -610,12 +614,16 @@ export function ProvidenciaRow({
           }}
         >
           {emVoo ? (
-            <Loader2 className="size-[13px] animate-spin" strokeWidth={2.2} />
+            <Loader2
+              data-icon="inline-start"
+              className="animate-spin"
+              strokeWidth={2.2}
+            />
           ) : (
-            <Plus className="size-[13px]" strokeWidth={2.2} />
+            <Plus data-icon="inline-start" strokeWidth={2.2} />
           )}
           Iniciar providência
-        </button>
+        </Button>
       )}
     </li>
   );
@@ -640,7 +648,12 @@ function GerarPecaDaProvidencia({
     );
 
   return (
-    <Button type="button" size="sm" onClick={onClick}>
+    <Button
+      type="button"
+      size="sm"
+      className="w-full sm:w-auto"
+      onClick={onClick}
+    >
       <Sparkles data-icon="inline-start" aria-hidden />
       Gerar peça
     </Button>

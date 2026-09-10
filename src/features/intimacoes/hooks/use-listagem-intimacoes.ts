@@ -5,7 +5,11 @@ import { toast } from "sonner";
 
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { nomeExibicao } from "@/features/organization/lib/labels";
-import { abasVisiveis, ORIGEM_LABEL } from "@/features/triagem/lib/origem";
+import {
+  abasVisiveis,
+  ORIGEM_DESCRICAO,
+  ORIGEM_LABEL,
+} from "@/features/triagem/lib/origem";
 
 import {
   filtroDeIntervalo,
@@ -124,6 +128,7 @@ export function useListagemIntimacoes(triagem: boolean) {
   const origemTabs = abasVisiveis(query.origemFacets).map((tab) => ({
     key: tab.value ?? "",
     label: tab.label,
+    description: tab.value ? ORIGEM_DESCRICAO[tab.value] : undefined,
     count: tab.count,
     ativo: (tab.value ?? "") === origem,
     onClick: () => change({ origem: tab.value, ...limparUrgencia }),

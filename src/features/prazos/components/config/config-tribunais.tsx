@@ -73,6 +73,7 @@ function SystemRow({
             variant="outline"
             disabled={connection?.status === "AUTHENTICATING"}
             onClick={onConnect}
+            className="pointer-coarse:min-h-11"
             aria-label={`${connected ? "Ver conexão" : "Conectar"} ${system} · ${entry.court}`}
           >
             {connected
@@ -89,6 +90,7 @@ function SystemRow({
           size="sm"
           variant="ghost"
           nativeButton={false}
+          className="pointer-coarse:min-h-11"
           render={
             <a href={entry.source_url} target="_blank" rel="noreferrer" />
           }
@@ -158,7 +160,7 @@ export function ConfigTribunais() {
         Cada sistema tem seu próprio acesso. Conectar o eproc de um tribunal não
         conecta o e-SAJ.
       </p>
-      <div className="border-line flex items-center gap-2 border-y py-2">
+      <div className="surface-inset flex items-center gap-2 px-3 py-1">
         <Search className="text-muted-foreground size-4 shrink-0" aria-hidden />
         <Input
           aria-label="Buscar tribunal ou sistema"
@@ -181,6 +183,7 @@ export function ConfigTribunais() {
                 void catalog.refetch();
                 void connections.refetch();
               }}
+              className="pointer-coarse:min-h-11"
             >
               Tentar novamente
             </Button>
@@ -252,6 +255,7 @@ export function ConfigTribunais() {
                     size="sm"
                     variant="outline"
                     onClick={() => setSearch("")}
+                    className="pointer-coarse:min-h-11"
                   >
                     Limpar busca
                   </Button>

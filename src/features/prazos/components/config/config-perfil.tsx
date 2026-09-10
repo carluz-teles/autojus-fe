@@ -1,5 +1,9 @@
 "use client";
 
+import { Pencil } from "lucide-react";
+
+import { IconAction } from "@/components/ui/icon-action";
+
 import { useConfigPerfil } from "../../hooks/use-config-perfil";
 import { ConfigAvatarUpload } from "./config-avatar-upload";
 import { ConfigPerfilSessoes } from "./config-perfil-sessoes";
@@ -15,12 +19,12 @@ export function ConfigPerfil() {
     <>
       <div className="mb-1 flex items-start justify-between gap-4">
         <div className="font-display text-[20px] font-medium">Perfil</div>
-        <button
+        <IconAction
+          label="Editar dados"
+          icon={Pencil}
           onClick={p.abrirEditar}
-          className="border-line bg-panel text-foreground hover:bg-hover flex-none rounded-lg border px-3.5 py-2 text-[12.5px] font-medium"
-        >
-          Editar dados
-        </button>
+          className="pointer-coarse:size-11"
+        />
       </div>
       <p className="text-fg3 mt-0 mb-[18px] text-[12.5px]">
         Seus dados pessoais e credenciais.
@@ -34,16 +38,18 @@ export function ConfigPerfil() {
         enviando={p.enviandoFoto}
       />
 
-      <div className="border-line bg-panel overflow-hidden rounded-xl border">
+      <div className="surface-panel overflow-hidden">
         {p.rows.map((l) => (
           <div
             key={l.rot}
-            className="border-line2 flex items-center gap-3.5 border-b px-4 py-3 last:border-b-0"
+            className="border-line2 flex flex-col items-start gap-1 border-b px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:gap-3.5"
           >
-            <span className="text-fg3 w-[120px] flex-none text-[12px]">
+            <span className="text-fg3 w-auto flex-none text-[12px] sm:w-[120px]">
               {l.rot}
             </span>
-            <span className="flex-1 text-[13px]">{l.val}</span>
+            <span className="min-w-0 flex-1 text-[13px] [overflow-wrap:anywhere] break-words">
+              {l.val}
+            </span>
           </div>
         ))}
       </div>

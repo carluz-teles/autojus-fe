@@ -17,6 +17,11 @@ import { useInfinitePageBuffer } from "@/lib/hooks/use-infinite-page-buffer";
 import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
 import {
+  isAnalysisMaterializationPending,
+  isAnalysisPollTimedOut,
+} from "../lib/analysis-materialization";
+import { lifecycleDaLinha } from "../lib/listagem";
+import {
   analisarIntimacao,
   assignIntimacaoResponsavel,
   type AssignResponsavelParams,
@@ -150,6 +155,17 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     initialPageParam: "",
     getNextPageParam: (lastPage) => lastPage.page.next_cursor || undefined,
     enabled: filters.enabled ?? true,
+    // Lifecycle async da análise: enquanto alguma intimação estiver "Analisando…" (chegou,
+    // prazo real, ainda não materializou providência), poll a cada 4s pra a linha transicionar
+    // sozinha pra "Ação recomendada" quando o worker terminar. Para de pollar (false) assim que
+    // nenhuma linha está analisando — sem polling perpétuo. Só as páginas já carregadas contam.
+    refetchInterval: (q) => {
+      const pages = q.state.data?.pages ?? [];
+      const analyzing = pages.some((pg) =>
+        pg.data?.some((it) => lifecycleDaLinha(it).state === "analyzing"),
+      );
+      return analyzing ? 4000 : false;
+    },
     // Mantém os dados da faixa/filtro anterior enquanto a nova query carrega, pra
     // trocar tab/filtro NÃO derrubar a página inteira no skeleton (isPending só é
     // true no 1º load). O loading da troca fica scoped na lista via isFetching.
@@ -224,6 +240,7 @@ interface PollWindow {
   /** Só setado pela análise: o ai_analyzed_at que ainda esperamos ver refletido
    *  no cache (linhas de providência materializadas). */
   targetAnalyzedAt?: string;
+  targetAnalysisId?: string;
   /** Só setado pela análise: quantas providências os candidatos efêmeros do POST
    *  /analise prometeram. Enquanto `ai_providencias` (não-DISCARDED) não atingir
    *  essa contagem, a materialização ainda não terminou → seguimos polando e o
@@ -240,43 +257,23 @@ function abrirJanelaDePoll(
   qc: QueryClient,
   id: string,
   targetAnalyzedAt?: string,
+  targetAnalysisId?: string,
   expectedProvidenciasCount?: number,
 ) {
   const estadoAtual = qc.getQueryState(intimacoesKeys.detail(id));
   qc.setQueryData<PollWindow>(pollWindowKey(id), {
     baselineUpdateCount: estadoAtual?.dataUpdateCount ?? 0,
     targetAnalyzedAt,
+    targetAnalysisId,
     expectedProvidenciasCount,
   });
 }
 
-/** Providências já materializadas no detalhe. */
-function providenciasVisiveis(i: IntimacaoDetalheView): number {
-  return i.ai_providencias.length;
-}
-
-/** true = ainda falta a análise materializar (ver critério 1 acima). */
 function algoPendente(
   i: IntimacaoDetalheView | undefined,
   janela: PollWindow,
 ): boolean {
-  if (!i) return true;
-  const { targetAnalyzedAt, expectedProvidenciasCount } = janela;
-  // Análise recém-disparada: só estabiliza quando o ai_analyzed_at alvo refletiu
-  // E as providências prometidas pelos candidatos efêmeros do POST já apareceram
-  // no detalhe (a materialização é assíncrona no BE — pode chegar DEPOIS do
-  // ai_analyzed_at). Contagem esperada 0 = análise sem providência → não trava.
-  if (targetAnalyzedAt) {
-    if (i.ai_analyzed_at !== targetAnalyzedAt) return true;
-    if (
-      expectedProvidenciasCount != null &&
-      expectedProvidenciasCount > 0 &&
-      providenciasVisiveis(i) < expectedProvidenciasCount
-    ) {
-      return true;
-    }
-  }
-  return false;
+  return isAnalysisMaterializationPending(i, janela);
 }
 
 /** Quantas tentativas de refetch a janela já consumiu. */
@@ -308,7 +305,13 @@ export function useIntimacaoDetalhe(id: string) {
     refetchInterval: (q) => {
       const janela = qc.getQueryData<PollWindow>(pollWindowKey(id));
       if (!janela) return false;
-      if (tentativasDaJanela(qc, id, janela) >= POLL_MAX_ATTEMPTS) return false;
+      if (
+        isAnalysisPollTimedOut(
+          tentativasDaJanela(qc, id, janela),
+          POLL_MAX_ATTEMPTS,
+        )
+      )
+        return false;
       if (!algoPendente(q.state.data, janela)) return false;
       return POLL_INTERVAL_MS;
     },
@@ -320,6 +323,14 @@ export function useIntimacaoDetalhe(id: string) {
     !!janela.targetAnalyzedAt &&
     tentativasDaJanela(qc, id, janela) < POLL_MAX_ATTEMPTS &&
     algoPendente(query.data, janela);
+  const analiseTimeout =
+    !!janela &&
+    !!janela.targetAnalyzedAt &&
+    isAnalysisPollTimedOut(
+      tentativasDaJanela(qc, id, janela),
+      POLL_MAX_ATTEMPTS,
+    ) &&
+    algoPendente(query.data, janela);
 
   const analysisVisible =
     !!janela?.targetAnalyzedAt && !algoPendente(query.data, janela);
@@ -329,7 +340,7 @@ export function useIntimacaoDetalhe(id: string) {
     "complete",
     query.dataUpdatedAt,
   );
-  return { ...query, materializandoAnalise };
+  return { ...query, materializandoAnalise, analiseTimeout };
 }
 
 /** Contadores do inbox — GET /v1/intimacoes/summary. */
@@ -423,6 +434,7 @@ export function useAnalisarIntimacao(intimacaoId: string) {
         qc,
         intimacaoId,
         analise.analyzed_at,
+        analise.analysis_id,
         analise.providencias.length,
       );
       qc.invalidateQueries({ queryKey: intimacoesKeys.detail(intimacaoId) });

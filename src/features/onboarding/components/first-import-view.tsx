@@ -19,7 +19,7 @@ export function FirstImportView() {
         </>
       }
     >
-      <div className="mx-auto w-full max-w-[760px] space-y-5 px-4 py-7 sm:px-8">
+      <div className="mx-auto flex w-full max-w-[760px] flex-col gap-5 px-4 py-7 sm:px-8">
         {step === "access" ? (
           <ImportPreparation onContinue={() => setStep("oab")} />
         ) : (

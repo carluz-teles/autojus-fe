@@ -2,6 +2,8 @@
 
 import { Check, X } from "lucide-react";
 
+import { IconAction } from "@/components/ui/icon-action";
+
 import type { useInvite } from "../../hooks/use-invite";
 
 // Modal "Convidar membro" (port de Atjus - Convite.dc.html): compondo (e-mail +
@@ -16,7 +18,7 @@ export function InviteModal({ inv }: { inv: ReturnType<typeof useInvite> }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="border-line bg-panel w-[460px] max-w-full overflow-hidden rounded-2xl border shadow-[0_24px_64px_oklch(0.27_0.012_200/26%)]"
+        className="surface-panel w-[460px] max-w-full overflow-hidden rounded-2xl"
       >
         <div className="border-line2 flex items-start justify-between gap-3 border-b px-[22px] pt-[18px] pb-3.5">
           <div>
@@ -25,12 +27,12 @@ export function InviteModal({ inv }: { inv: ReturnType<typeof useInvite> }) {
             </div>
             <p className="text-fg3 mt-[3px] text-[12px]">{inv.sub}</p>
           </div>
-          <button
+          <IconAction
+            label="Fechar convite"
+            icon={X}
             onClick={inv.fechar}
-            className="text-fg3 hover:bg-hover grid size-7 flex-none place-items-center rounded-[7px]"
-          >
-            <X className="size-4" strokeWidth={1.8} />
-          </button>
+            className="pointer-coarse:size-11"
+          />
         </div>
 
         {inv.enviado ? (
@@ -97,12 +99,12 @@ export function InviteModal({ inv }: { inv: ReturnType<typeof useInvite> }) {
                       className="border-line bg-bg inline-flex items-center gap-[7px] rounded-full border py-[5px] pr-[6px] pl-[11px] text-[12px]"
                     >
                       {c.email}
-                      <button
+                      <IconAction
+                        label={`Remover convite para ${c.email}`}
+                        icon={X}
                         onClick={c.rm}
-                        className="text-fg3 hover:bg-hover grid size-4 place-items-center rounded"
-                      >
-                        <X className="size-[11px]" strokeWidth={2.2} />
-                      </button>
+                        className="size-9 rounded-full pointer-coarse:size-11"
+                      />
                     </span>
                   ))}
                 </div>
@@ -149,13 +151,20 @@ export function InviteModal({ inv }: { inv: ReturnType<typeof useInvite> }) {
                 </span>
                 <button
                   onClick={inv.toggleProto}
-                  className="relative h-[18px] w-[34px] flex-none rounded-full border-none"
-                  style={{ background: inv.protoTrilho }}
+                  type="button"
+                  aria-label="Pode protocolar"
+                  aria-pressed={inv.protoKnob !== "translateX(0)"}
+                  className="relative grid size-[34px] flex-none place-items-center rounded-full border-none bg-transparent p-0 pointer-coarse:size-11"
                 >
                   <span
-                    className="absolute top-0.5 left-0.5 size-3.5 rounded-full bg-white transition-transform duration-150"
-                    style={{ transform: inv.protoKnob }}
-                  />
+                    className="relative block h-[18px] w-[34px] rounded-full"
+                    style={{ background: inv.protoTrilho }}
+                  >
+                    <span
+                      className="absolute top-0.5 left-0.5 size-3.5 rounded-full bg-white transition-transform duration-150"
+                      style={{ transform: inv.protoKnob }}
+                    />
+                  </span>
                 </button>
               </div>
 

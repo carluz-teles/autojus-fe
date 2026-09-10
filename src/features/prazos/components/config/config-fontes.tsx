@@ -17,12 +17,9 @@ import { ConfigTribunais } from "./config-tribunais";
 // Cards de resumo (rótulo / valor grande / sublinha) usados em Termos e Ingestões.
 function ResumoCards({ cards }: { cards: ResumoCard[] }) {
   return (
-    <div className="mb-[18px] flex gap-2.5">
+    <div className="mb-[18px] grid grid-cols-1 gap-2.5 sm:grid-cols-3">
       {cards.map((r) => (
-        <div
-          key={r.rot}
-          className="border-line bg-panel flex-1 rounded-xl border px-[15px] py-[13px]"
-        >
+        <div key={r.rot} className="surface-panel min-w-0 px-[15px] py-[13px]">
           <div className="text-fg3 mb-[5px] text-[11px]">{r.rot}</div>
           <div className="font-display text-[22px] leading-none font-medium tabular-nums">
             {r.val}
@@ -37,7 +34,7 @@ function ResumoCards({ cards }: { cards: ResumoCard[] }) {
 // Linhas de esqueleto durante o carregamento das listas.
 function Skeleton({ linhas }: { linhas: number }) {
   return (
-    <div className="border-line bg-panel overflow-hidden rounded-xl border">
+    <div className="surface-panel overflow-hidden">
       {Array.from({ length: linhas }).map((_, i) => (
         <div
           key={i}
@@ -55,7 +52,7 @@ function Skeleton({ linhas }: { linhas: number }) {
 
 function Vazio({ texto }: { texto: string }) {
   return (
-    <div className="border-line bg-panel text-fg3 rounded-xl border px-4 py-8 text-center text-[12.5px]">
+    <div className="surface-panel text-fg3 px-4 py-8 text-center text-[12.5px]">
       {texto}
     </div>
   );
@@ -117,7 +114,7 @@ export function ConfigFontes({
             </p>
             <button
               onClick={fon.toggleAddTermo}
-              className="bg-primary text-primary-foreground flex flex-none items-center gap-1.5 rounded-lg border-none px-3.5 py-2 text-[12.5px] font-medium"
+              className="bg-primary text-primary-foreground flex min-h-9 flex-none items-center gap-1.5 rounded-lg border-none px-3.5 py-2 text-[12.5px] font-medium pointer-coarse:min-h-11"
             >
               <Plus className="size-3.5" strokeWidth={2} />
               Adicionar termo
@@ -125,7 +122,7 @@ export function ConfigFontes({
           </div>
 
           {fon.addAberto ? (
-            <div className="border-line bg-panel mb-[18px] flex flex-wrap items-center gap-2 rounded-xl border p-3">
+            <div className="surface-inset mb-[18px] flex flex-wrap items-center gap-2 p-3">
               <OabInput
                 autoFocus
                 value={fon.addValor}
@@ -138,7 +135,7 @@ export function ConfigFontes({
               <button
                 onClick={fon.addTermoSubmit}
                 disabled={fon.addTermoAdicionando}
-                className="bg-primary text-primary-foreground flex-none rounded-[9px] px-4 py-2.5 text-[12.5px] font-medium disabled:opacity-50"
+                className="bg-primary text-primary-foreground flex min-h-9 flex-none items-center rounded-[9px] px-4 py-2.5 text-[12.5px] font-medium disabled:opacity-50 pointer-coarse:min-h-11"
               >
                 {fon.addTermoAdicionando ? "Adicionando…" : "Adicionar"}
               </button>
@@ -155,7 +152,7 @@ export function ConfigFontes({
               {fon.termos.length === 0 ? (
                 <Vazio texto="Nenhuma OAB monitorada. Adicione um termo para começar a capturar." />
               ) : (
-                <div className="border-line bg-panel overflow-hidden rounded-xl border">
+                <div className="surface-panel overflow-hidden">
                   <div className="border-line2 bg-hover flex items-center gap-3 border-b px-4 py-2">
                     <span className="text-fg3 flex-1 text-[10.5px] font-medium tracking-[0.04em] uppercase">
                       Termo
@@ -195,7 +192,10 @@ export function ConfigFontes({
                         {t.cap}
                       </span>
                       <span className="flex w-[74px] flex-none justify-end">
-                        <ConfigToggle toggle={t.toggle} />
+                        <ConfigToggle
+                          toggle={t.toggle}
+                          label={`Alternar captura para ${t.valor}`}
+                        />
                       </span>
                     </div>
                   ))}
@@ -226,7 +226,7 @@ export function ConfigFontes({
               {fon.ingestoes.length === 0 ? (
                 <Vazio texto="Nenhuma varredura registrada ainda." />
               ) : (
-                <div className="border-line bg-panel overflow-hidden rounded-xl border">
+                <div className="surface-panel overflow-hidden">
                   <div className="border-line2 bg-hover flex items-center gap-3 border-b px-4 py-2">
                     <span className="text-fg3 flex-1 text-[10.5px] font-medium tracking-[0.04em] uppercase">
                       Varredura
