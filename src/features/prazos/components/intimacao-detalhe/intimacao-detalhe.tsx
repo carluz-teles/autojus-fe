@@ -296,21 +296,6 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
             <PainelPrazo det={det} />
           </aside>
           <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-2">
-            {m.resumo ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>
-                    <h2>O que foi determinado</h2>
-                  </CardTitle>
-                  <CardDescription>
-                    Resumo sugerido · confira o documento original.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm leading-relaxed">{m.resumo}</p>
-                </CardContent>
-              </Card>
-            ) : null}
             <Card id="teor-intimacao" className="scroll-mt-6">
               <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-2">

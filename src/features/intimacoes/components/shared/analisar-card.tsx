@@ -13,17 +13,20 @@
 //
 // Layout da seção "Providências" segue docs/design-card-providencias-v2.md (v2.1) —
 // fonte de verdade LITERAL (extraída do .dc.html canônico), substitui INTEIRAMENTE a
-// v1. `ProvidenciasLinhaLegal`, `ProvidenciasBanner` e `ComoIALeuCard` são exportados
-// porque também são consumidos por IntimacaoDetalhe (features/prazos) — o card
-// "Providências" de lá tem seu próprio header (não reusa <AnalisarCard/> inteiro),
-// mas usa os MESMOS blocos internos, pra não duplicar a heurística de
-// selo/confiança em dois lugares (Regra nº1).
+// v1. `ProvidenciasLinhaLegal` e `ProvidenciasBanner` são exportados porque também
+// são consumidos por IntimacaoDetalhe (features/prazos) — o card "Providências" de lá
+// tem seu próprio header (não reusa <AnalisarCard/> inteiro), mas usa os MESMOS blocos
+// internos, pra não duplicar a heurística de selo/confiança em dois lugares (Regra nº1).
 //
 // v2.1 (correção do usuário): a trilha "1·Ato / 2·Prazo / 3·Providências" foi
 // removida por decisão explícita, mesmo estando no .dc.html original —
 // `ProvidenciasLinhaLegal` (ex-`ProvidenciasBreadcrumb`) hoje só renderiza a linha
-// de detalhe legal. E "Como a IA leu" deixou de ser um card novo separado do card
-// "Análise" — é o MESMO card (ver `ComoIALeuCard`, corpo = `ai_summary` real).
+// de detalhe legal.
+//
+// 2026-09: o BE parou de gerar o resumo "O que aconteceu" (ai_summary sempre "").
+// O card pós-análise mostra as Providências diretamente — sem resumo, sem modo
+// degradado. O antigo card de leitura do teor (que só renderizava o resumo) foi
+// removido junto.
 //
 // Mapeamento de tokens do mock pro nosso design system: onde o .dc.html usa
 // `var(--accent)` para ênfase (ícone, "Criar todas", borda do "Gerar minuta", label
@@ -55,7 +58,6 @@ import {
   useIntimacaoDetalhe,
 } from "../../hooks/use-intimacoes";
 import type { IntimacaoDetalheView, IntimacaoProvidencia } from "../../types";
-import { EyebrowTitle } from "./eyebrow-title";
 
 /** Rótulo em PT do tipo de providência — fallback quando o action_item não tem
  *  `title` persistido (itens anteriores à migração 0090, ou análise degradada). */
@@ -69,40 +71,6 @@ const TIPO_LABEL: Record<string, string> = {
 
 function rotuloTipo(tipo: string): string {
   return TIPO_LABEL[tipo] ?? tipo;
-}
-
-/**
- * Heurística de confiança da classificação do ato — usada tanto na cor da
- * pílula "1 · Ato" do breadcrumb quanto no rótulo `{{ atoConf }}` do card "Como
- * a IA leu" (docs/design-card-providencias-v2.md §2 e §6: a doc pede a MESMA
- * derivação nos dois pontos). Cobre só os 2 casos reais do pipeline hoje:
- *  • ALGUM action_item com tipo_origem="ia" → "IA · confiança {média}%" (média
- *    das `confianca` desses itens, arredondada) — cor var(--primary).
- *  • senão (100% declarado, ou reclassificado manualmente sem nenhum item de
- *    origem IA sobrando) → "Declarado na intimação" — cor var(--green).
- * O terceiro caso do mock ("Divergente · revisar") é conceito do Motor de
- * Prazos pro PRAZO, não pro Ato, e não existe neste ponto do pipeline — omitido
- * de propósito (ver v2 §6), não é um esquecimento.
- */
-function atoConfianca(itens: IntimacaoProvidencia[]): {
-  label: string;
-  cor: string;
-} {
-  const inferidos = itens.filter((p) => p.tipo_origem === "ia");
-  if (inferidos.length > 0) {
-    const confiancas = inferidos
-      .map((p) => p.confianca)
-      .filter((c): c is number => c != null);
-    const media =
-      confiancas.length > 0
-        ? Math.round(
-            (confiancas.reduce((soma, c) => soma + c, 0) / confiancas.length) *
-              100,
-          )
-        : 0;
-    return { label: `confiança ${media}%`, cor: "var(--primary)" };
-  }
-  return { label: "Declarado na intimação", cor: "var(--green)" };
 }
 
 /**
@@ -232,91 +200,13 @@ export function ProvidenciasBanner({
 }
 
 /**
- * Card "Como a IA leu" (coluna secundária, docs/design-card-providencias-v2.md
- * §6, v2.1 — correção do usuário). Este é o MESMO card "Análise" que já
- * existia (mostrava só `ai_summary`) — não um card novo separado: aqui ele
- * ganha o visual accent/primary do `.dc.html` (label "LEITURA DO TEOR" + ato em
- * serif + confiança à direita) por cima do corpo real. O corpo é o `ai_summary`
- * de verdade (prop `resumo`). Some quando ainda não há providências. Traz o botão
- * "Confirmar tipo" (POST /confirmar) quando alguma providência do lote ainda está
- * com o gate de tipo em "a_confirmar" — é o gate de TIPO, separado do "Iniciar
- * providência" (que roda por linha). Ver `atoConfianca` pra heurística de confiança.
- */
-export function LeituraDoTeorCard({
-  intimacaoId,
-  ato,
-  resumo,
-  itens,
-}: {
-  intimacaoId: string;
-  ato: string;
-  resumo: string;
-  itens: IntimacaoProvidencia[];
-}) {
-  const confirmar = useConfirmarActionItem(intimacaoId);
-  if (itens.length === 0) return null;
-  const conf = atoConfianca(itens);
-  const aConfirmar = itens.filter((p) => p.tipo_status === "a_confirmar");
-
-  const onConfirmarTipo = () => {
-    for (const p of aConfirmar) {
-      confirmar.mutate(p.id, {
-        onError: () =>
-          toast.error("Não foi possível confirmar o tipo. Tente novamente."),
-      });
-    }
-  };
-
-  return (
-    <div
-      className="rounded-xl border px-4 py-3.5 shadow-sm"
-      style={{
-        borderColor: "color-mix(in oklch, var(--primary) 26%, transparent)",
-        background: "color-mix(in oklch, var(--primary) 5%, transparent)",
-      }}
-    >
-      <div className="flex items-center gap-2">
-        <span className="text-primary text-[11px] font-semibold tracking-[0.03em] uppercase">
-          Leitura do teor
-        </span>
-        <span className="text-fg3 ml-auto font-mono text-[10.5px]">
-          {conf.label}
-        </span>
-      </div>
-      <p className="font-display mt-2 mb-1 text-[16px]">{ato || "—"}</p>
-      <p className="text-fg2 text-[11.5px] leading-relaxed">{resumo}</p>
-      {aConfirmar.length > 0 ? (
-        <Button
-          size="sm"
-          onClick={onConfirmarTipo}
-          disabled={confirmar.isPending}
-          className="mt-3"
-          style={{ background: "var(--primary)" }}
-        >
-          {confirmar.isPending ? (
-            <Loader2
-              data-icon="inline-start"
-              className="animate-spin"
-              strokeWidth={2.2}
-            />
-          ) : (
-            <Check data-icon="inline-start" strokeWidth={2.2} />
-          )}
-          Confirmar tipo
-        </Button>
-      ) : null}
-    </div>
-  );
-}
-
-/**
  * Card central de análise. Três estados:
  *  • LOADING (mutation em voo): spinner + linha de status + 3 skeletons.
  *  • PRÉ (ai_analyzed_at == null): CTA "Gerar análise".
- *  • PÓS (ai_analyzed_at != null): "O QUE ACONTECEU" (resumo) + seção "Providências"
- *    (por status de trabalho SUGGESTED→TODO→WORKING→DONE — ver ProvidenciaRow pros
- *    estados de cada uma) + rodapé de proveniência + "Gerar novamente". Resumo vazio =
- *    modo degradado.
+ *  • PÓS (ai_analyzed_at != null): seção "Providências" (por status de trabalho
+ *    SUGGESTED→TODO→WORKING→DONE — ver ProvidenciaRow pros estados de cada uma) +
+ *    rodapé de proveniência + "Gerar novamente". Análise sem providência é legítima
+ *    (mostra uma linha graciosa), não é erro.
  * O botão dispara useAnalisarIntimacao(id) → estado LOADING; erro → toast + alerta.
  */
 export function AnalisarCard({
@@ -355,8 +245,8 @@ export function AnalisarCard({
           Analisar esta intimação
         </h3>
         <p className="text-muted-foreground mt-2 max-w-[400px] text-[13.5px] leading-relaxed text-pretty">
-          Leitura do teor da publicação para gerar o resumo do que aconteceu e
-          as providências a cumprir. Você revisa antes de iniciar cada uma.
+          Leitura do teor da publicação para identificar as providências a
+          cumprir. Você revisa antes de iniciar cada uma.
         </p>
         {analisar.isError ? (
           <p role="alert" className="text-destructive mt-4 text-[13px]">
@@ -371,57 +261,39 @@ export function AnalisarCard({
     );
   }
 
-  // Pós-análise. Modo degradado = analisada mas summary vazio.
-  const degradado = !i.ai_summary?.trim();
-  // Providências (action_item), endereçadas por id.
+  // Pós-análise. Providências (action_item), endereçadas por id.
   const itens = i.ai_providencias;
 
   return (
     <section className="surface-panel px-5 py-5 sm:px-6 sm:py-6">
-      {degradado ? (
-        <p
-          role="alert"
-          className="text-muted-foreground text-[14px] leading-relaxed"
-        >
-          Análise indisponível no momento. Tente novamente.
-        </p>
+      {itens.length > 0 ? (
+        <div className="border-line bg-panel overflow-hidden rounded-xl border shadow-sm">
+          <div className="border-line2 flex items-center gap-2 border-b px-4 pt-3.5 pb-3">
+            <Sparkles className="text-primary size-4" strokeWidth={1.8} />
+            <span className="text-foreground text-[13px] font-semibold">
+              Providências
+            </span>
+            <span className="text-fg3 text-[11.5px]">
+              revise antes de iniciar
+            </span>
+            <span className="text-fg3 ml-auto font-mono text-[11px]">
+              {itens.length}
+            </span>
+          </div>
+
+          <ProvidenciasLinhaLegal intimacao={i} />
+          <ProvidenciasBanner intimacao={i} itens={itens} />
+
+          <ul>
+            {itens.map((p) => (
+              <ProvidenciaRow key={p.id} intimacaoId={i.id} providencia={p} />
+            ))}
+          </ul>
+        </div>
       ) : (
-        <>
-          <EyebrowTitle>O que aconteceu</EyebrowTitle>
-          <p className="text-foreground/90 mt-2.5 text-[14px] leading-relaxed">
-            {i.ai_summary}
-          </p>
-
-          {itens.length > 0 ? (
-            <div className="border-line bg-panel mt-7 overflow-hidden rounded-xl border shadow-sm">
-              <div className="border-line2 flex items-center gap-2 border-b px-4 pt-3.5 pb-3">
-                <Sparkles className="text-primary size-4" strokeWidth={1.8} />
-                <span className="text-foreground text-[13px] font-semibold">
-                  Providências
-                </span>
-                <span className="text-fg3 text-[11.5px]">
-                  revise antes de iniciar
-                </span>
-                <span className="text-fg3 ml-auto font-mono text-[11px]">
-                  {itens.length}
-                </span>
-              </div>
-
-              <ProvidenciasLinhaLegal intimacao={i} />
-              <ProvidenciasBanner intimacao={i} itens={itens} />
-
-              <ul>
-                {itens.map((p) => (
-                  <ProvidenciaRow
-                    key={p.id}
-                    intimacaoId={i.id}
-                    providencia={p}
-                  />
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </>
+        <p className="text-muted-foreground text-[14px] leading-relaxed">
+          Nenhuma providência sugerida para esta intimação.
+        </p>
       )}
 
       <div className="border-border/70 mt-6 flex flex-wrap items-center justify-between gap-3 border-t pt-4">

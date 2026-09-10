@@ -234,13 +234,12 @@ export interface IntimacaoAnaliseCandidate {
 
 /**
  * Resposta de POST /v1/intimacoes/:id/analise — a análise IA recém-gerada.
- * Espelha o IntimacaoAnaliseView do BE. summary vazio (com analyzed_at preenchido) = modo
- * degradado (IA indisponível). `providencias` são candidatos EFÊMEROS (ver
- * `IntimacaoAnaliseCandidate`) — NÃO confundir com `ai_providencias` do detalhe
+ * Espelha o IntimacaoAnaliseView do BE. O `summary` foi descontinuado no BE
+ * (2026-09) e não vem mais nesta resposta. `providencias` são candidatos EFÊMEROS
+ * (ver `IntimacaoAnaliseCandidate`) — NÃO confundir com `ai_providencias` do detalhe
  * (que é a view persistida, materializada assincronamente após esta resposta).
  */
 export interface IntimacaoAnalise {
-  summary: string;
   providencias: IntimacaoAnaliseCandidate[];
   /** ISO timestamp de quando a análise foi (re)gerada. */
   analyzed_at: string;
@@ -288,10 +287,8 @@ export interface IntimacaoDetalheView extends IntimacaoView {
   history: IntimacaoHistoryEntry[];
 
   // ── Análise IA (card "Analisar esta intimação") ──
-  /**
-   * Resumo "O que aconteceu" (ai_summary, omitempty no BE). undefined/"" com
-   * ai_analyzed_at preenchido = modo degradado (IA indisponível).
-   */
+  // deprecated: BE always returns ""; no longer rendered (2026-09). O campo segue
+  // no shape porque o BE ainda o devolve (vazio), mas o FE não o consome.
   ai_summary?: string;
   /** Providências PERSISTIDAS (action_item) — sempre array (nunca null); vazio
    *  antes da análise ou enquanto a materialização assíncrona não rodou ainda
@@ -299,7 +296,7 @@ export interface IntimacaoDetalheView extends IntimacaoView {
   ai_providencias: IntimacaoProvidencia[];
   /**
    * ISO timestamp da última análise IA; null = pré-análise (o card mostra o CTA);
-   * preenchido = pós-análise (o card mostra resumo + providências).
+   * preenchido = pós-análise (o card mostra as providências).
    */
   ai_analyzed_at: string | null;
 }
