@@ -85,14 +85,20 @@ Os exemplos são estáticos, fictícios e identificados como demonstração. Nen
 
 ## Implementação e acesso
 
-- Rota pública: `/lp`. A raiz `/` continua abrindo as notificações autenticadas.
+- Rota pública: `/`. A central autenticada fica em `/notificacoes`; `/lp` redireciona permanentemente para a raiz.
 - A página usa Server Components para o conteúdo, com interatividade limitada ao menu, à demonstração da plataforma e aos exemplos do chat.
 - Os providers Clerk/React Query foram limitados aos layouts da plataforma, autenticação, convite, onboarding e desenvolvimento. A LP não precisa de chaves Clerk nem do backend para carregar.
-- O proxy libera somente `/lp` e seus descendentes de metadados. As rotas da plataforma mantêm o middleware existente.
+- O proxy libera somente a raiz exata e os arquivos públicos de descoberta. As rotas da plataforma, incluindo `/notificacoes`, mantêm o middleware existente.
 - CSS adicional limitado ao namespace `.lp`; preferência por movimento reduzido, menu acessível, abas com teclado, links semânticos e disclosures nativos.
 - Os CTAs de criação de conta e entrada apontam para `/sign-up` e `/sign-in`. O funcionamento da autenticação requer a configuração Clerk habitual; a tarefa não provisiona contas ou serviços externos.
 
-## Validação inicial — 09/09/2026
+## Migração para a raiz — 11/09/2026
+
+A LP passou para `/`, com canonical, Open Graph, sitemap e links do llms na raiz do domínio. O caminho antigo `/lp` redireciona com HTTP 308. Notificações passou para `/notificacoes`, preservando a autenticação, menu, contador e retorno de onboarding. Login e cadastro usam esse destino como fallback, preservando URLs explícitas de retorno. Os atalhos de início do trabalho apontam para Triagem e Intimações.
+
+Validação da migração: build, lint e formatação aprovados; 408 testes em 53 arquivos. No Chromium, `/` retornou HTTP 200, `/lp` retornou 308 preservando query e fragmento, as demonstrações e o menu móvel funcionaram e não houve overflow em cinco larguras. As rotas `/processos` e `/notificacoes` continuam exigindo a configuração Clerk; não houve autenticação real nesta validação.
+
+## Validação inicial — 09/09/2026 (antes da migração)
 
 - Build de produção: passou; `/lp` é gerada estaticamente.
 - Suíte completa: 32 arquivos, 232 testes aprovados, incluindo a fronteira de autenticação.

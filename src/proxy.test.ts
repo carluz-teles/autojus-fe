@@ -21,10 +21,8 @@ describe("public marketing boundary", () => {
   });
 
   it.each([
-    "/lp",
-    "/lp/",
-    "/lp?preview=true",
-    "/lp/opengraph-image",
+    "/",
+    "/?preview=true",
     "/robots.txt",
     "/sitemap.xml",
     "/llms.txt",
@@ -40,8 +38,12 @@ describe("public marketing boundary", () => {
   });
 
   it.each([
-    "/",
+    "/notificacoes",
+    "/notificacoes?tab=unread",
     "/processos",
+    "/onboarding",
+    "/lp/processos",
+    "/lp/opengraph-image",
     "/lp-private",
     "/lpreview",
     "/api/lp",

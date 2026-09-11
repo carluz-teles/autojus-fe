@@ -31,14 +31,14 @@ export function getLandingSite() {
 
   return {
     origin: url.origin,
-    canonical: `${url.origin}/lp`,
+    canonical: `${url.origin}/`,
     indexable: process.env.NODE_ENV === "production",
   };
 }
 
 export function getLlmsText() {
   const { origin } = getLandingSite();
-  const page = `${origin ?? ""}/lp`;
+  const page = `${origin ?? ""}/`;
 
   return `# AtJud
 

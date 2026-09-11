@@ -31,6 +31,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useUnreadNotifications } from "@/features/notifications/use-notifications";
 import { useTriagemCount } from "@/features/triagem/hooks/use-triagem";
+import { APP_HOME_PATH } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 import { NAV_SECTIONS } from "./nav-config";
@@ -169,7 +170,7 @@ function SidebarFrame({
                   count={
                     item.href === "/triagem"
                       ? triagemCount
-                      : item.href === "/"
+                      : item.href === APP_HOME_PATH
                         ? unreadCount
                         : undefined
                   }
@@ -245,7 +246,7 @@ function MobileNavigation({
                     count={
                       item.href === "/triagem"
                         ? triagemCount
-                        : item.href === "/"
+                        : item.href === APP_HOME_PATH
                           ? unreadCount
                           : undefined
                     }
@@ -289,9 +290,7 @@ function NavItemLink({
   preview?: boolean;
 }) {
   const pathname = usePathname();
-  const target = preview
-    ? `/dev/fluxo${href === "/" ? "/notificacoes" : href}`
-    : href;
+  const target = preview ? `/dev/fluxo${href}` : href;
   const active =
     pathname === target ||
     pathname.startsWith(`${target}/`) ||

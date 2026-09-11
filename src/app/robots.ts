@@ -10,9 +10,12 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: [
+        "/$",
+        "/?",
+        // Let crawlers discover the permanent redirect from the previous URL.
         "/lp$",
         "/lp?",
-        "/lp/",
+        "/lp/$",
         "/_next/",
         "/atjud-mark.svg$",
         "/llms.txt$",

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { OnboardingFlow } from "@/features/onboarding/components/onboarding-flow";
 import type { Me } from "@/features/onboarding/types";
 import { apiFetch } from "@/lib/api/client";
+import { APP_HOME_PATH } from "@/lib/routes";
 
 // Rota acessível a usuário autenticado SEM org (o proxy exige só sessão). Fica
 // fora do grupo (app), portanto sem o shell nem o gating de org. Experiência
@@ -23,7 +24,7 @@ export default async function OnboardingPage() {
       completed = false;
     }
   }
-  if (completed) redirect("/");
+  if (completed) redirect(APP_HOME_PATH);
 
   return <OnboardingFlow />;
 }

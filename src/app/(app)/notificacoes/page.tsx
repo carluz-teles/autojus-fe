@@ -1,6 +1,7 @@
-import { redirect } from "next/navigation";
+import { NotificationsPage } from "@/features/notifications/notifications-page";
 
-// Preserve links to the former standalone center; the home is now canonical.
-export default function NotificationsRedirect() {
-  redirect("/");
+export const metadata = { title: "Notificações · Atjus" };
+
+export default function NotificationsPageRoute() {
+  return <NotificationsPage />;
 }

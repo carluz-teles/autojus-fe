@@ -29,10 +29,9 @@ const publicDiscoveryPaths = new Set([
 
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
   // Marketing is public and can render without Clerk or a backend connection.
-  // Match only this page and its metadata, never similarly prefixed app routes.
+  // The public home is exact: every application route still goes through Clerk.
   if (
-    request.nextUrl.pathname === "/lp" ||
-    request.nextUrl.pathname.startsWith("/lp/") ||
+    request.nextUrl.pathname === "/" ||
     publicDiscoveryPaths.has(request.nextUrl.pathname)
   ) {
     return NextResponse.next();

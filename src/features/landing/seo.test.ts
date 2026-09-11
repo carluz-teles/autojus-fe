@@ -20,7 +20,7 @@ describe("landing page discovery", () => {
     });
     expect(sitemap()).toEqual([]);
     expect(robots()).toEqual({ rules: { userAgent: "*", disallow: "/" } });
-    expect(getLlmsText()).toContain("[Landing page do AtJud](/lp)");
+    expect(getLlmsText()).toContain("[Landing page do AtJud](/)");
     expect(getLlmsText()).not.toMatch(/localhost|trycloudflare|undefined|null/);
   });
 
@@ -37,20 +37,20 @@ describe("landing page discovery", () => {
     vi.stubEnv("NODE_ENV", "production");
     expect(getLandingSite()).toEqual({
       origin: "https://atjud.example",
-      canonical: "https://atjud.example/lp",
+      canonical: "https://atjud.example/",
       indexable: true,
     });
-    expect(sitemap()).toEqual([{ url: "https://atjud.example/lp" }]);
+    expect(sitemap()).toEqual([{ url: "https://atjud.example/" }]);
     expect(robots()).toMatchObject({
       rules: {
         userAgent: "*",
         disallow: "/",
-        allow: expect.arrayContaining(["/lp$", "/_next/"]),
+        allow: expect.arrayContaining(["/$", "/_next/"]),
       },
       sitemap: "https://atjud.example/sitemap.xml",
     });
     expect(getLlmsText()).toContain(
-      "[Landing page do AtJud](https://atjud.example/lp)",
+      "[Landing page do AtJud](https://atjud.example/)",
     );
     expect(getLlmsText()).not.toMatch(
       /\]\([^)]*\/(processos|intimacoes|pecas)/,
