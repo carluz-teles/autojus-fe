@@ -5,15 +5,14 @@ import {
   CheckCircle2,
   ExternalLink,
   Landmark,
-  Search,
 } from "lucide-react";
 import { useState } from "react";
 
+import { ToolbarSearch } from "@/components/shell/list-toolbar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { EsajAccess } from "@/features/configuracoes/components/esaj-access";
 import {
@@ -164,19 +163,12 @@ export function ConfigTribunais() {
         conecta o e-SAJ.
       </p>
       {multipleCourts && (
-        <div className="surface-inset flex items-center gap-2 px-3 py-1">
-          <Search
-            className="text-muted-foreground size-4 shrink-0"
-            aria-hidden
-          />
-          <Input
-            aria-label="Buscar tribunal ou sistema"
-            placeholder="Buscar tribunal, estado ou sistema…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-9 min-w-0 border-0 bg-transparent shadow-none"
-          />
-        </div>
+        <ToolbarSearch
+          search={search}
+          onSearch={setSearch}
+          searchLabel="Buscar tribunal ou sistema"
+          placeholder="Buscar tribunal, estado ou sistema…"
+        />
       )}
       {catalog.isError || connections.isError ? (
         <Alert variant="destructive">
