@@ -1,12 +1,7 @@
 import "./globals.css";
 
-import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
-
-import { clerkAppearance } from "@/lib/clerk-appearance";
-
-import { Providers } from "./providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,6 +24,7 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: "jus-assessoria",
   description: "Plataforma de assessoria jurídica automatizada",
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({
@@ -37,15 +33,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider appearance={clerkAppearance}>
-      <html
-        lang="pt-BR"
-        className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
-      >
-        <body className="flex h-full flex-col">
-          <Providers>{children}</Providers>
-        </body>
-      </html>
-    </ClerkProvider>
+    <html
+      lang="pt-BR"
+      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
+    >
+      <body className="flex h-full flex-col">{children}</body>
+    </html>
   );
 }
