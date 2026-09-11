@@ -370,7 +370,7 @@ export function TesesRail({
                         referência indicada.
                       </p>
                     )}
-                    {a.excerpt.trim() ? (
+                    {a.excerpt?.trim() ? (
                       <blockquote className="text-muted-foreground border-primary/20 border-l-2 pl-2 text-xs leading-5 break-words">
                         {a.excerpt}
                       </blockquote>
