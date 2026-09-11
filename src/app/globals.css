@@ -429,8 +429,27 @@
   animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Barra indeterminada do header de streaming (fundamentos chegando). Uma faixa
+   translúcida que varre da esquerda pra direita — fiel ao mock .prog>i. */
+@keyframes theses-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+@utility theses-progress-bar {
+  animation: theses-slide 1.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reveal {
+    animation: none;
+  }
+
+  .theses-progress-bar {
     animation: none;
   }
 

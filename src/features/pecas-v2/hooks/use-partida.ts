@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import type { ActionItemView } from "@/features/action-items/types";
@@ -24,6 +24,7 @@ import {
   getIntimationTheses,
 } from "../services/pecas-v2.service";
 import type { Thesis } from "../types";
+import { useThesesStream } from "./use-theses-stream";
 
 export interface Preparation {
   objective: string;
@@ -118,6 +119,56 @@ export function usePartida(intimacaoId: string) {
     },
     onError: () => toast.error("Não foi possível sugerir fundamentos."),
   });
+
+  // ── Streaming SSE dos fundamentos (aparecem um a um) ───────────────────────
+  // Liga no 1º acesso: a query GET já resolveu e não há tese persistida. Se o
+  // stream cair antes da 1ª tese, `fellBack` desliga o stream e o consumer usa
+  // o POST síncrono. Se cair no meio (≥1 tese), mantém os cards + erro inline.
+  const [fellBack, setFellBack] = useState(false);
+  const noPersisted =
+    thesesQuery.isSuccess && (thesesQuery.data?.length ?? 0) === 0;
+  const streamEnabled = noPersisted && !fellBack && !generate.isPending;
+
+  const onStreamDone = useCallback(
+    (authoritative: Thesis[]) => {
+      // Reconciliação: os cards do stream usam ids locais (`stream-${n}`); a
+      // lista autoritativa traz os ids reais persistidos. Remapeia a SELEÇÃO
+      // por POSIÇÃO — a i-ésima tese selecionada vira o i-ésimo id real.
+      qc.setQueryData(key, authoritative);
+      setSelected((prev) => {
+        if (prev.size === 0) return prev;
+        const next = new Set<string>();
+        authoritative.forEach((t, i) => {
+          const localId = `stream-${i + 1}`;
+          if (prev.has(localId) || prev.has(t.id)) next.add(t.id);
+        });
+        return next;
+      });
+    },
+    // key é derivado de intimacaoId; qc é estável.
+    [qc, intimacaoId], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const onStreamError = useCallback((hadThesis: boolean) => {
+    // Falha pré-1ª-tese → degrada pro POST síncrono (desliga o stream). Falha
+    // mid-stream → mantém os cards; o erro inline vem do próprio state do stream.
+    if (!hadThesis) setFellBack(true);
+  }, []);
+
+  const stream = useThesesStream(intimacaoId, {
+    enabled: streamEnabled,
+    onDone: onStreamDone,
+    onError: onStreamError,
+  });
+
+  // Degradação: quando o stream sinaliza falha pré-1ª-tese, dispara o POST
+  // síncrono uma única vez (o generate cuida do cache + toast de erro).
+  const generateMutate = generate.mutate;
+  const shouldFallback = fellBack && generate.isIdle;
+  useEffect(() => {
+    if (shouldFallback) generateMutate();
+  }, [shouldFallback, generateMutate]);
+
   const create = useMutation({
     mutationFn: async () => {
       const ids = [...selected];
@@ -212,6 +263,20 @@ export function usePartida(intimacaoId: string) {
         })),
       }
     : null;
+  // Fonte das teses a exibir: enquanto o stream está ativo (ou parou no meio com
+  // cards já mostrados), usa a lista incremental do stream; senão a lista
+  // persistida (pós-`done`, ela vira autoritativa via setQueryData).
+  const streamActive = stream.status === "streaming";
+  const streamMidError = stream.status === "error" && stream.theses.length > 0;
+  const useStreamTheses = streamActive || streamMidError;
+  const sourceTheses = useStreamTheses
+    ? stream.theses
+    : (thesesQuery.data ?? []);
+  const theses = sourceTheses.map(
+    (t) =>
+      ({ ...t, state: selected.has(t.id) ? "pending_add" : "off" }) as Thesis,
+  );
+
   return {
     existingDraft: existing.data?.data ?? null,
     resume: () => {
@@ -235,13 +300,16 @@ export function usePartida(intimacaoId: string) {
     setPreparation,
     providencias,
     docs,
-    theses: (thesesQuery.data ?? []).map(
-      (t) =>
-        ({ ...t, state: selected.has(t.id) ? "pending_add" : "off" }) as Thesis,
-    ),
+    theses,
     selectedCount: selected.size,
-    isLoading: thesesQuery.isLoading,
+    // Não mostra o skeleton de "carregando" enquanto o stream vai preenchendo:
+    // o header ao vivo + os cards que chegam já são o feedback.
+    isLoading: thesesQuery.isLoading && !streamActive,
     isError: thesesQuery.isError,
+    // Estado do streaming pro TesesRail (header ao vivo + card fantasma).
+    streaming: streamActive ? { active: true, count: stream.count } : undefined,
+    // Erro mid-stream: mantém os cards e oferece "Tentar novamente" (POST síncrono).
+    streamError: streamMidError,
     toggle: (t: Thesis) =>
       setSelected((prev) => {
         const next = new Set(prev);

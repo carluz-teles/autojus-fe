@@ -15,8 +15,29 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-import type { Thesis } from "../../types";
+import type { Thesis, ThesisConfidence } from "../../types";
 import { ApplyThesisSelection } from "./thesis-selection";
+
+// Chip de confiança (top-right do card): alta=teal, média=dourado, baixa=neutro.
+// Fiel ao mock (.chip.alta/.media/.baixa) — pill uppercase pequeno.
+const CONFIDENCE_CHIP: Record<
+  ThesisConfidence,
+  { label: string; className: string }
+> = {
+  alta: {
+    label: "Alta",
+    className: "bg-primary/15 text-primary",
+  },
+  media: {
+    label: "Média",
+    className: "bg-gold/20 text-gold-foreground",
+  },
+  baixa: {
+    label: "Baixa",
+    className: "bg-muted text-muted-foreground",
+  },
+};
+
 export function TesesRail({
   theses,
   batch,
@@ -30,6 +51,7 @@ export function TesesRail({
   disabled = false,
   pregen,
   onRegenerate,
+  streaming,
 }: {
   theses: Thesis[];
   batch?: {
@@ -52,7 +74,11 @@ export function TesesRail({
   disabled?: boolean;
   pregen?: boolean;
   onRegenerate?: () => void;
+  /** Estado do streaming SSE. `active` liga o header ao vivo + o card fantasma.
+   *  Backward-compat: ausente → comportamento estático de sempre. */
+  streaming?: { active: boolean; count: number };
 }) {
+  const isStreaming = !!streaming?.active;
   const autosCount = theses.filter(
     (t) => t.sourceDocumentId || t.anchors.some((a) => a.documentId),
   ).length;
@@ -68,16 +94,52 @@ export function TesesRail({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="font-display text-xl">Fundamentos sugeridos</h2>
-          {theses.length > 0 && (
-            <p className="text-muted-foreground mt-2 text-xs">
-              {theses.length} {theses.length === 1 ? "sugestão" : "sugestões"} ·{" "}
-              {autosCount}{" "}
-              {autosCount === 1
-                ? "cita documento dos autos"
-                : "citam documentos dos autos"}
-            </p>
+          {isStreaming ? (
+            <>
+              <div
+                role="status"
+                className="text-muted-foreground mt-3 flex items-center gap-2.5 text-xs"
+              >
+                <span
+                  aria-hidden
+                  className="relative inline-flex size-2.5 shrink-0"
+                >
+                  <span className="bg-primary absolute inset-0 rounded-full" />
+                  <span className="bg-primary absolute inset-0 animate-ping rounded-full opacity-60 motion-reduce:animate-none" />
+                </span>
+                <span>
+                  Lendo os autos e gerando fundamentos…{" "}
+                  <span className="text-foreground font-medium tabular-nums">
+                    {streaming?.count ?? 0}
+                  </span>{" "}
+                  {(streaming?.count ?? 0) === 1 ? "encontrado" : "encontrados"}
+                </span>
+              </div>
+              <div
+                aria-hidden
+                className="bg-line2 mt-3.5 h-0.5 overflow-hidden rounded-full"
+              >
+                <span
+                  className="theses-progress-bar block h-full w-2/5 rounded-full"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, transparent, var(--primary), transparent)",
+                  }}
+                />
+              </div>
+            </>
+          ) : (
+            theses.length > 0 && (
+              <p className="text-muted-foreground mt-2 text-xs">
+                {theses.length} {theses.length === 1 ? "sugestão" : "sugestões"}{" "}
+                · {autosCount}{" "}
+                {autosCount === 1
+                  ? "cita documento dos autos"
+                  : "citam documentos dos autos"}
+              </p>
+            )
           )}
         </div>
         {onRegenerate && (
@@ -183,7 +245,7 @@ export function TesesRail({
           Consultando as fontes atualizadas do processo…
         </p>
       )}
-      {!theses.length && !isRegenerating && !isError && (
+      {!theses.length && !isRegenerating && !isError && !isStreaming && (
         <EmptyState
           icon={BookOpen}
           title="Nenhum fundamento sugerido"
@@ -206,11 +268,12 @@ export function TesesRail({
                 grounded: t.grounded,
               },
             ];
+        const chip = t.confidence ? CONFIDENCE_CHIP[t.confidence] : null;
         return (
           <article
             key={t.id}
             className={cn(
-              "flex flex-col gap-3 rounded-xl border p-4 transition-colors",
+              "motion-safe:reveal flex flex-col gap-3 rounded-xl border p-4 transition-colors",
               selected ? "border-primary/25 bg-primary/5" : "bg-card",
             )}
           >
@@ -223,10 +286,20 @@ export function TesesRail({
               />
               <Label
                 htmlFor={`thesis-${t.id}`}
-                className="min-w-0 text-sm leading-5"
+                className="min-w-0 flex-1 text-sm leading-5"
               >
                 {t.label}
               </Label>
+              {chip && (
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
+                    chip.className,
+                  )}
+                >
+                  {chip.label}
+                </span>
+              )}
             </div>
             <p className="text-muted-foreground text-xs leading-5">
               {t.foundation}
@@ -313,6 +386,23 @@ export function TesesRail({
           </article>
         );
       })}
+      {isStreaming && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="border-border text-muted-foreground motion-safe:reveal flex items-center gap-3 rounded-xl border border-dashed p-4 text-xs"
+        >
+          <span
+            aria-hidden
+            className="border-line2 border-t-primary size-3.5 shrink-0 animate-spin rounded-full border-2 motion-reduce:animate-none"
+          />
+          <div className="flex flex-1 flex-col gap-2">
+            <Skeleton className="h-2 w-3/5" />
+            <Skeleton className="h-2 w-11/12" />
+          </div>
+          <span className="shrink-0">consultando os autos…</span>
+        </div>
+      )}
     </div>
   );
 }

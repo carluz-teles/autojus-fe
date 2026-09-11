@@ -278,6 +278,7 @@ export function mapThesisFromApi(api: ThesisAPI): Thesis {
     grounded: !!api.grounded,
     state: (api.state as ThesisState) ?? "off",
     position: api.position ?? 0,
+    confidence: api.confidence,
   };
 }
 

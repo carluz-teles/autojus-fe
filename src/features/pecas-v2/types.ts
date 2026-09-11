@@ -253,6 +253,10 @@ export type QuickActionKind =
  *  de propor (off↔pending_add, included↔pending_remove); o editor aprova. */
 export type ThesisState = "off" | "pending_add" | "included" | "pending_remove";
 
+/** Confiança de uma tese sugerida (força da fundamentação nos autos). Opcional:
+ *  o GET /theses legado pode não expô-la; o stream SSE sempre traz. */
+export type ThesisConfidence = "alta" | "media" | "baixa";
+
 /** Uma tese sugerida pela IA, SEMPRE ancorada em exatamente um documento de
  *  origem (`sourceDocumentId` → item da "Fundada em"). Espelha o wire shape
  *  snake_case do contrato Teses. */
@@ -281,6 +285,8 @@ export interface Thesis {
   state: ThesisState;
   /** Ordem estável. */
   position: number;
+  /** Confiança da sugestão (chip alta/média/baixa). Ausente no GET legado. */
+  confidence?: ThesisConfidence;
 }
 
 /** Um trecho da peça gerada atribuído a uma tese (seção casada por heading). */

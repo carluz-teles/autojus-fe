@@ -120,12 +120,13 @@ export function PartidaPage({ intimacaoId }: { intimacaoId: string }) {
                 theses={h.theses}
                 selectedCount={h.selectedCount}
                 isLoading={h.isLoading}
-                isError={h.isError}
+                isError={h.isError || h.streamError}
                 onToggle={h.toggle}
                 onFonte={fonte}
                 teorSourceId={intimacaoId}
                 isRegenerating={h.isRegenerating || h.isGenerating}
                 onRegenerate={h.regenerate}
+                streaming={h.streaming}
                 pregen
               />
             </>
