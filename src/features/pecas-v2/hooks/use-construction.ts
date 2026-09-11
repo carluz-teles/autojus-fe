@@ -21,7 +21,6 @@ import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
 import type { SagaState, Thesis } from "../types";
 import { useDraft } from "./use-draft";
-import { useGenerationPreparation } from "./use-generation-preparation";
 import { thesesKey, useGenerateDraft, useThesesController } from "./use-theses";
 import { useThesesStream } from "./use-theses-stream";
 
@@ -228,24 +227,6 @@ export function useConstruction(id: string) {
     stage === "pronta" &&
     (saga === "EXTRACTING" || (saga === "CREATED" && firedGenerate));
 
-  const preparationStatus = useGenerationPreparation(
-    id,
-    instructions,
-    theses.selectedIds,
-    JSON.stringify([
-      draftQuery.data?.processDocuments,
-      draftQuery.data?.attachments,
-      draftQuery.data?.updatedAt,
-      theses.theses,
-    ]),
-    stage === "pregen" &&
-      hasTeor &&
-      !theses.isLoading &&
-      !theses.isError &&
-      !theses.isRegenerating &&
-      !theses.isTogglingId,
-  );
-
   // Fonte das teses a exibir: enquanto o stream está ativo (ou parou no meio com
   // cards já mostrados), usa a lista incremental do stream; senão a lista
   // persistida do controller (pós-`done`, ela vira autoritativa via setQueryData).
@@ -291,7 +272,6 @@ export function useConstruction(id: string) {
     fecharAuto,
     gerarMinuta,
     instructions,
-    preparationStatus,
     setInstructions: setInstructionsEdit,
     generationError: generate.error?.message,
     regenerateWithTheses,

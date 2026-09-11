@@ -255,7 +255,6 @@ export function ConstructionPage({ id }: { id: string }) {
           onBack={h.voltar}
         />
         <PreparationCanvas
-          preparationStatus={h.preparationStatus}
           title={draft.title}
           cnj={draft.process.cnj}
           instructions={h.instructions}

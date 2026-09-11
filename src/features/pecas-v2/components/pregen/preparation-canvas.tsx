@@ -25,7 +25,6 @@ interface Props {
   disabled?: boolean;
   busy?: boolean;
   error?: string;
-  preparationStatus?: string;
 }
 
 /** Presentation shared by the real draft flow and the isolated local prototype. */
@@ -41,7 +40,6 @@ export function PreparationCanvas({
   disabled,
   busy,
   error,
-  preparationStatus,
 }: Props) {
   return (
     <section
@@ -110,14 +108,6 @@ export function PreparationCanvas({
                   </FieldDescription>
                 </Field>
               </FieldGroup>
-              {preparationStatus && (
-                <p
-                  role="status"
-                  className="text-muted-foreground text-xs leading-relaxed"
-                >
-                  {preparationStatus}
-                </p>
-              )}
             </div>
             <section
               className="flex flex-col gap-4"
