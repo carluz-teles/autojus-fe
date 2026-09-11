@@ -7,11 +7,12 @@ import { useEffect, useRef } from "react";
 import { PageFrame, ShellBackLink } from "@/components/shell/page-frame";
 import { Button } from "@/components/ui/button";
 import { useActionItemDetalhe } from "@/features/action-items/hooks/use-action-items";
+import { iniciarActionItem } from "@/features/action-items/services/action-items.service";
 import { useApi } from "@/lib/api/use-api";
 
 import { createDraft } from "../../services/pecas-v2.service";
 
-// Both origins open the same construction, with no intermediate preparation form.
+// Both origins resume the same draft; empty drafts open its preparation canvas.
 export function ConstructionEntry({
   actionItemId = "",
   intimationId = "",
@@ -42,14 +43,18 @@ export function ConstructionEntry({
           "A construção de uma peça deve começar por uma intimação. Abra a intimação de origem para continuar.",
         );
       if (item.draft_id) return item.draft_id;
-      if (
-        !["TODO", "WORKING"].includes(item.status) ||
-        !item.gera_peca ||
-        item.tipo_status !== "confiavel"
-      )
+      if (!item.gera_peca || item.tipo_status !== "confiavel")
         throw new Error(
-          "Revise e adicione a providência antes de gerar a peça.",
+          "Revise o tipo da providência antes de gerar a peça.",
         );
+      if (["DONE", "CANCELLED", "DISMISSED"].includes(item.status))
+        throw new Error("Esta providência já foi encerrada.");
+      // Atalho "Criar peça": clicar aqui É concordar com a providência. Se ela ainda
+      // está SUGGESTED, iniciamos (SUGGESTED → TODO) antes de abrir a construção —
+      // sem exigir um passo de curadoria separado. TODO/WORKING já seguem direto.
+      if (item.status === "SUGGESTED") {
+        await iniciarActionItem(api, actionItemId);
+      }
       const result = await createDraft(api, {
         actionItemId,
         intimationId: item.intimation_id,
@@ -59,7 +64,12 @@ export function ConstructionEntry({
       return result.id;
     },
     onSuccess: async (draftId) => {
-      await qc.invalidateQueries({ queryKey: ["action-items"] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["action-items"] }),
+        // O atalho confirmou a providência (SUGGESTED → TODO): invalida a Triagem
+        // para o card refletir o novo status ao voltar.
+        qc.invalidateQueries({ queryKey: ["intimacoes"] }),
+      ]);
       router.replace(`/pecas/${draftId}?retorno=${encodeURIComponent(back)}`);
     },
   });
@@ -94,7 +104,7 @@ export function ConstructionEntry({
             </Button>
           </>
         ) : (
-          <p role="status">Abrindo a construção da peça…</p>
+          <p role="status">Abrindo a peça…</p>
         )}
       </div>
     </PageFrame>

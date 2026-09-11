@@ -82,18 +82,19 @@ export function DataTable<T>({
     typeof total === "number";
 
   return (
-    <div className={cn("flex flex-col", className)}>
+    <div className={cn("flex min-w-0 flex-col", className)}>
       <div
-        className="bg-card overflow-x-auto rounded-xl border shadow-sm"
+        className="surface-panel overflow-x-auto overscroll-x-contain"
         aria-busy={isLoading}
       >
         <table className={cn("w-full text-sm", fixedLayout && "table-fixed")}>
-          <thead className="text-muted-foreground border-b text-left text-xs tracking-wide uppercase">
+          <thead className="bg-muted/30 text-muted-foreground border-b text-left text-[11px] tracking-wide uppercase">
             <tr>
               {hasStatus ? <th className="w-6 px-2 py-3" aria-hidden /> : null}
               {columns.map((col) => (
                 <th
                   key={col.key}
+                  scope="col"
                   style={col.width != null ? { width: col.width } : undefined}
                   className={cn(
                     "px-5 py-3 font-medium",
@@ -108,7 +109,7 @@ export function DataTable<T>({
               ) : null}
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-border/70 divide-y">
             {isLoading ? (
               <StateRow span={span}>{loadingLabel}</StateRow>
             ) : error ? (

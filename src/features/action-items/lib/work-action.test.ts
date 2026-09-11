@@ -23,6 +23,21 @@ function item(overrides: Partial<ActionItemView> = {}): ActionItemView {
 }
 
 describe("primaryWorkAction", () => {
+  it.each(["SUGGESTED", "TODO", "WORKING"] as const)(
+    "bloqueia avanço de %s enquanto a origem aguarda confirmação",
+    (status) => {
+      expect(
+        primaryWorkAction(item({ status, origin_review_required: true })),
+      ).toBe("review-origin");
+    },
+  );
+  it("mantém consulta da peça existente mesmo com revisão pendente", () => {
+    expect(
+      primaryWorkAction(
+        item({ draft_id: "peca-1", origin_review_required: true }),
+      ),
+    ).toBe("open-piece");
+  });
   it("oferece gerar peça para providência ativa, confirmada e ligada à intimação", () => {
     expect(primaryWorkAction(item())).toBe("generate-piece");
   });

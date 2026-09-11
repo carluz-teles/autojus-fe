@@ -62,7 +62,7 @@ export function TabsList({
       role="tablist"
       aria-label={ariaLabel}
       onKeyDown={(e) => {
-        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(e.key)) return;
         const tabs = Array.from(
           e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
         );
@@ -72,7 +72,13 @@ export function TabsList({
         if (current === -1) return;
         e.preventDefault();
         const delta = e.key === "ArrowRight" ? 1 : -1;
-        const next = tabs[(current + delta + tabs.length) % tabs.length];
+        const index =
+          e.key === "Home"
+            ? 0
+            : e.key === "End"
+              ? tabs.length - 1
+              : (current + delta + tabs.length) % tabs.length;
+        const next = tabs[index];
         next.focus();
         next.click();
       }}

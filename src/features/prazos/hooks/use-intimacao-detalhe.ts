@@ -279,7 +279,6 @@ function useModel(i: IntimacaoDetalheView | undefined) {
     const providencias = i.ai_providencias;
 
     const analisada = i.ai_analyzed_at !== null;
-    const degradado = analisada && !i.ai_summary?.trim();
 
     return {
       id: i.id,
@@ -322,10 +321,9 @@ function useModel(i: IntimacaoDetalheView | undefined) {
       prazoCor: prazo.cor,
       fatalData: visivel?.end_date ? formatarData(visivel.end_date) : "",
 
-      // IA (pré vs pós-análise)
+      // IA (pré vs pós-análise) — o resumo "O que aconteceu" foi descontinuado
+      // no BE (2026-09); o pós-análise mostra só as providências.
       analisada,
-      degradado,
-      resumo: i.ai_summary?.trim() ?? "",
       analisadaEm: i.ai_analyzed_at ? formatarData(i.ai_analyzed_at) : "",
       providencias,
 
@@ -474,14 +472,14 @@ export function useIntimacaoDetalhe(id: string) {
     isError: query.isError,
     model,
     // Intimação crua (IntimacaoDetalheView) — além do VM `model`, os blocos
-    // compartilhados do card Providências (ProvidenciasLinhaLegal/Banner,
-    // ComoIALeuCard, em features/intimacoes) esperam o shape real do BE, não a
-    // VM derivada desta tela.
+    // compartilhados do card Providências (ProvidenciasLinhaLegal/Banner, em
+    // features/intimacoes) esperam o shape real do BE, não a VM derivada desta tela.
     intimacao: i,
 
     // IA
     analisando: analisar.isPending || query.materializandoAnalise,
     analiseErro: analisar.isError,
+    analiseTimeout: query.analiseTimeout,
     onAnalisar,
 
     // triagem

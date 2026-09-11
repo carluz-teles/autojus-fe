@@ -17,7 +17,7 @@ export function Dia({ cal }: { cal: CalModel }) {
           {d.allday.length === 1 ? "vencimento" : "vencimentos"} · dia todo
         </span>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-4">
+      <div className="surface-inset m-4 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 sm:p-4">
         {d.allday.map((e) => (
           <EventoCalendario key={e.id} evento={e} />
         ))}

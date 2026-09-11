@@ -183,6 +183,10 @@ export interface ThesisAPI {
   grounded: boolean;
   state: "off" | "pending_add" | "included" | "pending_remove";
   position: number;
+  /** Confiança da sugestão. Ausente no GET legado; o stream SSE sempre traz. */
+  confidence?: "alta" | "media" | "baixa";
+  /** Ordinal do frame no stream (`thesis` event). Só no wire de streaming. */
+  n?: number;
 }
 
 export interface ThesisAnchorAPI {

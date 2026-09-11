@@ -32,14 +32,14 @@ export function InternalDueDate({
       <PopoverTrigger
         disabled={disabled}
         aria-label="Alterar entrega interna"
-        render={<Button variant="outline" className="justify-start" />}
+        render={<Button variant="outline" className="w-full justify-start" />}
       >
         <CalendarDays data-icon="inline-start" />
         {date ? format(date, "dd/MM/yyyy") : "Definir data"}
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-auto max-w-[var(--available-width)]"
+        className="w-auto max-w-[var(--available-width)] p-3"
       >
         <PopoverHeader>
           <PopoverTitle>Entrega interna</PopoverTitle>

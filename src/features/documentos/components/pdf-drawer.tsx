@@ -35,9 +35,9 @@ export function PdfDrawer({
         title={doc?.titulo ?? "Documento"}
         description={doc?.meta}
         eyebrow="Autos · Documento original"
-        className="max-w-[860px]"
+        className="max-w-[960px]"
       >
-        <div className="bg-muted/30 h-full min-h-64 rounded-lg border">
+        <div className="bg-muted/30 h-full min-h-64 overflow-hidden rounded-xl border shadow-inner">
           {loading ? (
             <div
               role="status"

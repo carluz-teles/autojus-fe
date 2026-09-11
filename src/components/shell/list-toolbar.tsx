@@ -1,13 +1,16 @@
 "use client";
 
-import { Search, X } from "lucide-react";
+import { FilterX, type LucideIcon, Search, X } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { FacetedFilter } from "@/components/ui/faceted-filter";
+import { IconAction } from "@/components/ui/icon-action";
 
 interface Filter {
   key: string;
   label: string;
+  /** Ícone da categoria (repassado ao FacetedFilter). */
+  icon?: LucideIcon;
   value: string;
   options: { value: string; label: string }[];
   onChange: (value: string) => void;
@@ -38,30 +41,26 @@ export function ListToolbar({
   return (
     <div
       data-slot="list-toolbar"
-      className="border-line -mt-px flex shrink-0 flex-wrap items-center gap-2 border-y px-4 py-2"
+      className="border-line bg-card/60 -mt-px flex shrink-0 flex-wrap items-center gap-2 border-y px-3 py-2.5 sm:px-4"
     >
-      <div className="border-line bg-panel focus-within:ring-ring/50 flex h-8 w-full min-w-0 items-center gap-2 rounded-lg border px-2.5 focus-within:ring-2 sm:w-[280px]">
-        <Search aria-hidden="true" className="text-fg3 size-3.5 shrink-0" />
-        <input
-          aria-label={searchLabel}
-          type="search"
-          autoComplete="off"
-          placeholder={placeholder}
-          value={search}
-          onChange={(e) => onSearch(e.target.value)}
-          className="placeholder:text-fg3 min-w-0 flex-1 bg-transparent text-[12.5px] outline-none"
-        />
-      </div>
-      <FacetedFilter
-        label="Filtrar"
-        facets={filters}
-        values={Object.fromEntries(filters.map((f) => [f.key, f.value]))}
-        onChange={(key, value) =>
-          filters.find((f) => f.key === key)?.onChange(value)
-        }
-        onClear={onClear}
-        className="h-8 rounded-lg px-2.5 text-[12.5px]"
+      <ToolbarSearch
+        search={search}
+        onSearch={onSearch}
+        searchLabel={searchLabel}
+        placeholder={placeholder}
       />
+      {filters.length > 0 && (
+        <FacetedFilter
+          label="Filtrar"
+          facets={filters}
+          values={Object.fromEntries(filters.map((f) => [f.key, f.value]))}
+          onChange={(key, value) =>
+            filters.find((f) => f.key === key)?.onChange(value)
+          }
+          onClear={onClear}
+          className="h-9"
+        />
+      )}
       {controls}
       {active.length > 0 && (
         <div aria-label="Filtros ativos" className="contents">
@@ -72,19 +71,17 @@ export function ListToolbar({
               onClick={f.remove}
               aria-label={`Remover filtro ${f.label}`}
               title={f.label}
-              className="border-line bg-panel text-fg2 hover:bg-hover focus-visible:ring-ring/50 inline-flex h-8 max-w-full items-center gap-1.5 rounded-lg border pr-2 pl-2.5 text-[12px] outline-none focus-visible:ring-2"
+              className="border-line bg-panel text-fg2 hover:bg-hover focus-visible:ring-ring/50 inline-flex h-8 max-w-full items-center gap-1.5 rounded-lg border pr-2 pl-2.5 text-[12px] outline-none focus-visible:ring-2 [@media(pointer:coarse)]:min-h-11"
             >
               <span className="truncate">{f.label}</span>
               <X aria-hidden="true" className="text-fg3 size-3 shrink-0" />
             </button>
           ))}
-          <button
-            type="button"
+          <IconAction
+            icon={FilterX}
+            label="Limpar todos os filtros"
             onClick={onClear}
-            className="text-fg3 hover:text-fg2 focus-visible:ring-ring/50 h-8 rounded px-1 text-xs underline underline-offset-4 outline-none focus-visible:ring-2"
-          >
-            Limpar filtros
-          </button>
+          />
         </div>
       )}
       {children && (
@@ -92,6 +89,36 @@ export function ListToolbar({
           {children}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Campo de busca canônico (pílula 280px, borda + foco). Fonte única — usado
+ *  pelo ListToolbar e por buscas isoladas fora de uma toolbar (ex.: abas de
+ *  configuração), para o input de busca ficar idêntico em todo o app. */
+export function ToolbarSearch({
+  search,
+  onSearch,
+  searchLabel,
+  placeholder,
+}: {
+  search: string;
+  onSearch: (value: string) => void;
+  searchLabel: string;
+  placeholder: string;
+}) {
+  return (
+    <div className="border-input bg-card focus-within:border-ring focus-within:ring-ring/20 flex h-9 w-full min-w-0 items-center gap-2 rounded-lg border px-3 shadow-xs focus-within:ring-3 sm:w-[280px] [@media(pointer:coarse)]:h-11">
+      <Search aria-hidden="true" className="text-fg3 size-3.5 shrink-0" />
+      <input
+        aria-label={searchLabel}
+        type="search"
+        autoComplete="off"
+        placeholder={placeholder}
+        value={search}
+        onChange={(e) => onSearch(e.target.value)}
+        className="placeholder:text-fg3 min-w-0 flex-1 bg-transparent text-[12.5px] outline-none"
+      />
     </div>
   );
 }

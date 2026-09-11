@@ -1,5 +1,7 @@
 "use client";
 
+import { Bell } from "lucide-react";
+
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -20,7 +22,14 @@ export function NotificationPreferences() {
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h1 className="font-display text-xl font-medium">Notificações</h1>
+        <h1 className="font-display flex items-center gap-2 text-xl font-medium">
+          <Bell
+            aria-hidden
+            className="text-primary size-4 shrink-0"
+            strokeWidth={1.8}
+          />
+          Notificações
+        </h1>
         <p className="text-muted-foreground text-sm">
           Escolha como receber cada atualização. Estas preferências são suas e
           valem para este escritório.
@@ -48,7 +57,7 @@ export function NotificationPreferences() {
           </Button>
         </Alert>
       ) : (
-        <div className="divide-border divide-y border-y">
+        <div className="surface-panel divide-border divide-y overflow-hidden px-4">
           {types.data.data.map((definition) => {
             const channels = preferenceChannels(
               definition,

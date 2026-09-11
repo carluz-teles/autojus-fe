@@ -43,6 +43,7 @@ export function ListSearchToolbar({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
+          aria-label={placeholder}
           className="pr-9 pl-9"
         />
         {value ? (
@@ -50,7 +51,8 @@ export function ListSearchToolbar({
             type="button"
             onClick={() => onChange("")}
             aria-label="Limpar busca"
-            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 absolute top-1/2 right-2.5 flex size-5 -translate-y-1/2 items-center justify-center rounded outline-none focus-visible:ring-2"
+            title="Limpar busca"
+            className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring/50 absolute top-1/2 right-1 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg outline-none focus-visible:ring-2"
           >
             <X className="size-3.5" />
           </button>

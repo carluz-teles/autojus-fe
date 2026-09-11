@@ -4,6 +4,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { FileText, UploadCloud, X } from "lucide-react";
 import { useRef } from "react";
 
+import { IconAction } from "@/components/ui/icon-action";
 import { CERT_ACCEPT } from "@/features/configuracoes/hooks/use-cert-upload";
 
 import type { useCertWizard } from "../../hooks/use-cert-wizard";
@@ -24,7 +25,7 @@ export function CertWizard({ w }: { w: ReturnType<typeof useCertWizard> }) {
     >
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/30" />
-        <Dialog.Popup className="border-line bg-panel fixed top-1/2 left-1/2 z-50 max-h-[90dvh] w-[480px] max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border shadow-xl">
+        <Dialog.Popup className="surface-panel fixed top-1/2 left-1/2 z-50 max-h-[90dvh] w-[480px] max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl">
           <div className="border-line2 flex items-start justify-between gap-3 border-b px-[22px] pt-[18px] pb-3.5">
             <div>
               <Dialog.Title className="text-[16px] font-medium">
@@ -34,14 +35,13 @@ export function CertWizard({ w }: { w: ReturnType<typeof useCertWizard> }) {
                 Envie o arquivo .pfx ou .p12 e informe a senha.
               </Dialog.Description>
             </div>
-            <button
+            <IconAction
+              label="Fechar certificado"
+              icon={X}
               onClick={w.fechar}
               disabled={w.adicionando}
-              className="text-fg3 hover:bg-hover grid size-7 flex-none place-items-center rounded-[7px]"
-            >
-              <span className="sr-only">Fechar certificado</span>
-              <X className="size-4" strokeWidth={1.8} />
-            </button>
+              className="pointer-coarse:size-11"
+            />
           </div>
 
           <div className="px-[22px] py-5">
@@ -95,7 +95,7 @@ export function CertWizard({ w }: { w: ReturnType<typeof useCertWizard> }) {
                   </span>
                   <button
                     onClick={w.trocar}
-                    className="border-line bg-panel text-fg2 hover:bg-hover flex-none rounded-[7px] border px-2.5 py-[5px] text-[11.5px]"
+                    className="border-line bg-panel text-fg2 hover:bg-hover flex min-h-9 flex-none items-center rounded-[7px] border px-2.5 py-[5px] text-[11.5px] pointer-coarse:min-h-11"
                   >
                     Trocar
                   </button>

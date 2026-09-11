@@ -6,7 +6,7 @@
 // de autenticar — sem passar pelo wizard de criação de escritório.
 export function InviteNotice({ mode }: { mode: "sign_up" | "sign_in" }) {
   return (
-    <p className="max-w-sm rounded-xl border border-[color-mix(in_oklch,var(--success)_25%,transparent)] bg-[color-mix(in_oklch,var(--success)_7%,transparent)] p-3.5 text-center text-[13px] leading-relaxed">
+    <p className="surface-inset border-success/25 bg-success/7 max-w-sm p-3.5 text-center text-[13px] leading-relaxed">
       Você foi convidado para um escritório.{" "}
       {mode === "sign_up"
         ? "Crie sua conta para aceitar o convite."

@@ -11,16 +11,18 @@
 // _private: useDraft (saga polling), useThesesController (contrato Teses) e
 // useGenerateDraft (POST /generate).
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { detalheNaFila } from "@/features/intimacoes/lib/fila-navigation";
 import { htmlToText } from "@/lib/html/html-to-text";
 import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
-import type { SagaState } from "../types";
+import type { SagaState, Thesis } from "../types";
 import { useDraft } from "./use-draft";
-import { useGenerateDraft, useThesesController } from "./use-theses";
+import { thesesKey, useGenerateDraft, useThesesController } from "./use-theses";
+import { useThesesStream } from "./use-theses-stream";
 
 /** Estágio do CENTRO da tela — a barra e o rail não mudam entre estágios. */
 export type CenterStage = "pregen" | "gerando" | "pronta" | "falha";
@@ -56,8 +58,55 @@ export function useConstruction(id: string) {
   const draftQuery = useDraft(id);
   const hasOrigin = !!draftQuery.data?.intimation.id;
   const hasTeor = !!htmlToText(draftQuery.data?.intimation.teor || "").trim();
-  const theses = useThesesController(id, hasOrigin && hasTeor);
+  const theses = useThesesController(id);
   const generate = useGenerateDraft(id);
+  const qc = useQueryClient();
+
+  // ── Streaming SSE dos fundamentos da CONSTRUÇÃO (aparecem um a um) ──────────
+  // Espelha o fluxo da partida (use-partida) mas draft-scoped ("pecas/${id}"):
+  // liga no 1º acesso do pregen quando a query GET já resolveu sem tese
+  // persistida. Degrada como a partida — falha pré-1ª-tese → cai no POST
+  // síncrono (regenerate do controller); falha mid-stream → mantém os cards +
+  // "Tentar novamente" (o próprio regenerate). Na `done`, semeia o cache draft-
+  // scoped com a lista autoritativa pra o controller assumir os ids reais.
+  const [streamFellBack, setStreamFellBack] = useState(false);
+  const noPersisted =
+    theses.theses.length === 0 && !theses.isLoading && !theses.isError;
+  const streamEnabled = hasOrigin && hasTeor && noPersisted && !streamFellBack;
+
+  const onStreamDone = useCallback(
+    (authoritative: Thesis[]) => {
+      // A lista autoritativa traz ids reais + state inicial persistido — o
+      // controller (useTheses query) passa a servir dela.
+      qc.setQueryData(thesesKey(id), authoritative);
+    },
+    [qc, id],
+  );
+
+  const onStreamError = useCallback((hadThesis: boolean) => {
+    // Falha pré-1ª-tese → degrada pro POST síncrono (desliga o stream). Falha
+    // mid-stream → mantém os cards; o erro inline vem do state do stream e o
+    // usuário reusa o regenerate.
+    if (!hadThesis) setStreamFellBack(true);
+  }, []);
+
+  const stream = useThesesStream(`pecas/${id}`, {
+    enabled: streamEnabled,
+    onDone: onStreamDone,
+    onError: onStreamError,
+  });
+
+  // Degradação: quando o stream falha pré-1ª-tese, dispara o generate síncrono
+  // do controller (ele cuida do cache). O próprio regenerate dedupa (no-op se já
+  // estiver gerando), e o gate `noPersisted` deixa de valer assim que a lista
+  // chega — então não re-dispara. Espelha o `fellBack && generate.isIdle` da
+  // partida sem um setState extra dentro do efeito.
+  const regenerate = theses.regenerate;
+  const shouldFallback =
+    streamFellBack && noPersisted && !theses.isRegenerating;
+  useEffect(() => {
+    if (shouldFallback) regenerate();
+  }, [shouldFallback, regenerate]);
 
   // Auto (documento dos autos) aberto no drawer: o viewer embute o PDF original
   // (busca os bytes por conta própria via /documentos/:id/raw). Guardamos só a
@@ -73,6 +122,8 @@ export function useConstruction(id: string) {
   const [highlightedDocId, setHighlightedDocId] = useState<string | null>(null);
   // Disparei "Gerar minuta" nesta sessão? Ponte otimista até o saga avançar.
   const [firedGenerate, setFiredGenerate] = useState(false);
+  const [instructionsEdit, setInstructionsEdit] = useState<string | null>(null);
+  const instructions = instructionsEdit ?? draftQuery.data?.instructions ?? "";
 
   const saga = draftQuery.data?.sagaState;
   const generated = saga === "DRAFTED" || saga === "REVIEWED";
@@ -147,9 +198,12 @@ export function useConstruction(id: string) {
     )
       return;
     setFiredGenerate(true);
-    generate.mutate(theses.selectedIds, {
-      onError: () => setFiredGenerate(false),
-    });
+    generate.mutate(
+      { thesisIds: theses.selectedIds, instructions: instructions.trim() },
+      {
+        onError: () => setFiredGenerate(false),
+      },
+    );
   };
 
   const voltar = () =>
@@ -173,19 +227,53 @@ export function useConstruction(id: string) {
     stage === "pronta" &&
     (saga === "EXTRACTING" || (saga === "CREATED" && firedGenerate));
 
+  // Fonte das teses a exibir: enquanto o stream está ativo (ou parou no meio com
+  // cards já mostrados), usa a lista incremental do stream; senão a lista
+  // persistida do controller (pós-`done`, ela vira autoritativa via setQueryData).
+  const streamActive = stream.status === "streaming";
+  const streamMidError = stream.status === "error" && stream.theses.length > 0;
+  // Cinto de segurança: assim que EXISTE tese autoritativa persistida (o controller
+  // já tem a lista — via `done` do stream ou regeneração), a view autoritativa
+  // vence SEMPRE, mesmo que o `stream.status` tenha ficado preso em "streaming"
+  // (ex.: o efeito foi desmontado antes do `done` num teardown do StrictMode). Sem
+  // isto, o header "consultando os autos…" ficava pra sempre com a lista já pronta.
+  const useStreamTheses =
+    (streamActive || streamMidError) && theses.theses.length === 0;
+
+  // thesesView reveste o controller: enquanto streama, mostra os cards do stream
+  // + o header/fantasma ao vivo (prop `streaming`) e suprime o skeleton. TODAS as
+  // ações (toggle/regenerate/selectedIds) seguem apontando pro controller real — a
+  // seleção/geração não muda. Pós-`done` o controller assume (cache semeado), então
+  // isto vira um passthrough puro.
+  const thesesView = useStreamTheses
+    ? {
+        ...theses,
+        theses: stream.theses,
+        // Não pisca o skeleton: o header ao vivo + os cards que chegam já são
+        // o feedback (fiel à UI de streaming já construída).
+        isLoading: false,
+        streaming: streamActive
+          ? { active: true, count: stream.count }
+          : undefined,
+      }
+    : { ...theses, streaming: undefined };
+
   return {
     draft: draftQuery.data,
     regenerating,
     isLoading: draftQuery.isLoading,
     isError: draftQuery.isError,
     stage,
-    theses,
+    theses: thesesView,
     highlightedDocId,
     focusSource,
     verAuto,
     autoDrawer,
     fecharAuto,
     gerarMinuta,
+    instructions,
+    setInstructions: setInstructionsEdit,
+    generationError: generate.error?.message,
     regenerateWithTheses,
     contentEdited: !!draftQuery.data?.contentEdited,
     isGenerating: generate.isPending,

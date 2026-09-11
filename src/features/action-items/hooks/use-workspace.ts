@@ -18,6 +18,35 @@ import type {
   UpdateActionItemInput,
 } from "../types";
 
+export type WorkAction =
+  | "start"
+  | "complete"
+  | "accept"
+  | "accept_completed"
+  | "dismiss"
+  | "cancel"
+  | "reopen";
+
+export interface WorkMutationCommand {
+  id?: string;
+  action?: WorkAction;
+  patch?: UpdateActionItemInput;
+  create?: CreateWorkInput;
+}
+
+export function buildWorkMutationRequest(command: WorkMutationCommand) {
+  const { id, action, patch, create } = command;
+  const legacy =
+    action === "start" ? "comecar" : action === "complete" ? "concluir" : null;
+  return {
+    path: create
+      ? "/v1/action-items"
+      : `/v1/action-items/${id}${action ? (legacy ? `/${legacy}` : "/actions") : ""}`,
+    method: patch ? "PATCH" : "POST",
+    body: create ?? patch ?? (legacy ? {} : { action }),
+  } as const;
+}
+
 export function useWorkspaceList(filters: Record<string, string | undefined>) {
   const api = useApi();
   const key = ["action-items", "workspace", filters];
@@ -46,25 +75,11 @@ export function useWorkMutation() {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (command: {
-      id?: string;
-      action?: string;
-      patch?: UpdateActionItemInput;
-      create?: CreateWorkInput;
-    }) => {
-      const { id, action, patch, create } = command;
-      const legacy =
-        action === "start"
-          ? "comecar"
-          : action === "complete"
-            ? "concluir"
-            : null;
-      const path = create
-        ? "/v1/action-items"
-        : `/v1/action-items/${id}${action ? (legacy ? `/${legacy}` : "/actions") : ""}`;
-      const result = await api<{ data: ActionItemView }>(path, {
-        method: patch ? "PATCH" : "POST",
-        body: create ?? patch ?? (legacy ? {} : { action }),
+    mutationFn: async (command: WorkMutationCommand) => {
+      const request = buildWorkMutationRequest(command);
+      const result = await api<{ data: ActionItemView }>(request.path, {
+        method: request.method,
+        body: request.body,
       });
       return result.data;
     },

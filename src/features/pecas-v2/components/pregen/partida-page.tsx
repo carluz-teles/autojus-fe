@@ -83,7 +83,10 @@ export function PartidaPage({ intimacaoId }: { intimacaoId: string }) {
           </>
         }
       />
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <section
+        aria-label="Configuração da peça"
+        className="min-h-0 flex-1 overflow-y-auto"
+      >
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-5 sm:p-8">
           <h1 className="sr-only">Teses da peça</h1>
           {h.existingDraft ? (
@@ -117,18 +120,19 @@ export function PartidaPage({ intimacaoId }: { intimacaoId: string }) {
                 theses={h.theses}
                 selectedCount={h.selectedCount}
                 isLoading={h.isLoading}
-                isError={h.isError}
+                isError={h.isError || h.streamError}
                 onToggle={h.toggle}
                 onFonte={fonte}
                 teorSourceId={intimacaoId}
                 isRegenerating={h.isRegenerating || h.isGenerating}
                 onRegenerate={h.regenerate}
+                streaming={h.streaming}
                 pregen
               />
             </>
           )}
         </div>
-      </main>
+      </section>
       <Sheet open={contextOpen} onOpenChange={setContextOpen}>
         <SheetContent title="Contexto e fontes">{rail}</SheetContent>
       </Sheet>

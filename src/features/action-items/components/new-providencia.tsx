@@ -40,19 +40,21 @@ export function NewProvidencia({
   processId = "",
   intimationId = "",
   onCreated,
+  disabled = false,
 }: {
   processId?: string;
   intimationId?: string;
   onCreated?: (id: string) => void;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)}>
+      <Button size="sm" disabled={disabled} onClick={() => setOpen(true)}>
         <Plus data-icon="inline-start" />
         Nova providência
       </Button>
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet open={open && !disabled} onOpenChange={setOpen}>
         <NewProvidenciaForm
           processId={processId}
           intimationId={intimationId}
@@ -149,8 +151,8 @@ function NewProvidenciaForm({
           );
         }}
       >
-        <fieldset disabled={save.isPending}>
-          <FieldGroup>
+        <fieldset disabled={save.isPending} className="min-w-0">
+          <FieldGroup className="gap-5">
             {!processId && (
               <Field>
                 <FieldLabel htmlFor={`${uid}-search`}>Processo</FieldLabel>
@@ -163,6 +165,7 @@ function NewProvidenciaForm({
                 />
                 <NativeSelect
                   aria-label="Selecionar processo"
+                  className="w-full"
                   required
                   value={form.court_record_id}
                   onChange={(e) => {
@@ -230,6 +233,7 @@ function NewProvidenciaForm({
               </FieldLabel>
               <NativeSelect
                 id={`${uid}-type`}
+                className="w-full"
                 value={form.tipo}
                 onChange={(e) =>
                   patch({ tipo: e.target.value as ActionItemTipo })
@@ -247,6 +251,7 @@ function NewProvidenciaForm({
                 <FieldLabel htmlFor={`${uid}-piece`}>Peça</FieldLabel>
                 <NativeSelect
                   id={`${uid}-piece`}
+                  className="w-full"
                   value={form.piece_profile_key}
                   onChange={(e) => patch({ piece_profile_key: e.target.value })}
                 >

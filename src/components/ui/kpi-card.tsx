@@ -79,16 +79,14 @@ export function KpiCard({
   const inner = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-          {label}
-        </span>
+        <span className="section-label leading-relaxed">{label}</span>
         <span
           className={cn(
             "flex size-8 shrink-0 items-center justify-center rounded-lg",
             ICON_BOX_TONE[tone],
           )}
         >
-          <Icon className="size-4" />
+          <Icon aria-hidden className="size-4" strokeWidth={1.7} />
         </span>
       </div>
       <p
@@ -107,11 +105,10 @@ export function KpiCard({
     </>
   );
 
-  const base =
-    "bg-card ring-foreground/10 flex flex-col rounded-xl p-4 text-left shadow-sm ring-1";
+  const base = "surface-panel flex min-w-0 flex-col p-4 text-left sm:p-5";
   const interactive =
-    "hover:ring-gold/40 focus-visible:ring-ring/50 transition-shadow outline-none focus-visible:ring-2";
-  const activeRing = active ? "ring-gold/60 ring-2" : "";
+    "hover:border-primary/30 focus-visible:ring-ring/50 transition-[border-color,box-shadow] motion-reduce:transition-none outline-none focus-visible:ring-2";
+  const activeRing = active ? "border-primary/40 ring-primary/15 ring-2" : "";
 
   if (href) {
     return (

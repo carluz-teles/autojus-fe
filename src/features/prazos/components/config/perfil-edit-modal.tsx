@@ -2,6 +2,8 @@
 
 import { X } from "lucide-react";
 
+import { IconAction } from "@/components/ui/icon-action";
+
 import { usePerfilEditForm } from "../../hooks/use-perfil-edit-form";
 
 // Modal "Editar dados" do Perfil — só o NOME (Clerk headless user.update),
@@ -16,7 +18,7 @@ export function PerfilEditModal({ onFechar }: { onFechar: () => void }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="border-line bg-panel w-[420px] max-w-full overflow-hidden rounded-2xl border shadow-[0_24px_64px_oklch(0.27_0.012_200/26%)]"
+        className="surface-panel w-[420px] max-w-full overflow-hidden rounded-2xl"
       >
         <div className="border-line2 flex items-start justify-between gap-3 border-b px-[22px] pt-[18px] pb-3.5">
           <div>
@@ -27,12 +29,11 @@ export function PerfilEditModal({ onFechar }: { onFechar: () => void }) {
               Como seu nome aparece para a equipe.
             </p>
           </div>
-          <button
+          <IconAction
+            label="Fechar edição do perfil"
+            icon={X}
             onClick={onFechar}
-            className="text-fg3 hover:bg-hover grid size-7 flex-none place-items-center rounded-[7px]"
-          >
-            <X className="size-4" strokeWidth={1.8} />
-          </button>
+          />
         </div>
 
         <form

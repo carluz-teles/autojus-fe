@@ -5,15 +5,14 @@ import {
   CheckCircle2,
   ExternalLink,
   Landmark,
-  Search,
 } from "lucide-react";
 import { useState } from "react";
 
+import { ToolbarSearch } from "@/components/shell/list-toolbar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { EsajAccess } from "@/features/configuracoes/components/esaj-access";
 import {
@@ -73,6 +72,7 @@ function SystemRow({
             variant="outline"
             disabled={connection?.status === "AUTHENTICATING"}
             onClick={onConnect}
+            className="pointer-coarse:min-h-11"
             aria-label={`${connected ? "Ver conexão" : "Conectar"} ${system} · ${entry.court}`}
           >
             {connected
@@ -89,6 +89,7 @@ function SystemRow({
           size="sm"
           variant="ghost"
           nativeButton={false}
+          className="pointer-coarse:min-h-11"
           render={
             <a href={entry.source_url} target="_blank" rel="noreferrer" />
           }
@@ -152,22 +153,23 @@ export function ConfigTribunais() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Selection | null>(null);
   const groups = groupCourtCatalog(catalog.data?.data ?? [], search);
+  // Busca só faz sentido com mais de um tribunal no catálogo (hoje só TJSP).
+  const multipleCourts =
+    new Set((catalog.data?.data ?? []).map((entry) => entry.court)).size > 1;
   return (
     <div className="flex flex-col gap-4">
       <p className="text-muted-foreground text-sm leading-relaxed">
         Cada sistema tem seu próprio acesso. Conectar o eproc de um tribunal não
         conecta o e-SAJ.
       </p>
-      <div className="border-line flex items-center gap-2 border-y py-2">
-        <Search className="text-muted-foreground size-4 shrink-0" aria-hidden />
-        <Input
-          aria-label="Buscar tribunal ou sistema"
+      {multipleCourts && (
+        <ToolbarSearch
+          search={search}
+          onSearch={setSearch}
+          searchLabel="Buscar tribunal ou sistema"
           placeholder="Buscar tribunal, estado ou sistema…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 min-w-0 border-0 bg-transparent shadow-none"
         />
-      </div>
+      )}
       {catalog.isError || connections.isError ? (
         <Alert variant="destructive">
           <AlertCircle aria-hidden />
@@ -181,6 +183,7 @@ export function ConfigTribunais() {
                 void catalog.refetch();
                 void connections.refetch();
               }}
+              className="pointer-coarse:min-h-11"
             >
               Tentar novamente
             </Button>
@@ -252,6 +255,7 @@ export function ConfigTribunais() {
                     size="sm"
                     variant="outline"
                     onClick={() => setSearch("")}
+                    className="pointer-coarse:min-h-11"
                   >
                     Limpar busca
                   </Button>

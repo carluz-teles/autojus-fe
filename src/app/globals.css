@@ -57,6 +57,12 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-fraunces);
+  --shadow-surface:
+    0 1px 2px color-mix(in oklch, var(--foreground) 4%, transparent),
+    0 8px 24px -18px color-mix(in oklch, var(--foreground) 16%, transparent);
+  --shadow-float:
+    0 4px 8px -4px color-mix(in oklch, var(--foreground) 10%, transparent),
+    0 16px 40px -12px color-mix(in oklch, var(--foreground) 18%, transparent);
   /* Escala tipográfica do design Atjus — ~1px menor que o padrão Tailwind: corpo
      13.5px (text-sm), secundário 11.5px (text-xs), base 14px. Converge a app toda
      pro system design. Títulos (font-display) são dimensionados por tela com px
@@ -133,7 +139,7 @@
   /* Aliases do mockup — usados direto nos componentes portados da casca nova. */
   --panel: oklch(0.992 0.002 95);
   --fg2: oklch(0.5 0.012 200);
-  --fg3: oklch(0.62 0.01 200);
+  --fg3: var(--muted-foreground);
   --line: oklch(0.915 0.005 200);
   --line2: oklch(0.94 0.004 200);
   --hover: oklch(0.955 0.006 200);
@@ -216,7 +222,7 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground font-sans antialiased;
     /* Atmosfera: degradê branco→pastel (o "papel" clareia no topo) + véus de
        primário e latão. --sheen adapta ao dark (lá o branco vira um brilho de 3%). */
     background-image:
@@ -246,7 +252,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid color-mix(in oklch, var(--primary) 50%, transparent);
+    outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
 
@@ -258,6 +264,28 @@
     background: var(--border);
     border-radius: 6px;
   }
+}
+
+/* Shared editorial surfaces. Used by custom layouts as well as DS primitives. */
+@utility surface-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-surface);
+}
+
+@utility surface-inset {
+  background: color-mix(in oklch, var(--muted) 55%, var(--card));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+@utility section-label {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 @utility ring-hairline {
@@ -401,8 +429,58 @@
   animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Barra indeterminada do header de streaming (fundamentos chegando). Uma faixa
+   translúcida que varre da esquerda pra direita — fiel ao mock .prog>i. */
+@keyframes theses-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+@utility theses-progress-bar {
+  animation: theses-slide 1.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reveal {
     animation: none;
+  }
+
+  .theses-progress-bar {
+    animation: none;
+  }
+
+  [data-slot="button"],
+  [data-slot="native-select"],
+  [role="combobox"],
+  [data-slot="popover-content"],
+  [data-slot="sheet-content"],
+  [data-slot="sheet-backdrop"],
+  [data-slot="tooltip-content"],
+  [data-slot="menu-content"] {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Compact desktop controls retain comfortable touch targets and prevent iOS
+   zooming the viewport when focusing a form field. */
+@media (pointer: coarse) {
+  [data-slot="button"],
+  [data-slot="native-select"],
+  [role="combobox"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="menuitemradio"] {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 1rem;
   }
 }

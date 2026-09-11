@@ -4,9 +4,11 @@ import type { IntimacaoDetalheView } from "@/features/intimacoes/types";
 
 import type { PrazoDetalheView } from "../types";
 import {
+  bloqueiaProvidencias,
   confirmacaoSchema,
   prazoVisivel,
   precisaConfirmarPrazo,
+  tipoIncompativelComPrazo,
 } from "./confirmacao";
 
 const prazo = {
@@ -16,6 +18,65 @@ const prazo = {
 } as PrazoDetalheView;
 
 describe("confirmação de prazo", () => {
+  it.each(["ciencia", "sem_ato"])(
+    "pede revisão do tipo %s com prazo declarado ativo, preservando a data",
+    (tipo_ato) => {
+      const p = {
+        ...prazo,
+        tipo_ato,
+        origem: "declarado",
+        confirmacao_exigida: false,
+        end_date: "2026-09-08",
+      } as PrazoDetalheView;
+      expect(tipoIncompativelComPrazo(p)).toBe(true);
+      expect(precisaConfirmarPrazo(p, "declarado")).toBe(true);
+      expect(bloqueiaProvidencias(p, "declarado")).toBe(true);
+      expect(p.end_date).toBe("2026-09-08");
+      for (const patch of [
+        { confirmed: true },
+        { status: "MET" },
+        { status: "CANCELLED" },
+        { status: "NO_DEADLINE" },
+      ]) {
+        const revised = { ...p, ...patch } as PrazoDetalheView;
+        expect(tipoIncompativelComPrazo(revised)).toBe(false);
+        expect(bloqueiaProvidencias(revised, "declarado")).toBe(false);
+      }
+    },
+  );
+  it("bloqueia divergência até a decisão, sem oferecer confirmação que a contorne", () => {
+    const p = {
+      ...prazo,
+      origem: "calculado",
+      cross_validation: {
+        resultado: "divergente",
+        data_declarada: "2026-09-10",
+        data_calculada: "2026-09-11",
+        dif_dias: 1,
+      },
+    } as PrazoDetalheView;
+    expect(bloqueiaProvidencias(p, "calculado")).toBe(true);
+    expect(precisaConfirmarPrazo(p, "calculado")).toBe(false);
+  });
+  it.each([
+    ["ia", "OPEN", false, true],
+    ["ia", "MISSED", false, true],
+    ["ia", "OPEN", true, false],
+    ["ia", "MET", false, false],
+    ["ia", "CANCELLED", false, false],
+    ["a_classificar", "NO_DEADLINE", false, true],
+    ["sem_prazo", "NO_DEADLINE", false, false],
+  ])(
+    "bloqueio em %s/%s confirmado=%s: %s",
+    (estado, status, confirmed, expected) => {
+      expect(
+        bloqueiaProvidencias(
+          { ...prazo, status, confirmed } as PrazoDetalheView,
+          estado as string,
+        ),
+      ).toBe(expected);
+    },
+  );
   it("oferece revisão para prazo declarado recuperado, até a confirmação humana", () => {
     expect(
       precisaConfirmarPrazo(
@@ -31,9 +92,9 @@ describe("confirmação de prazo", () => {
     ).toBe(false);
   });
   it.each(["declarado", "calculado", "validado", "divergente", "manual"])(
-    "não abre confirmação de tipo para %s com outra pendência de apuração",
+    "oferece confirmação exigida pela política para %s",
     (estado) => {
-      expect(precisaConfirmarPrazo(prazo, estado)).toBe(false);
+      expect(precisaConfirmarPrazo(prazo, estado)).toBe(true);
     },
   );
   it("exige revisão do inferido, inclusive importação já vencida", () => {

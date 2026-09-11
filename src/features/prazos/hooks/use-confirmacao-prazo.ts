@@ -78,6 +78,8 @@ export function useConfirmacaoPrazo(
         qc.invalidateQueries({ queryKey: ["prazos"] }),
         qc.invalidateQueries({ queryKey: intimacoesKeys.all }),
         qc.invalidateQueries({ queryKey: ["processos"] }),
+        qc.invalidateQueries({ queryKey: ["action-items"] }),
+        qc.invalidateQueries({ queryKey: ["preparation-actions"] }),
       ]);
       toast.success("Revisão registrada.");
     },

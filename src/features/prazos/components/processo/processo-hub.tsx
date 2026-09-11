@@ -16,6 +16,7 @@ import { TeorContent } from "@/components/teor-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { IconAction } from "@/components/ui/icon-action";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -116,11 +117,13 @@ function Registros({ items }: { items: RegistroProcesso[] }) {
         <Link
           key={item.id}
           href={item.href || "#"}
-          className="hover:bg-muted/50 focus-visible:ring-ring/50 -mx-2 flex flex-col gap-3 rounded-lg p-3 outline-none focus-visible:ring-3 sm:flex-row sm:items-start sm:justify-between"
+          className="hover:bg-muted/40 focus-visible:ring-ring/50 flex flex-col gap-3 rounded-xl px-3 py-4 transition-colors outline-none focus-visible:ring-3 sm:flex-row sm:items-start sm:justify-between"
         >
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-medium">{item.titulo}</h3>
+              <h3 className="font-display text-base font-medium">
+                {item.titulo}
+              </h3>
               <Badge variant={item.variant}>{item.status}</Badge>
             </div>
             {item.descricao && (
@@ -143,7 +146,7 @@ function Registros({ items }: { items: RegistroProcesso[] }) {
           </div>
           <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-end">
             {item.prazo && (
-              <div className="space-y-1 sm:text-right">
+              <div className="flex flex-col gap-1 sm:text-right">
                 <p className="text-sm font-medium tabular-nums">
                   {item.prazo.data}
                 </p>
@@ -163,7 +166,7 @@ function Registros({ items }: { items: RegistroProcesso[] }) {
 
 function Fato({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="min-w-0 space-y-1">
+    <div className="flex min-w-0 flex-col gap-1">
       <dt className="text-muted-foreground text-xs">{label}</dt>
       <dd className="text-sm leading-relaxed break-words">{children}</dd>
     </div>
@@ -187,7 +190,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
         </>
       }
     >
-      <div className="mx-auto max-w-[1320px] space-y-4 px-4 py-4">
+      <div className="mx-auto flex max-w-[1320px] flex-col gap-5 px-4 py-4 sm:px-6 sm:py-5">
         {h.processoQ.isPending && (
           <div
             role="status"
@@ -210,10 +213,10 @@ export function ProcessoHub({ numero }: { numero: string }) {
           <>
             <section
               aria-label="Identificação do processo"
-              className="border-line border-b pb-4"
+              className="surface-panel p-5 sm:p-6"
             >
               <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
-                <div className="min-w-0 space-y-2">
+                <div className="flex min-w-0 flex-col gap-2">
                   <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
                     <span>PROCESSO</span>
                     <span aria-hidden="true">/</span>
@@ -223,16 +226,13 @@ export function ProcessoHub({ numero }: { numero: string }) {
                     <span className="font-mono text-sm tabular-nums sm:text-base">
                       {identity.cnj}
                     </span>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label="Copiar CNJ"
+                    <IconAction
+                      icon={Copy}
+                      label="Copiar CNJ"
                       onClick={() => void h.copiarCNJ()}
-                    >
-                      <Copy />
-                    </Button>
+                    />
                   </div>
-                  <h2 className="max-w-3xl text-xl leading-tight font-medium tracking-tight break-words sm:text-[22px]">
+                  <h2 className="font-display max-w-3xl text-2xl leading-tight font-medium tracking-tight break-words">
                     {identity.title}
                   </h2>
                   {identity.partes && (
@@ -243,10 +243,12 @@ export function ProcessoHub({ numero }: { numero: string }) {
                   <ProcessoSituacao situacao={identity.situacaoDetalhe} />
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={h.abrirEdicao}>
-                    <Pencil />
-                    Editar dados
-                  </Button>
+                  <IconAction
+                    icon={Pencil}
+                    label="Editar dados do processo"
+                    variant="outline"
+                    onClick={h.abrirEdicao}
+                  />
                   <Button size="sm" onClick={h.verAutos}>
                     <FolderOpen />
                     Consultar autos
@@ -267,9 +269,9 @@ export function ProcessoHub({ numero }: { numero: string }) {
             {identity.prazo && (
               <section
                 aria-label="Prazo em atenção"
-                className="bg-gold/5 border-gold/25 flex flex-col justify-between gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center"
+                className="bg-gold/5 border-gold/25 flex flex-col justify-between gap-3 rounded-xl border px-5 py-4 shadow-sm sm:flex-row sm:items-center"
               >
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <p className="text-muted-foreground text-xs font-medium">
                     Prazo mais próximo em aberto
                   </p>
@@ -291,16 +293,19 @@ export function ProcessoHub({ numero }: { numero: string }) {
             )}
 
             <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
-              <div className="border-line min-w-0 space-y-4 lg:border-l lg:pl-5">
+              <div className="flex min-w-0 flex-col gap-5">
                 <section
                   id="processo-trabalho"
                   tabIndex={-1}
-                  className="border-line scroll-mt-4 border-b pb-4 outline-none"
+                  className="surface-panel scroll-mt-4 p-4 outline-none sm:p-5"
                   aria-labelledby="trabalho-title"
                 >
                   <div className="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                     <div>
-                      <h2 id="trabalho-title" className="text-sm font-medium">
+                      <h2
+                        id="trabalho-title"
+                        className="font-display text-xl font-medium"
+                      >
                         Trabalho do escritório
                       </h2>
                       <p className="text-muted-foreground mt-1 text-sm">
@@ -373,11 +378,14 @@ export function ProcessoHub({ numero }: { numero: string }) {
                 <section
                   id="processo-acervo"
                   tabIndex={-1}
-                  className="border-line scroll-mt-4 border-b pb-4 outline-none"
+                  className="surface-panel scroll-mt-4 p-4 outline-none sm:p-5"
                   aria-labelledby="acervo-title"
                 >
                   <div className="mb-3">
-                    <h2 id="acervo-title" className="text-sm font-medium">
+                    <h2
+                      id="acervo-title"
+                      className="font-display text-xl font-medium"
+                    >
                       Documentos e histórico
                     </h2>
                     <p className="text-muted-foreground mt-1 text-sm">
@@ -585,12 +593,14 @@ export function ProcessoHub({ numero }: { numero: string }) {
               </div>
 
               <aside
-                className="border-line min-w-0 space-y-4 lg:border-l lg:pl-5"
+                className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4"
                 aria-label="Informações do processo"
               >
-                <section className="border-line space-y-4 border-b pb-4">
-                  <h2 className="text-sm font-medium">Ficha do processo</h2>
-                  <div className="space-y-2">
+                <section className="surface-panel flex flex-col gap-4 p-4">
+                  <h2 className="font-display text-lg font-medium">
+                    Ficha do processo
+                  </h2>
+                  <div className="flex flex-col gap-2">
                     <p className="text-muted-foreground text-xs">
                       Responsável no escritório
                     </p>
@@ -603,15 +613,15 @@ export function ProcessoHub({ numero }: { numero: string }) {
                       onAssign={h.assign}
                     />
                   </div>
-                  <dl className="space-y-3 border-t pt-3">
+                  <dl className="flex flex-col gap-3 border-t pt-3">
                     <Fato label="Assunto">{p.subject || "Não informado"}</Fato>
                     <Fato label="Distribuição">{h.distribuido}</Fato>
                     <Fato label="Valor da causa">{h.valorFormatado}</Fato>
                     <Fato label="Publicidade">{h.segredo}</Fato>
                   </dl>
                 </section>
-                <section className="space-y-3">
-                  <h2 className="text-sm font-medium">
+                <section className="surface-panel flex flex-col gap-3 p-4">
+                  <h2 className="font-display text-lg font-medium">
                     Último andamento conhecido
                   </h2>
                   <p className="text-muted-foreground text-xs tabular-nums">

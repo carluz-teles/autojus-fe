@@ -1,4 +1,5 @@
 import type { PrazoDetalheView } from "../types";
+import { tipoIncompativelComPrazo } from "./confirmacao";
 
 export function formatarCNJ(value: string): string {
   const digits = value.replace(/\D/g, "");
@@ -57,6 +58,8 @@ export function situacaoRevisao(p: PrazoDetalheView | null, estado: string) {
           : "Prazo revisado",
       pendente: false,
     };
+  if (tipoIncompativelComPrazo(p))
+    return { label: "Tipo incompatível com prazo · revisar", pendente: true };
   if (estado === "a_classificar")
     return {
       label:

@@ -3,6 +3,8 @@
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { ShellHeader } from "@/components/shell/page-frame";
+import { Button } from "@/components/ui/button";
+import { IconAction } from "@/components/ui/icon-action";
 import { cn } from "@/lib/utils";
 
 import { usePrazosCalendario } from "../../hooks/use-prazos-calendario";
@@ -21,18 +23,18 @@ export function CalendarioView() {
     <div className="text-foreground flex min-h-0 min-w-0 flex-1 flex-col text-[13px]">
       <ShellHeader>
         <CalendarDays className="text-fg2 size-4" strokeWidth={1.9} />
-        <span className="text-[13px] font-medium">Calendário</span>
-        <div className="hidden sm:block">
+        <h1 className="text-[13px] font-medium">Calendário</h1>
+        <div className="hidden lg:block">
           <DateNavigation cal={cal} />
         </div>
         <span className="text-fg3 ml-1 font-mono text-[11px] capitalize">
           {cal.titulo}
         </span>
-        <div className="ml-auto hidden shrink-0 sm:block">
+        <div className="ml-auto hidden shrink-0 lg:block">
           <ViewSwitcher cal={cal} />
         </div>
       </ShellHeader>
-      <div className="border-line flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-4 py-2 sm:hidden">
+      <div className="border-line flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-4 py-2 lg:hidden">
         <DateNavigation cal={cal} />
         <ViewSwitcher cal={cal} />
       </div>
@@ -51,26 +53,21 @@ export function CalendarioView() {
 function DateNavigation({ cal }: { cal: CalModel }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
-      <button
+      <IconAction
+        label="Anterior"
+        icon={ChevronLeft}
         onClick={cal.prev}
-        aria-label="Anterior"
-        className="text-fg3 hover:bg-hover grid size-6 place-items-center rounded-md"
-      >
-        <ChevronLeft className="size-4" strokeWidth={2} />
-      </button>
-      <button
+        className="pointer-coarse:size-11"
+      />
+      <IconAction
+        label="Próximo"
+        icon={ChevronRight}
         onClick={cal.next}
-        aria-label="Próximo"
-        className="text-fg3 hover:bg-hover grid size-6 place-items-center rounded-md"
-      >
-        <ChevronRight className="size-4" strokeWidth={2} />
-      </button>
-      <button
-        onClick={cal.hoje}
-        className="border-line bg-panel text-fg2 hover:bg-hover ml-1 rounded-md border px-2.5 py-1 text-[11.5px]"
-      >
+        className="pointer-coarse:size-11"
+      />
+      <Button onClick={cal.hoje} variant="outline" size="sm" className="ml-1">
         Hoje
-      </button>
+      </Button>
     </div>
   );
 }
@@ -96,10 +93,11 @@ function Seg({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "rounded-[5px] px-3 py-1 text-[12px] font-medium transition-colors",
+        "rounded-[5px] px-3 py-1 text-[12px] font-medium transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11",
         active
           ? "bg-panel text-foreground shadow-[0_1px_2px_oklch(0.27_0.012_200_/_14%)]"
           : "text-fg2 hover:text-foreground",

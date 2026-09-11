@@ -24,7 +24,7 @@ export function ImportPreparation({ onContinue }: { onContinue: () => void }) {
   const access = courtAccess(connections.data ?? []);
   const ready = valid.length > 0 && access === "connected";
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5">
       <div>
         <p className="text-primary mb-2 text-[11px] font-medium">
           PRIMEIRA IMPORTAÇÃO

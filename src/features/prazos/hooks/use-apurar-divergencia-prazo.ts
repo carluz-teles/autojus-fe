@@ -27,6 +27,7 @@ export function useApurarDivergenciaPrazo() {
     }) => apurarDivergenciaPrazo(fetcher, prazoId, body),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["prazos"] });
+      await queryClient.invalidateQueries({ queryKey: ["action-items"] });
     },
   });
 

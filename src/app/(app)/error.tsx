@@ -1,9 +1,11 @@
 "use client";
 
+import { CircleAlert, RotateCw } from "lucide-react";
 import { useEffect } from "react";
 
-import { PageHeader } from "@/components/shell/page-header";
+import { PageFrame } from "@/components/shell/page-frame";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 
 // Error boundary do grupo (app). error.tsx envolve o page.tsx (e layouts mais
 // aninhados) do segmento, mas NÃO o layout.tsx do MESMO segmento — então um
@@ -26,14 +28,26 @@ export default function AppSegmentError({
   }, [error]);
 
   return (
-    <div className="flex flex-col gap-8">
-      <PageHeader
-        title="Algo deu errado"
-        description="Não foi possível carregar esta página. Você pode tentar novamente."
-      />
-      <div className="reveal">
-        <Button onClick={() => reset()}>Tentar novamente</Button>
+    <PageFrame
+      header={
+        <h1 className="text-sm font-medium">
+          Não foi possível carregar a página
+        </h1>
+      }
+    >
+      <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
+        <EmptyState
+          icon={CircleAlert}
+          title="Vamos tentar novamente?"
+          description="Não foi possível carregar esta página. Sua navegação pelo escritório continua disponível."
+          action={
+            <Button onClick={() => reset()}>
+              <RotateCw data-icon="inline-start" />
+              Tentar novamente
+            </Button>
+          }
+        />
       </div>
-    </div>
+    </PageFrame>
   );
 }

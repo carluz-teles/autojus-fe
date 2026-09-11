@@ -5,6 +5,21 @@ import type { ApiFetcher } from "@/lib/api/use-api";
 import { generateDraft } from "./pecas-v2.service";
 
 describe("geração com seleção de teses", () => {
+  it("envia as orientações da preparação junto com as teses sem substituir conteúdo", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue({ data: { updated_at: "2026-09-08T18:00:00Z" } });
+    await generateDraft(
+      fetcher as ApiFetcher,
+      "piece",
+      ["thesis"],
+      "Não presumir valores.",
+    );
+    expect(fetcher.mock.calls[0][1].body).toEqual({
+      thesis_ids: ["thesis"],
+      instructions: "Não presumir valores.",
+    });
+  });
   it("envia seleção e revisão no mesmo pedido de substituição", async () => {
     const fetcher = vi
       .fn()

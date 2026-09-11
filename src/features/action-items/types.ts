@@ -29,12 +29,42 @@ export type ActionItemTipoOrigem = "declarado" | "ia" | "manual";
 // usuário confirmar o tipo antes (POST /confirmar).
 export type ActionItemTipoStatus = "confiavel" | "a_confirmar";
 
+export type FulfillmentStatus =
+  "possible_fulfillment" | "no_indication" | "unverified";
+
+export interface AnalysisSources {
+  source_revision: string;
+  scope: "post_intimation_and_undated";
+  coverage: "usable" | "partial" | "unavailable";
+  reason: string;
+  checked_at: string;
+  stale: boolean;
+}
+
+export interface FulfillmentEvidence {
+  document_id: string;
+  title: string;
+  date: string;
+  page: number;
+  quote: string;
+}
+
+export interface ProvidenciaFulfillment {
+  status: FulfillmentStatus;
+  reason: string;
+  obligation_quote: string;
+  evidence: FulfillmentEvidence[];
+  sources: AnalysisSources;
+  invalidated: boolean;
+}
+
 // Tipo de ato/providência — closed set espelhado do BE (internal/actionitem).
 export type ActionItemTipo =
   "contestar" | "recorrer" | "manifestar" | "cumprir" | "ciencia";
 
 // Providência base — mesma forma no board/fila e na aba do processo (ActionItemView do BE).
 export interface ActionItemView {
+  origin_review_required?: boolean;
   id: string;
   intimation_id: string;
   court_record_id?: string;
@@ -78,6 +108,7 @@ export interface ActionItemView {
   draft_state?: string | null;
   draft_title?: string | null;
   intimation_text?: string | null;
+  fulfillment?: ProvidenciaFulfillment | null;
   activity?: WorkActivity[];
 }
 

@@ -10,7 +10,7 @@ export function Semana({ cal }: { cal: CalModel }) {
       {cal.semana.map((d) => (
         <div
           key={d.data}
-          className="bg-panel overflow-hidden rounded-xl border"
+          className="surface-panel overflow-hidden"
           style={{
             borderColor: d.hoje
               ? "color-mix(in oklch, var(--primary) 40%, transparent)"

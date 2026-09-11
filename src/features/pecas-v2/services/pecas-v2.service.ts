@@ -144,25 +144,6 @@ export async function getTheses(
 
 /** POST /v1/pecas/:id/theses — (re)gera sugestões via IA, ancoradas nos
  *  attachments; PERSISTE. Novas sugestões nascem em state="off". */
-export interface ThesisSources {
-  revision: string;
-  analyzed_revision: string;
-  refreshed_at: string | null;
-  indexed_documents: number;
-  needs_refresh: boolean;
-  can_refresh: boolean;
-}
-
-export async function getThesisSources(
-  fetcher: ApiFetcher,
-  id: string,
-): Promise<ThesisSources> {
-  const res = await fetcher<DataEnvelope<ThesisSources>>(
-    `${ENDPOINT}/${id}/theses/sources`,
-  );
-  return res.data;
-}
-
 export async function generateTheses(
   fetcher: ApiFetcher,
   id: string,

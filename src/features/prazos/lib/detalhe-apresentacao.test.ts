@@ -10,6 +10,21 @@ import {
 } from "./detalhe-apresentacao";
 
 describe("apresentação do detalhe", () => {
+  it("não apresenta ciência com prazo ativo como classificação aceita", () => {
+    const p = {
+      status: "OPEN",
+      origem: "declarado",
+      tipo_ato: "ciencia",
+      confirmed: false,
+    } as PrazoDetalheView;
+    expect(situacaoRevisao(p, "declarado")).toEqual({
+      label: "Tipo incompatível com prazo · revisar",
+      pendente: true,
+    });
+    expect(
+      situacaoRevisao({ ...p, confirmed: true }, "declarado").pendente,
+    ).toBe(false);
+  });
   it("preserva nomes só dos feriados que continuam no cálculo revisado", () => {
     const p = {
       confirmed: true,

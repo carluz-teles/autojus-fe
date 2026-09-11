@@ -4,6 +4,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { CheckCircle2, Loader2, X } from "lucide-react";
 import { useState } from "react";
 
+import { IconAction } from "@/components/ui/icon-action";
 import { useCertificados } from "@/features/configuracoes/hooks/use-cert-upload";
 import {
   useConnectCourtConnection,
@@ -157,7 +158,7 @@ export function ConexaoWizard({
     >
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/30" />
-        <Dialog.Popup className="border-line bg-panel fixed top-1/2 left-1/2 z-40 max-h-[90dvh] w-[480px] max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border shadow-xl">
+        <Dialog.Popup className="surface-panel fixed top-1/2 left-1/2 z-40 max-h-[90dvh] w-[480px] max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl">
           <div className="border-line2 flex items-start justify-between gap-3 border-b px-[22px] pt-[18px] pb-3.5">
             <div>
               <Dialog.Title className="text-[16px] font-medium">
@@ -171,14 +172,13 @@ export function ConexaoWizard({
                     : "Segundo fator do tribunal — só uma vez."}
               </Dialog.Description>
             </div>
-            <button
+            <IconAction
+              label="Fechar conexão"
+              icon={X}
               onClick={onFechar}
-              aria-label="Fechar conexão"
               disabled={iniciando || mfaMut.isPending}
-              className="text-fg3 hover:bg-hover grid size-7 flex-none place-items-center rounded-[7px]"
-            >
-              <X className="size-4" strokeWidth={1.8} />
-            </button>
+              className="pointer-coarse:size-11"
+            />
           </div>
 
           <div className="px-[22px] py-5">

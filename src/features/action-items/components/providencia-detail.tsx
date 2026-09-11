@@ -10,12 +10,14 @@ import { TeorContent } from "@/components/teor-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { IconAction } from "@/components/ui/icon-action";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { detalheNaFila } from "@/features/intimacoes/lib/fila-navigation";
 import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
@@ -24,11 +26,18 @@ import { useApi } from "@/lib/api/use-api";
 import { formatDate } from "@/lib/format";
 
 import { useActionItemDetalhe } from "../hooks/use-action-items";
+import { useProvidenciaFlow } from "../hooks/use-providencia-flow";
 import { useWorkMutation } from "../hooks/use-workspace";
 import { STATUS_LABEL } from "../lib/status-pill";
 import type { ActionItemPriority, ActionItemView } from "../types";
 import { InternalDueDate } from "./internal-due-date";
 import { NewProvidencia, PIECE_PROFILES, WORK_TYPES } from "./new-providencia";
+import {
+  ProvidenciaNextStep,
+  ProvidenciaPiece,
+  ProvidenciaSteps,
+} from "./providencia-flow";
+import { ProvidenciaFulfillment } from "./providencia-fulfillment";
 import { WorkActions } from "./work-actions";
 
 export function ProvidenciaDetail({ id }: { id: string }) {
@@ -39,7 +48,7 @@ export function ProvidenciaDetail({ id }: { id: string }) {
       header={
         <>
           <ShellBackLink href="/pipeline" label="Voltar às providências" />
-          <span className="font-medium">Providência</span>
+          <h1 className="shrink-0 text-[13px] font-medium">Providência</h1>
         </>
       }
     >
@@ -62,6 +71,7 @@ export function ProvidenciaDetail({ id }: { id: string }) {
 }
 
 function WorkDetailContent({ p }: { p: ActionItemView }) {
+  const flow = useProvidenciaFlow(p);
   const directory = useOrgMembersDirectory();
   const parties = usePartes(p.court_record_id || "");
   const save = useWorkMutation();
@@ -69,8 +79,8 @@ function WorkDetailContent({ p }: { p: ActionItemView }) {
   const [classification, setClassification] = useState(false);
   const terminal = ["DONE", "CANCELLED", "DISMISSED"].includes(p.status);
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-5 p-4 sm:p-6">
+      <section className="surface-panel flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
         <div className="flex w-full min-w-0 flex-1 flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{STATUS_LABEL[p.status]}</Badge>
@@ -78,40 +88,78 @@ function WorkDetailContent({ p }: { p: ActionItemView }) {
               <Badge variant="warning">Tipo a revisar</Badge>
             )}
           </div>
-          <h1 className="font-display text-2xl leading-tight break-words sm:text-3xl">
+          <h2 className="font-display text-2xl leading-tight tracking-tight break-words sm:text-3xl">
             {p.title}
-          </h1>
+          </h2>
           <p className="text-muted-foreground text-sm">
             {p.process_title || "Processo vinculado"}
             {p.cnj_number ? ` · ${formatarCNJ(p.cnj_number)}` : ""}
           </p>
         </div>
-        <WorkActions item={p} />
-      </div>
-      <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="flex min-w-0 flex-col gap-6">
-          <section className="flex flex-col gap-3">
+        {p.intimation_id ? (
+          <Link
+            className="text-primary inline-flex shrink-0 items-center gap-2 text-xs underline-offset-4 hover:underline"
+            href={detalheNaFila(p.intimation_id, `/providencias/${p.id}`)}
+          >
+            Intimação de origem
+            <ArrowUpRight className="size-3.5" aria-hidden />
+          </Link>
+        ) : null}
+      </section>
+      <ProvidenciaSteps item={p} evidence={flow.evidence} />
+      <ProvidenciaFulfillment fulfillment={p.fulfillment} />
+      <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_21rem]">
+        <div className="flex min-w-0 flex-col gap-5">
+          <ProvidenciaNextStep
+            item={p}
+            evidence={flow.evidence}
+            refreshing={flow.refreshing}
+            onRefresh={flow.refresh}
+          >
+            <WorkActions
+              item={p}
+              onReviewType={() => setClassification(true)}
+            />
+          </ProvidenciaNextStep>
+          <ProvidenciaPiece
+            item={p}
+            evidence={flow.evidence}
+            creatorName={directory.nameFor(flow.evidence.draft?.created_by)}
+          />
+          <section className="surface-panel flex flex-col gap-4 p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="font-medium">O que precisa ser feito</h2>
-              <Button variant="ghost" size="sm" onClick={() => setEdit(true)}>
-                <Pencil data-icon="inline-start" />
-                Editar
-              </Button>
+              <div>
+                <p className="section-label">Execução</p>
+                <h2 className="font-display mt-1 text-xl font-medium">
+                  O que precisa ser feito
+                </h2>
+              </div>
+              <IconAction
+                icon={Pencil}
+                label="Editar providência"
+                onClick={() => setEdit(true)}
+              />
             </div>
             <TeorContent
               content={p.description}
               emptyMessage="Adicione orientações para executar esta providência."
             />
           </section>
-          <Tabs defaultValue="context">
+          <Tabs
+            defaultValue="context"
+            className="surface-panel overflow-hidden"
+          >
             <TabsList>
               <TabsTrigger value="context">Contexto</TabsTrigger>
               <TabsTrigger value="activity">Histórico</TabsTrigger>
             </TabsList>
-            <TabsContent value="context">
-              <div className="flex flex-col gap-5 py-4">
+            <TabsContent
+              value="context"
+              className="m-0 px-5 pb-5 sm:px-6 sm:pb-6"
+            >
+              <div className="flex flex-col gap-5 pt-5">
                 <section className="flex flex-col gap-2">
-                  <h2 className="font-medium">Processo</h2>
+                  <h2 className="font-display text-lg font-medium">Processo</h2>
                   <Link
                     className="text-primary inline-flex items-center gap-2 text-sm underline underline-offset-4"
                     href={`/processos/${p.court_record_id}`}
@@ -145,6 +193,7 @@ function WorkDetailContent({ p }: { p: ActionItemView }) {
                       <NewProvidencia
                         processId={p.court_record_id}
                         intimationId={p.intimation_id}
+                        disabled={p.origin_review_required}
                       />
                     </div>
                   )}
@@ -155,7 +204,10 @@ function WorkDetailContent({ p }: { p: ActionItemView }) {
                       <h2 className="font-medium">Intimação de origem</h2>
                       <Link
                         className="text-primary text-sm underline"
-                        href={`/intimacoes/${p.intimation_id}`}
+                        href={detalheNaFila(
+                          p.intimation_id,
+                          `/providencias/${p.id}`,
+                        )}
                       >
                         Abrir intimação
                       </Link>
@@ -171,29 +223,18 @@ function WorkDetailContent({ p }: { p: ActionItemView }) {
                     Providência criada manualmente no processo.
                   </p>
                 )}
-                {p.draft_id && (
-                  <section className="flex flex-col gap-2 border-t pt-5">
-                    <h2 className="font-medium">Peça vinculada</h2>
-                    <Link
-                      className="text-primary text-sm underline"
-                      href={`/pecas/${p.draft_id}?retorno=${encodeURIComponent(`/providencias/${p.id}`)}`}
-                    >
-                      {p.draft_title || p.title}
-                    </Link>
-                    <p className="text-muted-foreground text-xs">
-                      A peça permanece vinculada ao histórico deste trabalho.
-                    </p>
-                  </section>
-                )}
               </div>
             </TabsContent>
-            <TabsContent value="activity">
+            <TabsContent
+              value="activity"
+              className="m-0 px-5 pb-5 sm:px-6 sm:pb-6"
+            >
               {p.activity?.length === 100 && (
                 <p className="text-muted-foreground text-xs">
                   Últimas 100 alterações.
                 </p>
               )}
-              <ol className="divide-y">
+              <ol className="divide-y pt-4">
                 {p.activity?.length ? (
                   p.activity.map((event) => (
                     <li key={event.id} className="flex flex-col gap-1 py-4">
@@ -218,7 +259,7 @@ function WorkDetailContent({ p }: { p: ActionItemView }) {
                               .join(", ") + " atualizado"}
                       </p>
                       {event.kind !== "created" && (
-                        <dl className="space-y-2">
+                        <dl className="flex flex-col gap-2">
                           {Object.entries(event.changes).map(
                             ([key, change]) => (
                               <div key={key} className="text-xs">
@@ -261,11 +302,9 @@ function WorkDetailContent({ p }: { p: ActionItemView }) {
             </TabsContent>
           </Tabs>
         </div>
-        <aside className="flex min-w-0 flex-col gap-5 rounded-xl border p-5 lg:self-start">
+        <aside className="surface-panel flex min-w-0 flex-col gap-5 p-5 lg:sticky lg:top-4 lg:self-start">
           <section className="flex flex-col gap-2">
-            <h2 className="text-muted-foreground text-xs">
-              Prazo judicial vinculado
-            </h2>
+            <h2 className="section-label">Prazo judicial vinculado</h2>
             <p className="text-lg font-medium">
               {p.judicial_due_date
                 ? formatDate(p.judicial_due_date)
@@ -337,9 +376,7 @@ function WorkDetailContent({ p }: { p: ActionItemView }) {
             </NativeSelect>
           </Field>
           <section className="flex flex-col gap-2 border-t pt-4">
-            <h2 className="text-muted-foreground text-xs">
-              Tipo de providência
-            </h2>
+            <h2 className="section-label">Tipo de providência</h2>
             <p className="text-sm">{WORK_TYPES[p.tipo]}</p>
             <p className="text-muted-foreground text-xs">
               {PIECE_PROFILES[p.piece_profile_key || ""]}

@@ -24,7 +24,7 @@ export function ConfigAvatarUpload({
   const inputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="mb-[18px] flex items-center gap-3.5">
+    <div className="surface-inset mb-[18px] flex items-center gap-3.5 p-3">
       <span className="text-primary grid size-14 flex-none place-items-center overflow-hidden rounded-full text-[18px] font-semibold [background:color-mix(in_oklch,var(--primary)_14%,transparent)]">
         {url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -38,7 +38,7 @@ export function ConfigAvatarUpload({
           <button
             onClick={() => inputRef.current?.click()}
             disabled={enviando}
-            className="border-line bg-panel text-foreground hover:bg-hover rounded-lg border px-3.5 py-2 text-[12.5px] disabled:opacity-50"
+            className="border-line bg-panel text-foreground hover:bg-hover min-h-9 rounded-lg border px-3.5 py-2 text-[12.5px] disabled:opacity-50 pointer-coarse:min-h-11"
           >
             {enviando ? "Enviando…" : label}
           </button>

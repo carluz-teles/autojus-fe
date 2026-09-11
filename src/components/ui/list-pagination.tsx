@@ -1,9 +1,10 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { IconAction } from "@/components/ui/icon-action";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -51,9 +52,13 @@ export function ListPagination({
         className,
       )}
     >
-      <div className="text-muted-foreground flex items-center gap-2 text-sm">
+      <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
         <span>Itens por página</span>
         <Select
+          items={PAGE_SIZE_OPTIONS.map((n) => ({
+            value: String(n),
+            label: String(n),
+          }))}
           value={String(pageSize)}
           onValueChange={(v) => v != null && onPageSizeChange(Number(v))}
         >
@@ -65,11 +70,13 @@ export function ListPagination({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {PAGE_SIZE_OPTIONS.map((n) => (
-              <SelectItem key={n} value={String(n)}>
-                {n}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <SelectItem key={n} value={String(n)}>
+                  {n}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
         {typeof totalCount === "number" ? (
@@ -84,26 +91,20 @@ export function ListPagination({
         <span className="text-muted-foreground text-sm tabular-nums">
           Página {pageNumber}
         </span>
-        <Button
+        <IconAction
+          icon={ChevronLeft}
+          label="Página anterior"
           variant="outline"
-          size="sm"
           onClick={onPrev}
           disabled={!canPrev}
-          aria-label="Página anterior"
-        >
-          <ChevronLeft />
-          Anterior
-        </Button>
-        <Button
+        />
+        <IconAction
+          icon={ChevronRight}
+          label="Próxima página"
           variant="outline"
-          size="sm"
           onClick={onNext}
           disabled={!canNext}
-          aria-label="Próxima página"
-        >
-          Próxima
-          <ChevronRight />
-        </Button>
+        />
       </div>
     </div>
   );

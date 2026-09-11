@@ -4,7 +4,11 @@ import { useAuth } from "@clerk/nextjs";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo, useSyncExternalStore } from "react";
 
-import { detalheNaFila, retornoDaFila } from "../lib/fila-navigation";
+import {
+  detalheNaFila,
+  retornoDaFila,
+  rotuloRetornoDaFila,
+} from "../lib/fila-navigation";
 
 const subscribe = () => () => {};
 const serverSnapshot = () => "[]";
@@ -42,11 +46,7 @@ export function useFilaNavigation(currentId?: string) {
   const index = currentId ? ids.indexOf(currentId) : -1;
   return {
     retorno,
-    label: retorno.startsWith("/triagem")
-      ? "Voltar à triagem"
-      : retorno.startsWith("/processos/")
-        ? "Voltar ao processo"
-        : "Voltar às intimações",
+    label: rotuloRetornoDaFila(retorno),
     anterior: index > 0 ? detalheNaFila(ids[index - 1], retorno) : null,
     proxima:
       index >= 0 && index < ids.length - 1

@@ -5,7 +5,6 @@ import {
   Columns3,
   FolderOpen,
   ListChecks,
-  ListOrdered,
   type LucideIcon,
   Mail,
   Settings,
@@ -46,7 +45,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     titulo: "Vistas",
     itens: [
       { href: "/pipeline", label: "Providências", icon: Columns3 },
-      { href: "/fila", label: "Fila", icon: ListOrdered },
       { href: "/calendario", label: "Calendário", icon: CalendarDays },
     ],
   },
@@ -74,7 +72,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/triagem", label: "Triagem", icon: ListChecks },
   { href: "/meus-prazos", label: "Meus Prazos", icon: Clock },
   { href: "/pipeline", label: "Providências", icon: Columns3 },
-  { href: "/fila", label: "Fila", icon: ListOrdered },
   { href: "/calendario", label: "Calendário", icon: CalendarDays },
   { href: "/processos", label: "Processos", icon: FolderOpen },
   { href: "/intimacoes", label: "Intimações", icon: Mail },

@@ -85,6 +85,14 @@ export function useCourtCatalog() {
   return useQuery({
     queryKey: ["court-catalog"],
     queryFn: () => listCourtCatalog(fetcher),
+    // Hoje só suportamos TJSP — filtra o catálogo do BE para não oferecer outros
+    // tribunais na UI. Ponto único: os dois consumidores (ConfigTribunais e
+    // useSyncAutos) leem daqui. Quando abrirmos mais tribunais, é só remover o
+    // filtro (ou trocar pela allowlist real).
+    select: (res) => ({
+      ...res,
+      data: res.data.filter((entry) => entry.court === "TJSP"),
+    }),
     staleTime: 300_000,
   });
 }

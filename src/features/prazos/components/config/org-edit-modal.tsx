@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react";
 
+import { IconAction } from "@/components/ui/icon-action";
 import { useOrgProfileEditForm } from "@/features/organization/hooks/use-org-profile-edit-form";
 import { maskCnpj, maskPhone } from "@/lib/masks";
 
@@ -20,7 +21,7 @@ export function OrgEditModal({ onFechar }: { onFechar: () => void }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="border-line bg-panel w-[460px] max-w-full overflow-hidden rounded-2xl border shadow-[0_24px_64px_oklch(0.27_0.012_200/26%)]"
+        className="surface-panel w-[460px] max-w-full overflow-hidden rounded-2xl"
       >
         <div className="border-line2 flex items-start justify-between gap-3 border-b px-[22px] pt-[18px] pb-3.5">
           <div>
@@ -31,12 +32,11 @@ export function OrgEditModal({ onFechar }: { onFechar: () => void }) {
               Aparecem nas peças e no cadastro junto aos tribunais.
             </p>
           </div>
-          <button
+          <IconAction
+            label="Fechar edição do escritório"
+            icon={X}
             onClick={onFechar}
-            className="text-fg3 hover:bg-hover grid size-7 flex-none place-items-center rounded-[7px]"
-          >
-            <X className="size-4" strokeWidth={1.8} />
-          </button>
+          />
         </div>
 
         <form onSubmit={f.submit} noValidate>

@@ -61,8 +61,25 @@ describe("listagem", () => {
     expect(g.items).toHaveLength(2);
     expect(g.total_count).toBe(5);
     expect(g.pending).toBe(2);
-    expect(g.pendencias).toBe("1 a classificar · 1 a revisar");
+    expect(g.pendencias).toBe("1 a classificar · 1 para revisar prazo");
     expect(g.responsavel).toBe("Responsáveis diferentes");
     expect(g.urgente?.data).toBe("15/09/2026");
+  });
+  it("separa a origem inferida da ação de revisão", () => {
+    const row = linhaIntimacao(item({ estado: "ia" }));
+    expect(row.origem).toBe("Inferido");
+    expect(row.origemDescricao).toContain("não uma confirmação do advogado");
+    expect(row.revisao.label).toBe("Revisar tipo e prazo");
+    expect(row.revisao.pending).toBe(true);
+    expect(row.revisao.description).toContain("não dá ciência nem protocola");
+    expect(linhaIntimacao(item()).revisao.label).toBe("Revisar prazo");
+  });
+  it("preserva a origem inferida após confirmação sem pedir nova revisão", () => {
+    const i = item({ estado: "ia" });
+    i.prazo!.confirmed = true;
+    i.prazo!.selo = "confiavel";
+    const row = linhaIntimacao(i);
+    expect(row.origem).toBe("Inferido");
+    expect(row.revisao).toEqual({ label: "Prazo revisado", pending: false });
   });
 });

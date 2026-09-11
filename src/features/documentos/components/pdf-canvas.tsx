@@ -50,7 +50,8 @@ export function PdfCanvas({
           const viewport = page.getViewport({ scale });
 
           const canvas = document.createElement("canvas");
-          canvas.className = "mx-auto mb-3 rounded shadow-sm";
+          canvas.className =
+            "mx-auto mb-4 rounded-lg border border-black/5 shadow-sm";
           canvas.width = Math.floor(viewport.width * outputScale);
           canvas.height = Math.floor(viewport.height * outputScale);
           canvas.style.width = `${Math.floor(viewport.width)}px`;
@@ -89,7 +90,7 @@ export function PdfCanvas({
   }, [blob, initialPage]);
 
   return (
-    <div className="relative h-full overflow-y-auto px-3 py-3">
+    <div className="bg-muted/40 relative h-full overflow-y-auto px-3 py-4 sm:px-5">
       {rendering && !error && (
         <div className="text-fg3 absolute inset-0 flex items-center justify-center gap-2 text-[12px]">
           <Loader2 className="size-4 animate-spin" />
