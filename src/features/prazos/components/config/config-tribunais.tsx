@@ -154,22 +154,30 @@ export function ConfigTribunais() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Selection | null>(null);
   const groups = groupCourtCatalog(catalog.data?.data ?? [], search);
+  // Busca só faz sentido com mais de um tribunal no catálogo (hoje só TJSP).
+  const multipleCourts =
+    new Set((catalog.data?.data ?? []).map((entry) => entry.court)).size > 1;
   return (
     <div className="flex flex-col gap-4">
       <p className="text-muted-foreground text-sm leading-relaxed">
         Cada sistema tem seu próprio acesso. Conectar o eproc de um tribunal não
         conecta o e-SAJ.
       </p>
-      <div className="surface-inset flex items-center gap-2 px-3 py-1">
-        <Search className="text-muted-foreground size-4 shrink-0" aria-hidden />
-        <Input
-          aria-label="Buscar tribunal ou sistema"
-          placeholder="Buscar tribunal, estado ou sistema…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 min-w-0 border-0 bg-transparent shadow-none"
-        />
-      </div>
+      {multipleCourts && (
+        <div className="surface-inset flex items-center gap-2 px-3 py-1">
+          <Search
+            className="text-muted-foreground size-4 shrink-0"
+            aria-hidden
+          />
+          <Input
+            aria-label="Buscar tribunal ou sistema"
+            placeholder="Buscar tribunal, estado ou sistema…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9 min-w-0 border-0 bg-transparent shadow-none"
+          />
+        </div>
+      )}
       {catalog.isError || connections.isError ? (
         <Alert variant="destructive">
           <AlertCircle aria-hidden />
