@@ -59,7 +59,7 @@ export function useConstruction(id: string) {
   const draftQuery = useDraft(id);
   const hasOrigin = !!draftQuery.data?.intimation.id;
   const hasTeor = !!htmlToText(draftQuery.data?.intimation.teor || "").trim();
-  const theses = useThesesController(id, hasOrigin && hasTeor);
+  const theses = useThesesController(id);
   const generate = useGenerateDraft(id);
   const qc = useQueryClient();
 
@@ -251,13 +251,19 @@ export function useConstruction(id: string) {
   // persistida do controller (pós-`done`, ela vira autoritativa via setQueryData).
   const streamActive = stream.status === "streaming";
   const streamMidError = stream.status === "error" && stream.theses.length > 0;
-  const useStreamTheses = streamActive || streamMidError;
+  // Cinto de segurança: assim que EXISTE tese autoritativa persistida (o controller
+  // já tem a lista — via `done` do stream ou regeneração), a view autoritativa
+  // vence SEMPRE, mesmo que o `stream.status` tenha ficado preso em "streaming"
+  // (ex.: o efeito foi desmontado antes do `done` num teardown do StrictMode). Sem
+  // isto, o header "consultando os autos…" ficava pra sempre com a lista já pronta.
+  const useStreamTheses =
+    (streamActive || streamMidError) && theses.theses.length === 0;
 
   // thesesView reveste o controller: enquanto streama, mostra os cards do stream
   // + o header/fantasma ao vivo (prop `streaming`) e suprime o skeleton. TODAS as
-  // ações (toggle/regenerate/selectedIds/setState/editorAction/direito) seguem
-  // apontando pro controller real — a seleção/geração não muda. Pós-`done` o
-  // controller assume (cache semeado), então isto vira um passthrough puro.
+  // ações (toggle/regenerate/selectedIds) seguem apontando pro controller real — a
+  // seleção/geração não muda. Pós-`done` o controller assume (cache semeado), então
+  // isto vira um passthrough puro.
   const thesesView = useStreamTheses
     ? {
         ...theses,
