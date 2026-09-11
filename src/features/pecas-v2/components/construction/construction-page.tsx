@@ -310,6 +310,7 @@ export function ConstructionPage({ id }: { id: string }) {
               }
               pregen
               onRegenerate={h.theses.regenerate}
+              streaming={h.theses.streaming}
             />
           }
         />
@@ -655,6 +656,7 @@ export function ConstructionPage({ id }: { id: string }) {
                         }
                         pregen={h.stage === "pregen"}
                         onRegenerate={h.theses.regenerate}
+                        streaming={h.theses.streaming}
                       />
                     }
                   />

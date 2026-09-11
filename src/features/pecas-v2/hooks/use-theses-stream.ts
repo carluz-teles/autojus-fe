@@ -1,8 +1,16 @@
 "use client";
 
-// useThesesStream — assina o SSE /v1/intimacoes/:id/theses-stream e emite os
+// useThesesStream — assina o SSE de teses (…/theses-stream) e emite os
 // fundamentos UM A UM conforme o BE os gera, em vez de esperar ~9s pelo POST
 // síncrono que devolve todos de uma vez.
+//
+// ESCOPO PARAMETRIZADO por `resourcePath`: o MESMO hook serve os dois fluxos —
+//   • partida:    "intimacoes/${intimacaoId}"  → SSE intimation-scoped
+//   • construção: "pecas/${draftId}"           → SSE draft-scoped
+// Ambos falam o MESMO contrato (POST {resourcePath}/theses-stream-token → token
+// opaco; EventSource {resourcePath}/theses-stream?stream_token=…) e os MESMOS
+// eventos abaixo. Só o segmento da coleção muda; o BE resolve o kind do token
+// pela coleção (pecas vs intimacoes).
 //
 // Diferente de useDraftStream (que acumula MARKDOWN cru delta-a-delta), aqui
 // cada frame `thesis` é um objeto COMPLETO (o mesmo wire shape do
@@ -101,7 +109,9 @@ export function applyReview(
 }
 
 export function useThesesStream(
-  intimacaoId: string,
+  /** Segmento da coleção + id: "intimacoes/${id}" (partida) ou "pecas/${id}"
+   *  (construção). Sem barra inicial/final — o hook monta as duas URLs. */
+  resourcePath: string,
   opts: UseThesesStreamOptions,
 ): ThesesStreamState {
   const { getToken } = useAuth();
@@ -136,7 +146,7 @@ export function useThesesStream(
         throw new Error("Sessão indisponível para acompanhar os fundamentos.");
 
       const tokenRes = await fetch(
-        `${API}/v1/intimacoes/${intimacaoId}/theses-stream-token`,
+        `${API}/v1/${resourcePath}/theses-stream-token`,
         { method: "POST", headers: { Authorization: `Bearer ${jwt}` } },
       );
       if (cancelled) return;
@@ -149,7 +159,7 @@ export function useThesesStream(
       if (!streamToken)
         throw new Error("Token de acompanhamento indisponível.");
 
-      const url = `${API}/v1/intimacoes/${intimacaoId}/theses-stream?stream_token=${encodeURIComponent(streamToken)}`;
+      const url = `${API}/v1/${resourcePath}/theses-stream?stream_token=${encodeURIComponent(streamToken)}`;
       es = new EventSource(url, { withCredentials: false });
 
       es.addEventListener("progress", (e: MessageEvent) => {
@@ -228,7 +238,7 @@ export function useThesesStream(
       cancelled = true;
       es?.close();
     };
-  }, [intimacaoId, opts.enabled, getToken]);
+  }, [resourcePath, opts.enabled, getToken]);
 
   return state;
 }

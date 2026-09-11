@@ -155,7 +155,7 @@ export function usePartida(intimacaoId: string) {
     if (!hadThesis) setFellBack(true);
   }, []);
 
-  const stream = useThesesStream(intimacaoId, {
+  const stream = useThesesStream(`intimacoes/${intimacaoId}`, {
     enabled: streamEnabled,
     onDone: onStreamDone,
     onError: onStreamError,
