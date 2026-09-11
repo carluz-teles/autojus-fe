@@ -1,6 +1,6 @@
 "use client";
 
-import { FilterX, Search, X } from "lucide-react";
+import { FilterX, type LucideIcon, Search, X } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { FacetedFilter } from "@/components/ui/faceted-filter";
@@ -9,6 +9,8 @@ import { IconAction } from "@/components/ui/icon-action";
 interface Filter {
   key: string;
   label: string;
+  /** Ícone da categoria (repassado ao FacetedFilter). */
+  icon?: LucideIcon;
   value: string;
   options: { value: string; label: string }[];
   onChange: (value: string) => void;

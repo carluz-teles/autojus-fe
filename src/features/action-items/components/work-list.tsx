@@ -1,28 +1,19 @@
 "use client";
 
-import {
-  CheckSquare,
-  LayoutGrid,
-  List,
-  ListFilter,
-  Search,
-  Users,
-  X,
-} from "lucide-react";
+import { CheckSquare, LayoutGrid, List, ListFilter, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 
 import { InfiniteListFooter } from "@/components/shell/infinite-list-footer";
+import { ListToolbar } from "@/components/shell/list-toolbar";
 import { PageFrame } from "@/components/shell/page-frame";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { type Facet, FacetedFilter } from "@/components/ui/faceted-filter";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { FilterTabs } from "@/features/intimacoes/components/shared/filter-tabs";
 import { UrgenciaFilter } from "@/features/intimacoes/components/shared/urgencia-filter";
 import { Responsavel } from "@/features/organization/components/responsavel";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
@@ -148,13 +139,16 @@ export function WorkList({
   const directory = useOrgMembersDirectory();
   const filters = { status, q: debounced, assignee, tipo, from, to };
   const list = useWorkspaceList(filters);
-  const facets: Facet[] = [
+  // Filtros no shape do ListToolbar canônico (value + onChange por facet).
+  const toolbarFilters = [
     ...(!mine
       ? [
           {
             key: "assignee",
             label: "Responsável",
             icon: Users,
+            value: assignee,
+            onChange: (v: string) => set({ assignee: v }),
             options: [
               { value: "me", label: "Minhas providências" },
               { value: "unassigned", label: "Sem responsável" },
@@ -170,6 +164,8 @@ export function WorkList({
       key: "tipo",
       label: "Tipo",
       icon: ListFilter,
+      value: tipo,
+      onChange: (v: string) => set({ tipo: v }),
       options: Object.entries(WORK_TYPES).map(([value, label]) => ({
         value,
         label,
@@ -179,6 +175,12 @@ export function WorkList({
       key: "status",
       label: "Histórico e sugestões",
       icon: CheckSquare,
+      // A aba controla o status de trabalho; este facet só oferece os estados de
+      // histórico/sugestão — some quando uma aba de trabalho está ativa.
+      value: ["SUGGESTED", "CANCELLED", "DISMISSED"].includes(status)
+        ? status
+        : "",
+      onChange: (v: string) => set({ status: v }),
       options: [
         { value: "SUGGESTED", label: "Sugestões pendentes" },
         { value: "CANCELLED", label: "Canceladas" },
@@ -206,6 +208,59 @@ export function WorkList({
   const rangeLabel =
     urgency.find((x) => x.from === from && x.to === to)?.label ||
     `${from ? formatDate(from) : "…"} – ${to ? formatDate(to) : "…"}`;
+  const clearFilters = () =>
+    set({ assignee: "", tipo: "", status: activeOnly ? "ACTIVE" : "" });
+  const activeFilters = [
+    ...(!mine && assignee
+      ? [
+          {
+            key: "assignee",
+            label:
+              assignee === "me"
+                ? "Minhas"
+                : assignee === "unassigned"
+                  ? "Sem responsável"
+                  : (directory.nameFor(assignee) ?? "Responsável"),
+            remove: () => set({ assignee: "" }),
+          },
+        ]
+      : []),
+    ...(tipo
+      ? [
+          {
+            key: "tipo",
+            label: WORK_TYPES[tipo as keyof typeof WORK_TYPES],
+            remove: () => set({ tipo: "" }),
+          },
+        ]
+      : []),
+    ...(from || to
+      ? [
+          {
+            key: "range",
+            label: rangeLabel,
+            remove: () => set({ from: "", to: "" }),
+          },
+        ]
+      : []),
+    ...(["SUGGESTED", "CANCELLED", "DISMISSED"].includes(status)
+      ? [
+          {
+            key: "status",
+            label: STATUS_LABEL[status as keyof typeof STATUS_LABEL],
+            remove: () => set({ status: "" }),
+          },
+        ]
+      : []),
+  ];
+  // Abas de status no padrão canônico (FilterTabs); a aba controla o status de
+  // trabalho (Todas/Ativas/A fazer/Em andamento/Concluídas).
+  const statusTabs = TABS.map((tab) => ({
+    key: tab.key || "todas",
+    label: tab.label,
+    ativo: status === tab.key,
+    onClick: () => set({ status: tab.key }),
+  }));
   const groups = useMemo(
     () =>
       grouped
@@ -242,120 +297,63 @@ export function WorkList({
         </>
       }
       toolbar={
-        <div className="flex shrink-0 flex-col border-b">
-          <div className="flex flex-wrap items-center gap-3 border-b px-4 py-2">
-            <Search className="text-muted-foreground size-4" aria-hidden />
-            <Input
-              aria-label="Buscar providências"
-              type="search"
-              className="h-8 min-w-40 flex-1 border-0 bg-transparent shadow-none"
-              placeholder="Buscar por providência, processo ou CNJ…"
-              value={search}
-              onChange={(e) => set({ q: e.target.value })}
-            />
-            <FacetedFilter
-              facets={facets}
-              values={{ assignee, tipo, status }}
-              onChange={(key, value) => set({ [key]: value })}
-              onClear={() =>
-                set({
-                  assignee: "",
-                  tipo: "",
-                  status: activeOnly ? "ACTIVE" : "",
-                })
-              }
-            />
-            <UrgenciaFilter
-              tabs={urgency.map((x) => ({
-                key: x.key,
-                label: x.label,
-                ativo: x.from === from && x.to === to,
-                onClick: () => set({ from: x.from, to: x.to }),
-              }))}
-              urgency={
-                urgency.find((x) => x.from === from && x.to === to)?.key || ""
-              }
-              from={from}
-              to={to}
-              onRange={(from, to) => set({ from, to })}
-            />
-          </div>
-          {((assignee && !mine) ||
-            tipo ||
-            from ||
-            to ||
-            ["SUGGESTED", "CANCELLED", "DISMISSED"].includes(status)) && (
-            <div className="flex flex-wrap gap-2 px-4 py-2">
-              {!mine && assignee && (
-                <FilterChip onClear={() => set({ assignee: "" })}>
-                  {assignee === "me"
-                    ? "Minhas"
-                    : assignee === "unassigned"
-                      ? "Sem responsável"
-                      : directory.nameFor(assignee)}
-                </FilterChip>
-              )}
-              {tipo && (
-                <FilterChip onClear={() => set({ tipo: "" })}>
-                  {WORK_TYPES[tipo as keyof typeof WORK_TYPES]}
-                </FilterChip>
-              )}
-              {(from || to) && (
-                <FilterChip onClear={() => set({ from: "", to: "" })}>
-                  {rangeLabel}
-                </FilterChip>
-              )}
-              {["SUGGESTED", "CANCELLED", "DISMISSED"].includes(status) && (
-                <FilterChip onClear={() => set({ status: "" })}>
-                  {STATUS_LABEL[status as keyof typeof STATUS_LABEL]}
-                </FilterChip>
-              )}
-            </div>
-          )}
-          <div className="flex flex-wrap items-center justify-between gap-2 px-4">
-            <Tabs
-              className="max-w-full overflow-x-auto"
-              defaultValue=""
-              value={status}
-              onValueChange={(value) => set({ status: value })}
-            >
-              <TabsList>
-                {TABS.map((tab) => (
-                  <TabsTrigger key={tab.key} value={tab.key}>
-                    {tab.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-            <div className="flex flex-wrap items-center gap-2 py-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-pressed={grouped}
-                onClick={() => set({ group: grouped ? "" : "process" })}
-              >
-                Agrupar por processo
-              </Button>
-              <ToggleGroup
-                value={[board ? "board" : "list"]}
-                onValueChange={(v) =>
-                  set({ view: v[0] === "board" ? "board" : "list" })
+        <>
+          <ListToolbar
+            search={search}
+            onSearch={(v) => set({ q: v })}
+            searchLabel="Buscar providências"
+            placeholder="Buscar por providência, processo ou CNJ…"
+            filters={toolbarFilters}
+            active={activeFilters}
+            onClear={clearFilters}
+            controls={
+              <UrgenciaFilter
+                tabs={urgency.map((x) => ({
+                  key: x.key,
+                  label: x.label,
+                  ativo: x.from === from && x.to === to,
+                  onClick: () => set({ from: x.from, to: x.to }),
+                }))}
+                urgency={
+                  urgency.find((x) => x.from === from && x.to === to)?.key || ""
                 }
-                size="sm"
-                variant="outline"
-              >
-                <ToggleGroupItem value="list">
-                  <List aria-hidden />
-                  {deadlineAgenda ? "Prazo" : "Lista"}
-                </ToggleGroupItem>
-                <ToggleGroupItem value="board">
-                  <LayoutGrid aria-hidden />
-                  Quadro
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-          </div>
-        </div>
+                from={from}
+                to={to}
+                onRange={(from, to) => set({ from, to })}
+              />
+            }
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-pressed={grouped}
+              onClick={() => set({ group: grouped ? "" : "process" })}
+            >
+              Agrupar por processo
+            </Button>
+            <ToggleGroup
+              value={[board ? "board" : "list"]}
+              onValueChange={(v) =>
+                set({ view: v[0] === "board" ? "board" : "list" })
+              }
+              size="sm"
+              variant="outline"
+            >
+              <ToggleGroupItem value="list">
+                <List aria-hidden />
+                {deadlineAgenda ? "Prazo" : "Lista"}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="board">
+                <LayoutGrid aria-hidden />
+                Quadro
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </ListToolbar>
+          <FilterTabs
+            label="Filtrar por status da providência"
+            tabs={statusTabs}
+          />
+        </>
       }
     >
       <div className="flex w-full min-w-0 flex-col gap-4 px-3 py-4 sm:px-4 sm:py-6">
@@ -498,21 +496,6 @@ export function WorkList({
         )}
       </div>
     </PageFrame>
-  );
-}
-function FilterChip({
-  children,
-  onClear,
-}: {
-  children: React.ReactNode;
-  onClear: () => void;
-}) {
-  return (
-    <Button variant="outline" size="sm" onClick={onClear}>
-      {children}
-      <X data-icon="inline-end" />
-      <span className="sr-only">Remover filtro</span>
-    </Button>
   );
 }
 export function WorkRow({
