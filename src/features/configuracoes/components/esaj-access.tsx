@@ -25,7 +25,13 @@ export function EsajAccess({ court }: { court: string }) {
   return (
     <Popover>
       <PopoverTrigger
-        render={<Button size="sm" variant="outline" className="pointer-coarse:min-h-11" />}
+        render={
+          <Button
+            size="sm"
+            variant="outline"
+            className="pointer-coarse:min-h-11"
+          />
+        }
       >
         Ver acesso
       </PopoverTrigger>

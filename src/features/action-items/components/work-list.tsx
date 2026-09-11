@@ -67,11 +67,21 @@ export function relativeDeadline(date: string, today = localDate()): string {
 
 /** Definição ORDENADA dos baldes de urgência da agenda de Meus Prazos. */
 const DEADLINE_BUCKETS = [
-  { key: "overdue", label: "Atrasadas", dot: "bg-destructive", note: "Ação imediata" },
+  {
+    key: "overdue",
+    label: "Atrasadas",
+    dot: "bg-destructive",
+    note: "Ação imediata",
+  },
   { key: "today", label: "Hoje", dot: "bg-gold", note: "" },
   { key: "week", label: "Esta semana", dot: "bg-primary", note: "" },
   { key: "later", label: "Depois", dot: "bg-primary/40", note: "" },
-  { key: "none", label: "Sem prazo definido", dot: "bg-muted-foreground/40", note: "Requer triagem" },
+  {
+    key: "none",
+    label: "Sem prazo definido",
+    dot: "bg-muted-foreground/40",
+    note: "Requer triagem",
+  },
 ] as const;
 
 type DeadlineBucketKey = (typeof DEADLINE_BUCKETS)[number]["key"];
@@ -281,7 +291,8 @@ export function WorkList({
     () => (useAgenda ? bucketByDeadline(list.items) : []),
     [useAgenda, list.items],
   );
-  const overdueCount = buckets.find((b) => b.key === "overdue")?.items.length ?? 0;
+  const overdueCount =
+    buckets.find((b) => b.key === "overdue")?.items.length ?? 0;
   const todayCount = buckets.find((b) => b.key === "today")?.items.length ?? 0;
   return (
     <PageFrame

@@ -37,6 +37,8 @@ describe("stream da geração atual", () => {
     expect(buffer.append("␞")).toBe("");
     expect(buffer.acceptsStage()).toBe(true);
     expect(buffer.append("## Manifestação\n\n")).toBe("## Manifestação\n\n");
-    expect(buffer.append("Texto parcial")).toBe("## Manifestação\n\nTexto parcial");
+    expect(buffer.append("Texto parcial")).toBe(
+      "## Manifestação\n\nTexto parcial",
+    );
   });
 });

@@ -44,9 +44,7 @@ export function ConstructionEntry({
         );
       if (item.draft_id) return item.draft_id;
       if (!item.gera_peca || item.tipo_status !== "confiavel")
-        throw new Error(
-          "Revise o tipo da providência antes de gerar a peça.",
-        );
+        throw new Error("Revise o tipo da providência antes de gerar a peça.");
       if (["DONE", "CANCELLED", "DISMISSED"].includes(item.status))
         throw new Error("Esta providência já foi encerrada.");
       // Atalho "Criar peça": clicar aqui É concordar com a providência. Se ela ainda
