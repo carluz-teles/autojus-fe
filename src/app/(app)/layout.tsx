@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/shell/app-shell";
+import PlatformProviders from "@/components/shell/platform-providers";
 import type { Me } from "@/features/onboarding/types";
 import { apiFetch } from "@/lib/api/client";
 
@@ -43,5 +44,9 @@ export default async function AppLayout({
   }
   if (!onboardingCompleted) redirect("/onboarding");
 
-  return <AppShell>{children}</AppShell>;
+  return (
+    <PlatformProviders>
+      <AppShell>{children}</AppShell>
+    </PlatformProviders>
+  );
 }

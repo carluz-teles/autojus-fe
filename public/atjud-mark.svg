@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <path
+    fill="#153e32"
+    d="M6 2h34c13 0 22 9 22 22v34a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4Z"
+  />
+  <text
+    x="31"
+    y="47"
+    fill="#f8f8f2"
+    font-family="Georgia,serif"
+    font-size="49"
+    text-anchor="middle"
+  >
+    A
+  </text>
+  <path d="m17 49 32-9" stroke="#d8edac" stroke-width="1.5" />
+</svg>

@@ -10,6 +10,8 @@ import {
   Settings,
 } from "lucide-react";
 
+import { APP_HOME_PATH } from "@/lib/routes";
+
 export interface NavItem {
   href: string;
   label: string;
@@ -36,7 +38,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     titulo: "Espaço",
     itens: [
-      { href: "/", label: "Notificações", icon: Bell },
+      { href: APP_HOME_PATH, label: "Notificações", icon: Bell },
       { href: "/triagem", label: "Triagem", icon: ListChecks },
       { href: "/meus-prazos", label: "Meus Prazos", icon: Clock },
     ],
@@ -68,7 +70,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
 // Lista PLANA de todas as rotas conhecidas — fonte dos rótulos do breadcrumb
 // (SEG_LABEL em breadcrumb-context) e dos comandos da paleta ⌘K.
 export const NAV_ITEMS: readonly NavItem[] = [
-  { href: "/", label: "Notificações", icon: Bell },
+  { href: APP_HOME_PATH, label: "Notificações", icon: Bell },
   { href: "/triagem", label: "Triagem", icon: ListChecks },
   { href: "/meus-prazos", label: "Meus Prazos", icon: Clock },
   { href: "/pipeline", label: "Providências", icon: Columns3 },

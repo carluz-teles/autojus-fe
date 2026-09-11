@@ -1,8 +1,13 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import {
+  type NextFetchEvent,
+  type NextRequest,
+  NextResponse,
+} from "next/server";
 
 // Next.js 16 renomeou Middleware → Proxy (mesma funcionalidade). clerkMiddleware
 // injeta o contexto de auth (JWT/JWKS); o BE resolve org_id→tenant_id.
-// Público = telas de auth + aceite de convite (o convidado chega deslogado);
+// A LP é liberada antes do Clerk. Na plataforma, público = auth + convite;
 // todo o resto exige sessão (auth.protect() redireciona para
 // NEXT_PUBLIC_CLERK_SIGN_IN_URL quando não autenticado).
 const isPublicRoute = createRouteMatcher([
@@ -11,9 +16,28 @@ const isPublicRoute = createRouteMatcher([
   "/convite(.*)",
 ]);
 
-export default clerkMiddleware(async (auth, req) => {
+const platformMiddleware = clerkMiddleware(async (auth, req) => {
   if (!isPublicRoute(req)) await auth.protect();
 });
+
+const publicDiscoveryPaths = new Set([
+  "/robots.txt",
+  "/sitemap.xml",
+  "/llms.txt",
+  "/llm.text",
+]);
+
+export default function proxy(request: NextRequest, event: NextFetchEvent) {
+  // Marketing is public and can render without Clerk or a backend connection.
+  // The public home is exact: every application route still goes through Clerk.
+  if (
+    request.nextUrl.pathname === "/" ||
+    publicDiscoveryPaths.has(request.nextUrl.pathname)
+  ) {
+    return NextResponse.next();
+  }
+  return platformMiddleware(request, event);
+}
 
 export const config = {
   matcher: [

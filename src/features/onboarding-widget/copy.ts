@@ -53,16 +53,14 @@ export const ONBOARDING_STEPS_COPY: Record<
     title: "Faça a primeira triagem",
     description: "Organize a inbox e decida o que fazer com cada intimação.",
     ctaLabel: "Triar intimações",
-    href: "/",
+    href: "/triagem",
   },
   first_analise: {
     id: "first_analise",
     title: "Analise a primeira intimação",
     description: "Entenda o cenário jurídico de cada caso antes de agir.",
     ctaLabel: "Analisar intimações",
-    // Não existe filtro dedicado de "não analisada" na lista hoje (ver
-    // Reuse Check) — leva pra inbox geral, não pra um destino inventado.
-    href: "/",
+    href: "/intimacoes",
   },
   first_peca: {
     id: "first_peca",
@@ -70,11 +68,8 @@ export const ONBOARDING_STEPS_COPY: Record<
     description:
       "Transforme a intimação em petição pronta para revisar em minutos.",
     ctaLabel: "Criar peça",
-    // "/" tem o botão "Nova peça" (NovaPecaModal): escolhe a intimação
-    // de origem (já filtrada PENDING) + tipo, e navega pra
-    // /pecas/nova?intimation_id=... — é o entry point direto, não precisa
-    // passar por /intimacoes primeiro.
-    href: "/",
+    // A construção de uma peça parte da seleção de uma intimação.
+    href: "/intimacoes",
   },
 };
 
