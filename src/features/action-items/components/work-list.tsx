@@ -50,14 +50,81 @@ function localDate(offset = 0) {
   d.setDate(d.getDate() + offset);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+
+/** Data efetiva do prazo da providência (mesma regra da WorkRow). */
+function deadlineOf(p: ActionItemView): string | undefined {
+  return p.effective_due_date || p.due_date?.slice(0, 10) || undefined;
+}
+
+/** Diferença em dias entre duas datas 'YYYY-MM-DD' (b − a), sem fuso. */
+function daysBetween(a: string, b: string): number {
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+  return Math.round(
+    (Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000,
+  );
+}
+
+/** Texto relativo do prazo ("há 2 dias" / "amanhã" / "em 3 dias"). */
+export function relativeDeadline(date: string, today = localDate()): string {
+  const d = daysBetween(today, date);
+  if (d < 0) return d === -1 ? "há 1 dia" : `há ${-d} dias`;
+  if (d === 0) return "hoje";
+  if (d === 1) return "amanhã";
+  return `em ${d} dias`;
+}
+
+/** Definição ORDENADA dos baldes de urgência da agenda de Meus Prazos. */
+const DEADLINE_BUCKETS = [
+  { key: "overdue", label: "Atrasadas", dot: "bg-destructive", note: "Ação imediata" },
+  { key: "today", label: "Hoje", dot: "bg-gold", note: "" },
+  { key: "week", label: "Esta semana", dot: "bg-primary", note: "" },
+  { key: "later", label: "Depois", dot: "bg-primary/40", note: "" },
+  { key: "none", label: "Sem prazo definido", dot: "bg-muted-foreground/40", note: "Requer triagem" },
+] as const;
+
+type DeadlineBucketKey = (typeof DEADLINE_BUCKETS)[number]["key"];
+
+/** Agrupa as providências por urgência do prazo, ordenando dentro de cada balde
+ *  pela data mais próxima. Balde sem itens é descartado. */
+function bucketByDeadline(items: ActionItemView[]) {
+  const today = localDate();
+  const endOfWeek = localDate((7 - new Date().getDay()) % 7);
+  const map: Record<DeadlineBucketKey, ActionItemView[]> = {
+    overdue: [],
+    today: [],
+    week: [],
+    later: [],
+    none: [],
+  };
+  for (const p of items) {
+    const date = deadlineOf(p);
+    if (!date) map.none.push(p);
+    else if (date < today && ["TODO", "WORKING"].includes(p.status))
+      map.overdue.push(p);
+    else if (date === today) map.today.push(p);
+    else if (date <= endOfWeek) map.week.push(p);
+    else map.later.push(p);
+  }
+  const byDate = (a: ActionItemView, b: ActionItemView) =>
+    (deadlineOf(a) || "").localeCompare(deadlineOf(b) || "");
+  return DEADLINE_BUCKETS.map((b) => ({
+    ...b,
+    items: map[b.key].sort(byDate),
+  })).filter((b) => b.items.length > 0);
+}
+
 export function WorkList({
   title = "Providências",
   mine = false,
   activeOnly = false,
+  deadlineAgenda = false,
 }: {
   title?: string;
   mine?: boolean;
   activeOnly?: boolean;
+  /** Meus Prazos: vista "Prazo" agrupa as providências por urgência de prazo. */
+  deadlineAgenda?: boolean;
 }) {
   const params = useSearchParams();
   const router = useRouter();
@@ -152,6 +219,15 @@ export function WorkList({
         : [{ key: "all", label: "", items: list.items }],
     [grouped, list.items],
   );
+  // Vista "Prazo" de Meus Prazos: agenda por urgência. Cede para "Agrupar por
+  // processo" e para o Quadro quando o usuário os aciona.
+  const useAgenda = deadlineAgenda && !board && !grouped;
+  const buckets = useMemo(
+    () => (useAgenda ? bucketByDeadline(list.items) : []),
+    [useAgenda, list.items],
+  );
+  const overdueCount = buckets.find((b) => b.key === "overdue")?.items.length ?? 0;
+  const todayCount = buckets.find((b) => b.key === "today")?.items.length ?? 0;
   return (
     <PageFrame
       header={
@@ -270,7 +346,7 @@ export function WorkList({
               >
                 <ToggleGroupItem value="list">
                   <List aria-hidden />
-                  Lista
+                  {deadlineAgenda ? "Prazo" : "Lista"}
                 </ToggleGroupItem>
                 <ToggleGroupItem value="board">
                   <LayoutGrid aria-hidden />
@@ -302,6 +378,59 @@ export function WorkList({
             description="Crie uma providência ou ajuste os filtros para encontrar o trabalho."
             action={<NewProvidencia />}
           />
+        ) : useAgenda ? (
+          <>
+            <p className="text-muted-foreground text-xs">
+              Suas providências ativas,{" "}
+              <span className="text-foreground font-medium">
+                organizadas pelo prazo
+              </span>
+              {overdueCount > 0 && (
+                <>
+                  {" · "}
+                  <span className="text-destructive font-medium">
+                    {overdueCount} atrasada{overdueCount > 1 ? "s" : ""}
+                  </span>
+                </>
+              )}
+              {todayCount > 0 &&
+                ` · ${todayCount} ${todayCount > 1 ? "vencem" : "vence"} hoje`}
+            </p>
+            {buckets.map((bucket) => (
+              <section
+                key={bucket.key}
+                className="flex min-w-0 flex-col gap-2.5"
+              >
+                <div className="flex items-center gap-2.5 px-1">
+                  <span
+                    className={cn("size-2 rounded-[3px]", bucket.dot)}
+                    aria-hidden
+                  />
+                  <h2
+                    className={cn(
+                      "text-[13px] font-semibold",
+                      bucket.key === "overdue" && "text-destructive",
+                    )}
+                  >
+                    {bucket.label}
+                  </h2>
+                  <span className="text-muted-foreground rounded-full border px-2 text-xs tabular-nums">
+                    {bucket.items.length}
+                  </span>
+                  {bucket.note && (
+                    <span className="text-muted-foreground ml-auto text-xs">
+                      {bucket.note}
+                    </span>
+                  )}
+                </div>
+                <div className="bg-card @container/worklist divide-y overflow-hidden rounded-xl border px-4 shadow-sm sm:px-5">
+                  {bucket.items.map((p) => (
+                    <WorkRow key={p.id} item={p} />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </>
         ) : (
           <>
             <p className="text-muted-foreground text-xs">
@@ -395,8 +524,10 @@ export function WorkRow({
 }) {
   const directory = useOrgMembersDirectory();
   const date = p.effective_due_date || p.due_date?.slice(0, 10);
-  const overdue =
-    date && date < localDate() && ["TODO", "WORKING"].includes(p.status);
+  const today = localDate();
+  const active = ["TODO", "WORKING"].includes(p.status);
+  const overdue = date && date < today && active;
+  const isToday = date === today;
   return (
     <article
       className={cn(
@@ -438,12 +569,26 @@ export function WorkRow({
         )}
       >
         <div className="flex flex-col gap-1">
-          <p className={overdue ? "text-destructive text-sm" : "text-sm"}>
-            {overdue ? "Em atraso · " : ""}
-            {date
-              ? `${date === p.judicial_due_date ? "Judicial" : "Entrega interna"} · ${formatDate(date)}`
-              : "Sem data definida"}
+          <p
+            className={cn(
+              "text-sm",
+              overdue && "text-destructive font-medium",
+              isToday && !overdue && active && "text-gold font-medium",
+            )}
+          >
+            {!date
+              ? "Sem data definida"
+              : overdue
+                ? `Em atraso · ${formatDate(date)}`
+                : isToday
+                  ? `Hoje · ${formatDate(date)}`
+                  : `${date === p.judicial_due_date ? "Judicial" : "Entrega interna"} · ${formatDate(date)}`}
           </p>
+          {date && active && !isToday && (
+            <p className="text-muted-foreground text-xs">
+              {relativeDeadline(date, today)}
+            </p>
+          )}
           <Responsavel
             value={p.assignee_user_id}
             nome={directory.nameFor(p.assignee_user_id)}
