@@ -60,6 +60,14 @@ export type MfaSeedResult =
   | { kind: "connected"; connection: CourtConnectionView }
   | { kind: "needs_selection"; candidates: MfaSelectionCandidate[] };
 
+/**
+ * Segundo fator exigido pelo sistema (fonte de verdade: catálogo do BE).
+ * Decide qual captura de 2FA a UI mostra: TOTP_APP (app autenticador, seed
+ * capturado 1x → mfa-seed) ou EMAIL_CODE (código por e-mail, efêmero a cada
+ * login → mfa-code). Vazio = o sistema não pede segundo fator.
+ */
+export type SecondFactor = "TOTP_APP" | "EMAIL_CODE" | "";
+
 export interface CourtCatalogEntry {
   court: string;
   name: string;
@@ -69,4 +77,6 @@ export interface CourtCatalogEntry {
   source_url: string;
   connection_mode?: "PERSISTENT" | "PER_OPERATION";
   capabilities?: ("SYNC_AUTOS" | "PREPARE_FILING")[];
+  /** Tipo do segundo fator do sistema (ver {@link SecondFactor}). */
+  second_factor?: SecondFactor;
 }

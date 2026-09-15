@@ -10,6 +10,7 @@ import {
   type CreateCourtConnectionInput,
   listCourtCatalog,
   listCourtConnections,
+  submitMfaCode,
   submitMfaSeed,
   type SubmitMfaSeedInput,
 } from "../services/court-connections.service";
@@ -77,6 +78,25 @@ export function useSubmitMfaSeed() {
         queryClient.invalidateQueries({ queryKey: QUERY_KEY });
       }
     },
+  });
+}
+
+export interface SubmitMfaCodeArgs {
+  id: string;
+  code: string;
+}
+
+/**
+ * Envia o código do segundo fator por e-mail (EMAIL_CODE, ex.: e-SAJ). Em
+ * sucesso invalida a lista para reidratar o status. Código inválido chega como
+ * erro (kind INVALID) — o chamador trata e mantém o passo aberto.
+ */
+export function useSubmitMfaCode() {
+  const fetcher = useApi();
+  const queryClient = useQueryClient();
+  return useMutation<CourtConnectionView, Error, SubmitMfaCodeArgs>({
+    mutationFn: ({ id, code }) => submitMfaCode(fetcher, id, code),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
   });
 }
 
