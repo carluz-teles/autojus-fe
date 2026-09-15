@@ -28,7 +28,6 @@ import {
 import { Field, FieldLabel } from "@/components/ui/field";
 import { IconAction } from "@/components/ui/icon-action";
 import { Input } from "@/components/ui/input";
-import { ProvidenciasSection } from "@/features/action-items/components/providencias-section";
 import { useFilaNavigation } from "@/features/intimacoes/hooks/use-fila-navigation";
 import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
 import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
@@ -41,7 +40,9 @@ import {
   tipoIncompativelComPrazo,
 } from "../../lib/confirmacao";
 import { dataEscolhidaNaApuracao } from "../../lib/detalhe-apresentacao";
+import { AutosSection } from "./autos-section";
 import { ConfirmacaoPrazo } from "./confirmacao-prazo";
+import { DisposicaoSection } from "./disposicao-section";
 import { ExplicacaoPrazo } from "./explicacao-prazo";
 
 const POPUP_CLASS =
@@ -265,7 +266,7 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
 
         <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[min-content_1fr] lg:gap-5 xl:grid-cols-[minmax(0,1fr)_410px]">
           <div className="min-w-0 lg:col-start-1 lg:row-start-1">
-            <Providencias det={det} />
+            <Disposicao det={det} />
           </div>
           <aside
             id="prazo-decisao"
@@ -332,6 +333,7 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
                 />
               </CardContent>
             </Card>
+            <AutosSection processId={m.courtRecordId} />
             <details className={DISCLOSURE}>
               <summary className={SUMMARY}>
                 <span>
@@ -665,12 +667,13 @@ function CalculoDetalhado({ det }: { det: Detalhe }) {
   );
 }
 
-function Providencias({ det }: { det: Detalhe }) {
+function Disposicao({ det }: { det: Detalhe }) {
   const m = det.model!;
   return (
-    <ProvidenciasSection
-      processId={m.courtRecordId}
+    <DisposicaoSection
       intimationId={m.id}
+      providencias={m.providencias}
+      retorno={`/intimacoes/${m.id}`}
       analyzing={det.analisando}
       analysisError={det.analiseErro}
       analysisProcessingTimeout={det.analiseTimeout}
