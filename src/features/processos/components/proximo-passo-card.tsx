@@ -7,11 +7,12 @@ import {
   Gavel,
   Landmark,
   ListChecks,
-  TrendingUp,
   type LucideIcon,
+  TrendingUp,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+
 import type { ProximoPasso, ProximoPassoKind } from "../types";
 
 const META: Record<ProximoPassoKind, { icon: LucideIcon; kicker: string }> = {
