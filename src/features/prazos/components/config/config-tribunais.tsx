@@ -32,13 +32,34 @@ import type {
 
 import { ConexaoWizard } from "./conexao-wizard";
 
-type Selection = { entry: CourtCatalogEntry; connection?: CourtConnectionView };
+const ATTENTION_STATUSES = [
+  "MFA_REQUIRED",
+  "MFA_ENROLLMENT_REQUIRED",
+  "REAUTH_REQUIRED",
+  "CERTIFICATE_REQUIRED",
+  "ERROR",
+];
 
+type TribunalGrupo = {
+  court: string;
+  name: string;
+  systems: CourtCatalogEntry[];
+};
+
+type Selection = {
+  court: string;
+  name: string;
+  entries: CourtCatalogEntry[];
+};
+
+/** Linha de um sistema dentro do card do tribunal — nome, escopo e status. */
 function SystemRow({
   entry,
   connection,
-  onConnect,
-}: Selection & { onConnect: () => void }) {
+}: {
+  entry: CourtCatalogEntry;
+  connection?: CourtConnectionView;
+}) {
   const perOperation = entry.connection_mode === "PER_OPERATION";
   const connected =
     !perOperation && entry.available && connection?.status === "CONNECTED";
@@ -46,13 +67,7 @@ function SystemRow({
     !perOperation &&
     entry.available &&
     connection &&
-    [
-      "MFA_REQUIRED",
-      "MFA_ENROLLMENT_REQUIRED",
-      "REAUTH_REQUIRED",
-      "CERTIFICATE_REQUIRED",
-      "ERROR",
-    ].includes(connection.status);
+    ATTENTION_STATUSES.includes(connection.status);
   const status = !entry.available
     ? "Em preparação"
     : perOperation
@@ -61,29 +76,36 @@ function SystemRow({
         ? courtConnectionLabels[connection.status]
         : "Não conectado";
   const system = courtSystemName(entry.system);
-  const actions = (
-    <div className="flex max-w-full flex-wrap items-center gap-2">
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0">
+      <div className="min-w-0 flex-1 basis-52">
+        <div className="flex flex-wrap items-center gap-2">
+          <h4 className="text-foreground text-[13px] font-medium">{system}</h4>
+          {entry.scope && (
+            <span className="text-muted-foreground text-xs">{entry.scope}</span>
+          )}
+          <Badge
+            variant={
+              connected ? "success" : needsAttention ? "warning" : "outline"
+            }
+          >
+            {connected && <CheckCircle2 data-icon="inline-start" aria-hidden />}
+            {needsAttention && (
+              <AlertCircle data-icon="inline-start" aria-hidden />
+            )}
+            {status}
+          </Badge>
+        </div>
+        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+          {entry.system === "ESAJ"
+            ? "Preparação de peticionamento com peça e anexos."
+            : "Consulta e sincronização de autos."}
+        </p>
+      </div>
       {entry.available ? (
         perOperation ? (
           <EsajAccess court={entry.court} />
-        ) : (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={connection?.status === "AUTHENTICATING"}
-            onClick={onConnect}
-            className="pointer-coarse:min-h-11"
-            aria-label={`${connected ? "Ver conexão" : "Conectar"} ${system} · ${entry.court}`}
-          >
-            {connected
-              ? "Ver conexão"
-              : connection?.status === "AUTHENTICATING"
-                ? "Conectando…"
-                : needsAttention
-                  ? "Retomar conexão"
-                  : "Conectar"}
-          </Button>
-        )
+        ) : null
       ) : (
         <Button
           size="sm"
@@ -101,49 +123,102 @@ function SystemRow({
       )}
     </div>
   );
-  const description = (
-    <div className="min-w-0 flex-1 basis-56">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-foreground text-sm font-medium">{system}</h3>
-        {entry.scope && (
-          <span className="text-muted-foreground text-xs">{entry.scope}</span>
-        )}
-        <Badge
-          variant={
-            connected ? "success" : needsAttention ? "warning" : "outline"
-          }
-        >
-          {connected && <CheckCircle2 data-icon="inline-start" aria-hidden />}
-          {needsAttention && (
-            <AlertCircle data-icon="inline-start" aria-hidden />
-          )}
-          {status}
-        </Badge>
-      </div>
-      <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-        {entry.system === "ESAJ"
-          ? "Preparação de peticionamento com peça e anexos."
-          : "Consulta e sincronização de autos."}
-      </p>
-      {entry.available && (
-        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-          {perOperation
-            ? "Certificado A1 · 2FA se solicitado pelo portal."
-            : "Certificado A1 e segundo fator (2FA)."}
-        </p>
-      )}
-    </div>
+}
+
+/** Card de um tribunal: sistemas com status + UM botão de conexão unificado. */
+function TribunalCard({
+  group,
+  connections,
+  onConnect,
+}: {
+  group: TribunalGrupo;
+  connections: CourtConnectionView[];
+  onConnect: (selection: Selection) => void;
+}) {
+  // Sistemas conectáveis pelo fluxo unificado (disponíveis e persistentes).
+  const connectable = group.systems.filter(
+    (entry) => entry.available && entry.connection_mode !== "PER_OPERATION",
   );
+  const connectedCount = connectable.filter(
+    (entry) => connectionForSystem(entry, connections)?.status === "CONNECTED",
+  ).length;
+  const total = connectable.length;
+  const needsAttention = connectable.some((entry) => {
+    const c = connectionForSystem(entry, connections);
+    return c && ATTENTION_STATUSES.includes(c.status);
+  });
+  const allConnected = total > 0 && connectedCount === total;
+  const resumo =
+    total === 0
+      ? "Sem sistemas conectáveis no momento."
+      : allConnected
+        ? total === 1
+          ? "Sistema conectado."
+          : "Todos os sistemas conectados."
+        : connectedCount > 0
+          ? `${connectedCount} de ${total} sistemas conectados.`
+          : "Nenhum sistema conectado.";
+
   return (
-    <section
-      aria-label={`${entry.court} · ${system}`}
-      className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0"
-    >
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        {description}
-        {actions}
-      </div>
-    </section>
+    <Card size="sm" role="region" aria-labelledby={`court-${group.court}`}>
+      <CardHeader>
+        <CardTitle id={`court-${group.court}`}>
+          <div className="flex items-center gap-2">
+            <Landmark className="text-primary size-4 shrink-0" aria-hidden />
+            <h2 className="min-w-0">
+              <span>{group.court}</span>
+              <span className="text-muted-foreground font-normal">
+                {" "}
+                · {group.name}
+              </span>
+            </h2>
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <Separator />
+      <CardContent className="divide-border divide-y">
+        {group.systems.map((entry) => (
+          <SystemRow
+            key={entry.system}
+            entry={entry}
+            connection={connectionForSystem(entry, connections)}
+          />
+        ))}
+      </CardContent>
+      {total > 0 && (
+        <>
+          <Separator />
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3">
+            <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+              {allConnected && (
+                <CheckCircle2 className="text-primary size-3.5" aria-hidden />
+              )}
+              {needsAttention && !allConnected && (
+                <AlertCircle className="text-gold size-3.5" aria-hidden />
+              )}
+              {resumo}
+            </p>
+            <Button
+              size="sm"
+              variant={connectedCount > 0 ? "outline" : "default"}
+              onClick={() =>
+                onConnect({
+                  court: group.court,
+                  name: group.name,
+                  entries: connectable,
+                })
+              }
+              className="pointer-coarse:min-h-11"
+              aria-label={`${
+                connectedCount > 0 ? "Gerenciar conexões" : "Conectar"
+              } ${group.court}`}
+            >
+              {connectedCount > 0 ? "Gerenciar conexões" : "Conectar"}
+            </Button>
+          </div>
+        </>
+      )}
+    </Card>
   );
 }
 
@@ -159,8 +234,8 @@ export function ConfigTribunais() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-muted-foreground text-sm leading-relaxed">
-        Cada sistema tem seu próprio acesso. Conectar o eproc de um tribunal não
-        conecta o e-SAJ.
+        Um certificado conecta os sistemas do tribunal (eproc e e-SAJ). O
+        segundo fator só é pedido quando o portal exige.
       </p>
       {multipleCourts && (
         <ToolbarSearch
@@ -200,47 +275,12 @@ export function ConfigTribunais() {
         <>
           <div className="flex flex-col gap-4">
             {groups.map((group) => (
-              <Card
+              <TribunalCard
                 key={group.court}
-                size="sm"
-                role="region"
-                aria-labelledby={`court-${group.court}`}
-              >
-                <CardHeader>
-                  <CardTitle id={`court-${group.court}`}>
-                    <div className="flex items-center gap-2">
-                      <Landmark
-                        className="text-primary size-4 shrink-0"
-                        aria-hidden
-                      />
-                      <h2 className="min-w-0">
-                        <span>{group.court}</span>
-                        <span className="text-muted-foreground font-normal">
-                          {" "}
-                          · {group.name}
-                        </span>
-                      </h2>
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <Separator />
-                <CardContent className="divide-border divide-y">
-                  {group.systems.map((entry) => {
-                    const connection = connectionForSystem(
-                      entry,
-                      connections.data ?? [],
-                    );
-                    return (
-                      <SystemRow
-                        key={entry.system}
-                        entry={entry}
-                        connection={connection}
-                        onConnect={() => setSelected({ entry, connection })}
-                      />
-                    );
-                  })}
-                </CardContent>
-              </Card>
+                group={group}
+                connections={connections.data ?? []}
+                onConnect={setSelected}
+              />
             ))}
             {!groups.length && (
               <div
@@ -271,13 +311,12 @@ export function ConfigTribunais() {
       )}
       {selected && (
         <ConexaoWizard
-          key={
-            selected.connection?.id ??
-            `${selected.entry.court}:${selected.entry.system}`
-          }
+          key={selected.court}
           aberto
-          court={selected.entry.court}
-          existingConnection={selected.connection}
+          court={selected.court}
+          courtName={selected.name}
+          entries={selected.entries}
+          connections={connections.data ?? []}
           onFechar={() => setSelected(null)}
         />
       )}
