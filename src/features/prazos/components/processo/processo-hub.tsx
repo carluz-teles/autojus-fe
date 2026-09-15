@@ -296,6 +296,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
             {p.proximo_passo && (
               <ProximoPassoCard
                 passo={p.proximo_passo}
+                phase={p.phase}
                 onConferir={
                   p.proximo_passo.kind === "CUMPRIR_PRAZO" ||
                   p.proximo_passo.kind === "INICIAR_PROVIDENCIA"
