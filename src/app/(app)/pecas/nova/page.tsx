@@ -8,11 +8,30 @@ export const metadata = { title: "Nova peça · Construção · jus·assessoria"
 export default async function NovaPecaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ intimacao?: string; providencia?: string }>;
+  searchParams: Promise<{
+    intimacao?: string;
+    providencia?: string;
+    auto?: string;
+  }>;
 }) {
-  const { intimacao, providencia } = await searchParams;
+  const { intimacao, providencia, auto } = await searchParams;
+  // auto=1 → auto-partida: construção direto (tela "Construindo a peça…"),
+  // pulando a escolha de teses.
+  const autoStart = auto === "1" || auto === "true";
   if (providencia)
-    return <ConstructionEntry key={providencia} actionItemId={providencia} />;
+    return (
+      <ConstructionEntry
+        key={providencia}
+        actionItemId={providencia}
+        auto={autoStart}
+      />
+    );
   if (!intimacao) redirect("/intimacoes");
-  return <ConstructionEntry key={intimacao} intimationId={intimacao} />;
+  return (
+    <ConstructionEntry
+      key={intimacao}
+      intimationId={intimacao}
+      auto={autoStart}
+    />
+  );
 }
