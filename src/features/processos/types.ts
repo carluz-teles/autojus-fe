@@ -63,6 +63,31 @@ export interface ProcessoView {
    * cliente-side via useProcessosPrazos.
    */
   next_deadline?: NextDeadlineView | null;
+  /**
+   * Próximo passo processual sugerido — motor 100% determinístico no BE (regras
+   * por fase/classe/sinais), sem IA. Só vem no detalhe (GET /v1/processos/:id),
+   * nunca na listagem. `null` = nenhuma regra disparou → o FE omite o card.
+   * Contrato: docs/contrato-proximo-passo.md (backend).
+   */
+  proximo_passo?: ProximoPasso | null;
+}
+
+/** Conjunto fechado de ações do motor de próximo passo (espelha o BE). */
+export type ProximoPassoKind =
+  | "CUMPRIR_PRAZO"
+  | "INICIAR_PROVIDENCIA"
+  | "AVALIAR_SENTENCA"
+  | "ACOMPANHAR_RECURSO"
+  | "ACOMPANHAR_EXECUCAO"
+  | "PREPARAR_AUDIENCIA";
+
+/** Sugestão de próximo passo. Quando não-null, os três campos são não-vazios. */
+export interface ProximoPasso {
+  kind: ProximoPassoKind;
+  /** Rótulo curto para o card (ex.: "Protocolar contestação — vence em 3 dias"). */
+  label: string;
+  /** Explicação em PT-BR do porquê da sugestão. */
+  rationale: string;
 }
 
 /** Projeção do prazo mais próximo — shape minimal, suficiente para a coluna. */

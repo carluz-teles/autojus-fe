@@ -28,6 +28,7 @@ import { CourtAccessNotice } from "@/features/onboarding/components/court-access
 import { Responsavel } from "@/features/organization/components/responsavel";
 import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
 import { ProcessoSituacao } from "@/features/processos/components/situacao-processo";
+import { ProximoPassoCard } from "@/features/processos/components/proximo-passo-card";
 import { FASE_STEPS } from "@/features/processos/lib/apresentacao";
 import type { ProcessoPhase } from "@/features/processos/types";
 import { formatDate } from "@/lib/format";
@@ -290,6 +291,18 @@ export function ProcessoHub({ numero }: { numero: string }) {
                   <ArrowRight />
                 </Button>
               </section>
+            )}
+
+            {p.proximo_passo && (
+              <ProximoPassoCard
+                passo={p.proximo_passo}
+                onConferir={
+                  p.proximo_passo.kind === "CUMPRIR_PRAZO" ||
+                  p.proximo_passo.kind === "INICIAR_PROVIDENCIA"
+                    ? h.irParaTrabalho
+                    : undefined
+                }
+              />
             )}
 
             <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
