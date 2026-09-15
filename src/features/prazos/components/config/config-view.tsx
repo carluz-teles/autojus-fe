@@ -3,6 +3,7 @@
 import { Clock, Settings2 } from "lucide-react";
 
 import { ShellHeader } from "@/components/shell/page-frame";
+import { ConfigPapeisTimbrados } from "@/features/letterhead/components/config-papeis-timbrados";
 import { NotificationPreferences } from "@/features/notifications/notification-preferences";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +62,7 @@ export function ConfigView() {
           <div className="max-w-[680px] px-4 pt-7 pb-28 sm:px-8">
             {cfg.tab === "perfil" ? <ConfigPerfil /> : null}
             {cfg.tab === "org" ? <ConfigOrg /> : null}
+            {cfg.tab === "papeis" ? <ConfigPapeisTimbrados /> : null}
 
             {cfg.tab === "plano" ? (
               <>
