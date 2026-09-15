@@ -28,12 +28,12 @@ export function CourtAccessNotice({
     : query.isError
       ? "Não foi possível verificar o acesso aos autos"
       : access === "error"
-        ? "Não foi possível autenticar no eproc"
+        ? "Não foi possível autenticar no tribunal"
         : access === "connecting"
-          ? "Conexão com o eproc em andamento"
+          ? "Conexão com o tribunal em andamento"
           : access === "mfa"
-            ? "Conclua o segundo fator do eproc"
-            : `Acesso ao eproc${court ? ` · ${court}` : ""} não identificado`;
+            ? "Conclua o segundo fator do tribunal"
+            : `Acesso ao tribunal${court ? ` · ${court}` : ""} não identificado`;
   return (
     <div
       role="status"
@@ -44,10 +44,10 @@ export function CourtAccessNotice({
         <p className="font-medium">{title}</p>
         <p className="text-fg3 mt-0.5">
           {outsideScope
-            ? "A conexão disponível cobre o eproc de 1º grau do TJSP. O grau deste processo não está confirmado dentro dessa cobertura."
+            ? "A conexão disponível cobre o 1º grau do TJSP. O grau deste processo não está confirmado dentro dessa cobertura."
             : query.isError
               ? "Verifique a conexão antes de contar com a busca automática."
-              : "As publicações podem chegar pelo DJEN. A busca de autos depende de uma conexão ativa com o eproc; o acesso ao e-SAJ é separado."}
+              : "As publicações podem chegar pelo DJEN. A busca de autos depende de uma conexão ativa com o tribunal."}
         </p>
       </div>
       {onPrepare ? (

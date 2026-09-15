@@ -13,12 +13,17 @@ export function usableCertificates(
   );
 }
 
+/** Sistemas que dão acesso aos autos de um tribunal (eproc e/ou e-SAJ). */
+const RELEVANT_SYSTEMS = ["EPROC", "ESAJ"];
+
 export function courtAccess(
   connections: CourtConnectionView[],
   court?: string,
 ) {
+  // O tribunal está acessível quando QUALQUER sistema relevante conecta — o
+  // acesso do eproc e o do e-SAJ coexistem (um não substitui o outro).
   const relevant = connections.filter(
-    (c) => c.system === "EPROC" && (!court || c.court === court),
+    (c) => RELEVANT_SYSTEMS.includes(c.system) && (!court || c.court === court),
   );
   if (relevant.some((c) => c.status === "CONNECTED")) return "connected";
   if (relevant.some((c) => c.status === "ERROR")) return "error";
