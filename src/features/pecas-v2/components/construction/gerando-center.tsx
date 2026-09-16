@@ -2,14 +2,17 @@
 
 // Estágio GERANDO da Construção — a IA "redige" a peça em tempo real.
 //
-// Enquanto o SSE (/generation-stream) não emitiu o 1º chunk, mostra as etapas
-// reais do processamento. Assim que o markdown começa a chegar, troca
-// pelo texto renderizado (markdown→HTML via marked), progressivo e bonito pro
-// cliente. O stream fica ativo enquanto `enabled` (saga EXTRACTING); o markdown
-// acumulado é convertido a cada frame e injetado como HTML já formatado.
+// 4-phase loader driven by real SSE signals only (no timers):
+//   Phase 1 — Consultando teses     (theses-stream or sync-REST fallback)
+//   Phase 2 — Reunindo o contexto   (generation-stream stage: loading_context)
+//   Phase 3 — Consultando os autos  (generation-stream stage: analyzing_sources)
+//   Phase 4 — Redigindo a minuta    (generation-stream stage: drafting_sections)
 //
-// Componente = JSX + binding: o streaming é orquestrado por useDraftStream (o
-// único I/O), a conversão markdown→HTML é a única transformação de apresentação.
+// Quando o 1º chunk chega (onProgress com texto não-vazio), troca o loader
+// pela folha de escrita progressiva. O in-sheet label "Conferindo" é exibido
+// pelo estágio auditing_draft, dentro da folha aberta.
+//
+// Componente = JSX + binding; o streaming é orquestrado por useDraftStream.
 
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Sparkles } from "lucide-react";
@@ -21,7 +24,11 @@ import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
 import { draftKeys } from "../../hooks/use-draft";
 import { useDraftStream } from "../../hooks/use-draft-stream";
-import { GenerationLoading } from "./generation-loading";
+import {
+  GenerationLoading,
+  type GenerationPhase,
+  STAGE_PHASE,
+} from "./generation-loading";
 
 // GFM ligado (tables), breaks OFF — o LLM já separa parágrafos com linha em
 // branco (CommonMark). Parse síncrono: roda a cada frame durante o stream.
@@ -38,9 +45,22 @@ interface Props {
   /** Ativa o SSE (tipicamente saga EXTRACTING). */
   streamEnabled: boolean;
   startedAt: string;
+  /**
+   * Fase 1 já concluída (teses resolvidas via stream ou sync-REST).
+   * Quando true, o loader entra direto na fase 2 enquanto aguarda o generation-stream.
+   */
+  thesesDone?: boolean;
+  /** Contador ao vivo de teses (do theses-stream progress). */
+  thesesCount?: number;
 }
 
-export function GerandoCenter({ draftId, streamEnabled, startedAt }: Props) {
+export function GerandoCenter({
+  draftId,
+  streamEnabled,
+  startedAt,
+  thesesDone = false,
+  thesesCount,
+}: Props) {
   const qc = useQueryClient();
   const [html, setHtml] = useState("");
   const [writingStarted, setWritingStarted] = useState(false);
@@ -59,8 +79,8 @@ export function GerandoCenter({ draftId, streamEnabled, startedAt }: Props) {
     onDone: () => {
       void qc.invalidateQueries({ queryKey: draftKeys.detail(draftId) });
     },
-    onStage: (stage) => {
-      setStage(stage);
+    onStage: (s) => {
+      setStage(s);
       setConnectionError(false);
     },
     onError: () => setConnectionError(true),
@@ -82,9 +102,22 @@ export function GerandoCenter({ draftId, streamEnabled, startedAt }: Props) {
     }
   }, [html]);
 
+  // Derive current phase from signals — NO timers, only real events.
+  // Phase 1 done when thesesDone=true; phase 2-4 from generation-stream stage.
+  const phase: GenerationPhase = (() => {
+    const stagePhase = STAGE_PHASE[stage];
+    if (stagePhase) return stagePhase;
+    // stage is "waiting" or unknown: if theses resolved, show phase 2; else phase 1.
+    return thesesDone ? 2 : 1;
+  })();
+
   if (!writingStarted)
     return (
-      <GenerationLoading stage={stage} connectionError={connectionError} />
+      <GenerationLoading
+        phase={phase}
+        thesesCount={thesesCount}
+        connectionError={connectionError}
+      />
     );
 
   return (

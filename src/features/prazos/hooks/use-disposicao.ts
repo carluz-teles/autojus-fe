@@ -4,12 +4,14 @@
 // pura (derivarDisposicao) com os rótulos de peça e os handlers de ação:
 //   · "Dar ciência" → conclui o action_item de ciência (comecar → concluir).
 //     Sem item materializado, resolve a própria intimação (caminho equivalente).
-//   · "Gerar peça"  → href da auto-partida (/pecas/nova?...&auto=1): abre a
-//     construção já disparando a geração, sem passar pela tela de teses.
+//   · "Gerar peça"  → abre modal de orientação opcional; ao confirmar, navega
+//     para /pecas/nova?...&auto=1&retorno=.. com as instructions codificadas
+//     como `instr` no search param (curta duração, não persiste em history URL).
+//     [Pular] = instructions vazio → gera com todas as teses recomendadas.
 // O componente chama só este hook (JSX + binding).
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -93,16 +95,39 @@ export function useDisposicao({
       toast.error("Não foi possível dar ciência. Tente novamente."),
   });
 
-  const gerarPecaHref = (actionItemId: string) =>
-    `/pecas/nova?providencia=${actionItemId}&intimacao=${intimationId}&auto=1&retorno=${encodeURIComponent(
-      retorno,
-    )}`;
+  // ── Modal de orientação ("Gerar peça") ─────────────────────────────────────
+  // Ao clicar "Gerar peça", abrimos o modal. O caller obtém actionItemId pelo
+  // closure. Ao confirmar (com ou sem instructions), navegamos para a rota de
+  // construção passando `instr` como search param de curta duração — evita
+  // query string longa (2000 chars) no histórico do browser.
+  const [modalOpen, setModalOpen] = useState(false);
+  const [pendingActionItemId, setPendingActionItemId] = useState<string>("");
+
+  const openGerarModal = (actionItemId: string) => {
+    setPendingActionItemId(actionItemId);
+    setModalOpen(true);
+  };
+
+  // Monta a URL de auto-partida. Se instructions for não-vazio, o caller deve
+  // armazená-lo em sessionStorage (keyed by actionItemId) antes de navegar —
+  // ConstructionEntry lê e limpa. Evita colocar 2000 chars na URL/history.
+  const buildGerarUrl = (actionItemId: string): string =>
+    `/pecas/nova?providencia=${actionItemId}&intimacao=${intimationId}&auto=1&retorno=${encodeURIComponent(retorno)}`;
 
   return {
     disposicao,
     onDarCiencia: () => darCiencia.mutate(disposicao.ciencia),
     dandoCiencia: darCiencia.isPending || resolver.isPending,
     cienciaErro: darCiencia.isError,
-    gerarPecaHref,
+    // Modal state
+    modalOpen,
+    pendingActionItemId,
+    openGerarModal,
+    closeGerarModal: () => setModalOpen(false),
+    buildGerarUrl,
+    pecaLabel: pendingActionItemId
+      ? (disposicao.pecas.find((p) => p.actionItemId === pendingActionItemId)
+          ?.label ?? "")
+      : "",
   };
 }

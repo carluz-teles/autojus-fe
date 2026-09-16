@@ -1,13 +1,18 @@
 "use client";
 
 import { Check, FileText, LoaderCircle, Sparkles } from "lucide-react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import type { IntimacaoProvidencia } from "@/features/intimacoes/types";
+import { GerarPecaModal } from "@/features/pecas-v2/components/pregen/gerar-peca-modal";
 
 import { ANALYSIS_PROCESSING_MESSAGE } from "../../../intimacoes/lib/analysis-materialization";
 import { useDisposicao } from "../../hooks/use-disposicao";
+
+// Chave sessionStorage usada para transportar `instructions` do modal até o
+// ConstructionEntry, evitando colocar 2000 chars na URL/history.
+export const INSTRUCTIONS_SESSION_KEY = "peca:instructions:";
 
 /**
  * DISPOSIÇÃO da intimação — a unidade de trabalho. Substitui o antigo bloco de
@@ -37,12 +42,40 @@ export function DisposicaoSection({
   reviewBlocked?: boolean;
   checkingReview?: boolean;
 }) {
-  const { disposicao, onDarCiencia, dandoCiencia, cienciaErro, gerarPecaHref } =
-    useDisposicao({ intimationId, providencias, retorno });
+  const router = useRouter();
+  const {
+    disposicao,
+    onDarCiencia,
+    dandoCiencia,
+    cienciaErro,
+    modalOpen,
+    pendingActionItemId,
+    openGerarModal,
+    closeGerarModal,
+    buildGerarUrl,
+    pecaLabel,
+  } = useDisposicao({ intimationId, providencias, retorno });
 
   const bloqueado = reviewBlocked || checkingReview;
   // Ainda sem action_items: intimação por analisar (ou análise em curso).
   const semAnalise = disposicao.vazia && !analyzed;
+
+  function handleGenerate(instructions: string) {
+    const url = buildGerarUrl(pendingActionItemId);
+    if (instructions) {
+      // Transporta as instructions via sessionStorage (curta duração — limpo
+      // pelo ConstructionEntry após a leitura).
+      try {
+        sessionStorage.setItem(
+          `${INSTRUCTIONS_SESSION_KEY}${pendingActionItemId}`,
+          instructions,
+        );
+      } catch {
+        // sessionStorage indisponível (modo privado restrito) — degrada sem instructions.
+      }
+    }
+    router.push(url);
+  }
 
   return (
     <section
@@ -147,8 +180,14 @@ export function DisposicaoSection({
               </div>
               <Button
                 variant={peca.jaIniciada ? "outline" : "default"}
-                nativeButton={false}
-                render={<Link href={gerarPecaHref(peca.actionItemId)} />}
+                onClick={() => {
+                  if (peca.jaIniciada) {
+                    // Peça já iniciada: abre direto (reabrir rascunho existente).
+                    router.push(buildGerarUrl(peca.actionItemId));
+                  } else {
+                    openGerarModal(peca.actionItemId);
+                  }
+                }}
               >
                 <Sparkles data-icon="inline-start" />
                 {peca.jaIniciada ? "Abrir peça" : "Gerar peça"}
@@ -168,6 +207,16 @@ export function DisposicaoSection({
           Não foi possível analisar a intimação. Tente novamente.
         </p>
       ) : null}
+
+      {/* Modal de orientação opcional da geração */}
+      <GerarPecaModal
+        open={modalOpen}
+        onOpenChange={(v) => {
+          if (!v) closeGerarModal();
+        }}
+        onGenerate={handleGenerate}
+        pecaLabel={pecaLabel}
+      />
     </section>
   );
 }

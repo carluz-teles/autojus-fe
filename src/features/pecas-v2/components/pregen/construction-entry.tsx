@@ -8,6 +8,7 @@ import { PageFrame, ShellBackLink } from "@/components/shell/page-frame";
 import { Button } from "@/components/ui/button";
 import { useActionItemDetalhe } from "@/features/action-items/hooks/use-action-items";
 import { iniciarActionItem } from "@/features/action-items/services/action-items.service";
+import { INSTRUCTIONS_SESSION_KEY } from "@/features/prazos/components/intimacao-detalhe/disposicao-section";
 import { type ApiFetcher, useApi } from "@/lib/api/use-api";
 
 import {
@@ -22,10 +23,14 @@ import {
 // da intimação e chama /generate, pulando a tela de escolha de teses. Espelha o
 // `create` da usePartida (idempotente): reabrir peça existente nunca substitui
 // conteúdo. Só age numa peça recém-criada (CREATED, sem conteúdo).
+//
+// `instructions` vem do modal de orientação opcional (GerarPecaModal), transportado
+// via sessionStorage para evitar colocar 2000 chars na URL/history.
 async function autoPartida(
   api: ApiFetcher,
   draftId: string,
   intimationId: string,
+  instructions?: string,
 ): Promise<void> {
   const draft = await getDraft(api, draftId);
   if (draft.sagaState !== "CREATED" || draft.contentHtml) return;
@@ -36,7 +41,21 @@ async function autoPartida(
     api,
     draftId,
     theses.map((t) => t.id),
+    instructions || undefined,
   );
+}
+
+/** Lê e limpa as instructions do sessionStorage (curta duração, chave por actionItemId). */
+function consumeInstructions(actionItemId: string): string {
+  if (!actionItemId || typeof sessionStorage === "undefined") return "";
+  const key = `${INSTRUCTIONS_SESSION_KEY}${actionItemId}`;
+  try {
+    const value = sessionStorage.getItem(key) ?? "";
+    if (value) sessionStorage.removeItem(key);
+    return value;
+  } catch {
+    return "";
+  }
 }
 
 // Both origins resume the same draft; empty drafts open its preparation canvas.
@@ -100,11 +119,16 @@ export function ConstructionEntry({
           ).id;
         }
       }
+      // Lê as instructions do sessionStorage (colocadas pelo GerarPecaModal).
+      // Chamada aqui (dentro do mutationFn, no client) pra garantir que está
+      // no browser.
+      const instructions = consumeInstructions(actionItemId || intimationId);
+
       // Auto-partida: dispara a geração direto. Uma falha aqui degrada para a tela
       // de preparação (o draft já existe) — não trava o usuário.
       if (auto && origem) {
         try {
-          await autoPartida(api, draftId, origem);
+          await autoPartida(api, draftId, origem, instructions || undefined);
         } catch {
           // segue para /pecas/:id na tela de preparação (pregen).
         }

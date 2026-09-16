@@ -9,7 +9,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -62,6 +62,7 @@ export function ConstructionPage({ id }: { id: string }) {
   const thesisBatch = useThesisBatch(h.theses.theses);
   const fetcher = useApi();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const qc = useQueryClient();
   const save = useContentSave(id, draft);
   const editor = useRef<RichEditorHandle | null>(null);
@@ -244,7 +245,18 @@ export function ConstructionPage({ id }: { id: string }) {
     );
   const ready =
     h.stage === "pronta" || (h.stage === "falha" && !!draft.contentHtml);
-  if (h.stage === "pregen" || (h.stage === "falha" && !draft.contentHtml)) {
+  // DELIVERABLE 4: fresh auto-draft (CREATED, no content, auto=1 param) must NEVER
+  // render the pregen screen — it goes straight to the gerando loader.
+  // deriveStage already returns "pregen" for saga CREATED && !firedGenerate, so we
+  // intercept here before rendering the pregen branch.
+  const isAutoFlow = searchParams.get("auto") === "1";
+  const isFreshAutoPregen =
+    h.stage === "pregen" && isAutoFlow && !draft.contentHtml;
+
+  if (
+    !isFreshAutoPregen &&
+    (h.stage === "pregen" || (h.stage === "falha" && !draft.contentHtml))
+  ) {
     const docs = draftToPecaContexto(draft).autos;
     return (
       <div className="bg-background flex min-h-0 flex-1 flex-col">
@@ -717,12 +729,14 @@ export function ConstructionPage({ id }: { id: string }) {
                     </Button>
                   </div>
                 )}
-                {generationActive && (
+                {(generationActive || isFreshAutoPregen) && (
                   <GerandoCenter
                     key={`${id}:${draft.updatedAt}`}
                     draftId={id}
                     streamEnabled={draft.sagaState === "EXTRACTING"}
                     startedAt={draft.updatedAt}
+                    thesesDone={h.theses.theses.length > 0}
+                    thesesCount={h.theses.streaming?.count}
                   />
                 )}
                 {ready && !generationActive && (
