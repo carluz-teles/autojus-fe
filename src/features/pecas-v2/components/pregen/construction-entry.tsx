@@ -15,17 +15,23 @@ import { runAssessmentAndGenerate } from "../../lib/assessment-lifecycle";
 import {
   buildAssessmentInput,
   createDraft,
-  generateIntimationTheses,
+  generateTheses,
   getDraft,
-  getIntimationTheses,
+  getTheses,
 } from "../../services/pecas-v2.service";
 
 // Auto-partida: dispara a geração da peça direto — auto-seleciona TODAS as teses
-// da intimação e roda o ciclo OBRIGATÓRIO da conferência (assessment request →
+// do RASCUNHO e roda o ciclo OBRIGATÓRIO da conferência (assessment request →
 // poll → auto-validate → generate), pulando a tela de escolha de teses e a tela
 // de revisão de fontes. Espelha o `create` da usePartida (idempotente): reabrir
 // peça existente nunca substitui conteúdo. Só age numa peça recém-criada
 // (CREATED, sem conteúdo).
+//
+// IMPORTANTE (fix do 404): as teses DEVEM ser draft-scoped (getTheses/
+// generateTheses → /v1/pecas/:id/theses). A conferência draft-scoped carrega o
+// Basis via ListSuggestedThesesByDraft(draftId); ids intimation-scoped (draft_id
+// NULL) não existem nessa lista → ErrSuggestedThesisNotFound → 404. Usar as teses
+// do próprio rascunho (as mesmas do pregen/gerarMinuta) faz os ids baterem.
 //
 // `instructions` vem do modal de orientação opcional (GerarPecaModal), transportado
 // via sessionStorage para evitar colocar 2000 chars na URL/history.
@@ -35,14 +41,13 @@ import {
 async function autoPartida(
   api: ApiFetcher,
   draftId: string,
-  intimationId: string,
   instructions?: string,
 ): Promise<void> {
   const draft = await getDraft(api, draftId);
   if (draft.sagaState !== "CREATED" || draft.contentHtml) return;
-  let theses = await getIntimationTheses(api, intimationId);
-  if (theses.length === 0)
-    theses = await generateIntimationTheses(api, intimationId);
+  // Teses DRAFT-scoped — precisam existir no Basis draft-scoped da conferência.
+  let theses = await getTheses(api, draftId);
+  if (theses.length === 0) theses = await generateTheses(api, draftId);
   // Input canônico — a MESMA instância vai para request/validate/generate.
   const input = buildAssessmentInput(
     theses.map((t) => t.id),
@@ -146,9 +151,11 @@ export function ConstructionEntry({
       // Auto-partida: roda o ciclo conferência → generate. Uma falha aqui degrada
       // para a tela de preparação (o draft já existe) — não trava o usuário, e as
       // instructions permanecem no sessionStorage para uma nova tentativa.
+      // O guard `origem` garante que o rascunho tem intimação de origem (a
+      // construção exige uma); as teses em si são resolvidas draft-scoped.
       if (auto && origem) {
         try {
-          await autoPartida(api, draftId, origem, instructions || undefined);
+          await autoPartida(api, draftId, instructions || undefined);
           // Sucesso (generate 202): agora sim limpa as instructions.
           clearInstructions(storageKey);
         } catch {
