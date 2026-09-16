@@ -267,7 +267,22 @@ export function ProcessoHub({ numero }: { numero: string }) {
               </dl>
             </section>
 
-            {identity.prazo && (
+            {/* Hero único: o próximo passo absorve o prazo mais próximo (data + badge
+                + ato). A faixa "Prazo em atenção" vira fallback só quando o motor não
+                deriva um próximo passo. */}
+            {p.proximo_passo ? (
+              <ProximoPassoCard
+                passo={p.proximo_passo}
+                phase={p.phase}
+                prazo={identity.prazo}
+                onConferir={
+                  p.proximo_passo.kind === "CUMPRIR_PRAZO" ||
+                  p.proximo_passo.kind === "INICIAR_PROVIDENCIA"
+                    ? h.irParaTrabalho
+                    : undefined
+                }
+              />
+            ) : identity.prazo ? (
               <section
                 aria-label="Prazo em atenção"
                 className="bg-gold/5 border-gold/25 flex flex-col justify-between gap-3 rounded-xl border px-5 py-4 shadow-sm sm:flex-row sm:items-center"
@@ -291,20 +306,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                   <ArrowRight />
                 </Button>
               </section>
-            )}
-
-            {p.proximo_passo && (
-              <ProximoPassoCard
-                passo={p.proximo_passo}
-                phase={p.phase}
-                onConferir={
-                  p.proximo_passo.kind === "CUMPRIR_PRAZO" ||
-                  p.proximo_passo.kind === "INICIAR_PROVIDENCIA"
-                    ? h.irParaTrabalho
-                    : undefined
-                }
-              />
-            )}
+            ) : null}
 
             <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
               <div className="flex min-w-0 flex-col gap-5">

@@ -13,11 +13,11 @@ export const DEGREE_LABEL: Record<ProcessoDegree, string> = {
 
 // As 5 fases do stepper, em ordem, com rótulo pt-BR — fonte única do stepper e do label.
 export const FASE_STEPS: { key: ProcessoPhase; label: string }[] = [
-  { key: "CONHECIMENTO", label: "Conhecimento" },
+  { key: "CONHECIMENTO", label: "Início" },
   { key: "INSTRUCAO", label: "Instrução" },
   { key: "SENTENCA", label: "Sentença" },
   { key: "RECURSO", label: "Recurso" },
-  { key: "EXECUCAO", label: "Execução" },
+  { key: "EXECUCAO", label: "Cumprimento/Execução" },
 ];
 
 interface LifecycleInfo {

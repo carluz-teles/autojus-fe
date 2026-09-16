@@ -11,10 +11,22 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 import { FASE_STEPS } from "../lib/apresentacao";
 import type { ProcessoPhase, ProximoPasso, ProximoPassoKind } from "../types";
+
+/** Prazo mais próximo em aberto — absorvido da antiga faixa "Prazo em atenção". */
+export interface ProximoPassoPrazo {
+  /** Vencimento formatado DD/MM/AAAA. */
+  data: string;
+  /** Tipo do ato (ex.: "Apelação"). */
+  ato: string;
+  /** Resumo de urgência (ex.: "20 dias corridos restantes"). */
+  resumo: string;
+  variant: "destructive" | "warning" | "success";
+}
 
 const META: Record<ProximoPassoKind, { icon: LucideIcon; kicker: string }> = {
   CUMPRIR_PRAZO: { icon: Clock, kicker: "Cumprir prazo" },
@@ -49,6 +61,10 @@ interface Props {
   passo: ProximoPasso;
   /** Fase processual atual (derivada no BE); mostra o "onde está" acima do passo. */
   phase?: ProcessoPhase | null;
+  /** Prazo mais próximo em aberto — quando presente, o hero absorve a antiga faixa
+   *  "Prazo em atenção" (data + badge de urgência + ato) e o sufixo "— vence…" sai
+   *  do label pra não duplicar com o badge. */
+  prazo?: ProximoPassoPrazo | null;
   /** Ação opcional — leva ao trabalho do processo (prazos/providências). */
   onConferir?: () => void;
 }
@@ -59,10 +75,15 @@ interface Props {
  * BE devolve `proximo_passo` não-null (motor determinístico). Sem sugestão → o
  * chamador não monta este componente.
  */
-export function ProximoPassoCard({ passo, phase, onConferir }: Props) {
+export function ProximoPassoCard({ passo, phase, prazo, onConferir }: Props) {
   const { icon: Icon, kicker } = META[passo.kind];
-  const urgent = isUrgent(passo);
+  const urgent = isUrgent(passo) || prazo?.variant === "destructive";
   const fase = faseInfo(phase);
+  // Com o bloco de prazo presente, o sufixo "— vence…/— vencido…" do label vira
+  // redundante com a data + badge — remove-o do label exibido (o motor mantém no dado).
+  const label = prazo
+    ? passo.label.replace(/\s*—\s*(vence|vencido)\b.*$/iu, "")
+    : passo.label;
   const tone = urgent
     ? "border-destructive/25 bg-destructive/5"
     : "border-primary/20 bg-primary/5";
@@ -111,8 +132,19 @@ export function ProximoPassoCard({ passo, phase, onConferir }: Props) {
             {kicker}
           </p>
           <p className="font-display text-base leading-snug font-medium">
-            {passo.label}
+            {label}
           </p>
+          {prazo ? (
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <span className="text-lg font-semibold tabular-nums">
+                {prazo.data}
+              </span>
+              <Badge variant={prazo.variant}>{prazo.resumo}</Badge>
+              <span className="text-muted-foreground text-sm">
+                · {prazo.ato}
+              </span>
+            </div>
+          ) : null}
           <p className="text-muted-foreground text-sm leading-relaxed">
             <span className="text-foreground font-medium">Por que: </span>
             {passo.rationale}
