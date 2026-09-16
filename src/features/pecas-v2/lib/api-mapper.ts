@@ -50,6 +50,7 @@ export function mapPecaDetailToDraft(api: PecaDetailAPI): Draft {
     title: humanizeTitle(api.title, api.piece_type),
     status: (api.status as Status) ?? "DRAFT",
     sagaState: (api.saga_state as SagaState) ?? "CREATED",
+    currentVersionId: api.current_version_id ?? null,
     authorship: api.authorship,
     updatedAt: api.updated_at,
     preamble: mapPreamble(structured),

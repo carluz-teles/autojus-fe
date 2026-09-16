@@ -26,6 +26,10 @@ export interface PecaDetailAPI {
   content: string;
   status: string;
   saga_state: string;
+  /** Versão atual persistida da peça. null quando nunca gerou (fresh draft).
+   *  Necessário para o `expected_current_version_id` do generate quando há
+   *  assessment ligado (OCC guard). */
+  current_version_id: string | null;
   created_at: string;
   updated_at: string;
   structured_content: StructuredContentAPI | null;
@@ -54,6 +58,60 @@ export interface PecaDetailAPI {
   filed_at: string | null;
   filing_number: string;
   signed_pdf_url: string | null; // Fatia 2b — presigned GET (15 min); null antes de assinar
+}
+
+// ── Assessment ("conferência das fontes") — gate obrigatório antes do generate ──
+// Contrato do BE (internal/draft/assessment_entity.go). O `input` (thesis_ids/
+// instructions/tone) deve ser IDÊNTICO entre request → validate → generate, ou o
+// BE devolve `assessment_stale`. Ver AssessmentInput (canonical source of truth).
+
+/** Input canônico da conferência — o MESMO objeto em request/validate/generate. */
+export interface AssessmentInputAPI {
+  thesis_ids: string[];
+  instructions: string;
+  tone: string;
+}
+
+export interface AssessmentValidationAPI {
+  id: string;
+  validated_by: string;
+  validated_at: string;
+}
+
+/** A conferência gerada (presente quando Request.status === "succeeded"). */
+export interface AssessmentAPI {
+  id: string;
+  version_no: number;
+  content_hash: string;
+  input_fingerprint: string;
+  source_revision: string;
+  created_at: string;
+  validation: AssessmentValidationAPI | null;
+}
+
+export interface AssessmentRequestErrorAPI {
+  code: string;
+  message: string;
+}
+
+/** Status do pedido async de conferência (queued/running/succeeded/failed/superseded). */
+export interface AssessmentRequestStateAPI {
+  id: string;
+  status: string;
+  input_fingerprint: string;
+  requested_at: string;
+  finished_at: string | null;
+  error: AssessmentRequestErrorAPI | null;
+}
+
+/** GET /v1/pecas/:id/assessment — estado completo. */
+export interface AssessmentStateAPI {
+  scope_type: string;
+  scope_id: string;
+  assessment: AssessmentAPI | null;
+  request: AssessmentRequestStateAPI | null;
+  needs_refresh: boolean;
+  input: AssessmentInputAPI | null;
 }
 
 // role é o enum bruto do BE — o mapper converte pra autor/reu/procurador
