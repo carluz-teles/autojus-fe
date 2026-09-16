@@ -122,6 +122,9 @@ export function useConstruction(id: string) {
   const [highlightedDocId, setHighlightedDocId] = useState<string | null>(null);
   // Disparei "Gerar minuta" nesta sessão? Ponte otimista até o saga avançar.
   const [firedGenerate, setFiredGenerate] = useState(false);
+  // Conferência (assessment) em andamento? Sinal real da fase 2 do loader — o
+  // ciclo REST (request+poll+validate) roda antes do generate flipar EXTRACTING.
+  const [firedAssessment, setFiredAssessment] = useState(false);
   const [instructionsEdit, setInstructionsEdit] = useState<string | null>(null);
   const instructions = instructionsEdit ?? draftQuery.data?.instructions ?? "";
 
@@ -178,10 +181,18 @@ export function useConstruction(id: string) {
     if (!hasOrigin || !hasTeor || generate.isPending || saga === "EXTRACTING")
       throw new Error("Geração indisponível");
     setFiredGenerate(true);
+    setFiredAssessment(false);
     try {
-      await generate.mutateAsync({ thesisIds, revision });
+      await generate.mutateAsync({
+        thesisIds,
+        instructions: instructions.trim(),
+        expectedCurrentVersionId: draftQuery.data?.currentVersionId ?? null,
+        revision,
+        onAssessmentStarted: () => setFiredAssessment(true),
+      });
     } catch (error) {
       setFiredGenerate(false);
+      setFiredAssessment(false);
       throw error;
     }
   };
@@ -198,10 +209,19 @@ export function useConstruction(id: string) {
     )
       return;
     setFiredGenerate(true);
+    setFiredAssessment(false);
     generate.mutate(
-      { thesisIds: theses.selectedIds, instructions: instructions.trim() },
       {
-        onError: () => setFiredGenerate(false),
+        thesisIds: theses.selectedIds,
+        instructions: instructions.trim(),
+        expectedCurrentVersionId: draftQuery.data?.currentVersionId ?? null,
+        onAssessmentStarted: () => setFiredAssessment(true),
+      },
+      {
+        onError: () => {
+          setFiredGenerate(false);
+          setFiredAssessment(false);
+        },
       },
     );
   };
@@ -277,6 +297,8 @@ export function useConstruction(id: string) {
     regenerateWithTheses,
     contentEdited: !!draftQuery.data?.contentEdited,
     isGenerating: generate.isPending,
+    // Conferência (assessment) em curso — sinal real da fase 2 do loader.
+    assessmentActive: firedAssessment && saga !== "EXTRACTING",
     hasOrigin,
     hasTeor,
     voltar,

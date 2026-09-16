@@ -9,7 +9,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -37,6 +37,7 @@ import { useConstruction } from "../../hooks/use-construction";
 import { useContentSave } from "../../hooks/use-content-save";
 import { draftKeys } from "../../hooks/use-draft";
 import { useThesisBatch } from "../../hooks/use-thesis-batch";
+import { shouldForceAutoLoader } from "../../lib/auto-flow";
 import { draftToPecaContexto } from "../../lib/peca-contexto";
 import type { Draft } from "../../types";
 import { ContextRail } from "../pregen/context-rail";
@@ -62,6 +63,7 @@ export function ConstructionPage({ id }: { id: string }) {
   const thesisBatch = useThesisBatch(h.theses.theses);
   const fetcher = useApi();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const qc = useQueryClient();
   const save = useContentSave(id, draft);
   const editor = useRef<RichEditorHandle | null>(null);
@@ -244,7 +246,32 @@ export function ConstructionPage({ id }: { id: string }) {
     );
   const ready =
     h.stage === "pronta" || (h.stage === "falha" && !!draft.contentHtml);
-  if (h.stage === "pregen" || (h.stage === "falha" && !draft.contentHtml)) {
+  // DELIVERABLE 4: fresh auto-draft (CREATED, no content, auto=1 param) skips the
+  // pregen screen and shows the gerando loader — BUT ONLY while generation is
+  // genuinely in flight (the mutation is running) or the saga has advanced to
+  // EXTRACTING. deriveStage returns "pregen" for saga CREATED && !firedGenerate.
+  //
+  // HIGH fix: the auto sequence (assessment→generate) runs BEFORE navigation, so
+  // when we land here the draft is either EXTRACTING (success — handled by the
+  // normal `gerando` path) or still CREATED (the auto cycle FAILED: poll timeout,
+  // assessment failed/superseded, or a request/validate/generate error). A still-
+  // CREATED draft here is the FAILURE case — forcing the loader would strand the
+  // user on an infinite spinner with no stream to advance it. Instead we fall
+  // through to the pregen PreparationCanvas, whose manual "Gerar minuta" re-runs
+  // the full lifecycle (gerarMinuta) reusing the instructions kept in
+  // sessionStorage. The success path (EXTRACTING) is unaffected.
+  const isFreshAutoPregen = shouldForceAutoLoader({
+    stage: h.stage,
+    isAutoFlow: searchParams.get("auto") === "1",
+    hasContent: !!draft.contentHtml,
+    isGenerating: h.isGenerating,
+    sagaState: draft.sagaState,
+  });
+
+  if (
+    !isFreshAutoPregen &&
+    (h.stage === "pregen" || (h.stage === "falha" && !draft.contentHtml))
+  ) {
     const docs = draftToPecaContexto(draft).autos;
     return (
       <div className="bg-background flex min-h-0 flex-1 flex-col">
@@ -717,12 +744,15 @@ export function ConstructionPage({ id }: { id: string }) {
                     </Button>
                   </div>
                 )}
-                {generationActive && (
+                {(generationActive || isFreshAutoPregen) && (
                   <GerandoCenter
                     key={`${id}:${draft.updatedAt}`}
                     draftId={id}
                     streamEnabled={draft.sagaState === "EXTRACTING"}
                     startedAt={draft.updatedAt}
+                    thesesDone={h.theses.theses.length > 0}
+                    thesesCount={h.theses.streaming?.count}
+                    assessmentActive={h.assessmentActive}
                   />
                 )}
                 {ready && !generationActive && (

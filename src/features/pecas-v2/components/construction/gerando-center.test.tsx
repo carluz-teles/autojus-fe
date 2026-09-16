@@ -57,13 +57,15 @@ describe("Transição da preparação para a folha", () => {
 
   it("abre a folha no primeiro texto, sem esperar a conclusão", async () => {
     await act(async () => mocks.stream!.onStage("drafting_sections"));
+    // Still on loader (phase 4 active, no content yet)
     expect(container.querySelector("ol")).not.toBeNull();
-    expect(container.textContent).toContain("Preparando a redação");
+    expect(container.textContent).toContain("Redigindo a minuta");
     await act(async () => mocks.stream!.onProgress(""));
     expect(
       container.querySelector('[aria-label="Texto da peça em geração"]'),
     ).toBeNull();
     await act(async () => mocks.stream!.onProgress("Primeiro trecho"));
+    // Sheet opened — loader gone, writing panel shown
     expect(container.querySelector("ol")).toBeNull();
     expect(
       container.querySelector('[aria-label="Texto da peça em geração"]')
@@ -97,5 +99,119 @@ describe("Transição da preparação para a folha", () => {
     await act(async () => mocks.stream!.onProgress("Nova minuta"));
     expect(container.textContent).not.toContain("Acompanhamento interrompido");
     expect(container.textContent).toContain("Nova minuta");
+  });
+});
+
+describe("4-phase loader sem timers", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+  beforeEach(async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    mocks.invalidate.mockClear();
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+  });
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  });
+
+  it("sem thesesDone mostra fase 1 ativa (Consultando teses)", async () => {
+    await act(async () =>
+      root.render(
+        createElement(GerandoCenter, {
+          draftId: "qa2",
+          startedAt: "2026-09-09T12:10:56.662788Z",
+          streamEnabled: false,
+          thesesDone: false,
+        }),
+      ),
+    );
+    expect(container.textContent).toContain("Consultando teses");
+    // Phase 1 active: aria-current="step"
+    const active = container.querySelector('[aria-current="step"]');
+    expect(active?.textContent).toContain("Consultando teses");
+  });
+
+  it("thesesDone=true sem stage mostra fase 2 ativa (Reunindo o contexto)", async () => {
+    await act(async () =>
+      root.render(
+        createElement(GerandoCenter, {
+          draftId: "qa3",
+          startedAt: "2026-09-09T12:10:56.662788Z",
+          streamEnabled: false,
+          thesesDone: true,
+        }),
+      ),
+    );
+    const active = container.querySelector('[aria-current="step"]');
+    expect(active?.textContent).toContain("Reunindo o contexto");
+  });
+
+  it("assessmentActive=true mantém fase 2 (conferência) sem stage do stream", async () => {
+    await act(async () =>
+      root.render(
+        createElement(GerandoCenter, {
+          draftId: "qa3b",
+          startedAt: "2026-09-09T12:10:56.662788Z",
+          streamEnabled: false,
+          // teses ainda não resolvidas localmente, mas a conferência já roda:
+          thesesDone: false,
+          assessmentActive: true,
+        }),
+      ),
+    );
+    const active = container.querySelector('[aria-current="step"]');
+    expect(active?.textContent).toContain("Reunindo o contexto");
+  });
+
+  it("stage loading_context avança para fase 2", async () => {
+    await act(async () =>
+      root.render(
+        createElement(GerandoCenter, {
+          draftId: "qa4",
+          startedAt: "2026-09-09T12:10:56.662788Z",
+          streamEnabled: true,
+          thesesDone: true,
+        }),
+      ),
+    );
+    await act(async () => mocks.stream!.onStage("loading_context"));
+    const active = container.querySelector('[aria-current="step"]');
+    expect(active?.textContent).toContain("Reunindo o contexto");
+  });
+
+  it("stage analyzing_sources avança para fase 3", async () => {
+    await act(async () =>
+      root.render(
+        createElement(GerandoCenter, {
+          draftId: "qa5",
+          startedAt: "2026-09-09T12:10:56.662788Z",
+          streamEnabled: true,
+          thesesDone: true,
+        }),
+      ),
+    );
+    await act(async () => mocks.stream!.onStage("analyzing_sources"));
+    const active = container.querySelector('[aria-current="step"]');
+    expect(active?.textContent).toContain("Consultando os autos");
+  });
+
+  it("stage drafting_sections avança para fase 4", async () => {
+    await act(async () =>
+      root.render(
+        createElement(GerandoCenter, {
+          draftId: "qa6",
+          startedAt: "2026-09-09T12:10:56.662788Z",
+          streamEnabled: true,
+          thesesDone: true,
+        }),
+      ),
+    );
+    await act(async () => mocks.stream!.onStage("drafting_sections"));
+    const active = container.querySelector('[aria-current="step"]');
+    expect(active?.textContent).toContain("Redigindo a minuta");
   });
 });

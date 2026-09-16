@@ -131,6 +131,9 @@ export interface Draft {
   title: string;
   status: Status;
   sagaState: SagaState;
+  /** Versão atual persistida (null quando nunca gerou). Usada como
+   *  `expected_current_version_id` no generate quando há assessment (OCC). */
+  currentVersionId: string | null;
   authorship: Authorship;
   updatedAt: string;
   preamble: DraftPreamble;

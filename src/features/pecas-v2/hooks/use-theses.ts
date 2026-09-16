@@ -23,9 +23,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "@/lib/api/use-api";
 import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
+import { runAssessmentAndGenerate } from "../lib/assessment-lifecycle";
 import { isSelectedForGeneration } from "../lib/thesis-selection";
 export { isSelectedForGeneration } from "../lib/thesis-selection";
 import * as svc from "../services/pecas-v2.service";
+import { buildAssessmentInput } from "../services/pecas-v2.service";
 import type { Draft, Thesis, ThesisState } from "../types";
 import { draftKeys } from "./use-draft";
 
@@ -95,26 +97,38 @@ function useUpdateThesisState(id: string) {
   });
 }
 
+/** Parâmetros da geração — o hook roda o ciclo OBRIGATÓRIO da conferência
+ *  (request → poll → auto-validate → generate) via runAssessmentAndGenerate.
+ *  `expectedCurrentVersionId` (current_version_id do draft) é o OCC guard do
+ *  generate. `revision` é a substituição de conteúdo na regeração. */
+export interface GenerateDraftParams {
+  thesisIds: string[];
+  instructions?: string;
+  expectedCurrentVersionId: string | null;
+  revision?: string;
+  /** Sinaliza a fase 2 (conferência) para o loader — sem timers. */
+  onAssessmentStarted?: () => void;
+}
+
 function useGenerateDraft(id: string) {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (
-      input:
-        | string[]
-        | { thesisIds: string[]; revision?: string; instructions?: string },
-    ) =>
-      Array.isArray(input)
-        ? svc.generateDraft(fetcher, id, input)
-        : svc.generateDraft(
-            fetcher,
-            id,
-            input.thesisIds,
-            input.instructions,
-            input.revision ? { revision: input.revision } : undefined,
-          ),
-    onSuccess: (result, input) => {
-      const selected = new Set(Array.isArray(input) ? input : input.thesisIds);
+    mutationFn: (params: GenerateDraftParams) =>
+      runAssessmentAndGenerate(
+        fetcher,
+        id,
+        buildAssessmentInput(params.thesisIds, params.instructions ?? ""),
+        {
+          expectedCurrentVersionId: params.expectedCurrentVersionId,
+          replacement: params.revision
+            ? { revision: params.revision }
+            : undefined,
+          onAssessmentStarted: params.onAssessmentStarted,
+        },
+      ),
+    onSuccess: (result, params) => {
+      const selected = new Set(params.thesisIds);
       qc.setQueryData<Thesis[]>(thesesKey(id), (list) =>
         list?.map((thesis) => ({
           ...thesis,
