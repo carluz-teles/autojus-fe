@@ -737,6 +737,7 @@ export function ConstructionPage({ id }: { id: string }) {
                     startedAt={draft.updatedAt}
                     thesesDone={h.theses.theses.length > 0}
                     thesesCount={h.theses.streaming?.count}
+                    assessmentActive={h.assessmentActive}
                   />
                 )}
                 {ready && !generationActive && (

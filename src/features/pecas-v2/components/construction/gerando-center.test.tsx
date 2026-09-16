@@ -150,6 +150,23 @@ describe("4-phase loader sem timers", () => {
     expect(active?.textContent).toContain("Reunindo o contexto");
   });
 
+  it("assessmentActive=true mantém fase 2 (conferência) sem stage do stream", async () => {
+    await act(async () =>
+      root.render(
+        createElement(GerandoCenter, {
+          draftId: "qa3b",
+          startedAt: "2026-09-09T12:10:56.662788Z",
+          streamEnabled: false,
+          // teses ainda não resolvidas localmente, mas a conferência já roda:
+          thesesDone: false,
+          assessmentActive: true,
+        }),
+      ),
+    );
+    const active = container.querySelector('[aria-current="step"]');
+    expect(active?.textContent).toContain("Reunindo o contexto");
+  });
+
   it("stage loading_context avança para fase 2", async () => {
     await act(async () =>
       root.render(

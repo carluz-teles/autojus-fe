@@ -11,21 +11,27 @@ import { iniciarActionItem } from "@/features/action-items/services/action-items
 import { INSTRUCTIONS_SESSION_KEY } from "@/features/prazos/components/intimacao-detalhe/disposicao-section";
 import { type ApiFetcher, useApi } from "@/lib/api/use-api";
 
+import { runAssessmentAndGenerate } from "../../lib/assessment-lifecycle";
 import {
+  buildAssessmentInput,
   createDraft,
-  generateDraft,
   generateIntimationTheses,
   getDraft,
   getIntimationTheses,
 } from "../../services/pecas-v2.service";
 
 // Auto-partida: dispara a geração da peça direto — auto-seleciona TODAS as teses
-// da intimação e chama /generate, pulando a tela de escolha de teses. Espelha o
-// `create` da usePartida (idempotente): reabrir peça existente nunca substitui
-// conteúdo. Só age numa peça recém-criada (CREATED, sem conteúdo).
+// da intimação e roda o ciclo OBRIGATÓRIO da conferência (assessment request →
+// poll → auto-validate → generate), pulando a tela de escolha de teses e a tela
+// de revisão de fontes. Espelha o `create` da usePartida (idempotente): reabrir
+// peça existente nunca substitui conteúdo. Só age numa peça recém-criada
+// (CREATED, sem conteúdo).
 //
 // `instructions` vem do modal de orientação opcional (GerarPecaModal), transportado
 // via sessionStorage para evitar colocar 2000 chars na URL/history.
+//
+// O auto-validate é silencioso (sem card de revisão de fontes) — a garantia se
+// mantém via validated_by = usuário atual, conforme o design aprovado.
 async function autoPartida(
   api: ApiFetcher,
   draftId: string,
@@ -37,24 +43,36 @@ async function autoPartida(
   let theses = await getIntimationTheses(api, intimationId);
   if (theses.length === 0)
     theses = await generateIntimationTheses(api, intimationId);
-  await generateDraft(
-    api,
-    draftId,
+  // Input canônico — a MESMA instância vai para request/validate/generate.
+  const input = buildAssessmentInput(
     theses.map((t) => t.id),
-    instructions || undefined,
+    instructions ?? "",
   );
+  await runAssessmentAndGenerate(api, draftId, input, {
+    expectedCurrentVersionId: draft.currentVersionId,
+  });
 }
 
-/** Lê e limpa as instructions do sessionStorage (curta duração, chave por actionItemId). */
-function consumeInstructions(actionItemId: string): string {
+/** Lê as instructions do sessionStorage SEM apagar (BLOCKER-3: sobrevivem para
+ *  retry se assessment/generate falhar). A limpeza só ocorre após generate 202. */
+function peekInstructions(actionItemId: string): string {
   if (!actionItemId || typeof sessionStorage === "undefined") return "";
-  const key = `${INSTRUCTIONS_SESSION_KEY}${actionItemId}`;
   try {
-    const value = sessionStorage.getItem(key) ?? "";
-    if (value) sessionStorage.removeItem(key);
-    return value;
+    return (
+      sessionStorage.getItem(`${INSTRUCTIONS_SESSION_KEY}${actionItemId}`) ?? ""
+    );
   } catch {
     return "";
+  }
+}
+
+/** Remove as instructions do sessionStorage (após generate bem-sucedido). */
+function clearInstructions(actionItemId: string): void {
+  if (!actionItemId || typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.removeItem(`${INSTRUCTIONS_SESSION_KEY}${actionItemId}`);
+  } catch {
+    // no-op
   }
 }
 
@@ -119,18 +137,23 @@ export function ConstructionEntry({
           ).id;
         }
       }
-      // Lê as instructions do sessionStorage (colocadas pelo GerarPecaModal).
-      // Chamada aqui (dentro do mutationFn, no client) pra garantir que está
-      // no browser.
-      const instructions = consumeInstructions(actionItemId || intimationId);
+      // Lê (SEM apagar) as instructions do sessionStorage (colocadas pelo
+      // GerarPecaModal). BLOCKER-3: só apaga após o generate 202 — se o ciclo da
+      // conferência ou o generate falhar, as instructions sobrevivem para retry.
+      const storageKey = actionItemId || intimationId;
+      const instructions = peekInstructions(storageKey);
 
-      // Auto-partida: dispara a geração direto. Uma falha aqui degrada para a tela
-      // de preparação (o draft já existe) — não trava o usuário.
+      // Auto-partida: roda o ciclo conferência → generate. Uma falha aqui degrada
+      // para a tela de preparação (o draft já existe) — não trava o usuário, e as
+      // instructions permanecem no sessionStorage para uma nova tentativa.
       if (auto && origem) {
         try {
           await autoPartida(api, draftId, origem, instructions || undefined);
+          // Sucesso (generate 202): agora sim limpa as instructions.
+          clearInstructions(storageKey);
         } catch {
-          // segue para /pecas/:id na tela de preparação (pregen).
+          // segue para /pecas/:id na tela de preparação (pregen); instructions
+          // preservadas.
         }
       }
       return draftId;
@@ -142,7 +165,11 @@ export function ConstructionEntry({
         // para o card refletir o novo status ao voltar.
         qc.invalidateQueries({ queryKey: ["intimacoes"] }),
       ]);
-      router.replace(`/pecas/${draftId}?retorno=${encodeURIComponent(back)}`);
+      // BLOCKER-2: preserva auto=1 para o guard isFreshAutoPregen (construction-page)
+      // continuar mostrando o loader em vez da tela de pregen enquanto o saga avança.
+      router.replace(
+        `/pecas/${draftId}?auto=1&retorno=${encodeURIComponent(back)}`,
+      );
     },
   });
   const { mutate } = create;

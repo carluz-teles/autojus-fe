@@ -14,11 +14,12 @@ import { usePartes } from "@/features/processos/hooks/use-processos";
 import type { PageEnvelope } from "@/lib/api/types";
 import { useApi } from "@/lib/api/use-api";
 
+import { runAssessmentAndGenerate } from "../lib/assessment-lifecycle";
 import type { PecaContexto } from "../lib/peca-contexto";
 import { partyOptions, representedParty } from "../lib/piece-intent";
 import {
+  buildAssessmentInput,
   createDraft,
-  generateDraft,
   generateIntimationTheses,
   getDraft,
   getIntimationTheses,
@@ -185,7 +186,16 @@ export function usePartida(intimacaoId: string) {
       if (!isNew || existing.sagaState !== "CREATED" || existing.contentHtml)
         return id;
       try {
-        await generateDraft(fetcher, id, ids);
+        // Ciclo OBRIGATÓRIO da conferência antes do generate (senão 409). O
+        // input das instructions deve casar com o que foi gravado no draft
+        // (preparationInstructions) — a MESMA string.
+        const input = buildAssessmentInput(
+          ids,
+          preparationInstructions(preparation),
+        );
+        await runAssessmentAndGenerate(fetcher, id, input, {
+          expectedCurrentVersionId: existing.currentVersionId,
+        });
       } catch {
         toast.error("Rascunho salvo. Retome a geração dentro da peça.");
       }

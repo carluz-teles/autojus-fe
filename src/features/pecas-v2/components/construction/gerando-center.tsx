@@ -52,6 +52,13 @@ interface Props {
   thesesDone?: boolean;
   /** Contador ao vivo de teses (do theses-stream progress). */
   thesesCount?: number;
+  /**
+   * Conferência das fontes (assessment) em curso — sinal REAL da fase 2
+   * ("Reunindo o contexto"): a duração das chamadas REST (request+poll+validate)
+   * é observável e não usa timer. Enquanto ativa, a fase 2 fica ativa mesmo antes
+   * do generation-stream emitir qualquer stage.
+   */
+  assessmentActive?: boolean;
 }
 
 export function GerandoCenter({
@@ -60,6 +67,7 @@ export function GerandoCenter({
   startedAt,
   thesesDone = false,
   thesesCount,
+  assessmentActive = false,
 }: Props) {
   const qc = useQueryClient();
   const [html, setHtml] = useState("");
@@ -103,11 +111,17 @@ export function GerandoCenter({
   }, [html]);
 
   // Derive current phase from signals — NO timers, only real events.
-  // Phase 1 done when thesesDone=true; phase 2-4 from generation-stream stage.
+  //   phase 1 (teses)   until thesesDone
+  //   phase 2 (contexto) = the ASSESSMENT window (assessmentActive) OR generation
+  //                        stage loading_context — both are real, observable.
+  //   phase 3 (autos)    = generation stage analyzing_sources
+  //   phase 4 (minuta)   = generation stage drafting_sections / safe_fallback
   const phase: GenerationPhase = (() => {
     const stagePhase = STAGE_PHASE[stage];
     if (stagePhase) return stagePhase;
-    // stage is "waiting" or unknown: if theses resolved, show phase 2; else phase 1.
+    // No load-bearing generation stage yet. The assessment REST cycle IS phase 2.
+    if (assessmentActive) return 2;
+    // stage "waiting"/unknown: if theses resolved, hold phase 2; else phase 1.
     return thesesDone ? 2 : 1;
   })();
 
