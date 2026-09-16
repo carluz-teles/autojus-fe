@@ -216,11 +216,13 @@ function Oab({ f }: { f: F }) {
   return (
     <>
       <div className="font-display mb-1 text-[21px] font-medium">
-        Ative sua primeira captura
+        Monitorar por OAB{" "}
+        <span className="text-fg3 font-normal">(opcional)</span>
       </div>
       <p className="text-fg3 mb-[18px] text-[12.5px] leading-[1.5]">
-        Confira as OABs que o Atjus vai monitorar no DJEN. A busca começa ao
-        confirmar abaixo.
+        Informe OABs para o Atjus monitorar o DJEN automaticamente. Sem OAB, você
+        importa processos por número (CNJ) quando quiser — dá pra concluir agora e
+        adicionar OABs depois em Configurações › Fontes.
       </p>
       <div className="mb-4">
         <CourtAccessNotice onPrepare={f.voltarOrg} />
@@ -272,7 +274,8 @@ function Oab({ f }: { f: F }) {
         ))}
         {f.oabs.length === 0 ? (
           <div className="border-line text-fg3 rounded-[9px] border border-dashed px-[13px] py-3 text-[12px]">
-            Nenhuma OAB ainda. Adicione ao menos uma para ativar a captura.
+            Opcional — sem OAB, você importa processos por número (CNJ) em
+            Processos › Importar. Dá pra concluir assim mesmo.
           </div>
         ) : null}
       </div>
@@ -301,7 +304,7 @@ function Oab({ f }: { f: F }) {
           ) : (
             <>
               <Sparkles className="size-[15px]" strokeWidth={1.8} />
-              Ativar captura e concluir
+              {f.oabs.length > 0 ? "Ativar captura e concluir" : "Concluir"}
             </>
           )}
         </button>

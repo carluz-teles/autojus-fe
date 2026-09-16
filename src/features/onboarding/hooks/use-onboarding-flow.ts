@@ -182,11 +182,14 @@ export function useOnboardingFlow() {
     dados.nome,
   ]);
 
+  // OAB é OPCIONAL: com o import manual por CNJ, dá pra concluir o onboarding sem
+  // nenhuma OAB (o usuário adiciona depois em Configurações › Fontes, ou importa
+  // processos por número). O gate real é o tenant provisionado.
   const concluir = useCallback(() => {
-    if (oabs.oabs.length === 0 || phase !== "idle" || !tenantReady) return;
+    if (phase !== "idle" || !tenantReady) return;
     setErro(null);
     salvarPerfil();
-  }, [oabs.oabs.length, phase, tenantReady, salvarPerfil]);
+  }, [phase, tenantReady, salvarPerfil]);
 
   useEffect(() => {
     if (phase === "provisioning" && tenantReady) {
@@ -236,7 +239,7 @@ export function useOnboardingFlow() {
     addOab: oabs.add,
     removeOab: oabs.remove,
     voltarOrg: () => setStep("access"),
-    podeConcluir: oabs.oabs.length > 0,
+    podeConcluir: tenantReady,
     preparando: phase !== "idle",
     erro,
     concluir,
