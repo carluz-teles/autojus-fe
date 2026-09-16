@@ -5,8 +5,10 @@
 //   · "Dar ciência" → conclui o action_item de ciência (comecar → concluir).
 //     Sem item materializado, resolve a própria intimação (caminho equivalente).
 //   · "Gerar peça"  → abre modal de orientação opcional; ao confirmar, navega
-//     para /pecas/nova?...&auto=1&retorno=.. com as instructions codificadas
-//     como `instr` no search param (curta duração, não persiste em history URL).
+//     para /pecas/nova?...&auto=1&retorno=.. As instructions (se houver) viajam
+//     por sessionStorage (chave por actionItemId), não pela URL — evita 2000
+//     chars no history e PII na barra de endereço. O componente grava antes de
+//     navegar; o ConstructionEntry lê e limpa após o generate.
 //     [Pular] = instructions vazio → gera com todas as teses recomendadas.
 // O componente chama só este hook (JSX + binding).
 
@@ -98,8 +100,8 @@ export function useDisposicao({
   // ── Modal de orientação ("Gerar peça") ─────────────────────────────────────
   // Ao clicar "Gerar peça", abrimos o modal. O caller obtém actionItemId pelo
   // closure. Ao confirmar (com ou sem instructions), navegamos para a rota de
-  // construção passando `instr` como search param de curta duração — evita
-  // query string longa (2000 chars) no histórico do browser.
+  // construção; as instructions (se houver) vão por sessionStorage, não pela URL
+  // — evita query string longa (2000 chars) e PII no histórico do browser.
   const [modalOpen, setModalOpen] = useState(false);
   const [pendingActionItemId, setPendingActionItemId] = useState<string>("");
 
