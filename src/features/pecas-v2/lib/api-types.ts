@@ -72,14 +72,14 @@ export interface AssessmentInputAPI {
   tone: string;
 }
 
-export interface AssessmentValidationAPI {
+interface AssessmentValidationAPI {
   id: string;
   validated_by: string;
   validated_at: string;
 }
 
 /** A conferência gerada (presente quando Request.status === "succeeded"). */
-export interface AssessmentAPI {
+interface AssessmentAPI {
   id: string;
   version_no: number;
   content_hash: string;
@@ -89,7 +89,7 @@ export interface AssessmentAPI {
   validation: AssessmentValidationAPI | null;
 }
 
-export interface AssessmentRequestErrorAPI {
+interface AssessmentRequestErrorAPI {
   code: string;
   message: string;
 }
@@ -125,7 +125,7 @@ export interface PartyAPI {
   is_client?: boolean;
 }
 
-export interface CounselAPI {
+interface CounselAPI {
   name: string;
   oab: string;
   uf: string;
@@ -165,7 +165,7 @@ export interface ProcessAPI {
   claim_value?: string | null;
 }
 
-export interface DeadlineAPI {
+interface DeadlineAPI {
   id: string;
   end_date: string;
   days_left: number;
@@ -205,7 +205,7 @@ export interface ProvidenceAPI {
   status: string; // "OPEN" | "DONE"
 }
 
-export interface ReviewAPI {
+interface ReviewAPI {
   status: string;
   generated_at: string;
   grounded: boolean;
@@ -247,7 +247,7 @@ export interface ThesisAPI {
   n?: number;
 }
 
-export interface ThesisAnchorAPI {
+interface ThesisAnchorAPI {
   document_id: string;
   label: string;
   excerpt: string;
@@ -255,15 +255,11 @@ export interface ThesisAnchorAPI {
   grounded: boolean;
 }
 
-export interface ThesisSegmentAPI {
+interface ThesisSegmentAPI {
   /** Título da seção (ex.: "I — DAS PRELIMINARES"). O FE casa por texto pra ancorar. */
   heading: string;
   /** Corpo da seção (parágrafos) — o trecho real a exibir. */
   conteudo: string;
-}
-
-export interface ThesesListAPI {
-  theses: ThesisAPI[];
 }
 
 // ── Chat (GET/POST /v1/pecas/:id/chat) ──────────────────────────────────────
@@ -273,7 +269,7 @@ export interface ChatThreadAPI {
   grounded_capable: boolean;
 }
 
-export interface ChatCitationAPI {
+interface ChatCitationAPI {
   document_id: string;
   page: number;
   quote: string;

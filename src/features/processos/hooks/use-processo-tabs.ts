@@ -2,7 +2,6 @@
 
 import { useInfiniteQuery } from "@tanstack/react-query";
 
-import { listActionItemsByProcesso } from "@/features/action-items/services/action-items.service";
 import { listIntimacoesByProcesso } from "@/features/intimacoes/services/intimacoes.service";
 import { listPrazosByProcesso } from "@/features/prazos/services/prazos.service";
 import { useApi } from "@/lib/api/use-api";
@@ -68,30 +67,5 @@ export function usePrazosByProcesso(processoId: string) {
     hasNextPage: query.hasNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
     fetchNextPage: query.fetchNextPage,
-  };
-}
-
-// ── Providências do processo ──────────────────────────────────────────────────
-
-/**
- * Providências de um processo — GET /v1/processos/:id/action-items (soonest-due-first, paginadas). Desligado enquanto `processoId` for vazio.
- */
-export function useActionItemsByProcesso(processoId: string) {
-  const fetcher = useApi();
-  const query = useInfiniteQuery({
-    queryKey: ["action-items", "por-processo", processoId],
-    queryFn: ({ pageParam }) =>
-      listActionItemsByProcesso(fetcher, {
-        processoId,
-        limit: 10,
-        cursor: pageParam || undefined,
-      }),
-    initialPageParam: "",
-    getNextPageParam: (page) => page.page.next_cursor,
-    enabled: !!processoId,
-  });
-  return {
-    ...query,
-    data: query.data?.pages.flatMap((page) => page.data) ?? [],
   };
 }

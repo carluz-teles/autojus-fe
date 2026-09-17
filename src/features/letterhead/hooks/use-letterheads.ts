@@ -25,7 +25,7 @@ import type {
 } from "../types";
 
 // Chaves de query centralizadas para invalidação consistente (padrão processosKeys).
-export const letterheadKeys = {
+const letterheadKeys = {
   all: ["letterheads"] as const,
   list: () => [...letterheadKeys.all, "list"] as const,
   detail: (id: string) => [...letterheadKeys.all, "detail", id] as const,

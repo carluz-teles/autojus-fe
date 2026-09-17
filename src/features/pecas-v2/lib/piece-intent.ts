@@ -10,15 +10,6 @@ const oabKey = (number: string, uf: string) => {
   return digits && uf.trim() ? `${uf.trim().toUpperCase()}:${digits}` : "";
 };
 
-export function partyOptions(parties?: PartesView): RepresentedParty[] {
-  if (!parties) return [];
-  return [
-    ...parties.autor.map((p) => ({ name: p.name, role: "Autor / Exequente" })),
-    ...parties.reu.map((p) => ({ name: p.name, role: "Réu / Executado" })),
-    ...parties.terceiros.map((p) => ({ name: p.name, role: "Terceiro" })),
-  ];
-}
-
 /** Only a unique party linked to a monitored counsel is safe to prefill.
  * Publication recipients themselves are lawyers, never represented parties. */
 export function representedParty(

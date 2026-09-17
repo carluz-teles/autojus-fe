@@ -1,6 +1,6 @@
 import type { FilingAttempt, FilingStatus } from "./types";
 
-export const FILING_LABEL: Record<FilingStatus, string> = {
+const FILING_LABEL: Record<FilingStatus, string> = {
   ENFILEIRADO: "Protocolo na fila",
   PROTOCOLANDO: "Enviando ao tribunal",
   CONFIRMACAO_PENDENTE: "Protocolo aguardando confirmação",

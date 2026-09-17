@@ -12,7 +12,7 @@ export interface CreateImportInput {
 }
 
 /** Status bruto do capture_run. RUNNING não é terminal; OK/PARTIAL/FAILED são. */
-export type CaptureRunStatus = "RUNNING" | "OK" | "PARTIAL" | "FAILED";
+type CaptureRunStatus = "RUNNING" | "OK" | "PARTIAL" | "FAILED";
 
 /** Resposta do POST /v1/acquisition/imports. */
 export interface ManualImportResult {

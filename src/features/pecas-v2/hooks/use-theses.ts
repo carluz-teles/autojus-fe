@@ -25,7 +25,6 @@ import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
 import { runAssessmentAndGenerate } from "../lib/assessment-lifecycle";
 import { isSelectedForGeneration } from "../lib/thesis-selection";
-export { isSelectedForGeneration } from "../lib/thesis-selection";
 import * as svc from "../services/pecas-v2.service";
 import { buildAssessmentInput } from "../services/pecas-v2.service";
 import type { Draft, Thesis, ThesisState } from "../types";
@@ -101,7 +100,7 @@ function useUpdateThesisState(id: string) {
  *  (request → poll → auto-validate → generate) via runAssessmentAndGenerate.
  *  `expectedCurrentVersionId` (current_version_id do draft) é o OCC guard do
  *  generate. `revision` é a substituição de conteúdo na regeração. */
-export interface GenerateDraftParams {
+interface GenerateDraftParams {
   thesisIds: string[];
   instructions?: string;
   expectedCurrentVersionId: string | null;

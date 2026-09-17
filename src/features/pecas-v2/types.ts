@@ -118,7 +118,7 @@ export interface DraftDeadline {
   daysLeft: number;
 }
 
-export type Authorship = "assistant" | "human_taken";
+type Authorship = "assistant" | "human_taken";
 
 /** Peça completa que a tela consome. */
 export interface Draft {
@@ -224,7 +224,7 @@ export interface PreviewState {
 
 // ── Chat ─────────────────────────────────────────────────────────────────────
 
-export type ChatRole = "user" | "assistant";
+type ChatRole = "user" | "assistant";
 
 /** Citação de uma resposta do chat — um trecho de um documento dos autos que
  *  sustenta a resposta. */
@@ -293,7 +293,7 @@ export interface Thesis {
 }
 
 /** Um trecho da peça gerada atribuído a uma tese (seção casada por heading). */
-export interface ThesisSegment {
+interface ThesisSegment {
   /** Título da seção — o FE casa por texto pra ancorar/rolar no editor. */
   heading: string;
   /** Corpo da seção (parágrafos) — o trecho real a exibir na remoção. */
@@ -302,7 +302,7 @@ export interface ThesisSegment {
 
 /** Uma âncora de proveniência de uma tese — um documento dos autos (ou o teor)
  *  que sustenta a tese. Uma tese pode ter várias. */
-export interface ThesisAnchor {
+interface ThesisAnchor {
   /** FK ao documento de origem (item da "Fundada em"). */
   documentId: string;
   /** Rótulo humano da fonte (ex.: "Ato ordinatório · pág. 1"). Pode repetir. */

@@ -1,7 +1,7 @@
 /** Fictional, read-only scenarios. These are UX concepts, not domain states. */
 export type Stage =
   "received" | "analysis" | "work" | "writing" | "review" | "filing" | "done";
-export type JourneyEvent = {
+type JourneyEvent = {
   title: string;
   actor: string;
   at: string;

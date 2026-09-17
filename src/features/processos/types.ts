@@ -2,7 +2,7 @@
 // Processo consolidado a partir da captura (DJEN) + enriquecimento (DATAJUD).
 
 export type ProcessoDegree = "UNKNOWN" | "G1" | "G2" | "JE" | "SUPERIOR";
-export type ProcessoSecrecy = "PUBLIC" | "RESTRICTED" | "SECRET";
+type ProcessoSecrecy = "PUBLIC" | "RESTRICTED" | "SECRET";
 
 /** Fase processual — o stepper do cockpit. Conjunto fechado, alinhado ao BE (court_record.phase). */
 export type ProcessoPhase =
@@ -91,7 +91,7 @@ export interface ProximoPasso {
 }
 
 /** Projeção do prazo mais próximo — shape minimal, suficiente para a coluna. */
-export interface NextDeadlineView {
+interface NextDeadlineView {
   /** Vencimento do prazo (RFC3339). */
   end_date: string;
   /** Dias restantes (negativo = vencido). */
@@ -120,14 +120,14 @@ export interface ProcessoFilters {
 // vazia = "sem partes identificadas ainda". document (CPF/CNPJ) pode ser null.
 
 /** Um advogado de uma parte (OAB + UF). */
-export interface PartyCounsel {
+interface PartyCounsel {
   name: string;
   oab: string;
   uf: string;
 }
 
 /** Uma parte (autor/réu/terceiro) com seus advogados. document pode ser null. */
-export interface Party {
+interface Party {
   name: string;
   document: string | null;
   counsels: PartyCounsel[];
@@ -171,7 +171,7 @@ export interface ProcessoResumoView {
 }
 
 /** Prazo aberto com sinalização de urgência do resumo por IA. */
-export interface ResumoKeyDate {
+interface ResumoKeyDate {
   kind: string;
   /** Vencimento (YYYY-MM-DD). */
   end_date: string;
@@ -184,20 +184,20 @@ export interface ResumoKeyDate {
 }
 
 /** Andamento significativo citado no resumo. */
-export interface ResumoMovement {
+interface ResumoMovement {
   occurred_at: string;
   text: string;
   source: string;
 }
 
 /** Sinal vermelho detectado no processo. */
-export interface ResumoRisk {
+interface ResumoRisk {
   description: string;
   source: string;
 }
 
 /** Próximo passo sugerido. */
-export interface ResumoAction {
+interface ResumoAction {
   action: string;
   source: string;
 }

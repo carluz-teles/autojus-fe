@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "@/lib/api/use-api";
 
 import * as svc from "../services/pecas-v2.service";
-import type { ChatMessage, QuickActionKind } from "../types";
+import type { ChatMessage } from "../types";
 import { draftKeys } from "./use-draft";
 
 export function useChatThread(id: string) {
@@ -50,24 +50,6 @@ export function useSendChatMessage(id: string) {
         const base = (prev ?? []).filter((m) => m.id !== ctx?.optimisticId);
         return [...base, res.user, res.assistant];
       });
-    },
-  });
-}
-
-/** Quick actions do chat (Resumir os autos / Sugerir teses / etc.) — usam o
- *  mesmo /chat endpoint com um prompt hardcoded no service. */
-export function useRunQuickAction(id: string) {
-  const fetcher = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (action: QuickActionKind) =>
-      svc.runQuickAction(fetcher, id, action),
-    onSuccess: (res) => {
-      qc.setQueryData<ChatMessage[]>(draftKeys.chat(id), (prev) => [
-        ...(prev ?? []),
-        res.user,
-        res.assistant,
-      ]);
     },
   });
 }

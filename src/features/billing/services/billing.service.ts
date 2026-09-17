@@ -1,14 +1,7 @@
 import { ApiError } from "@/lib/api/errors";
 import type { ApiFetcher } from "@/lib/api/use-api";
 
-import type {
-  CheckoutInput,
-  CheckoutResult,
-  Plan,
-  PlansEnvelope,
-  PortalResult,
-  Subscription,
-} from "../types";
+import type { Subscription } from "../types";
 
 const BASE = "/v1/billing";
 
@@ -29,23 +22,4 @@ export async function getSubscription(
     if (err instanceof ApiError && err.kind === "ENTITY_NOT_FOUND") return null;
     throw err;
   }
-}
-
-export async function listPlans(fetcher: ApiFetcher): Promise<Plan[]> {
-  const res = await fetcher<PlansEnvelope>(`${BASE}/plans`);
-  return res.data;
-}
-
-export function startCheckout(
-  fetcher: ApiFetcher,
-  input: CheckoutInput,
-): Promise<CheckoutResult> {
-  return fetcher<CheckoutResult>(`${BASE}/checkout`, {
-    method: "POST",
-    body: input,
-  });
-}
-
-export function openPortal(fetcher: ApiFetcher): Promise<PortalResult> {
-  return fetcher<PortalResult>(`${BASE}/portal`, { method: "POST" });
 }

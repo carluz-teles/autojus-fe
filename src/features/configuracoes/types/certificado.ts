@@ -62,7 +62,7 @@ export interface CertificadosListResult {
  * Checagens que o BE consegue determinar ao parsear o .pfx na etapa de validação.
  * Contrato: POST /v1/certificates/preview → PreviewResult.checks.
  */
-export interface CertificadoChecks {
+interface CertificadoChecks {
   /** A janela de validade contém "agora" (não expirado nem futuro). */
   nao_expirado: boolean;
   /** O .pfx trouxe a cadeia da AC (um A1 ICP-Brasil embarca a cadeia). */
@@ -86,18 +86,6 @@ export interface CertificadoPreviewResult {
   not_after: string;
   fingerprint: string;
   checks: CertificadoChecks;
-}
-
-/**
- * Corpo do POST /v1/certificates/:id/sign. A senha é de sessão, usada apenas para
- * o BE decifrar o .pfx e assinar — nunca persistida nem logada.
- * Omitida/ignorada quando a política do certificado é "nunca" (password_policy
- * "never" na wire): o BE não exige senha nesse caso.
- */
-export interface CertificadoSignRequest {
-  password?: string;
-  /** SHA-256 (base64) do documento a assinar, computado pelo chamador. */
-  digest_sha256: string;
 }
 
 /**
@@ -135,7 +123,7 @@ const POLICY_TO_API: Record<
 };
 
 /** Traduz o `password_policy` da wire (BE, inglês) pro vocabulário do FE. */
-export function passwordPolicyFromApi(
+function passwordPolicyFromApi(
   value: CertificatePasswordPolicyApi,
 ): CertificadoPasswordPolicy {
   return POLICY_FROM_API[value];
@@ -154,16 +142,4 @@ export function mapCertificateView(raw: CertificateViewApi): CertificateView {
     ...raw,
     password_policy: passwordPolicyFromApi(raw.password_policy),
   };
-}
-
-/** Corpo do PATCH /v1/certificates/:id/password-policy. */
-export interface CertificadoPasswordPolicyPatchRequest {
-  password_policy: CertificatePasswordPolicyApi;
-}
-
-/** Escopos que o titular autoriza para o certificado. */
-export interface CertificadoScope {
-  assinar: boolean;
-  protocolar: boolean;
-  procuracoes: boolean;
 }

@@ -43,9 +43,7 @@ export function preferenceChannels(
   );
 }
 
-export function notificationContext(
-  notification: Pick<NotificationView, "payload">,
-) {
+function notificationContext(notification: Pick<NotificationView, "payload">) {
   const text = (key: string) => {
     const value = notification.payload?.[key];
     return typeof value === "string" ? value.trim() : "";

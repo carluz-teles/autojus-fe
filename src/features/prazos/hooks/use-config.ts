@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 
 // Aba ativa da tela de configurações.
-export type ConfigTab =
+type ConfigTab =
   | "perfil"
   | "org"
   | "papeis"

@@ -8,7 +8,7 @@
 
 // Saga do documento — o estado caminha PENDING→UPLOADED→EXTRACTING→EXTRACTED→CHUNKED→
 // READY (ou FAILED). Na Fatia 1 o doc para em UPLOADED (o pipeline chega no Bloco C).
-export type DocumentStatus =
+type DocumentStatus =
   | "PENDING"
   | "UPLOADED"
   | "EXTRACTING"
@@ -18,7 +18,7 @@ export type DocumentStatus =
   | "FAILED";
 
 /** COURT = dos autos (peso probatório); UPLOAD = enviado pelo advogado. */
-export type DocumentOrigin = "COURT" | "UPLOAD";
+type DocumentOrigin = "COURT" | "UPLOAD";
 
 // Documento (o que a aba lista/mostra).
 export interface DocumentView {

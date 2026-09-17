@@ -57,7 +57,7 @@ function daysBetween(a: string, b: string): number {
 }
 
 /** Texto relativo do prazo ("há 2 dias" / "amanhã" / "em 3 dias"). */
-export function relativeDeadline(date: string, today = localDate()): string {
+function relativeDeadline(date: string, today = localDate()): string {
   const d = daysBetween(today, date);
   if (d < 0) return d === -1 ? "há 1 dia" : `há ${-d} dias`;
   if (d === 0) return "hoje";

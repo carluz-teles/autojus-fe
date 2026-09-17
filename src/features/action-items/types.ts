@@ -23,13 +23,13 @@ export type ActionItemPriority = "HIGH" | "MEDIUM" | "LOW";
 
 // Proveniência da classificação do TIPO: declarada no teor, inferida pela IA, ou
 // corrigida manualmente (reclassificar muda pra "manual").
-export type ActionItemTipoOrigem = "declarado" | "ia" | "manual";
+type ActionItemTipoOrigem = "declarado" | "ia" | "manual";
 
 // Gate de tipo: "confiavel" já pode virar trabalho; "a_confirmar" espera o
 // usuário confirmar o tipo antes (POST /confirmar).
 export type ActionItemTipoStatus = "confiavel" | "a_confirmar";
 
-export type FulfillmentStatus =
+type FulfillmentStatus =
   "possible_fulfillment" | "no_indication" | "unverified";
 
 export interface AnalysisSources {
@@ -41,7 +41,7 @@ export interface AnalysisSources {
   stale: boolean;
 }
 
-export interface FulfillmentEvidence {
+interface FulfillmentEvidence {
   document_id: string;
   title: string;
   date: string;
@@ -145,7 +145,7 @@ export interface ActionItemsSummary {
 // Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
 export type { PageEnvelope } from "@/lib/api/types";
 
-export interface WorkActivity {
+interface WorkActivity {
   id: string;
   actor_user_id: string | null;
   kind: string;

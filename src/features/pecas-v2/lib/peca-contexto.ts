@@ -5,7 +5,7 @@
 
 import type { Draft } from "../types";
 
-export interface PecaContextoProcesso {
+interface PecaContextoProcesso {
   cnj: string;
   classe: string;
   assunto: string;
@@ -15,7 +15,7 @@ export interface PecaContextoProcesso {
   valor: string;
 }
 
-export interface PecaContextoIntimacao {
+interface PecaContextoIntimacao {
   /** id da intimação — usado como id do item "Intimação de origem" na Fundada em. */
   id: string;
   tipoLabel: string;
@@ -25,7 +25,7 @@ export interface PecaContextoIntimacao {
   teor: string;
 }
 
-export interface PecaContextoParte {
+interface PecaContextoParte {
   roleLabel: string;
   name: string;
   counselLabel: string;

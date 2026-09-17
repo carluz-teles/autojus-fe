@@ -8,7 +8,7 @@ import { useApi } from "@/lib/api/use-api";
 
 import { getOrgProfile } from "../services/organization.service";
 
-export const ORG_PROFILE_KEY = ["organization", "profile"] as const;
+const ORG_PROFILE_KEY = ["organization", "profile"] as const;
 
 /**
  * Perfil fiscal do escritório na página /organization: leitura via GET (React

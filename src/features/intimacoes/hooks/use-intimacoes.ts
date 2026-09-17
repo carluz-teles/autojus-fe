@@ -10,7 +10,6 @@ import {
 } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { iniciarActionItem } from "@/features/action-items/services/action-items.service";
 import { useApi } from "@/lib/api/use-api";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useInfinitePageBuffer } from "@/lib/hooks/use-infinite-page-buffer";
@@ -25,16 +24,10 @@ import {
   analisarIntimacao,
   assignIntimacaoResponsavel,
   type AssignResponsavelParams,
-  type BulkAssignParams,
-  bulkAssignResponsavel,
-  confirmarActionItem,
   confirmTrustedDeadlinesBatch,
   getIntimacao,
-  getIntimacoesSummary,
   ignoreIntimacao,
   listIntimacoes,
-  reclassificarActionItem,
-  type ReclassificarActionItemParams,
   reopenIntimacao,
   resolveIntimacao,
   resolveIntimacoesBatch,
@@ -343,15 +336,6 @@ export function useIntimacaoDetalhe(id: string) {
   return { ...query, materializandoAnalise, analiseTimeout };
 }
 
-/** Contadores do inbox — GET /v1/intimacoes/summary. */
-export function useIntimacoesSummary() {
-  const fetcher = useApi();
-  return useQuery({
-    queryKey: intimacoesKeys.summary(),
-    queryFn: () => getIntimacoesSummary(fetcher),
-  });
-}
-
 /** Invalida lista + summary + detalhe de uma intimação. */
 function useInvalidarIntimacoes() {
   const qc = useQueryClient();
@@ -443,67 +427,6 @@ export function useAnalisarIntimacao(intimacaoId: string) {
 }
 
 /**
- * Confirma o TIPO da providência — POST /v1/action-items/:id/confirmar. É o gate de
- * TIPO ("Confirmar tipo" do card de leitura), promove "a_confirmar"→"confiavel".
- * NÃO é o "Iniciar providência" (esse é `useIniciarProvidencia`). Invalida detalhe +
- * providências. Idempotente.
- */
-export function useConfirmarActionItem(intimacaoId: string) {
-  const fetcher = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (actionItemId: string) =>
-      confirmarActionItem(fetcher, actionItemId),
-    onSuccess: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: intimacoesKeys.detail(intimacaoId) }),
-        qc.invalidateQueries({ queryKey: ["action-items"] }),
-      ]);
-    },
-  });
-}
-
-/**
- * Inicia a providência sugerida — POST /v1/action-items/:id/iniciar (SUGGESTED→TODO).
- * É o "Iniciar providência": tira a sugestão do diagnóstico e a coloca no trabalho
- * (board/fila). Invalida o detalhe da intimação (a linha reflete "iniciada") + as
- * providências do board/fila.
- */
-export function useIniciarProvidencia(intimacaoId: string) {
-  const fetcher = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (actionItemId: string) =>
-      iniciarActionItem(fetcher, actionItemId),
-    onSuccess: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: intimacoesKeys.detail(intimacaoId) }),
-        qc.invalidateQueries({ queryKey: ["action-items"] }),
-      ]);
-    },
-  });
-}
-
-/**
- * Reclassifica o tipo de peça da providência — POST /v1/action-items/:id/reclassificar.
- * Muda tipo_origem→"manual". Invalida o detalhe para reidratar piece_profile_key/tipo.
- */
-export function useReclassificarActionItem(intimacaoId: string) {
-  const fetcher = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      actionItemId,
-      ...params
-    }: { actionItemId: string } & ReclassificarActionItemParams) =>
-      reclassificarActionItem(fetcher, actionItemId, params),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: intimacoesKeys.detail(intimacaoId) });
-    },
-  });
-}
-
-/**
  * Atribui/desatribui o responsável único (0057) — PUT /v1/intimacoes/:id/responsavel.
  * Atualiza o cache do detalhe com o IntimacaoDetalheView fresco do BE.
  */
@@ -515,23 +438,6 @@ export function useAssignIntimacaoResponsavel(intimacaoId: string) {
       assignIntimacaoResponsavel(fetcher, intimacaoId, params),
     onSuccess: (detalhe) => {
       qc.setQueryData(intimacoesKeys.detail(intimacaoId), detalhe);
-    },
-  });
-}
-
-/**
- * Atribuição em massa do responsável — POST /v1/intimacoes/bulk/responsavel. Invalida
- * a lista (e o detalhe, caso a intimação aberta tenha sido afetada) pra reidratar.
- */
-export function useBulkAssignResponsavel() {
-  const fetcher = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (params: BulkAssignParams) =>
-      bulkAssignResponsavel(fetcher, params),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: intimacoesKeys.lists() });
-      qc.invalidateQueries({ queryKey: intimacoesKeys.all });
     },
   });
 }

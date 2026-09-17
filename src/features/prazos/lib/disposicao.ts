@@ -28,7 +28,7 @@ export interface DisposicaoPeca {
 }
 
 /** O item de CIÊNCIA (gera_peca=false) desta intimação, quando existe. */
-export interface DisposicaoCiencia {
+interface DisposicaoCiencia {
   actionItemId: string;
   status: IntimacaoProvidenciaStatus;
   concluida: boolean;

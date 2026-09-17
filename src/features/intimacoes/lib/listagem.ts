@@ -22,9 +22,9 @@ export const ETAPA_LABEL = {
   PARTNER_REVIEW: "Revisão do sócio",
   FILED: "Protocolada",
 };
-export const cnjKey = (cnj: string) => cnj.replace(/\D/g, "");
+const cnjKey = (cnj: string) => cnj.replace(/\D/g, "");
 
-export function revisaoDaLinha(i: IntimacaoView) {
+function revisaoDaLinha(i: IntimacaoView) {
   const p = i.prazo;
   if (
     i.user_status !== "PENDING" ||
@@ -96,7 +96,7 @@ export function lifecycleDaLinha(i: IntimacaoView): LinhaLifecycle {
   return { state: "none" };
 }
 
-export function vencimentoDaLinha(i: IntimacaoView) {
+function vencimentoDaLinha(i: IntimacaoView) {
   const p = i.prazo;
   if (!p || p.status === "NO_DEADLINE")
     return {

@@ -2,16 +2,9 @@
 // (GET/POST/PATCH /v1/pecas). O BADGE de status/versão da UI ("Rascunho v1") deriva
 // destes campos; nada aqui é mock.
 
-/** saga_state do rascunho: pipeline de geração/revisão (débito das próximas frentes). */
-export type PecaSagaState =
-  "CREATED" | "EXTRACTING" | "DRAFTED" | "REVIEWED" | "FAILED";
-
-/** status do ciclo de vida da peça (v0: só DRAFT é persistido nesta frente). */
-export type PecaStatus = "DRAFT" | "SIGNED" | "FILED" | "DISCARDED";
-
 /** Contexto da intimação de origem, embutido no detalhe da peça. Null quando a peça
  *  nasceu em branco/de processo (sem intimação). */
-export interface PecaIntimation {
+interface PecaIntimation {
   id: string;
   type: string;
   content: string;
@@ -21,7 +14,7 @@ export interface PecaIntimation {
 
 /** Contexto do processo (via court_record), incluindo partes
  *  (Task 2a). plaintiffs/defendants nunca são null (array vazio quando sem partes). */
-export interface PecaProcess {
+interface PecaProcess {
   case_id: string;
   court_record_id: string;
   cnj_number: string;
@@ -37,7 +30,7 @@ export interface PecaProcess {
 }
 
 /** Prazo derivado da intimação (via deadline). Null quando não há prazo ainda. */
-export interface PecaDeadline {
+interface PecaDeadline {
   id: string;
   end_date: string;
   days_left: number;
@@ -52,15 +45,6 @@ export type AttachmentCategory =
   | "Provas documentais"
   | "Declaração de hipossuficiência"
   | "Outro";
-
-export const ATTACHMENT_CATEGORIES: AttachmentCategory[] = [
-  "Procuração",
-  "Comprovante de endereço",
-  "Contrato",
-  "Provas documentais",
-  "Declaração de hipossuficiência",
-  "Outro",
-];
 
 /** Body do POST /v1/pecas/:id/anexos. */
 export interface AttachDocumentInput {
@@ -156,7 +140,7 @@ export interface PecaListItem {
 }
 
 /** Coverage summary do review (grounded/chunks/suggestions). */
-export interface PecaCoverageSummary {
+interface PecaCoverageSummary {
   grounded: boolean;
   chunks_used: number;
   suggestions_total: number;
@@ -192,14 +176,14 @@ export interface PecaExportResult {
 // ── Fatia 3: revisão IA (sugestões) ──────────────────────────────────────────
 
 /** Citation — âncora de um finding a um documento do processo. */
-export interface PecaCitation {
+interface PecaCitation {
   document_id: string;
   page: number;
   quote: string;
 }
 
 /** Finding — uma sugestão de revisão mapeada a um trecho do rascunho. */
-export interface PecaFinding {
+interface PecaFinding {
   n: number;
   category: string;
   original: string;
@@ -210,7 +194,7 @@ export interface PecaFinding {
 }
 
 /** Coverage — resumo do grounding e filtragem de uma revisão. */
-export interface PecaCoverage {
+interface PecaCoverage {
   grounded: boolean;
   chunks_used: number;
   suggestions_total: number;
@@ -220,7 +204,7 @@ export interface PecaCoverage {
 }
 
 /** Review — parecer IA completo de uma peça. */
-export interface PecaReview {
+interface PecaReview {
   id: string;
   draft_id: string;
   findings: PecaFinding[];
@@ -258,16 +242,13 @@ export interface PecaChatThread {
   grounded_capable: boolean;
 }
 
-/** Resposta do POST /v1/pecas/:id/chat. */
-export type PecaChatResponse = PecaChatMessage;
-
 // ── Fatia: teses / tom / instruções (tela de partida) ───────────────────────
 
 /** Confiança de uma tese sugerida pela IA. */
-export type ThesisConfidence = "alta" | "media" | "baixa";
+type ThesisConfidence = "alta" | "media" | "baixa";
 
 /** Tom da peça enviado ao BE no generate — rótulos curtos, fiéis ao mockup. */
-export type PecaTone = "tecnico" | "objetivo" | "enfatico";
+type PecaTone = "tecnico" | "objetivo" | "enfatico";
 
 /** Uma tese sugerida pela IA — POST /v1/pecas/:id/theses.
  *
@@ -277,7 +258,7 @@ export type PecaTone = "tecnico" | "objetivo" | "enfatico";
  *    media → 1 evidência OU 2+ indiretas
  *    baixa → 0 evidências (só doutrina/dispositivo puro)
  *  Sempre array (nunca null, mesmo vazio) — contrato do wire. */
-export interface Thesis {
+interface Thesis {
   label: string;
   confidence: ThesisConfidence;
   reference: string;

@@ -5,7 +5,7 @@
 // o prompt sob o draftId antes de navegar, e a tela da peça (use-construction)
 // lê por draftId — sem precisar carregar o actionItemId na URL.
 
-export const INSTRUCTIONS_SESSION_KEY = "peca:instructions:";
+const INSTRUCTIONS_SESSION_KEY = "peca:instructions:";
 
 export function peekInstructions(key: string): string {
   if (!key || typeof sessionStorage === "undefined") return "";

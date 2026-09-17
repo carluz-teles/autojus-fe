@@ -35,7 +35,7 @@ export type CenterStage = "pregen" | "gerando" | "pronta" | "falha";
  *  "acabei de clicar Gerar". O flag existe porque, entre o POST /generate e o
  *  saga entrar em CREATED/EXTRACTING no próximo poll, há uma janela em que o
  *  saga ainda é o anterior — sem o flag, o centro piscaria de volta pro CTA. */
-export function deriveStage(
+function deriveStage(
   saga: SagaState | undefined,
   firedGenerate: boolean,
   hasContent = false,

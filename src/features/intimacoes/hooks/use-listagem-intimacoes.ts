@@ -33,7 +33,7 @@ import {
 
 export const TRIAGEM_STAGES = ["RECEIVED", "AWAITING_CONFIRMATION"];
 
-export type TriageLane = "attention" | "ready" | "science" | "historical";
+type TriageLane = "attention" | "ready" | "science" | "historical";
 
 const TRIAGE_LANES: Array<{ value: TriageLane; label: string }> = [
   { value: "attention", label: "Precisa de análise" },

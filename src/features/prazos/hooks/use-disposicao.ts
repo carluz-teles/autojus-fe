@@ -34,7 +34,7 @@ import { useApi } from "@/lib/api/use-api";
 import { derivarDisposicao, type DisposicaoPeca } from "../lib/disposicao";
 
 /** Rótulo pt-BR da peça: perfil do catálogo, com fallback no tipo do ato. */
-export function rotuloPeca(p: DisposicaoPeca): string {
+function rotuloPeca(p: DisposicaoPeca): string {
   const perfil = p.pieceProfileKey ? PIECE_PROFILES[p.pieceProfileKey] : "";
   return perfil || WORK_TYPES[p.tipo] || "Peça";
 }

@@ -30,7 +30,7 @@ export interface FlowEvidence {
 export type FlowStepId =
   "origin" | "work" | "writing" | "review" | "filing" | "done";
 export type FlowStepState = "recorded" | "current" | "pending" | "unrecorded";
-export interface FlowStep {
+interface FlowStep {
   id: FlowStepId;
   label: string;
   state: FlowStepState;

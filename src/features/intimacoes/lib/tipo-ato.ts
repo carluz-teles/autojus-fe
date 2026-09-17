@@ -21,24 +21,6 @@ export const TIPO_ATO_LABEL: Record<string, string> = {
 };
 
 /**
- * Rótulo do tipo de ato para o CHIP do card/detalhe. Retorna "" quando o tipo não deve
- * virar chip próprio porque o chip de ESTADO já comunica o caso (indeterminado → "A
- * classificar"; ciencia/sem_ato → "Sem prazo"): nesses o tipo seria redundante. Só os atos
- * COM prazo (o "o que fazer") ganham chip de tipo.
- */
-export function tipoAtoChipLabel(tipoAto: string): string {
-  if (
-    !tipoAto ||
-    tipoAto === "indeterminado" ||
-    tipoAto === "ciencia" ||
-    tipoAto === "sem_ato"
-  ) {
-    return "";
-  }
-  return TIPO_ATO_LABEL[tipoAto] ?? "";
-}
-
-/**
  * Rótulo pt-BR do tipo de ato para exibição SEMPRE presente (título de card de prazo,
  * item de derivação, opção de picker): mapa conhecido, senão o fallback genérico "Prazo".
  * Diferente de tipoAtoChipLabel (que devolve "" para tipos que não viram chip próprio).

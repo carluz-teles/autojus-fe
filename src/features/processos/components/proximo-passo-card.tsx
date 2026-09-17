@@ -18,7 +18,7 @@ import { FASE_STEPS } from "../lib/apresentacao";
 import type { ProcessoPhase, ProximoPasso, ProximoPassoKind } from "../types";
 
 /** Prazo mais próximo em aberto — absorvido da antiga faixa "Prazo em atenção". */
-export interface ProximoPassoPrazo {
+interface ProximoPassoPrazo {
   /** Vencimento formatado DD/MM/AAAA. */
   data: string;
   /** Tipo do ato (ex.: "Apelação"). */

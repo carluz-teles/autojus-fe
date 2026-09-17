@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /** Monograma da marca: quadrado tinta com "j" serifado e fio de latão. */
-export function BrandMark({ className }: { className?: string }) {
+function BrandMark({ className }: { className?: string }) {
   return (
     <span
       aria-hidden

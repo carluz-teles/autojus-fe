@@ -23,7 +23,7 @@ export const PIPELINE_ORDEM: readonly PipelineStatusKey[] = [
   "DONE",
 ];
 
-export const PIPELINE_LABEL: Record<PipelineStatusKey, string> = {
+const PIPELINE_LABEL: Record<PipelineStatusKey, string> = {
   TODO: "A Fazer",
   WORKING: "Em elaboração",
   DONE: "Concluída",
@@ -32,9 +32,9 @@ export const PIPELINE_LABEL: Record<PipelineStatusKey, string> = {
 // Chave em minúsculo do StatusIcon (components/icons.tsx, tipado PrazoStage) — as
 // 3 colunas reusam chaves legadas: "intimacao" (círculo tracejado) = A Fazer,
 // "elaboracao" = Em elaboração, "protocolado" (círculo com check) = Concluída.
-export type PipelineIconKey = "intimacao" | "elaboracao" | "protocolado";
+type PipelineIconKey = "intimacao" | "elaboracao" | "protocolado";
 
-export const PIPELINE_ICON_KEY: Record<PipelineStatusKey, PipelineIconKey> = {
+const PIPELINE_ICON_KEY: Record<PipelineStatusKey, PipelineIconKey> = {
   TODO: "intimacao",
   WORKING: "elaboracao",
   DONE: "protocolado",
@@ -56,7 +56,7 @@ function diasDaProvidencia(dueDate: string | null): number | null {
   );
 }
 
-export interface PipelineCard {
+interface PipelineCard {
   id: string;
   providencia: string;
   cnjCurto: string;

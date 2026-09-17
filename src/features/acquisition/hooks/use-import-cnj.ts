@@ -11,7 +11,7 @@ import { createImport, getImport } from "../services/acquisition.service";
 import type { CreateImportInput } from "../types";
 
 // Chaves de query centralizadas (padrão das outras features).
-export const acquisitionKeys = {
+const acquisitionKeys = {
   all: ["acquisition", "imports"] as const,
   detail: (id: string) => [...acquisitionKeys.all, id] as const,
 };

@@ -21,7 +21,6 @@ import type {
   AssessmentInputAPI,
   AssessmentRequestStateAPI,
   AssessmentStateAPI,
-  AssumeAuthorshipResultAPI,
   ChatMessageAPI,
   ChatThreadAPI,
   DataEnvelope,
@@ -34,8 +33,6 @@ import type {
   Draft,
   IterateScope,
   IterationResult,
-  PendingChange,
-  QuickActionKind,
   QuickAdjustKind,
   StructuredContent,
   Thesis,
@@ -87,30 +84,6 @@ export async function createDraft(
 }
 
 // ── Teses da PARTIDA (intimation-scoped, sem draft) ──────────────────────────
-
-/** GET /v1/intimacoes/:id/theses — teses persistidas da intimação (state "off"). */
-export async function getIntimationTheses(
-  fetcher: ApiFetcher,
-  intimationId: string,
-): Promise<Thesis[]> {
-  const res = await fetcher<DataEnvelope<ThesisAPI[]>>(
-    `/v1/intimacoes/${intimationId}/theses`,
-  );
-  return (res.data ?? []).map(mapThesisFromApi);
-}
-
-/** POST /v1/intimacoes/:id/theses — (re)gera+persiste teses da intimação via IA,
- *  ancoradas nos autos do processo. Nascem em state "off". */
-export async function generateIntimationTheses(
-  fetcher: ApiFetcher,
-  intimationId: string,
-): Promise<Thesis[]> {
-  const res = await fetcher<DataEnvelope<ThesisAPI[]>>(
-    `/v1/intimacoes/${intimationId}/theses`,
-    { method: "POST" },
-  );
-  return (res.data ?? []).map(mapThesisFromApi);
-}
 
 // ── Leitura ──────────────────────────────────────────────────────────────────
 
@@ -420,28 +393,6 @@ export async function refazerSection(
   };
 }
 
-// ── Revisão (aba "Revisão" — reusa /iterate com instruction de revisão) ─────
-
-const REVIEW_INSTRUCTION =
-  "Faça uma revisão proativa da peça — clareza, fundamentação, completude e coerência. " +
-  "Sugira reescritas por seção com categoria (CLAREZA/FUNDAMENTAÇÃO/COMPLETUDE/COERÊNCIA/ÊNFASE) " +
-  "e explicação curta do porquê.";
-
-export async function runReview(
-  fetcher: ApiFetcher,
-  id: string,
-): Promise<PendingChange[]> {
-  const body = {
-    scope: { kind: "whole" },
-    instruction: REVIEW_INSTRUCTION,
-  };
-  const res = await fetcher<DataEnvelope<IterateResultAPI>>(
-    `${ENDPOINT}/${id}/iterate`,
-    { method: "POST", body },
-  );
-  return (res.data.changes ?? []).map((c) => mapSectionChangeFromApi(c));
-}
-
 // ── Chat ────────────────────────────────────────────────────────────────────
 
 export async function sendChatMessage(
@@ -466,117 +417,6 @@ export async function sendChatMessage(
     grounded: false,
   };
   return { user, assistant };
-}
-
-export async function runQuickAction(
-  fetcher: ApiFetcher,
-  id: string,
-  action: QuickActionKind,
-): Promise<{ user: ChatMessage; assistant: ChatMessage }> {
-  const question = QUICK_ACTION_PROMPTS[action];
-  return sendChatMessage(fetcher, id, question);
-}
-
-const QUICK_ACTION_PROMPTS: Record<QuickActionKind, string> = {
-  summarize_case:
-    "Resuma os autos em 3-5 linhas, destacando partes, pedido e estágio.",
-  suggest_theses:
-    "Sugira as principais teses jurídicas aplicáveis a este caso, ordenadas por força.",
-  check_deadline:
-    "Confira o prazo desta peça: qual é o termo final e se é dias úteis ou corridos.",
-  find_precedents:
-    "Encontre precedentes STJ/STF/tribunais relevantes pra esta peça.",
-};
-
-// ── Ações (assumir autoria + refazer do zero) ───────────────────────────────
-
-export async function assumirAutoria(
-  fetcher: ApiFetcher,
-  id: string,
-): Promise<{ authorship: "human_taken" }> {
-  const res = await fetcher<DataEnvelope<AssumeAuthorshipResultAPI>>(
-    `${ENDPOINT}/${id}/assume-authorship`,
-    { method: "POST" },
-  );
-  return { authorship: res.data.authorship };
-}
-
-/**
- * "Refazer do zero" — chama POST /pecas/:id/generate reusando os últimos
- * parâmetros (tone/theses/instructions). O worker-ai regenera; polling do
- * saga_state acontece no hook (invalidateQueries → useDraft refetch).
- */
-export async function refazerDoZero(
-  fetcher: ApiFetcher,
-  id: string,
-): Promise<{ sagaState: "EXTRACTING" }> {
-  await fetcher(`${ENDPOINT}/${id}/generate`, {
-    method: "POST",
-    body: {}, // vazio → BE reusa params atuais no draft row
-  });
-  return { sagaState: "EXTRACTING" };
-}
-
-// ── Autosave do editor rico (PUT /pecas/:id/content-html) ───────────────────
-
-/** Autosave do editor rico (Fase B). Grava content_html direto na coluna.
- *  A partir do 1º save, content_html vira source-of-truth pro renderer PDF
- *  (Fase C, chromedp). structured_content fica congelado (a IA continua
- *  gerando pra novas gerações, mas edição humana só toca em content_html). */
-export async function saveContentHtml(
-  fetcher: ApiFetcher,
-  id: string,
-  contentHtml: string,
-): Promise<void> {
-  await fetcher(`${ENDPOINT}/${id}/content-html`, {
-    method: "PUT",
-    body: { content_html: contentHtml },
-  });
-}
-
-// ── Anexos (POST/DELETE /pecas/:id/anexos) ────────────────────────────────────
-
-/** Categorias de anexo — casadas com o CHECK do BE (migração 0043) e o enum
- *  `AttachmentCategory` em internal/draft/entity.go. */
-export type AttachmentCategory =
-  | "Procuração"
-  | "Comprovante de endereço"
-  | "Contrato"
-  | "Provas documentais"
-  | "Declaração de hipossuficiência"
-  | "Outro";
-
-export const ATTACHMENT_CATEGORIES: AttachmentCategory[] = [
-  "Procuração",
-  "Comprovante de endereço",
-  "Contrato",
-  "Provas documentais",
-  "Declaração de hipossuficiência",
-  "Outro",
-];
-
-/** Vincula um documento já uploadado (via document slice) à peça, com categoria. */
-export async function attachDocument(
-  fetcher: ApiFetcher,
-  draftId: string,
-  documentId: string,
-  category: AttachmentCategory,
-): Promise<void> {
-  await fetcher(`${ENDPOINT}/${draftId}/anexos`, {
-    method: "POST",
-    body: { document_id: documentId, category },
-  });
-}
-
-/** Remove o vínculo peça↔documento. O documento em si permanece (owned pelo slice document). */
-export async function removeAttachment(
-  fetcher: ApiFetcher,
-  draftId: string,
-  attachmentId: string,
-): Promise<void> {
-  await fetcher(`${ENDPOINT}/${draftId}/anexos/${attachmentId}`, {
-    method: "DELETE",
-  });
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
