@@ -6,6 +6,8 @@ import {
   MessageSquare,
   PanelLeft,
   PanelsTopLeft,
+  RotateCcw,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -265,6 +267,40 @@ export function ConstructionPage({ id }: { id: string }) {
       isGenerating: h.isGenerating,
       sagaState: draft.sagaState,
     });
+
+  // Falha do fluxo auto (assessment/generate): estado de erro LIMPO na linguagem do
+  // fluxo novo + "Tentar de novo" (re-roda a geração com as mesmas teses/instructions).
+  // NÃO cai mais no pregen antigo de escolher tese — que só existe pra curadoria manual.
+  if (h.autoFailed) {
+    return (
+      <div className="bg-background flex min-h-0 flex-1 flex-col">
+        <TopBar
+          title={draft.title}
+          cnjShort={draft.process.cnj}
+          state="Geração"
+          onBack={h.voltar}
+        />
+        <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+          <span className="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-full">
+            <TriangleAlert className="size-6" aria-hidden />
+          </span>
+          <div>
+            <h2 className="font-display text-xl font-medium">
+              Não foi possível gerar a peça agora
+            </h2>
+            <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">
+              {h.generationError ||
+                "A conferência das fontes não pôde ser concluída. Isso costuma ser temporário — tente de novo. Nada foi assinado ou protocolado."}
+            </p>
+          </div>
+          <Button onClick={h.retryAuto} disabled={h.isGenerating}>
+            <RotateCcw data-icon="inline-start" />
+            Tentar de novo
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (
     !isFreshAutoPregen &&

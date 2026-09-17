@@ -256,7 +256,8 @@ export function useConstruction(id: string) {
   // (draft-scoped, via stream) estão prontas, dispara a geração com TODAS elas +
   // o prompt opcional (sessionStorage por draftId). O loader de 4 fases aparece
   // desde o início (sem a antiga tela intermediária "Construindo a peça…").
-  // Falha → autoFailed → cai no pregen recuperável (fix-3, sem loader infinito).
+  // Falha → autoFailed → estado de erro limpo + "Tentar de novo" (retryAuto), na
+  // linguagem do fluxo novo — sem cair no pregen antigo de escolher tese.
   const autoParam = params.get("auto") === "1";
   const [autoFailed, setAutoFailed] = useState(false);
   const autoFired = useRef(false);
@@ -318,6 +319,15 @@ export function useConstruction(id: string) {
     draftQuery.data?.currentVersionId,
   ]);
 
+  // Retry do fluxo auto após falha (assessment_unavailable, timeout, erro): rearma
+  // o gatilho (autoFired=false) e limpa autoFailed → o efeito acima re-dispara a
+  // geração com as mesmas teses + instructions. É o "Tentar de novo" do estado de
+  // erro (substitui a queda no pregen antigo).
+  const retryAuto = useCallback(() => {
+    autoFired.current = false;
+    setAutoFailed(false);
+  }, []);
+
   // Fonte das teses a exibir: enquanto o stream está ativo (ou parou no meio com
   // cards já mostrados), usa a lista incremental do stream; senão a lista
   // persistida do controller (pós-`done`, ela vira autoritativa via setQueryData).
@@ -373,6 +383,9 @@ export function useConstruction(id: string) {
     // Janela da auto-partida (auto=1, rascunho fresco): mostra o loader direto,
     // antes mesmo do generate disparar (enquanto as teses chegam).
     autoPending,
+    // Falha do fluxo auto (assessment/generate) → estado de erro + "Tentar de novo".
+    autoFailed: autoParam && autoFailed,
+    retryAuto,
     hasOrigin,
     hasTeor,
     voltar,
