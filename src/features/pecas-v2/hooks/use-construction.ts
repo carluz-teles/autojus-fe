@@ -13,12 +13,16 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { detalheNaFila } from "@/features/intimacoes/lib/fila-navigation";
 import { htmlToText } from "@/lib/html/html-to-text";
 import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
+import {
+  clearInstructions,
+  peekInstructions,
+} from "../lib/instructions-storage";
 import type { SagaState, Thesis } from "../types";
 import { useDraft } from "./use-draft";
 import { thesesKey, useGenerateDraft, useThesesController } from "./use-theses";
@@ -247,6 +251,73 @@ export function useConstruction(id: string) {
     stage === "pronta" &&
     (saga === "EXTRACTING" || (saga === "CREATED" && firedGenerate));
 
+  // ── NAVEGAR-PRIMEIRO: auto-partida NA TELA DA PEÇA ─────────────────────────
+  // Chegou via "Gerar peça" (auto=1) num rascunho fresco: assim que as teses
+  // (draft-scoped, via stream) estão prontas, dispara a geração com TODAS elas +
+  // o prompt opcional (sessionStorage por draftId). O loader de 4 fases aparece
+  // desde o início (sem a antiga tela intermediária "Construindo a peça…").
+  // Falha → autoFailed → cai no pregen recuperável (fix-3, sem loader infinito).
+  const autoParam = params.get("auto") === "1";
+  const [autoFailed, setAutoFailed] = useState(false);
+  const autoFired = useRef(false);
+  // Janela em que o loader deve aparecer antes/durante o disparo automático
+  // (evita um flash do pregen enquanto as teses ainda chegam).
+  const autoPending =
+    autoParam &&
+    saga === "CREATED" &&
+    !hasContent &&
+    !autoFailed &&
+    !theses.isError;
+  useEffect(() => {
+    if (!autoParam || autoFired.current || autoFailed) return;
+    if (saga !== "CREATED" || hasContent || firedGenerate) return;
+    if (!hasOrigin || !hasTeor) return;
+    if (theses.isError) {
+      setAutoFailed(true);
+      return;
+    }
+    if (theses.isLoading || theses.isRegenerating || theses.isTogglingId)
+      return;
+    if (theses.theses.length === 0) return; // aguarda as teses (stream) assentarem
+    autoFired.current = true;
+    const allIds = theses.theses.map((t) => t.id);
+    const instr = peekInstructions(id).trim();
+    setFiredGenerate(true);
+    setFiredAssessment(false);
+    generate.mutate(
+      {
+        thesisIds: allIds,
+        instructions: instr,
+        expectedCurrentVersionId: draftQuery.data?.currentVersionId ?? null,
+        onAssessmentStarted: () => setFiredAssessment(true),
+      },
+      {
+        onSuccess: () => clearInstructions(id), // BLOCKER-3: limpa só no 202
+        onError: () => {
+          setFiredGenerate(false);
+          setFiredAssessment(false);
+          setAutoFailed(true);
+        },
+      },
+    );
+  }, [
+    autoParam,
+    autoFailed,
+    saga,
+    hasContent,
+    firedGenerate,
+    hasOrigin,
+    hasTeor,
+    theses.isError,
+    theses.isLoading,
+    theses.isRegenerating,
+    theses.isTogglingId,
+    theses.theses,
+    generate,
+    id,
+    draftQuery.data?.currentVersionId,
+  ]);
+
   // Fonte das teses a exibir: enquanto o stream está ativo (ou parou no meio com
   // cards já mostrados), usa a lista incremental do stream; senão a lista
   // persistida do controller (pós-`done`, ela vira autoritativa via setQueryData).
@@ -299,6 +370,9 @@ export function useConstruction(id: string) {
     isGenerating: generate.isPending,
     // Conferência (assessment) em curso — sinal real da fase 2 do loader.
     assessmentActive: firedAssessment && saga !== "EXTRACTING",
+    // Janela da auto-partida (auto=1, rascunho fresco): mostra o loader direto,
+    // antes mesmo do generate disparar (enquanto as teses chegam).
+    autoPending,
     hasOrigin,
     hasTeor,
     voltar,

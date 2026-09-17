@@ -220,9 +220,9 @@ function Oab({ f }: { f: F }) {
         <span className="text-fg3 font-normal">(opcional)</span>
       </div>
       <p className="text-fg3 mb-[18px] text-[12.5px] leading-[1.5]">
-        Informe OABs para o Atjus monitorar o DJEN automaticamente. Sem OAB, você
-        importa processos por número (CNJ) quando quiser — dá pra concluir agora e
-        adicionar OABs depois em Configurações › Fontes.
+        Informe OABs para o Atjus monitorar o DJEN automaticamente. Sem OAB,
+        você importa processos por número (CNJ) quando quiser — dá pra concluir
+        agora e adicionar OABs depois em Configurações › Fontes.
       </p>
       <div className="mb-4">
         <CourtAccessNotice onPrepare={f.voltarOrg} />

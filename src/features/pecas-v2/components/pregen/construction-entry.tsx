@@ -8,81 +8,25 @@ import { PageFrame, ShellBackLink } from "@/components/shell/page-frame";
 import { Button } from "@/components/ui/button";
 import { useActionItemDetalhe } from "@/features/action-items/hooks/use-action-items";
 import { iniciarActionItem } from "@/features/action-items/services/action-items.service";
-import { INSTRUCTIONS_SESSION_KEY } from "@/features/prazos/components/intimacao-detalhe/disposicao-section";
-import { type ApiFetcher, useApi } from "@/lib/api/use-api";
+import { useApi } from "@/lib/api/use-api";
 
-import { runAssessmentAndGenerate } from "../../lib/assessment-lifecycle";
 import {
-  buildAssessmentInput,
-  createDraft,
-  generateTheses,
-  getDraft,
-  getTheses,
-} from "../../services/pecas-v2.service";
+  clearInstructions,
+  peekInstructions,
+  setInstructions,
+} from "../../lib/instructions-storage";
+import { createDraft } from "../../services/pecas-v2.service";
 
-// Auto-partida: dispara a geração da peça direto — auto-seleciona TODAS as teses
-// do RASCUNHO e roda o ciclo OBRIGATÓRIO da conferência (assessment request →
-// poll → auto-validate → generate), pulando a tela de escolha de teses e a tela
-// de revisão de fontes. Espelha o `create` da usePartida (idempotente): reabrir
-// peça existente nunca substitui conteúdo. Só age numa peça recém-criada
-// (CREATED, sem conteúdo).
+// NAVEGAR-PRIMEIRO: a ConstructionEntry só CRIA o rascunho e navega direto pra
+// /pecas/:id?auto=1 — a sequência de auto-partida (teses → conferência → generate)
+// roda LÁ, dirigindo o loader de 4 fases desde o início. Antes, o ciclo inteiro
+// rodava aqui ("Construindo a peça…") e só depois navegava, criando DUAS telas de
+// loading. Agora esta tela é uma transição curtíssima (só o createDraft).
 //
-// IMPORTANTE (fix do 404): as teses DEVEM ser draft-scoped (getTheses/
-// generateTheses → /v1/pecas/:id/theses). A conferência draft-scoped carrega o
-// Basis via ListSuggestedThesesByDraft(draftId); ids intimation-scoped (draft_id
-// NULL) não existem nessa lista → ErrSuggestedThesisNotFound → 404. Usar as teses
-// do próprio rascunho (as mesmas do pregen/gerarMinuta) faz os ids baterem.
-//
-// `instructions` vem do modal de orientação opcional (GerarPecaModal), transportado
-// via sessionStorage para evitar colocar 2000 chars na URL/history.
-//
-// O auto-validate é silencioso (sem card de revisão de fontes) — a garantia se
-// mantém via validated_by = usuário atual, conforme o design aprovado.
-async function autoPartida(
-  api: ApiFetcher,
-  draftId: string,
-  instructions?: string,
-): Promise<void> {
-  const draft = await getDraft(api, draftId);
-  if (draft.sagaState !== "CREATED" || draft.contentHtml) return;
-  // Teses DRAFT-scoped — precisam existir no Basis draft-scoped da conferência.
-  let theses = await getTheses(api, draftId);
-  if (theses.length === 0) theses = await generateTheses(api, draftId);
-  // Input canônico — a MESMA instância vai para request/validate/generate.
-  const input = buildAssessmentInput(
-    theses.map((t) => t.id),
-    instructions ?? "",
-  );
-  await runAssessmentAndGenerate(api, draftId, input, {
-    expectedCurrentVersionId: draft.currentVersionId,
-  });
-}
-
-/** Lê as instructions do sessionStorage SEM apagar (BLOCKER-3: sobrevivem para
- *  retry se assessment/generate falhar). A limpeza só ocorre após generate 202. */
-function peekInstructions(actionItemId: string): string {
-  if (!actionItemId || typeof sessionStorage === "undefined") return "";
-  try {
-    return (
-      sessionStorage.getItem(`${INSTRUCTIONS_SESSION_KEY}${actionItemId}`) ?? ""
-    );
-  } catch {
-    return "";
-  }
-}
-
-/** Remove as instructions do sessionStorage (após generate bem-sucedido). */
-function clearInstructions(actionItemId: string): void {
-  if (!actionItemId || typeof sessionStorage === "undefined") return;
-  try {
-    sessionStorage.removeItem(`${INSTRUCTIONS_SESSION_KEY}${actionItemId}`);
-  } catch {
-    // no-op
-  }
-}
-
-// Both origins resume the same draft; empty drafts open its preparation canvas.
-// `auto` = auto-partida (construção direto, com tela de "Construindo a peça…").
+// O prompt opcional (GerarPecaModal, gravado por actionItemId) é re-chaveado por
+// draftId antes de navegar — a tela da peça (use-construction) lê por draftId,
+// sem carregar o actionItemId na URL. BLOCKER-3: a limpeza do prompt só ocorre
+// após o generate 202 (na tela da peça), então sobrevive a retry.
 export function ConstructionEntry({
   actionItemId = "",
   intimationId = "",
@@ -105,7 +49,6 @@ export function ConstructionEntry({
   const create = useMutation({
     mutationFn: async () => {
       let draftId: string;
-      let origem = intimationId;
       if (!actionItemId) {
         if (!intimationId) throw new Error("Selecione a intimação de origem.");
         draftId = (await createDraft(api, { intimationId })).id;
@@ -116,7 +59,6 @@ export function ConstructionEntry({
           throw new Error(
             "A construção de uma peça deve começar por uma intimação. Abra a intimação de origem para continuar.",
           );
-        origem = item.intimation_id;
         if (item.draft_id) {
           draftId = item.draft_id;
         } else {
@@ -142,25 +84,14 @@ export function ConstructionEntry({
           ).id;
         }
       }
-      // Lê (SEM apagar) as instructions do sessionStorage (colocadas pelo
-      // GerarPecaModal). BLOCKER-3: só apaga após o generate 202 — se o ciclo da
-      // conferência ou o generate falhar, as instructions sobrevivem para retry.
-      const storageKey = actionItemId || intimationId;
-      const instructions = peekInstructions(storageKey);
-
-      // Auto-partida: roda o ciclo conferência → generate. Uma falha aqui degrada
-      // para a tela de preparação (o draft já existe) — não trava o usuário, e as
-      // instructions permanecem no sessionStorage para uma nova tentativa.
-      // O guard `origem` garante que o rascunho tem intimação de origem (a
-      // construção exige uma); as teses em si são resolvidas draft-scoped.
-      if (auto && origem) {
-        try {
-          await autoPartida(api, draftId, instructions || undefined);
-          // Sucesso (generate 202): agora sim limpa as instructions.
+      // Re-chaveia o prompt opcional (modal) de actionItemId → draftId, pra a tela
+      // da peça lê-lo sem depender da URL. Só quando há prompt e é fluxo auto.
+      if (auto) {
+        const storageKey = actionItemId || intimationId;
+        const instr = peekInstructions(storageKey);
+        if (instr) {
+          setInstructions(draftId, instr);
           clearInstructions(storageKey);
-        } catch {
-          // segue para /pecas/:id na tela de preparação (pregen); instructions
-          // preservadas.
         }
       }
       return draftId;
@@ -172,10 +103,11 @@ export function ConstructionEntry({
         // para o card refletir o novo status ao voltar.
         qc.invalidateQueries({ queryKey: ["intimacoes"] }),
       ]);
-      // BLOCKER-2: preserva auto=1 para o guard isFreshAutoPregen (construction-page)
-      // continuar mostrando o loader em vez da tela de pregen enquanto o saga avança.
+      // auto=1 sinaliza pra tela da peça disparar a auto-partida (teses →
+      // conferência → generate) e mostrar o loader de 4 fases direto.
+      const q = auto ? "auto=1&" : "";
       router.replace(
-        `/pecas/${draftId}?auto=1&retorno=${encodeURIComponent(back)}`,
+        `/pecas/${draftId}?${q}retorno=${encodeURIComponent(back)}`,
       );
     },
   });
@@ -210,9 +142,7 @@ export function ConstructionEntry({
             </Button>
           </>
         ) : (
-          <p role="status">
-            {auto ? "Construindo a peça…" : "Abrindo a peça…"}
-          </p>
+          <p role="status">Abrindo a peça…</p>
         )}
       </div>
     </PageFrame>

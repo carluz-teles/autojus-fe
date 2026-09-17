@@ -6,13 +6,10 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import type { IntimacaoProvidencia } from "@/features/intimacoes/types";
 import { GerarPecaModal } from "@/features/pecas-v2/components/pregen/gerar-peca-modal";
+import { setInstructions } from "@/features/pecas-v2/lib/instructions-storage";
 
 import { ANALYSIS_PROCESSING_MESSAGE } from "../../../intimacoes/lib/analysis-materialization";
 import { useDisposicao } from "../../hooks/use-disposicao";
-
-// Chave sessionStorage usada para transportar `instructions` do modal até o
-// ConstructionEntry, evitando colocar 2000 chars na URL/history.
-export const INSTRUCTIONS_SESSION_KEY = "peca:instructions:";
 
 /**
  * DISPOSIÇÃO da intimação — a unidade de trabalho. Substitui o antigo bloco de
@@ -62,18 +59,9 @@ export function DisposicaoSection({
 
   function handleGenerate(instructions: string) {
     const url = buildGerarUrl(pendingActionItemId);
-    if (instructions) {
-      // Transporta as instructions via sessionStorage (curta duração — limpo
-      // pelo ConstructionEntry após a leitura).
-      try {
-        sessionStorage.setItem(
-          `${INSTRUCTIONS_SESSION_KEY}${pendingActionItemId}`,
-          instructions,
-        );
-      } catch {
-        // sessionStorage indisponível (modo privado restrito) — degrada sem instructions.
-      }
-    }
+    // Transporta as instructions via sessionStorage (chave = actionItemId); a
+    // ConstructionEntry re-chaveia por draftId antes de navegar pra tela da peça.
+    if (instructions) setInstructions(pendingActionItemId, instructions);
     router.push(url);
   }
 
