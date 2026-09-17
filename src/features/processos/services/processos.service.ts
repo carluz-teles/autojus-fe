@@ -5,8 +5,6 @@ import type {
   PartesView,
   ProcessoFilters,
   ProcessoPhase,
-  ProcessoResumoView,
-  ProcessosSummary,
   ProcessoView,
 } from "../types";
 
@@ -61,29 +59,6 @@ export async function getProcesso(
 }
 
 /**
- * Contadores da lista — GET /v1/processos/summary → objeto único (sem envelope
- * de cursor). Alimenta a KpiRow do topo da tela.
- */
-export async function getProcessosSummary(
-  fetcher: ApiFetcher,
-): Promise<ProcessosSummary> {
-  return fetcher<ProcessosSummary>(`${ENDPOINT}/summary`);
-}
-
-/**
- * Resumo do processo por IA — GET /v1/processos/:id/resume. Write-once
- * sync-on-first-GET no BE: a primeira abertura gera (chama o LLM) e persiste;
- * as seguintes servem do cache. O :id é o court_record id (o mesmo de
- * /processos). Slices sempre inicializados; em degrade summary="" + risks [].
- */
-export async function getProcessoResumo(
-  fetcher: ApiFetcher,
-  id: string,
-): Promise<ProcessoResumoView> {
-  return fetcher<ProcessoResumoView>(`${ENDPOINT}/${id}/resume`);
-}
-
-/**
  * Partes do processo — GET /v1/processos/:id/partes → {autor,reu,terceiros}. O
  * :id é o court_record id (o mesmo que /processos devolve). Cada lista já vem
  * inicializada pelo BE (nunca null); alimenta os cards AUTOR/RÉU do cockpit.
@@ -126,41 +101,5 @@ export async function updateProcessoManual(
   return fetcher<ProcessoView>(`${ENDPOINT}/${id}`, {
     method: "PATCH",
     body,
-  });
-}
-
-/** Atribuição em massa do responsável. `all=true` aplica a toda a
- *  faixa/filtro atual (inclui não paginados) via os filtros; senão aplica
- *  aos `ids` (court_record ids). Espelha bulkAssignResponsavel de Intimações —
- *  mesmo contrato, só o nome do campo de usuário muda (`user_id` no BE deste
- *  slice, em vez de `assignee_user_id`). */
-export interface BulkAssignResponsavelParams {
-  userId: string | null;
-  all: boolean;
-  ids: string[];
-  /** filtros ativos — usados só no modo all; espelham o GET /processos. */
-  search?: string;
-  court?: string;
-  lifecycle?: string;
-  degree?: string;
-  assignee?: string;
-}
-
-export async function bulkAssignResponsavel(
-  fetcher: ApiFetcher,
-  params: BulkAssignResponsavelParams,
-): Promise<{ affected: number }> {
-  return fetcher<{ affected: number }>(`${ENDPOINT}/bulk/responsavel`, {
-    method: "POST",
-    body: {
-      user_id: params.userId,
-      all: params.all,
-      ids: params.ids,
-      search: params.search ?? "",
-      court: params.court ?? "",
-      lifecycle: params.lifecycle ?? "",
-      degree: params.degree ?? "",
-      assignee: params.assignee ?? "",
-    },
   });
 }

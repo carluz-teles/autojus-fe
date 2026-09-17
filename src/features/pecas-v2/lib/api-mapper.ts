@@ -289,6 +289,21 @@ function formatOab(c: { oab: string; uf: string }): string | undefined {
   return `OAB/${uf} nº ${c.oab}`;
 }
 
+// ── Iterate (SectionChangeAPI → PendingChange) ──────────────────────────────
+
+function mapSectionChangeFromApi(api: SectionChangeAPI): PendingChange {
+  return {
+    sectionId: api.section_id,
+    sectionRoman: api.section_roman,
+    sectionTitle: api.section_title,
+    category: api.category,
+    explanation: api.explanation,
+    oldParagraphs: api.old_paragraphs ?? [],
+    newParagraphs: api.new_paragraphs ?? [],
+    baseRevision: api.base_revision ?? "",
+  };
+}
+
 // ── Chat ─────────────────────────────────────────────────────────────────────
 
 export function mapChatMessageFromApi(api: ChatMessageAPI): ChatMessage {
@@ -306,24 +321,6 @@ export function mapChatMessageFromApi(api: ChatMessageAPI): ChatMessage {
       quote: c.quote,
     })),
     grounded: !!api.grounded,
-  };
-}
-
-// ── Iterate (SectionChangeAPI → PendingChange) ──────────────────────────────
-
-export function mapSectionChangeFromApi(
-  api: SectionChangeAPI,
-  overrides?: { category?: string; explanation?: string },
-): PendingChange {
-  return {
-    sectionId: api.section_id,
-    sectionRoman: api.section_roman,
-    sectionTitle: api.section_title,
-    category: overrides?.category ?? api.category,
-    explanation: overrides?.explanation ?? api.explanation,
-    oldParagraphs: api.old_paragraphs ?? [],
-    newParagraphs: api.new_paragraphs ?? [],
-    baseRevision: api.base_revision ?? "",
   };
 }
 

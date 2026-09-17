@@ -176,21 +176,6 @@ export interface Draft {
 
 // ── Iteração / ajustes rápidos ───────────────────────────────────────────────
 
-/** Escopo de uma iteração: "peça toda" ou uma seção específica (id estável da
- *  seção, o mesmo do structured_content — o BE valida contra ele). */
-export type IterateScope =
-  { kind: "whole" } | { kind: "section"; sectionId: string };
-
-export type QuickAdjustKind =
-  "emphatic" | "concise" | "reinforce_thesis" | "add_grounds";
-
-/** Resultado de qualquer iteração (livre ou ajuste rápido, peça toda ou seção).
- *  Cada mudança já vem com categoria/explicação/old+new paragraphs prontas
- *  pra virar um card no painel Ajuste proposto (Peça v2 — POST /iterate no BE). */
-export interface IterationResult {
-  changes: PendingChange[];
-}
-
 /** Uma mudança pendente numa seção — vira 1 card no painel Ajuste proposto.
  *  Cada card mostra categoria (badge âmbar), título da seção, explicação curta
  *  do porquê da mudança e o diff em blocos (removido/adicionado). */
@@ -207,19 +192,6 @@ export interface PendingChange {
   newParagraphs: string[];
   /** Revisão exata do HTML usada para produzir esta proposta. */
   baseRevision: string;
-}
-
-/** Estado do painel "Ajuste proposto" — 1..N cards pendentes derivados de uma
- *  iteração (escopo "whole" gera N cards, escopo "section" gera 1). O painel
- *  fecha automaticamente quando pending fica vazio. */
-export interface PreviewState {
-  scope: IterateScope;
-  scopeLabel: string;
-  pending: PendingChange[];
-  onAcceptOne: (sectionId: string) => void;
-  onDismissOne: (sectionId: string) => void;
-  onAcceptAll: () => void;
-  onDismissAll: () => void;
 }
 
 // ── Chat ─────────────────────────────────────────────────────────────────────
@@ -246,9 +218,6 @@ export interface ChatMessage {
   /** A resposta se apoia em trechos dos autos recuperados (RAG). */
   grounded: boolean;
 }
-
-export type QuickActionKind =
-  "summarize_case" | "suggest_theses" | "check_deadline" | "find_precedents";
 
 // ── Teses da peça (contrato Teses — provenance obrigatória) ──────────────────
 

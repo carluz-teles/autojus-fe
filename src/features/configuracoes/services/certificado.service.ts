@@ -18,14 +18,10 @@
 import type { ApiFetcher } from "@/lib/api/use-api";
 
 import {
-  type CertificadoPasswordPolicy,
-  type CertificadoPreviewResult,
-  type CertificadoSignResult,
   type CertificadosListResult,
   type CertificateView,
   type CertificateViewApi,
   mapCertificateView,
-  passwordPolicyToApi,
 } from "../types/certificado";
 
 const ENDPOINT = "/v1/certificates";
@@ -50,71 +46,12 @@ export async function uploadCertificado(
   return mapCertificateView(raw);
 }
 
-/**
- * Pré-valida o certificado (etapa "Validação" do wizard) SEM armazenar nada.
- * O BE parseia o .pfx, extrai os metadados e devolve as checagens (✓/✗). A senha
- * é usada apenas para abrir o arquivo e é descartada — nunca persistida, nunca
- * logada. Mesmo shape multipart do upload.
- */
-export async function previewCertificado(
-  fetcher: ApiFetcher,
-  file: File,
-  password: string,
-): Promise<CertificadoPreviewResult> {
-  const fd = new FormData();
-  fd.append("file", file);
-  fd.append("password", password);
-  return fetcher<CertificadoPreviewResult>(`${ENDPOINT}/preview`, {
-    method: "POST",
-    formData: fd,
-  });
-}
-
-/**
- * Assina um digest SHA-256 (base64) server-side com a chave do certificado. A
- * senha é de sessão, usada apenas para o BE decifrar o .pfx e assinar — nunca
- * persistida nem logada. Omitida quando a política do certificado é "nunca"
- * (o BE não exige senha nesse caso). Devolve {signature, cert_chain} (base64).
- */
-export async function signComCertificado(
-  fetcher: ApiFetcher,
-  id: string,
-  password: string | undefined,
-  digestSha256: string,
-): Promise<CertificadoSignResult> {
-  return fetcher<CertificadoSignResult>(`${ENDPOINT}/${id}/sign`, {
-    method: "POST",
-    body: password
-      ? { password, digest_sha256: digestSha256 }
-      : { digest_sha256: digestSha256 },
-  });
-}
-
 /** Lista os certificados do tenant (o do usuário corrente é owner_user_id = meu ID). */
 export async function listCertificados(
   fetcher: ApiFetcher,
 ): Promise<CertificadosListResult> {
   const raw = await fetcher<{ data: CertificateViewApi[] }>(ENDPOINT);
   return { data: raw.data.map(mapCertificateView) };
-}
-
-/**
- * Atualiza a política de senha do certificado (PATCH /v1/certificates/:id/password-policy).
- * Devolve o certificado atualizado (mesmo shape do GET).
- */
-export async function updatePasswordPolicyCertificado(
-  fetcher: ApiFetcher,
-  id: string,
-  policy: CertificadoPasswordPolicy,
-): Promise<CertificateView> {
-  const raw = await fetcher<CertificateViewApi>(
-    `${ENDPOINT}/${id}/password-policy`,
-    {
-      method: "PATCH",
-      body: { password_policy: passwordPolicyToApi(policy) },
-    },
-  );
-  return mapCertificateView(raw);
 }
 
 /** Remove / revoga o certificado. O BE devolve 204. */

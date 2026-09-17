@@ -128,20 +128,6 @@ export interface UpdateActionItemInput {
   assignee_user_id?: string;
 }
 
-/**
- * Contadores agregados do board de providências — GET /v1/action-items/summary.
- * Objeto único (sem envelope de cursor), nos 3 buckets de status de trabalho.
- * SUGGESTED nunca entra nas contagens. Espelha o ActionItemsSummary do BE.
- */
-export interface ActionItemsSummary {
-  /** TODO — "A Fazer". */
-  a_fazer: number;
-  /** WORKING — "Em elaboração". */
-  em_elaboracao: number;
-  /** DONE — "Concluída". */
-  concluida: number;
-}
-
 // Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
 export type { PageEnvelope } from "@/lib/api/types";
 

@@ -34,5 +34,3 @@ export function useApiBlob() {
     [getToken],
   );
 }
-
-export type ApiBlobFetcher = ReturnType<typeof useApiBlob>;

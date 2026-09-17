@@ -199,19 +199,5 @@ export interface PrazoConfirmResult {
   };
 }
 
-/**
- * Contadores agregados da agenda de prazos — GET /v1/prazos/summary. Objeto único
- * (sem envelope de cursor). Alimenta a KpiRow do topo da tela.
- */
-export interface PrazosSummary {
-  total: number;
-  criticos: number;
-  vencendo: number;
-  abertos: number;
-  futuros: number;
-  vencidos: number;
-  cumpridos: number;
-}
-
 // Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
 export type { PageEnvelope } from "@/lib/api/types";

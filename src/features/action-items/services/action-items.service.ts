@@ -1,13 +1,6 @@
 import type { ApiFetcher } from "@/lib/api/use-api";
 
-import type {
-  ActionItemsSummary,
-  ActionItemStatus,
-  ActionItemTipo,
-  ActionItemView,
-  PageEnvelope,
-  UpdateActionItemInput,
-} from "../types";
+import type { ActionItemView, UpdateActionItemInput } from "../types";
 
 const ENDPOINT = "/v1/action-items";
 
@@ -19,67 +12,6 @@ const ENDPOINT = "/v1/action-items";
  *  (list/summary usam envelopes próprios; :id e as transições devolvem { data }). */
 interface DataEnvelope<T> {
   data: T;
-}
-
-export interface ListActionItemsParams {
-  /** Filtra pelo status de trabalho (server-side). TODO|WORKING|DONE — SUGGESTED
-   *  nunca é aceito/retornado no board. Omitido = todos os 3. */
-  status?: ActionItemStatus;
-  /** Id interno do responsável — base do filtro "meus" (aceita "me"). Omitido = de todos. */
-  assignee?: string;
-  /** Filtra pelo tipo do ato (contestar/recorrer/…). */
-  tipo?: ActionItemTipo;
-  /** Janela de vencimento ("YYYY-MM-DD", sem hora/timezone). Omitidas = sem recorte. */
-  from?: string;
-  to?: string;
-  limit?: number;
-  /** Cursor opaco: eco do next_cursor recebido para pedir a próxima página. */
-  cursor?: string;
-}
-
-/** Board/fila — as providências do tenant, filtráveis por status/responsável/tipo/janela. */
-export async function listActionItems(
-  fetcher: ApiFetcher,
-  {
-    status,
-    assignee,
-    tipo,
-    from,
-    to,
-    limit = 20,
-    cursor,
-  }: ListActionItemsParams = {},
-): Promise<PageEnvelope<ActionItemView>> {
-  return fetcher<PageEnvelope<ActionItemView>>(ENDPOINT, {
-    query: { status, assignee, tipo, from, to, limit, cursor },
-  });
-}
-
-/**
- * Contadores do board — GET /v1/action-items/summary → objeto único (sem envelope
- * de cursor), nos buckets a_fazer/em_elaboracao/concluida. Alimenta a KpiRow.
- */
-export async function getActionItemsSummary(
-  fetcher: ApiFetcher,
-): Promise<ActionItemsSummary> {
-  return fetcher<ActionItemsSummary>(`${ENDPOINT}/summary`);
-}
-
-export interface ListActionItemsByProcessoParams {
-  processoId: string;
-  limit?: number;
-  cursor?: string;
-}
-
-/** Aba do processo — providências vinculadas ao court_record daquele processo. */
-export async function listActionItemsByProcesso(
-  fetcher: ApiFetcher,
-  { processoId, limit = 20, cursor }: ListActionItemsByProcessoParams,
-): Promise<PageEnvelope<ActionItemView>> {
-  return fetcher<PageEnvelope<ActionItemView>>(
-    `/v1/processos/${processoId}/action-items`,
-    { query: { limit, cursor } },
-  );
 }
 
 /**

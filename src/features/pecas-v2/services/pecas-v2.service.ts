@@ -14,7 +14,6 @@ import type { ApiFetcher } from "@/lib/api/use-api";
 import {
   mapChatMessageFromApi,
   mapPecaDetailToDraft,
-  mapSectionChangeFromApi,
   mapThesisFromApi,
 } from "../lib/api-mapper";
 import type {
@@ -24,20 +23,10 @@ import type {
   ChatMessageAPI,
   ChatThreadAPI,
   DataEnvelope,
-  IterateResultAPI,
   PecaDetailAPI,
   ThesisAPI,
 } from "../lib/api-types";
-import type {
-  ChatMessage,
-  Draft,
-  IterateScope,
-  IterationResult,
-  QuickAdjustKind,
-  StructuredContent,
-  Thesis,
-  ThesisState,
-} from "../types";
+import type { ChatMessage, Draft, Thesis, ThesisState } from "../types";
 
 const ENDPOINT = "/v1/pecas";
 
@@ -289,110 +278,6 @@ export async function validateAssessment(
   return res.data;
 }
 
-// ── Autosave (PATCH /pecas/:id — dual write) ─────────────────────────────────
-
-export interface SaveDraftInput {
-  preambleParagraphs?: string[];
-  sections?: { id: string; paragraphs: string[] }[];
-}
-
-/**
- * PATCH /v1/pecas/:id — reconstrói o structured_content COMPLETO (BE espera o
- * objeto inteiro, não patch parcial) mergindo o que veio no input com o que já
- * está no cache do React Query. Escreve também o `content` plain-text serializado
- * pra manter compatibilidade legada (dual write). Requer draft atual pra o merge.
- */
-export async function saveDraft(
-  fetcher: ApiFetcher,
-  id: string,
-  patch: SaveDraftInput,
-  currentDraft: Draft,
-): Promise<{ updatedAt: string }> {
-  const merged = mergeIntoStructured(patch, currentDraft);
-  const body = {
-    content: serializeStructured(merged),
-    structured_content: {
-      preamble: { paragraphs: merged.preamble.paragraphs },
-      sections: merged.sections.map((s) => ({
-        id: s.id,
-        roman: s.roman,
-        title: s.title,
-        short_title: s.shortTitle,
-        paragraphs: s.paragraphs,
-      })),
-    },
-  };
-  const res = await fetcher<DataEnvelope<{ updated_at: string }>>(
-    `${ENDPOINT}/${id}`,
-    { method: "PATCH", body },
-  );
-  return { updatedAt: res.data.updated_at };
-}
-
-// ── Iteração (POST /pecas/:id/iterate) ───────────────────────────────────────
-
-export async function iterateDraft(
-  fetcher: ApiFetcher,
-  id: string,
-  scope: IterateScope,
-  instruction: string,
-): Promise<IterationResult> {
-  const body = {
-    scope: mapScopeToApi(scope),
-    instruction,
-  };
-  const res = await fetcher<DataEnvelope<IterateResultAPI>>(
-    `${ENDPOINT}/${id}/iterate`,
-    { method: "POST", body },
-  );
-  return {
-    changes: (res.data.changes ?? []).map((c) => mapSectionChangeFromApi(c)),
-  };
-}
-
-export async function applyQuickAdjust(
-  fetcher: ApiFetcher,
-  id: string,
-  scope: IterateScope,
-  kind: QuickAdjustKind,
-): Promise<IterationResult> {
-  const body = {
-    scope: mapScopeToApi(scope),
-    kind,
-  };
-  const res = await fetcher<DataEnvelope<IterateResultAPI>>(
-    `${ENDPOINT}/${id}/iterate`,
-    { method: "POST", body },
-  );
-  return {
-    changes: (res.data.changes ?? []).map((c) => mapSectionChangeFromApi(c)),
-  };
-}
-
-/**
- * "Refazer seção" hoje só foca o painel Iterar (não dispara chamada). O hook
- * fica no repo pra futuras opcionalidades. Reusa iterate com scope=section +
- * instruction padrão.
- */
-export async function refazerSection(
-  fetcher: ApiFetcher,
-  id: string,
-  sectionId: string,
-): Promise<IterationResult> {
-  const body = {
-    scope: { kind: "section", section_id: sectionId },
-    instruction:
-      "Refaça esta seção mantendo o mesmo conteúdo com melhor redação.",
-  };
-  const res = await fetcher<DataEnvelope<IterateResultAPI>>(
-    `${ENDPOINT}/${id}/iterate`,
-    { method: "POST", body },
-  );
-  return {
-    changes: (res.data.changes ?? []).map((c) => mapSectionChangeFromApi(c)),
-  };
-}
-
 // ── Chat ────────────────────────────────────────────────────────────────────
 
 export async function sendChatMessage(
@@ -417,50 +302,4 @@ export async function sendChatMessage(
     grounded: false,
   };
   return { user, assistant };
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function mapScopeToApi(scope: IterateScope): {
-  kind: string;
-  section_id?: string;
-} {
-  if (scope.kind === "section") {
-    return { kind: "section", section_id: scope.sectionId };
-  }
-  return { kind: "whole" };
-}
-
-/** Reconstrói o structured completo aplicando o patch (só o que mudou). */
-function mergeIntoStructured(
-  patch: SaveDraftInput,
-  current: Draft,
-): StructuredContent {
-  const preamble = patch.preambleParagraphs
-    ? { paragraphs: patch.preambleParagraphs }
-    : { paragraphs: current.preamble.paragraphs };
-
-  const patched = new Map<string, string[]>();
-  for (const s of patch.sections ?? []) {
-    patched.set(s.id, s.paragraphs);
-  }
-
-  const sections = current.sections.map((s) => ({
-    ...s,
-    paragraphs: patched.has(s.id) ? patched.get(s.id)! : s.paragraphs,
-  }));
-
-  return { preamble, sections };
-}
-
-/** Serializa o structured num plain text semelhante ao que o generate produz.
- *  Preâmbulo (parágrafos separados por \n\n) + cada seção com heading romano. */
-function serializeStructured(s: StructuredContent): string {
-  const parts: string[] = [];
-  parts.push(...s.preamble.paragraphs);
-  for (const sec of s.sections) {
-    parts.push(`${sec.roman} — ${sec.title}`);
-    parts.push(...sec.paragraphs);
-  }
-  return parts.join("\n\n");
 }

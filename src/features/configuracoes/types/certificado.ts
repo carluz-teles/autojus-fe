@@ -46,7 +46,7 @@ export interface CertificateView {
  * Nunca usar diretamente fora de `certificado.service.ts` — o resto do FE
  * trabalha com `CertificadoPasswordPolicy` (português, já traduzido).
  */
-export type CertificatePasswordPolicyApi = "always" | "session" | "never";
+type CertificatePasswordPolicyApi = "always" | "session" | "never";
 
 /** `CertificateView` tal como chega do BE, antes da tradução de `password_policy`. */
 export type CertificateViewApi = Omit<CertificateView, "password_policy"> & {
@@ -59,50 +59,11 @@ export interface CertificadosListResult {
 }
 
 /**
- * Checagens que o BE consegue determinar ao parsear o .pfx na etapa de validação.
- * Contrato: POST /v1/certificates/preview → PreviewResult.checks.
- */
-interface CertificadoChecks {
-  /** A janela de validade contém "agora" (não expirado nem futuro). */
-  nao_expirado: boolean;
-  /** O .pfx trouxe a cadeia da AC (um A1 ICP-Brasil embarca a cadeia). */
-  cadeia_ok: boolean;
-  /** O certificado tem um titular identificável (CN não vazio). */
-  titular_confere: boolean;
-}
-
-/**
- * Resultado da pré-validação do certificado (etapa "Validação" do wizard).
- * O BE parseia o .pfx e REPORTA os metadados + checagens sem armazenar nada;
- * a senha é usada apenas para abrir o arquivo e é descartada.
- * Contrato: POST /v1/certificates/preview (multipart {file, password}).
- */
-export interface CertificadoPreviewResult {
-  subject_cn: string;
-  oab: string;
-  issuer: string;
-  serial: string;
-  not_before: string;
-  not_after: string;
-  fingerprint: string;
-  checks: CertificadoChecks;
-}
-
-/**
- * Resposta do sign: a assinatura (base64) e a cadeia de certificados (DER base64,
- * folha primeiro). Nada aqui é segredo — a assinatura é pública por natureza.
- */
-export interface CertificadoSignResult {
-  signature: string;
-  cert_chain: string[];
-}
-
-/**
  * Política de quando pedir a senha do certificado. Propriedade real do
  * certificado, persistida no BE (campo `password_policy` de `CertificateView`) —
  * `GET /v1/certificates`, atualizada via `PATCH /v1/certificates/:id/password-policy`.
  */
-export type CertificadoPasswordPolicy = "sempre" | "sessao" | "nunca";
+type CertificadoPasswordPolicy = "sempre" | "sessao" | "nunca";
 
 const POLICY_FROM_API: Record<
   CertificatePasswordPolicyApi,
@@ -113,27 +74,11 @@ const POLICY_FROM_API: Record<
   never: "nunca",
 };
 
-const POLICY_TO_API: Record<
-  CertificadoPasswordPolicy,
-  CertificatePasswordPolicyApi
-> = {
-  sempre: "always",
-  sessao: "session",
-  nunca: "never",
-};
-
 /** Traduz o `password_policy` da wire (BE, inglês) pro vocabulário do FE. */
 function passwordPolicyFromApi(
   value: CertificatePasswordPolicyApi,
 ): CertificadoPasswordPolicy {
   return POLICY_FROM_API[value];
-}
-
-/** Traduz o `password_policy` do FE pro vocabulário da wire (BE, inglês). */
-export function passwordPolicyToApi(
-  value: CertificadoPasswordPolicy,
-): CertificatePasswordPolicyApi {
-  return POLICY_TO_API[value];
 }
 
 /** `CertificateViewApi` → `CertificateView`: traduz `password_policy` pro FE. */

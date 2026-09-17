@@ -12,9 +12,9 @@ import type { PageEnvelope } from "@/lib/api/types";
 // Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
 export type { PageEnvelope } from "@/lib/api/types";
 
-export type IntimacaoDegree = "UNKNOWN" | "G1" | "G2" | "JE" | "SUPERIOR";
+type IntimacaoDegree = "UNKNOWN" | "G1" | "G2" | "JE" | "SUPERIOR";
 export type IntimacaoType = "INTIMACAO" | "CITACAO" | "COMUNICACAO";
-export type IntimacaoStatus = "ACTIVE" | "CANCELLED";
+type IntimacaoStatus = "ACTIVE" | "CANCELLED";
 /** Situação de triagem do usuário sobre a intimação (inbox). */
 export type IntimacaoUserStatus = "PENDING" | "RESOLVED" | "IGNORED";
 
@@ -299,23 +299,6 @@ export interface IntimacaoDetalheView extends IntimacaoView {
    * preenchido = pós-análise (o card mostra as providências).
    */
   ai_analyzed_at: string | null;
-}
-
-/**
- * Contadores agregados de intimações — GET /v1/intimacoes/summary. Objeto único
- * (sem envelope de cursor). Espelha o IntimacoesSummary do BE.
- */
-export interface IntimacoesSummary {
-  total: number;
-  pendentes: number;
-  resolvidas: number;
-  ignoradas: number;
-  /** Prazo vencido (days_left < 0). */
-  em_atraso: number;
-  /** Prazo vence hoje (days_left = 0). */
-  vencem_hoje: number;
-  /** Prazo derivado mas ainda não confirmado. */
-  nao_confirmado: number;
 }
 
 /**

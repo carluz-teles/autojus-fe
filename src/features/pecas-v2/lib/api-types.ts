@@ -275,24 +275,6 @@ interface ChatCitationAPI {
   quote: string;
 }
 
-export interface ChatMessageAPI {
-  changes?: SectionChangeAPI[];
-  id: string;
-  draft_id: string;
-  role: "user" | "assistant";
-  content: string;
-  citations: ChatCitationAPI[];
-  grounded: boolean;
-  model_version?: string;
-  created_at: string;
-}
-
-// ── Iterate (POST /v1/pecas/:id/iterate) ────────────────────────────────────
-
-export interface IterateResultAPI {
-  changes: SectionChangeAPI[];
-}
-
 export interface SectionChangeAPI {
   section_id: string;
   section_roman: string;
@@ -304,9 +286,14 @@ export interface SectionChangeAPI {
   base_revision: string;
 }
 
-// ── Assume authorship (POST /v1/pecas/:id/assume-authorship) ────────────────
-
-export interface AssumeAuthorshipResultAPI {
-  authorship: "human_taken";
-  updated_at: string;
+export interface ChatMessageAPI {
+  changes?: SectionChangeAPI[];
+  id: string;
+  draft_id: string;
+  role: "user" | "assistant";
+  content: string;
+  citations: ChatCitationAPI[];
+  grounded: boolean;
+  model_version?: string;
+  created_at: string;
 }
