@@ -37,7 +37,6 @@ describe("notification destinations", () => {
     "/primeira-importacao",
     "/processos/abc-123",
     "/intimacoes/abc-123",
-    "/providencias/abc-123",
     "/pecas/abc-123?retorno=%2Fnotificacoes",
   ])("accepts entity route %s", (href) => {
     expect(notificationHref({ payload: { href } })).toBe(href);
@@ -65,7 +64,6 @@ describe("legacy notification links", () => {
   const id = "03394fc5-ecaf-4475-a821-5f65f6dd7183";
   it.each([
     ["draft_id", "pecas"],
-    ["action_item_id", "providencias"],
     ["intimation_id", "intimacoes"],
     ["court_record_id", "processos"],
   ])("uses the entity id in %s", (key, route) => {
@@ -80,11 +78,19 @@ describe("legacy notification links", () => {
     expect(
       notificationHref({
         payload: {
-          action_item_id: id,
+          intimation_id: id,
           court_record_id: "319aff0f-82de-42c8-b943-14f8a34ede6e",
         },
       }),
-    ).toBe(`/providencias/${id}`);
+    ).toBe(`/intimacoes/${id}`);
+  });
+  it("falls back to the process context for a work item (no own screen)", () => {
+    const proc = "319aff0f-82de-42c8-b943-14f8a34ede6e";
+    expect(
+      notificationHref({
+        payload: { action_item_id: id, court_record_id: proc },
+      }),
+    ).toBe(`/processos/${proc}`);
   });
 });
 

@@ -555,7 +555,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                       <Colecao
                         query={h.pecasQ}
                         count={h.pecas.length}
-                        empty="Nenhuma peça vinculada. Abra uma intimação ou providência para iniciar a elaboração com o contexto do processo."
+                        empty="Nenhuma peça vinculada. Abra uma intimação para iniciar a elaboração com o contexto do processo."
                       >
                         <Registros items={h.pecas} />
                       </Colecao>

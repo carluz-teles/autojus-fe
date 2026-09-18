@@ -11,14 +11,14 @@ export function HeroVisual() {
   return (
     <div
       className="lp-hero-visual"
-      aria-label="Ilustração do fluxo: publicação analisada, providência gerada automaticamente e minuta fundamentada"
+      aria-label="Ilustração do fluxo: publicação analisada, próximo passo gerado automaticamente e minuta fundamentada"
     >
       <div className="lp-visual-grid" aria-hidden="true" />
       <div className="lp-orbit lp-orbit-one" aria-hidden="true" />
       <div className="lp-orbit lp-orbit-two" aria-hidden="true" />
       <div className="lp-visual-caption">
         <span className="lp-status-dot" />
-        DA INTIMAÇÃO À PROVIDÊNCIA<span>ATJUD / 01</span>
+        DA INTIMAÇÃO AO PRÓXIMO PASSO<span>ATJUD / 01</span>
       </div>
       <div className="lp-visual-flow">
         <div className="lp-capture-card">
@@ -44,7 +44,7 @@ export function HeroVisual() {
         <div className="lp-deadline-card">
           <div>
             <span className="lp-mini-label">
-              PROVIDÊNCIA GERADA AUTOMATICAMENTE
+              PRÓXIMO PASSO GERADO AUTOMATICAMENTE
             </span>
             <strong>Manifestar sobre documentos</strong>
             <span className="lp-mini-meta">

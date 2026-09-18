@@ -233,8 +233,7 @@ function NotificationsWorkspace() {
                   Selecione uma notificação para ver os detalhes.
                 </p>
                 <p className="max-w-72 text-[12px] leading-relaxed">
-                  Acesse o processo, a intimação ou a providência a partir da
-                  atualização.
+                  Acesse o processo ou a intimação a partir da atualização.
                 </p>
               </div>
             )}

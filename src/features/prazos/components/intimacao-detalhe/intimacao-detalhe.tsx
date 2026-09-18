@@ -200,13 +200,13 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
           <Alert variant="destructive" className="p-4">
             <TriangleAlert />
             <AlertTitle>
-              Confirmação obrigatória antes das providências
+              Confirmação obrigatória antes de gerar a peça
             </AlertTitle>
             <AlertDescription className="flex flex-col items-start gap-3">
               <p>
-                O tipo ou o prazo desta intimação ainda precisa de revisão. A
-                criação de providências e a geração de sugestões ficam
-                bloqueadas até resolver essa pendência.
+                O tipo ou o prazo desta intimação ainda precisa de revisão.
+                Gerar a peça e dar ciência ficam bloqueados até resolver essa
+                pendência.
               </p>
               <Button
                 size="sm"

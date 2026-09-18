@@ -54,7 +54,7 @@ export function ConstructionEntry({
         draftId = (await createDraft(api, { intimationId })).id;
       } else {
         const item = work.data;
-        if (!item) throw new Error("Providência não encontrada.");
+        if (!item) throw new Error("Não foi possível iniciar a peça.");
         if (!item.intimation_id)
           throw new Error(
             "A construção de uma peça deve começar por uma intimação. Abra a intimação de origem para continuar.",
@@ -63,11 +63,9 @@ export function ConstructionEntry({
           draftId = item.draft_id;
         } else {
           if (!item.gera_peca || item.tipo_status !== "confiavel")
-            throw new Error(
-              "Revise o tipo da providência antes de gerar a peça.",
-            );
+            throw new Error("Revise o tipo antes de gerar a peça.");
           if (["DONE", "CANCELLED", "DISMISSED"].includes(item.status))
-            throw new Error("Esta providência já foi encerrada.");
+            throw new Error("Este item já foi encerrado.");
           // Atalho "Gerar peça": clicar aqui É concordar com a providência. Se ela
           // ainda está SUGGESTED, iniciamos (SUGGESTED → TODO) antes de abrir a
           // construção — sem um passo de curadoria separado. TODO/WORKING seguem direto.
@@ -120,19 +118,13 @@ export function ConstructionEntry({
   }, [work.data, actionItemId, intimationId, mutate]);
   return (
     <PageFrame
-      header={
-        <ShellBackLink
-          href={origin}
-          label={actionItemId ? "Voltar à providência" : "Voltar à intimação"}
-        />
-      }
+      header={<ShellBackLink href={origin} label="Voltar à intimação" />}
     >
       <div className="flex flex-col items-start gap-4 p-6">
         {work.isError || create.isError ? (
           <>
             <p role="alert">
-              {create.error?.message ||
-                "Não foi possível carregar a providência."}
+              {create.error?.message || "Não foi possível carregar o trabalho."}
             </p>
             <Button
               onClick={() => (work.isError ? work.refetch() : create.mutate())}

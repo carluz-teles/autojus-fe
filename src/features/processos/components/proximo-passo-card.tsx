@@ -30,7 +30,7 @@ interface ProximoPassoPrazo {
 
 const META: Record<ProximoPassoKind, { icon: LucideIcon; kicker: string }> = {
   CUMPRIR_PRAZO: { icon: Clock, kicker: "Cumprir prazo" },
-  INICIAR_PROVIDENCIA: { icon: ListChecks, kicker: "Iniciar providência" },
+  INICIAR_PROVIDENCIA: { icon: ListChecks, kicker: "Iniciar trabalho" },
   AVALIAR_SENTENCA: { icon: Gavel, kicker: "Avaliar sentença" },
   ACOMPANHAR_RECURSO: { icon: TrendingUp, kicker: "Acompanhar recurso" },
   ACOMPANHAR_EXECUCAO: { icon: Landmark, kicker: "Acompanhar execução" },

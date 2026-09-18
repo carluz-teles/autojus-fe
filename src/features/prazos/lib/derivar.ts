@@ -36,7 +36,3 @@ export function urg(dias: number): Urg {
     fundo: "color-mix(in oklch, var(--green) 10%, transparent)",
   };
 }
-
-export function cnjCurto(cnj: string): string {
-  return cnj.slice(0, 11) + ".";
-}

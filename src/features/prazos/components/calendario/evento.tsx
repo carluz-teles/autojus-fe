@@ -14,8 +14,8 @@ export function EventoCalendario({
 }) {
   const compacto = densidade !== "dia";
   const mensal = densidade === "mes";
-  const tipo = e.tipo === "prazo" ? "Prazo" : "Providência";
-  const destino = e.tipo === "prazo" ? "Abrir intimação" : "Abrir providência";
+  const tipo = "Prazo";
+  const destino = "Abrir intimação";
   const data = e.dia.split("-").reverse().join("/");
   return (
     <Link

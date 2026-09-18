@@ -1,6 +1,6 @@
 export const landingNavigation = [
   { href: "#acervo", label: "Acervo conectado" },
-  { href: "#plataforma", label: "Providências" },
+  { href: "#plataforma", label: "Próximos passos" },
   { href: "#inteligencia", label: "Minutas inteligentes" },
   { href: "#assistente", label: "Chat jurídico" },
 ] as const;
@@ -16,10 +16,10 @@ export const workflow = [
   },
   {
     number: "02",
-    label: "Receba as providências",
+    label: "Receba os próximos passos",
     title: "A IA identifica o que fazer.",
     description:
-      "O AtJud analisa a intimação e gera as providências automaticamente. Distingue mera ciência de atos que exigem trabalho e reconhece cumprimento no histórico disponível.",
+      "O AtJud analisa a intimação e identifica os próximos passos automaticamente. Distingue mera ciência de atos que exigem trabalho e reconhece cumprimento no histórico disponível.",
     detail: "A triagem inicial já vem feita.",
   },
   {
@@ -52,9 +52,9 @@ export const faqs = [
       "O acompanhamento pelas OABs traz processos e publicações ao AtJud, e o DataJud complementa o histórico disponível. Com a conexão de tribunal configurada, os autos podem ser importados e vinculados ao processo. Assim, você consulta publicações, movimentações e documentos no mesmo acervo, que também alimenta a triagem, a minuta e o chat. A cobertura dos autos depende da integração e do acesso ao tribunal.",
   },
   {
-    question: "As providências são geradas automaticamente?",
+    question: "Os próximos passos são gerados automaticamente?",
     answer:
-      "Sim. O AtJud analisa o teor da intimação e o contexto disponível, identifica o ato solicitado e gera as providências. A classificação distingue mera ciência de situações que exigem atuação, como uma manifestação. Movimentos de resposta no histórico também permitem reconhecer cumprimento. Você recebe a triagem inicial pronta e pode conferir ou corrigir a classificação quando necessário.",
+      "Sim. O AtJud analisa o teor da intimação e o contexto disponível, identifica o ato solicitado e o próximo passo. A classificação distingue mera ciência de situações que exigem atuação, como uma manifestação. Movimentos de resposta no histórico também permitem reconhecer cumprimento. Você recebe a triagem inicial pronta e pode conferir ou corrigir a classificação quando necessário.",
   },
   {
     question: "Preciso ler todos os autos para começar a triagem?",
@@ -94,7 +94,7 @@ export const faqs = [
   {
     question: "Como começo a organizar meu escritório?",
     answer:
-      "Crie sua conta, configure os dados do escritório e cadastre as OABs para iniciar o acompanhamento. Depois, convide a equipe, distribua as providências e conecte os portais disponíveis quando precisar importar autos. As condições de assinatura e os limites são apresentados dentro da plataforma.",
+      "Crie sua conta, configure os dados do escritório e cadastre as OABs para iniciar o acompanhamento. Depois, convide a equipe, distribua o trabalho e conecte os portais disponíveis quando precisar importar autos. As condições de assinatura e os limites são apresentados dentro da plataforma.",
   },
 ] as const;
 
@@ -104,13 +104,13 @@ export const demoNotifications = [
     id: "manifestacao",
     title: "Redigir manifestação",
     process: "Processo ilustrativo · Cível",
-    time: "Providência gerada pela IA",
+    time: "Próximo passo gerado pela IA",
     initials: "AM",
     person: "Ana Martins",
     status: "Exige atuação",
     badgeVariant: "warning",
     description:
-      "O teor pede uma resposta aos documentos juntados. O AtJud identificou o ato e gerou a providência: redigir a manifestação com o contexto do processo.",
+      "O teor pede uma resposta aos documentos juntados. O AtJud identificou o ato e identificou o próximo passo: redigir a manifestação com o contexto do processo.",
     document: "Despacho",
     page: "3",
     quote:
