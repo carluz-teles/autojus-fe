@@ -636,8 +636,8 @@ export function ProcessoHub({ numero }: { numero: string }) {
                     {identity.movimento}
                   </p>
                   <p className="text-muted-foreground border-t pt-3 text-xs leading-relaxed">
-                    A situação do processo é inferida dos dados disponíveis.
-                    Prazos e providências são acompanhados separadamente.
+                    A situação do processo é inferida dos dados disponíveis. As
+                    intimações e seus prazos são acompanhados nas abas acima.
                   </p>
                 </section>
               </aside>
