@@ -684,6 +684,9 @@ function Disposicao({ det }: { det: Detalhe }) {
         det.intimacao?.estado ?? "",
       )}
       checkingReview={det.memoriaPending || det.memoriaErro}
+      ato={det.intimacao?.ai_act ?? ""}
+      tipoLabel={m.tipoLabel}
+      assunto={m.assunto}
     />
   );
 }
