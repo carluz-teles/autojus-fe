@@ -68,7 +68,8 @@ export function DisposicaoSection({
   // Peça-alvo do botão "Gerar peça": a 1ª que gera peça; se só houver ciência,
   // usa o próprio item de ciência (o BE deriva o tipo). "" quando nada há.
   const pecaAlvo = disposicao.pecas[0] ?? null;
-  const alvoId = pecaAlvo?.actionItemId ?? disposicao.ciencia?.actionItemId ?? "";
+  const alvoId =
+    pecaAlvo?.actionItemId ?? disposicao.ciencia?.actionItemId ?? "";
 
   // Texto do "trabalho necessário": descreve o que precisa ser alcançado.
   const descricaoTrabalho =
@@ -193,7 +194,10 @@ export function DisposicaoSection({
                 onClick={onDarCiencia}
               >
                 {dandoCiencia ? (
-                  <LoaderCircle data-icon="inline-start" className="animate-spin" />
+                  <LoaderCircle
+                    data-icon="inline-start"
+                    className="animate-spin"
+                  />
                 ) : (
                   <Check data-icon="inline-start" />
                 )}

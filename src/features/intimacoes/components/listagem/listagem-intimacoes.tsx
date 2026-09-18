@@ -23,9 +23,9 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { WORK_TYPES } from "@/features/action-items/components/new-providencia";
 import { ProvidenciaFulfillment } from "@/features/action-items/components/providencia-fulfillment";
 import { hasActionableFulfillment } from "@/features/action-items/lib/fulfillment";
+import { WORK_TYPES } from "@/features/action-items/lib/piece-labels";
 import { useResolverIntimacao } from "@/features/intimacoes/hooks/use-intimacoes";
 import { Responsavel } from "@/features/organization/components/responsavel";
 import { cn } from "@/lib/utils";

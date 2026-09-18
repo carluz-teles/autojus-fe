@@ -18,23 +18,9 @@ import { useApi } from "@/lib/api/use-api";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 
 import { useWorkMutation } from "../hooks/use-workspace";
+import { PIECE_PROFILES, WORK_TYPES } from "../lib/piece-labels";
 import type { ActionItemTipo, CreateWorkInput } from "../types";
 import { InternalDueDate } from "./internal-due-date";
-
-export const WORK_TYPES: Record<ActionItemTipo, string> = {
-  cumprir: "Cumprir determinação",
-  ciencia: "Tomar ciência",
-  manifestar: "Manifestar-se",
-  contestar: "Contestar",
-  recorrer: "Recorrer",
-};
-export const PIECE_PROFILES: Record<string, string> = {
-  "": "Não precisa de peça",
-  manifestacao: "Manifestação",
-  contestacao: "Contestação",
-  apelacao: "Apelação",
-  peticao_inicial: "Petição inicial",
-};
 
 export function NewProvidencia({
   processId = "",

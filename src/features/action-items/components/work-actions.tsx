@@ -17,9 +17,9 @@ import { detalheNaFila } from "@/features/intimacoes/lib/fila-navigation";
 
 import { useWorkMutation, type WorkAction } from "../hooks/use-workspace";
 import { hasActionableFulfillment } from "../lib/fulfillment";
+import { WORK_TYPES } from "../lib/piece-labels";
 import { primaryWorkAction } from "../lib/work-action";
 import type { ActionItemView } from "../types";
-import { WORK_TYPES } from "./new-providencia";
 import { ProvidenciaFulfillment } from "./providencia-fulfillment";
 
 export function WorkActions({

@@ -23,9 +23,10 @@ import { useDebounce } from "@/lib/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 
 import { useWorkspaceList } from "../hooks/use-workspace";
+import { WORK_TYPES } from "../lib/piece-labels";
 import { STATUS_LABEL } from "../lib/status-pill";
 import type { ActionItemView } from "../types";
-import { NewProvidencia, WORK_TYPES } from "./new-providencia";
+import { NewProvidencia } from "./new-providencia";
 import { ProvidenciaFulfillment } from "./providencia-fulfillment";
 import { WorkActions } from "./work-actions";
 

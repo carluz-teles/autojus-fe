@@ -28,10 +28,11 @@ import { formatDate } from "@/lib/format";
 import { useActionItemDetalhe } from "../hooks/use-action-items";
 import { useProvidenciaFlow } from "../hooks/use-providencia-flow";
 import { useWorkMutation } from "../hooks/use-workspace";
+import { PIECE_PROFILES, WORK_TYPES } from "../lib/piece-labels";
 import { STATUS_LABEL } from "../lib/status-pill";
 import type { ActionItemPriority, ActionItemView } from "../types";
 import { InternalDueDate } from "./internal-due-date";
-import { NewProvidencia, PIECE_PROFILES, WORK_TYPES } from "./new-providencia";
+import { NewProvidencia } from "./new-providencia";
 import {
   ProvidenciaNextStep,
   ProvidenciaPiece,

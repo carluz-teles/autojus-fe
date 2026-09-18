@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import {
   PIECE_PROFILES,
   WORK_TYPES,
-} from "@/features/action-items/components/new-providencia";
+} from "@/features/action-items/lib/piece-labels";
 import {
   comecarActionItem,
   concluirActionItem,
