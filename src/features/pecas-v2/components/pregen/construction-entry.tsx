@@ -42,9 +42,9 @@ export function ConstructionEntry({
   const qc = useQueryClient();
   const work = useActionItemDetalhe(actionItemId);
   const started = useRef(false);
-  const origin = actionItemId
-    ? `/providencias/${actionItemId}`
-    : `/intimacoes/${intimationId}`;
+  // A intimação é o lar do trabalho: o "voltar" da construção aponta pra ela
+  // (não mais pra uma tela de providência). retorno explícito tem prioridade.
+  const origin = intimationId ? `/intimacoes/${intimationId}` : "/triagem";
   const back = params.get("retorno") || origin;
   const create = useMutation({
     mutationFn: async () => {

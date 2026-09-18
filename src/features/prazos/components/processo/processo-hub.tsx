@@ -21,7 +21,6 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ProcessProvidencias } from "@/features/action-items/components/providencias-section";
 import { SyncAutosButton } from "@/features/configuracoes/components/sync-autos-button";
 import { PdfDrawer } from "@/features/documentos/components/pdf-drawer";
 import { CourtAccessNotice } from "@/features/onboarding/components/court-access-notice";
@@ -325,8 +324,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                         Trabalho do escritório
                       </h2>
                       <p className="text-muted-foreground mt-1 text-sm">
-                        Revise intimações, confira prazos e acompanhe
-                        providências.
+                        Revise as intimações do processo e confira os prazos.
                       </p>
                     </div>
                     <NativeSelect
@@ -351,9 +349,6 @@ export function ProcessoHub({ numero }: { numero: string }) {
                       <TabsList aria-label="Trabalho do processo">
                         <TabsTrigger value="intimacoes">Intimações</TabsTrigger>
                         <TabsTrigger value="prazos">Prazos</TabsTrigger>
-                        <TabsTrigger value="providencias">
-                          Providências
-                        </TabsTrigger>
                       </TabsList>
                     </div>
                     <TabsContent className="animate-none" value="intimacoes">
@@ -381,12 +376,6 @@ export function ProcessoHub({ numero }: { numero: string }) {
                       >
                         <Registros items={h.prazos} />
                       </Colecao>
-                    </TabsContent>
-                    <TabsContent className="animate-none" value="providencias">
-                      <ProcessProvidencias
-                        processId={numero}
-                        history={h.historico}
-                      />
                     </TabsContent>
                   </Tabs>
                 </section>

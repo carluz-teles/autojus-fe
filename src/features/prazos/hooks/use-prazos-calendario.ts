@@ -3,8 +3,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useWorkspaceList } from "@/features/action-items/hooks/use-workspace";
-import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { hojeISO } from "@/features/shared/db";
 import { useApi } from "@/lib/api/use-api";
 
@@ -18,10 +16,7 @@ import {
   tituloMes,
   toISODate,
 } from "../lib/calendario";
-import {
-  prazoParaEvento,
-  providenciaParaEvento,
-} from "../lib/calendario-eventos";
+import { prazoParaEvento } from "../lib/calendario-eventos";
 import { listPrazos } from "../services/prazos.service";
 
 // Modos do calendário (estilo Google). O NAV traz pra rota /calendario; aqui o
@@ -84,7 +79,6 @@ export function usePrazosCalendario() {
   const fetcher = useApi();
   const modo = useModo();
   const referencia = useReferencia(modo.modo);
-  const { nameFor } = useOrgMembersDirectory();
 
   const hoje = hojeISO();
 
@@ -107,34 +101,21 @@ export function usePrazosCalendario() {
     initialPageParam: "",
     getNextPageParam: (page) => page.page.next_cursor || undefined,
   });
-  const providenciasQuery = useWorkspaceList({ ...janela, status: "ACTIVE" });
   const { hasNextPage, isFetching, isError, fetchNextPage } = prazosQuery;
-  const {
-    hasMore,
-    isFetching: fetchingWork,
-    isError: errorWork,
-    loadMore,
-  } = providenciasQuery;
   useEffect(() => {
     if (hasNextPage && !isFetching && !isError)
       void fetchNextPage({ cancelRefetch: false });
   }, [hasNextPage, isFetching, isError, fetchNextPage]);
-  useEffect(() => {
-    if (hasMore && !fetchingWork && !errorWork) loadMore();
-  }, [hasMore, fetchingWork, errorWork, loadMore]);
 
-  const eventos = useMemo<CalEvento[]>(() => {
-    const dePrazos = (
-      prazosQuery.data?.pages.flatMap((page) => page.data) ?? []
-    )
-      .map(prazoParaEvento)
-      .filter((e): e is CalEvento => e !== null);
-    const deProvidencias = providenciasQuery.items
-      .filter((p) => p.status !== "DONE")
-      .map((p) => providenciaParaEvento(p, hoje, nameFor(p.assignee_user_id)))
-      .filter((e): e is CalEvento => e !== null);
-    return [...dePrazos, ...deProvidencias];
-  }, [prazosQuery.data, providenciasQuery.items, hoje, nameFor]);
+  // Calendário mostra os PRAZOS das intimações (a intimação move o prazo). Os
+  // eventos de action_item (providência) saíram junto com o conceito.
+  const eventos = useMemo<CalEvento[]>(
+    () =>
+      (prazosQuery.data?.pages.flatMap((page) => page.data) ?? [])
+        .map(prazoParaEvento)
+        .filter((e): e is CalEvento => e !== null),
+    [prazosQuery.data],
+  );
 
   const mes = useMemo(
     () => buildMes(eventos, referencia.ref, hoje),
@@ -156,7 +137,7 @@ export function usePrazosCalendario() {
       : tituloMes(referencia.ref);
 
   return {
-    isLoading: prazosQuery.isLoading || providenciasQuery.isPending,
+    isLoading: prazosQuery.isLoading,
     titulo,
     diasSemana: DIAS_SEMANA,
     modo: modo.modo,

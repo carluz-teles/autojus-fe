@@ -291,14 +291,7 @@ function NavItemLink({
 }) {
   const pathname = usePathname();
   const target = preview ? `/dev/fluxo${href}` : href;
-  const active =
-    pathname === target ||
-    pathname.startsWith(`${target}/`) ||
-    (preview &&
-      href === "/pipeline" &&
-      (pathname.startsWith("/dev/fluxo/providencias/") ||
-        pathname.startsWith("/dev/fluxo/pecas/") ||
-        pathname.startsWith("/dev/fluxo/protocolo/")));
+  const active = pathname === target || pathname.startsWith(`${target}/`);
   const accessibleLabel =
     count != null && count > 0 ? `${label} · ${count}` : label;
 

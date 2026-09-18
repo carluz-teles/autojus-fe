@@ -232,13 +232,10 @@ export function useConstruction(id: string) {
 
   const voltar = () =>
     router.push(
-      params.get("retorno")?.startsWith("/providencias/")
+      params.get("retorno")
         ? params.get("retorno")!
         : draftQuery.data?.intimation.id
-          ? detalheNaFila(
-              draftQuery.data.intimation.id,
-              params.get("retorno") ?? "/intimacoes",
-            )
+          ? detalheNaFila(draftQuery.data.intimation.id, "/intimacoes")
           : "/fila",
     );
 
