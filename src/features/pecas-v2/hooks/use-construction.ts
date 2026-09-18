@@ -186,16 +186,15 @@ export function useConstruction(id: string) {
     }
   };
 
+  // Fluxo DIRETO: um prompt → geração. Dispara POST /v1/pecas/:id/generate com
+  // { instructions, thesis_ids? } via `generateDraft` (o BE faz grounding + um
+  // único passo auto-verificador internamente — não há mais o ciclo de
+  // request→poll→validate→generate). As teses recomendadas seguem como opcionais
+  // (o BE as aceita, mas a geração NÃO depende delas estarem prontas): não
+  // gateamos por theses.isLoading/isError — só pela origem/teor e por não haver
+  // outra geração em curso.
   const gerarMinuta = () => {
-    if (
-      !hasOrigin ||
-      !hasTeor ||
-      generate.isPending ||
-      theses.isLoading ||
-      theses.isRegenerating ||
-      theses.isTogglingId ||
-      theses.isError
-    )
+    if (!hasOrigin || !hasTeor || generate.isPending || saga === "EXTRACTING")
       return;
     setFiredGenerate(true);
     generate.mutate(
