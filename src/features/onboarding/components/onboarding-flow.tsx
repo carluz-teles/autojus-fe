@@ -5,11 +5,23 @@ import { Building2, Check, Sparkles, User, X } from "lucide-react";
 import { CnpjInput } from "@/components/ui/cnpj-input";
 import { IconAction } from "@/components/ui/icon-action";
 import { OabInput } from "@/components/ui/oab-input";
-import { ConfigAvatarUpload } from "@/features/prazos/components/config/config-avatar-upload";
 import { formatOabDisplay } from "@/features/shared/lib/diario";
 
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
 import { CourtAccessNotice } from "./court-access-notice";
+import { OnboardingImageUpload } from "./image-upload";
+
+// Degradê de atmosfera (véu de primário + latão) reusado do body — dá profundidade às
+// telas do onboarding sem fugir da identidade. transform/opacity apenas nas animações.
+const ATMOSPHERE =
+  "radial-gradient(ellipse 70% 45% at 50% -8%, color-mix(in oklch, var(--primary) 8%, transparent), transparent 60%), radial-gradient(ellipse 52% 42% at 100% 0%, color-mix(in oklch, var(--gold) 6%, transparent), transparent 55%)";
+
+// Degradê da CTA primária — leve brilho no topo pra dar volume ao botão.
+const CTA_GRADIENT =
+  "linear-gradient(180deg, color-mix(in oklch, var(--primary) 92%, white), var(--primary))";
+
+// Degradê do selo/marca e anéis — primário → latão (assinatura do app).
+const BRAND_GRADIENT = "linear-gradient(135deg, var(--primary), var(--gold))";
 
 // Onboarding guiado por persona: user → org → oab → team → done. Componente = JSX +
 // binding; a lógica/conclusão vive no hook. Tokens da casca: bg-bg, surface-panel,
@@ -18,10 +30,16 @@ export function OnboardingFlow() {
   const f = useOnboardingFlow();
 
   return (
-    <div className="bg-bg text-foreground flex h-screen w-screen flex-col font-sans text-[13px]">
+    <div
+      className="bg-bg text-foreground flex h-screen w-screen flex-col font-sans text-[13px]"
+      style={{ backgroundImage: ATMOSPHERE, backgroundAttachment: "fixed" }}
+    >
       {/* topbar */}
-      <div className="border-line bg-panel flex flex-none items-center gap-3 border-b px-[22px] py-[15px]">
-        <span className="bg-primary text-primary-foreground font-display grid size-6 place-items-center rounded-md text-[14px] leading-none">
+      <div className="border-line flex flex-none items-center gap-3 border-b bg-[var(--panel)]/70 px-[22px] py-[15px] backdrop-blur-sm">
+        <span
+          className="text-primary-foreground font-display grid size-6 place-items-center rounded-md text-[14px] leading-none shadow-sm"
+          style={{ backgroundImage: BRAND_GRADIENT }}
+        >
           A
         </span>
         <span className="font-display text-[16px]">Atjus</span>
@@ -30,8 +48,12 @@ export function OnboardingFlow() {
             {f.dots.map((on, i) => (
               <span
                 key={i}
-                className="h-1 w-[26px] rounded-full transition-colors"
-                style={{ background: on ? "var(--primary)" : "var(--line)" }}
+                className="h-1 rounded-full transition-all duration-300"
+                style={{
+                  width: on ? 28 : 20,
+                  backgroundImage: on ? BRAND_GRADIENT : "none",
+                  background: on ? undefined : "var(--line)",
+                }}
               />
             ))}
           </div>
@@ -40,12 +62,23 @@ export function OnboardingFlow() {
 
       {/* corpo centralizado */}
       <div className="grid min-h-0 flex-1 place-items-center overflow-y-auto p-[30px]">
-        <div className="surface-panel w-[520px] max-w-full p-5 sm:p-7">
-          {f.step === "user" ? <UserStep f={f} /> : null}
-          {f.step === "org" ? <OrgStep f={f} /> : null}
-          {f.step === "oab" ? <OabStep f={f} /> : null}
-          {f.step === "team" ? <TeamStep f={f} /> : null}
-          {f.step === "done" ? <Done f={f} /> : null}
+        <div className="surface-panel relative w-[520px] max-w-full overflow-hidden p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.12)] sm:p-7">
+          {/* fio de luz no topo do card (primário→latão) */}
+          <span
+            aria-hidden
+            className="absolute inset-x-0 top-0 h-px opacity-70"
+            style={{
+              backgroundImage:
+                "linear-gradient(90deg, transparent, var(--primary), var(--gold), transparent)",
+            }}
+          />
+          <div key={f.step} className="reveal">
+            {f.step === "user" ? <UserStep f={f} /> : null}
+            {f.step === "org" ? <OrgStep f={f} /> : null}
+            {f.step === "oab" ? <OabStep f={f} /> : null}
+            {f.step === "team" ? <TeamStep f={f} /> : null}
+            {f.step === "done" ? <Done f={f} /> : null}
+          </div>
         </div>
       </div>
     </div>
@@ -138,7 +171,8 @@ function Footer({
       <button
         onClick={onCta}
         disabled={disabled || busy}
-        className="bg-primary text-primary-foreground inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[9px] px-4 py-2.5 text-[13px] font-medium disabled:cursor-not-allowed disabled:opacity-45"
+        style={{ backgroundImage: disabled || busy ? undefined : CTA_GRADIENT }}
+        className="bg-primary text-primary-foreground inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[9px] px-4 py-2.5 text-[13px] font-medium shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-px hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
       >
         {busy ? (
           <>
@@ -174,9 +208,10 @@ function Segmented<T extends string>({
           <button
             key={op.k}
             onClick={() => onChange(op.k)}
-            className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-[7px] text-[13px] font-medium transition-colors"
+            className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-[7px] text-[13px] font-medium shadow-none transition-all duration-200 data-[on=true]:shadow-sm"
+            data-on={on}
             style={{
-              background: on ? "var(--primary)" : "transparent",
+              backgroundImage: on ? BRAND_GRADIENT : "none",
               color: on ? "var(--primary-foreground)" : "var(--fg2)",
             }}
           >
@@ -202,12 +237,13 @@ function UserStep({ f }: { f: F }) {
         Comece por você — é assim que aparece nas peças e no protocolo.
       </p>
 
-      <ConfigAvatarUpload
+      <OnboardingImageUpload
         url={f.avatarUrl}
-        iniciais={iniciais}
-        label="Enviar foto"
+        initials={iniciais}
+        label="Adicionar foto"
+        hint="Opcional — aparece nas suas peças"
         onFile={f.uploadAvatar}
-        enviando={f.savingAvatar}
+        uploading={f.savingAvatar}
       />
 
       <div className="grid grid-cols-2 gap-3">
@@ -302,15 +338,15 @@ function OrgStep({ f }: { f: F }) {
             />
           </div>
           <div className="mb-1">
-            <span className="text-fg3 mb-1.5 block text-[11.5px]">
+            <span className="text-fg3 mb-2 block text-center text-[11.5px]">
               Logo do escritório
             </span>
-            <ConfigAvatarUpload
+            <OnboardingImageUpload
               url={f.logoPreview}
-              iniciais={iniciais}
-              label="Enviar logo"
+              initials={iniciais}
+              label="Adicionar logo"
+              hint="Opcional — usada no papel timbrado"
               onFile={f.stageLogo}
-              enviando={false}
             />
           </div>
         </>
@@ -503,8 +539,11 @@ function TeamStep({ f }: { f: F }) {
 function Done({ f }: { f: F }) {
   return (
     <div className="flex flex-col gap-5">
-      <span className="bg-selected text-primary grid size-11 place-items-center rounded-full">
-        <Check className="size-6" strokeWidth={2} />
+      <span
+        className="pop text-primary-foreground grid size-14 place-items-center rounded-full shadow-md"
+        style={{ backgroundImage: BRAND_GRADIENT }}
+      >
+        <Check className="size-7" strokeWidth={2.4} />
       </span>
       <div>
         <h1 className="font-display text-[22px] font-medium">
@@ -525,7 +564,8 @@ function Done({ f }: { f: F }) {
       <ErroLinha erro={f.erro} />
       <button
         onClick={f.abrirApp}
-        className="bg-primary text-primary-foreground inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg font-medium"
+        style={{ backgroundImage: CTA_GRADIENT }}
+        className="bg-primary text-primary-foreground inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg font-medium shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-px hover:shadow-md active:translate-y-0"
       >
         <Sparkles className="size-[15px]" strokeWidth={1.8} />
         Abrir triagem

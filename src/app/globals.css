@@ -429,6 +429,56 @@
   animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Reveal escalonado: filhos entram em cascata (onboarding, listas). */
+@utility reveal-stagger {
+  & > * {
+    animation: rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  & > *:nth-child(2) {
+    animation-delay: 0.05s;
+  }
+  & > *:nth-child(3) {
+    animation-delay: 0.1s;
+  }
+  & > *:nth-child(4) {
+    animation-delay: 0.15s;
+  }
+  & > *:nth-child(5) {
+    animation-delay: 0.2s;
+  }
+  & > *:nth-child(6) {
+    animation-delay: 0.25s;
+  }
+}
+
+/* Pop de confirmação (check do "concluído") — escala + fade, sutil. */
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility pop {
+  animation: pop 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Respeita quem pediu menos movimento. */
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal-stagger > *,
+  .pop {
+    animation: none !important;
+  }
+}
+
 /* Barra indeterminada do header de streaming (fundamentos chegando). Uma faixa
    translúcida que varre da esquerda pra direita — fiel ao mock .prog>i. */
 @keyframes theses-slide {
