@@ -48,12 +48,12 @@ export function OnboardingFlow() {
             {f.dots.map((on, i) => (
               <span
                 key={i}
-                className="h-1 rounded-full transition-all duration-300"
-                style={{
-                  width: on ? 28 : 20,
-                  backgroundImage: on ? BRAND_GRADIENT : "none",
-                  background: on ? undefined : "var(--line)",
-                }}
+                className="h-1.5 rounded-full transition-all duration-300"
+                style={
+                  on
+                    ? { width: 28, backgroundImage: BRAND_GRADIENT }
+                    : { width: 18, backgroundColor: "var(--line)" }
+                }
               />
             ))}
           </div>
