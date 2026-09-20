@@ -14,11 +14,11 @@ export function InviteModal({ inv }: { inv: ReturnType<typeof useInvite> }) {
   return (
     <div
       onClick={inv.fechar}
-      className="fixed inset-0 z-40 grid place-items-center bg-[oklch(0.27_0.012_200/32%)] p-6"
+      className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-[oklch(0.27_0.012_200/32%)] p-6"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="surface-panel w-[460px] max-w-full overflow-hidden rounded-2xl"
+        className="surface-panel my-auto w-[460px] max-w-full overflow-hidden rounded-2xl"
       >
         <div className="border-line2 flex items-start justify-between gap-3 border-b px-[22px] pt-[18px] pb-3.5">
           <div>

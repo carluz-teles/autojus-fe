@@ -470,11 +470,28 @@
   animation: pop 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Fade puro (só opacity) — entrada suave SEM transform, então NÃO cria containing
+   block pra `position: fixed` (ao contrário de .reveal). Use em wrappers que contêm
+   modais/overlays fixos. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@utility fade-in {
+  animation: fade-in 0.35s ease both;
+}
+
 /* Respeita quem pediu menos movimento. */
 @media (prefers-reduced-motion: reduce) {
   .reveal,
   .reveal-stagger > *,
-  .pop {
+  .pop,
+  .fade-in {
     animation: none !important;
   }
 }

@@ -34,9 +34,12 @@ export function SettingsSection({
   action?: ReactNode;
   children: ReactNode;
 }) {
+  // A raiz usa `fade-in` (só opacity) — NÃO cria containing block, então modais
+  // `position: fixed` renderizados como children se posicionam pela viewport. O
+  // efeito de "subida" (transform) fica só no cabeçalho, que não contém modais.
   return (
-    <div className="reveal">
-      <div className="mb-5 flex items-start justify-between gap-4">
+    <div className="fade-in">
+      <div className="reveal mb-5 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 className="font-display text-[20px] leading-tight font-medium">
             {title}
