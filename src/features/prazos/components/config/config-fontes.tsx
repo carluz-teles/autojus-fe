@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { OabInput } from "@/components/ui/oab-input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CourtAccessNotice } from "@/features/onboarding/components/court-access-notice";
+import { OabTermRow } from "@/features/shared/components/oab-term-row";
 
 import {
   type FontesTab,
@@ -165,26 +166,7 @@ export function ConfigFontes({
                     </span>
                   </div>
                   {fon.termos.map((t) => (
-                    <div
-                      key={t.valor}
-                      className="border-line2 hover:bg-hover flex items-center gap-3 border-b px-4 py-3 last:border-b-0"
-                    >
-                      <span
-                        className="w-[46px] flex-none rounded-md py-[3px] text-center text-[10px] font-semibold"
-                        style={{ background: t.tchBg, color: t.tchFg }}
-                      >
-                        {t.tipo}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className={`block text-[13px] font-medium ${t.mono ? "font-mono" : ""}`}
-                        >
-                          {t.valor}
-                        </span>
-                        <span className="text-fg3 mt-px block text-[11.5px]">
-                          {t.dono}
-                        </span>
-                      </span>
+                    <OabTermRow key={t.valor} value={t.valor} subtitle={t.dono}>
                       <span
                         className="w-24 flex-none text-right text-[13px]"
                         style={{ color: t.capCor }}
@@ -197,7 +179,7 @@ export function ConfigFontes({
                           label={`Alternar captura para ${t.valor}`}
                         />
                       </span>
-                    </div>
+                    </OabTermRow>
                   ))}
                 </div>
               )}

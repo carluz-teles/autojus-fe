@@ -25,3 +25,14 @@ export function formatOabDisplay(oab: string): string {
   const { uf, numero } = parseOab(oab);
   return `${numero}/${uf}`;
 }
+
+/** Formata no padrão dos Termos (Configurações): "UF XXX.XXX" — UF + número
+ * agrupado em milhares (ex.: "SP347019" → "SP 347.019"). Fonte única usada tanto
+ * na aba Termos quanto no passo de OABs do onboarding, pra os cards baterem. */
+export function formatOabTermo(oab: string): string {
+  const { uf, numero } = parseOab(oab);
+  const agrupado = numero
+    .replace(/\D/g, "")
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${uf.toUpperCase()} ${agrupado}`;
+}

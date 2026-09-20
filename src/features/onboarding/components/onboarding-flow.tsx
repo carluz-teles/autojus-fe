@@ -1,14 +1,14 @@
 "use client";
 
-import { Building2, Check, Sparkles, User, X } from "lucide-react";
+import { Building2, Check, Info, Sparkles, User, X } from "lucide-react";
 
 import { CnpjInput } from "@/components/ui/cnpj-input";
 import { IconAction } from "@/components/ui/icon-action";
 import { OabInput } from "@/components/ui/oab-input";
-import { formatOabDisplay } from "@/features/shared/lib/diario";
+import { OabTermRow } from "@/features/shared/components/oab-term-row";
+import { formatOabTermo } from "@/features/shared/lib/diario";
 
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
-import { CourtAccessNotice } from "./court-access-notice";
 import { OnboardingImageUpload } from "./image-upload";
 
 // Degradê de atmosfera (véu de primário + latão) reusado do body — dá profundidade às
@@ -399,36 +399,39 @@ function OabStep({ f }: { f: F }) {
         </div>
       </div>
 
-      <div className="flex min-h-[44px] flex-col gap-[7px]">
-        {f.oabs.map((o, i) => (
-          <div
-            key={`${o}-${i}`}
-            className="border-line bg-panel flex items-center gap-2.5 rounded-[9px] border px-[13px] py-2.5"
-          >
-            <User
-              className="text-primary size-[15px] flex-none"
-              strokeWidth={1.8}
-            />
-            <span className="flex-1 font-mono text-[13px]">
-              {formatOabDisplay(o)}
-            </span>
-            <IconAction
-              label={`Remover OAB ${formatOabDisplay(o)}`}
-              icon={X}
-              onClick={() => f.removeOab(i)}
-              className="pointer-coarse:size-11"
-            />
-          </div>
-        ))}
-        {f.oabs.length === 0 ? (
-          <div className="border-line text-fg3 rounded-[9px] border border-dashed px-[13px] py-3 text-[12px]">
-            Nenhuma OAB ainda. Adicione ao menos uma para ativar a captura.
-          </div>
-        ) : null}
-      </div>
+      {f.oabs.length === 0 ? (
+        <div className="border-line text-fg3 rounded-[10px] border border-dashed px-[13px] py-3 text-[12px]">
+          Nenhuma OAB ainda. Adicione ao menos uma para ativar a captura.
+        </div>
+      ) : (
+        <div className="surface-panel overflow-hidden">
+          {f.oabs.map((o, i) => (
+            <OabTermRow
+              key={`${o}-${i}`}
+              value={formatOabTermo(o)}
+              subtitle="aguardando 1ª captura"
+            >
+              <IconAction
+                label={`Remover OAB ${formatOabTermo(o)}`}
+                icon={X}
+                onClick={() => f.removeOab(i)}
+                className="pointer-coarse:size-11"
+              />
+            </OabTermRow>
+          ))}
+        </div>
+      )}
 
-      <div className="mt-4">
-        <CourtAccessNotice />
+      <div className="border-line bg-bg mt-4 flex items-start gap-2.5 rounded-[10px] border px-3.5 py-3">
+        <Info
+          className="text-primary mt-px size-4 flex-none"
+          strokeWidth={1.9}
+        />
+        <p className="text-fg3 text-[12px] leading-[1.5]">
+          As publicações já chegam pelo DJEN só com a OAB. O acesso aos autos
+          (certificado + 2FA do tribunal) você configura depois, em
+          Configurações — sem pressa agora.
+        </p>
       </div>
 
       <ErroLinha erro={f.erro} />
