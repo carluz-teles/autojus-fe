@@ -483,7 +483,7 @@
 }
 
 @utility fade-in {
-  animation: fade-in 0.35s ease both;
+  animation: fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Respeita quem pediu menos movimento. */
