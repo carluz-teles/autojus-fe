@@ -1,31 +1,21 @@
 "use client";
 
-import {
-  Building2,
-  Check,
-  ChevronRight,
-  Sparkles,
-  User,
-  X,
-} from "lucide-react";
-import Link from "next/link";
+import { Building2, Check, Sparkles, User, X } from "lucide-react";
 
 import { CnpjInput } from "@/components/ui/cnpj-input";
 import { IconAction } from "@/components/ui/icon-action";
 import { OabInput } from "@/components/ui/oab-input";
+import { ConfigAvatarUpload } from "@/features/prazos/components/config/config-avatar-upload";
 import { formatOabDisplay } from "@/features/shared/lib/diario";
 
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
 import { CourtAccessNotice } from "./court-access-notice";
-import { ImportPreparation } from "./import-preparation";
 
-// Onboarding guiado: welcome → org → access → oab → done. Componente = JSX + binding; a lógica/conclusão vive
-// no hook. Mapeamentos de token: var(--accent)→var(--primary), var(--serif)→
-// font-display, var(--mono)→font-mono; --bg/--panel/--line/--fg2/--fg3/--green/
-// --selected/--hover são tokens da casca.
+// Onboarding guiado por persona: user → org → oab → team → done. Componente = JSX +
+// binding; a lógica/conclusão vive no hook. Tokens da casca: bg-bg, surface-panel,
+// bg-panel, border-line, text-fg3, font-display, bg-primary. Campo obrigatório = "*".
 export function OnboardingFlow() {
   const f = useOnboardingFlow();
-  const solo = f.role === "solo";
 
   return (
     <div className="bg-bg text-foreground flex h-screen w-screen flex-col font-sans text-[13px]">
@@ -35,12 +25,12 @@ export function OnboardingFlow() {
           A
         </span>
         <span className="font-display text-[16px]">Atjus</span>
-        {f.temDots ? (
+        {f.step !== "done" ? (
           <div className="ml-3.5 flex items-center gap-1.5">
             {f.dots.map((on, i) => (
               <span
                 key={i}
-                className="h-1 w-[26px] rounded-full"
+                className="h-1 w-[26px] rounded-full transition-colors"
                 style={{ background: on ? "var(--primary)" : "var(--line)" }}
               />
             ))}
@@ -51,12 +41,10 @@ export function OnboardingFlow() {
       {/* corpo centralizado */}
       <div className="grid min-h-0 flex-1 place-items-center overflow-y-auto p-[30px]">
         <div className="surface-panel w-[520px] max-w-full p-5 sm:p-7">
-          {f.step === "welcome" ? <Welcome f={f} /> : null}
-          {f.step === "org" ? <Org f={f} solo={solo} /> : null}
-          {f.step === "access" ? (
-            <ImportPreparation onContinue={f.irOab} />
-          ) : null}
-          {f.step === "oab" ? <Oab f={f} /> : null}
+          {f.step === "user" ? <UserStep f={f} /> : null}
+          {f.step === "org" ? <OrgStep f={f} /> : null}
+          {f.step === "oab" ? <OabStep f={f} /> : null}
+          {f.step === "team" ? <TeamStep f={f} /> : null}
           {f.step === "done" ? <Done f={f} /> : null}
         </div>
       </div>
@@ -66,58 +54,13 @@ export function OnboardingFlow() {
 
 type F = ReturnType<typeof useOnboardingFlow>;
 
-function Welcome({ f }: { f: F }) {
-  const roles = [
-    {
-      k: "novo" as const,
-      t: "Novo escritório",
-      d: "Sou sócio/admin e vou configurar do zero",
-      icon: (
-        <Building2 className="text-primary size-[19px]" strokeWidth={1.7} />
-      ),
-    },
-    {
-      k: "solo" as const,
-      t: "Advogado solo",
-      d: "Trabalho por conta própria",
-      icon: <User className="text-primary size-[19px]" strokeWidth={1.7} />,
-    },
-  ];
+// Rótulo com asterisco obrigatório padronizado.
+function Label({ htmlFor, children }: { htmlFor?: string; children: string }) {
   return (
-    <>
-      <div className="mb-1.5 text-center">
-        <div className="font-display text-[27px] font-medium tracking-[-0.01em]">
-          Bem-vindo ao Atjus
-        </div>
-        <p className="text-fg3 mx-auto mt-2 max-w-[400px] text-[13px] leading-[1.55]">
-          Prazos e intimações sob controle, direto do DJEN. Como você vai usar?
-        </p>
-      </div>
-      <div className="mt-6 flex flex-col gap-2.5">
-        {roles.map((r) => (
-          <button
-            key={r.k}
-            onClick={() => f.escolherPapel(r.k)}
-            className="row-hover border-line bg-panel flex items-center gap-3 rounded-xl border p-[15px_16px] text-left"
-          >
-            <span
-              className="grid size-[38px] flex-none place-items-center rounded-[9px]"
-              style={{
-                background:
-                  "color-mix(in oklch, var(--primary) 11%, transparent)",
-              }}
-            >
-              {r.icon}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[14px] font-medium">{r.t}</span>
-              <span className="text-fg3 mt-px block text-[12px]">{r.d}</span>
-            </span>
-            <ChevronRight className="text-fg3 size-4" strokeWidth={2} />
-          </button>
-        ))}
-      </div>
-    </>
+    <label htmlFor={htmlFor} className="text-fg3 mb-1.5 block text-[11.5px]">
+      {children}
+      <span className="text-destructive"> *</span>
+    </label>
   );
 }
 
@@ -127,108 +70,278 @@ function Campo({
   value,
   onChange,
   placeholder,
+  onEnter,
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
+  onEnter?: () => void;
 }) {
   return (
-    <>
-      <label htmlFor={id} className="text-fg3 mb-1.5 block text-[11.5px]">
-        {label}
-      </label>
+    <div>
+      <Label htmlFor={id}>{label}</Label>
       <input
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && onEnter) onEnter();
+        }}
         placeholder={placeholder}
-        className="border-line bg-panel text-foreground placeholder:text-fg3 w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+        className="border-line bg-panel text-foreground placeholder:text-fg3 focus:border-primary w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+      />
+    </div>
+  );
+}
+
+function ErroLinha({ erro }: { erro: string | null }) {
+  if (!erro) return null;
+  return (
+    <p role="alert" className="text-destructive mt-3 text-[12px]">
+      {erro}
+    </p>
+  );
+}
+
+// Botões de rodapé — Voltar (secundário) + CTA primária única.
+function Footer({
+  onBack,
+  backLabel = "Voltar",
+  cta,
+  onCta,
+  disabled,
+  busy,
+  busyLabel,
+  icon,
+}: {
+  onBack?: () => void;
+  backLabel?: string;
+  cta: string;
+  onCta: () => void;
+  disabled?: boolean;
+  busy?: boolean;
+  busyLabel?: string;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div className="mt-[26px] flex gap-2.5">
+      {onBack ? (
+        <button
+          onClick={onBack}
+          className="border-line bg-panel text-foreground hover:bg-hover min-h-11 rounded-[9px] border px-4 py-2.5 text-[13px]"
+        >
+          {backLabel}
+        </button>
+      ) : null}
+      <button
+        onClick={onCta}
+        disabled={disabled || busy}
+        className="bg-primary text-primary-foreground inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[9px] px-4 py-2.5 text-[13px] font-medium disabled:cursor-not-allowed disabled:opacity-45"
+      >
+        {busy ? (
+          <>
+            <span className="spin size-[15px] rounded-full border-2 border-white/40 border-t-white" />
+            {busyLabel ?? "Aguarde…"}
+          </>
+        ) : (
+          <>
+            {icon}
+            {cta}
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
+// Toggle segmentado genérico (persona, papel do convite) — 2 opções.
+function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: { k: T; label: string; icon?: React.ReactNode }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="border-line bg-bg flex gap-1 rounded-[10px] border p-1">
+      {options.map((op) => {
+        const on = op.k === value;
+        return (
+          <button
+            key={op.k}
+            onClick={() => onChange(op.k)}
+            className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-[7px] text-[13px] font-medium transition-colors"
+            style={{
+              background: on ? "var(--primary)" : "transparent",
+              color: on ? "var(--primary-foreground)" : "var(--fg2)",
+            }}
+          >
+            {op.icon}
+            {op.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Passo 1: Usuário ──────────────────────────────────────────────────────────
+function UserStep({ f }: { f: F }) {
+  const iniciais =
+    `${f.firstName[0] ?? ""}${f.lastName[0] ?? ""}`.toUpperCase() || "?";
+  return (
+    <>
+      <div className="font-display mb-1 text-[21px] font-medium">
+        Bem-vindo ao Atjus
+      </div>
+      <p className="text-fg3 mb-5 text-[12.5px]">
+        Comece por você — é assim que aparece nas peças e no protocolo.
+      </p>
+
+      <ConfigAvatarUpload
+        url={f.avatarUrl}
+        iniciais={iniciais}
+        label="Enviar foto"
+        onFile={f.uploadAvatar}
+        enviando={f.savingAvatar}
+      />
+
+      <div className="grid grid-cols-2 gap-3">
+        <Campo
+          id="onb-first"
+          label="Nome"
+          value={f.firstName}
+          onChange={f.setFirstName}
+          placeholder="Renata"
+          onEnter={f.continuarUser}
+        />
+        <Campo
+          id="onb-last"
+          label="Sobrenome"
+          value={f.lastName}
+          onChange={f.setLastName}
+          placeholder="Marcondes"
+          onEnter={f.continuarUser}
+        />
+      </div>
+
+      <ErroLinha erro={f.erro} />
+      <Footer
+        cta="Continuar"
+        onCta={f.continuarUser}
+        disabled={!f.firstName.trim() || !f.lastName.trim()}
       />
     </>
   );
 }
 
-function Org({ f, solo }: { f: F; solo: boolean }) {
+// ── Passo 2: Organização ──────────────────────────────────────────────────────
+function OrgStep({ f }: { f: F }) {
+  const iniciais = (f.razaoSocial.trim()[0] ?? "E").toUpperCase();
   return (
     <>
       <div className="font-display mb-1 text-[21px] font-medium">
-        {solo ? "Seus dados" : "Seu escritório"}
+        Como você trabalha?
       </div>
-      <p className="text-fg3 mb-5 text-[12.5px]">
-        {solo
-          ? "Como você aparece nas peças e no protocolo."
-          : "Como aparece nas peças e no protocolo."}
+      <p className="text-fg3 mb-4 text-[12.5px]">
+        Isso define o que o Atjus prepara pra você.
       </p>
-      <div className="mb-4">
-        <Campo
-          id="onboarding-name"
-          label={solo ? "Nome completo" : "Razão social"}
-          value={f.nome}
-          onChange={f.setNome}
-          placeholder={
-            solo
-              ? "Ex.: Renata Marcondes"
-              : "Ex.: Prolheti & Marcondes Advogados"
-          }
+
+      <div className="mb-5">
+        <Segmented
+          value={f.persona}
+          onChange={f.setPersona}
+          options={[
+            {
+              k: "solo",
+              label: "Advogado autônomo",
+              icon: <User className="size-4" strokeWidth={1.8} />,
+            },
+            {
+              k: "firm",
+              label: "Escritório",
+              icon: <Building2 className="size-4" strokeWidth={1.8} />,
+            },
+          ]}
         />
       </div>
-      {!solo && (
+
+      {f.solo ? (
+        <div className="border-line text-fg3 bg-bg rounded-[10px] border border-dashed px-4 py-3.5 text-[12.5px] leading-[1.5]">
+          Você trabalha por conta própria. Sem razão social, CNPJ ou time — o
+          Atjus usa o seu nome nas peças. Dá pra virar escritório depois em
+          Configurações.
+        </div>
+      ) : (
         <>
-          <label className="text-fg3 mb-1.5 block text-[11.5px]">
-            <span className="mb-1.5 block">CNPJ</span>
+          <div className="mb-4">
+            <Label htmlFor="onb-cnpj">CNPJ</Label>
             <CnpjInput
-              value={f.doc}
-              onChange={f.setDoc}
-              className="border-line bg-panel text-foreground placeholder:text-fg3 w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+              value={f.cnpj}
+              onChange={f.setCnpj}
+              onBlur={f.onCnpjBlur}
+              className="border-line bg-panel text-foreground placeholder:text-fg3 focus:border-primary w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
             />
-          </label>
+            <p className="text-fg3 mt-1 text-[11px]">
+              {f.cnpjLoading
+                ? "Consultando a Receita…"
+                : "Buscamos a razão social automaticamente."}
+            </p>
+          </div>
+          <div className="mb-4">
+            <Campo
+              id="onb-razao"
+              label="Razão social"
+              value={f.razaoSocial}
+              onChange={f.setRazaoSocial}
+              placeholder="Prolheti & Marcondes Advogados"
+            />
+          </div>
+          <div className="mb-1">
+            <span className="text-fg3 mb-1.5 block text-[11.5px]">
+              Logo do escritório
+            </span>
+            <ConfigAvatarUpload
+              url={f.logoPreview}
+              iniciais={iniciais}
+              label="Enviar logo"
+              onFile={f.stageLogo}
+              enviando={false}
+            />
+          </div>
         </>
       )}
-      {f.erro && (
-        <p role="alert" className="text-destructive mt-3 text-[12px]">
-          {f.erro}
-        </p>
-      )}
-      <div className="mt-[26px] flex gap-2.5">
-        <button
-          onClick={f.voltarWelcome}
-          className="border-line bg-panel text-foreground hover:bg-hover rounded-[9px] border px-4 py-2.5 text-[13px]"
-        >
-          Voltar
-        </button>
-        <button
-          onClick={f.prepararAcesso}
-          disabled={f.preparando || !f.nome.trim()}
-          className="bg-primary text-primary-foreground flex-1 rounded-[9px] px-4 py-2.5 text-[13px] font-medium"
-        >
-          {f.preparando
-            ? "Preparando escritório…"
-            : "Preparar acesso aos autos"}
-        </button>
-      </div>
+
+      <ErroLinha erro={f.erro} />
+      <Footer
+        onBack={f.voltarUser}
+        cta="Continuar"
+        onCta={f.continuarOrg}
+        busy={f.busy}
+        busyLabel="Preparando sua conta…"
+      />
     </>
   );
 }
 
-function Oab({ f }: { f: F }) {
+// ── Passo 3: OABs ─────────────────────────────────────────────────────────────
+function OabStep({ f }: { f: F }) {
   return (
     <>
       <div className="font-display mb-1 text-[21px] font-medium">
         Ative sua primeira captura
       </div>
       <p className="text-fg3 mb-[18px] text-[12.5px] leading-[1.5]">
-        Confira as OABs que o Atjus vai monitorar no DJEN. A busca começa ao
-        confirmar abaixo.
+        Informe as OABs que o Atjus vai monitorar no DJEN. A busca começa em
+        segundo plano assim que você concluir.
       </p>
-      <div className="mb-4">
-        <CourtAccessNotice onPrepare={f.voltarOrg} />
-      </div>
+
       <div className="mb-3.5">
-        <span className="text-fg3 mb-1.5 block text-[11.5px]">
-          OAB monitorada
-        </span>
+        <Label>OAB monitorada</Label>
         <div className="flex gap-2">
           <label className="min-w-0 flex-1">
             <span className="sr-only">OAB monitorada</span>
@@ -238,17 +351,18 @@ function Oab({ f }: { f: F }) {
               onKeyDown={(e) => {
                 if (e.key === "Enter") f.addOab();
               }}
-              className="border-line bg-panel text-foreground placeholder:text-fg3 w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+              className="border-line bg-panel text-foreground placeholder:text-fg3 focus:border-primary w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
             />
           </label>
           <button
             onClick={f.addOab}
-            className="border-primary text-primary flex-none rounded-[9px] border bg-transparent px-[15px] py-2.5 text-[13px] font-medium"
+            className="border-primary text-primary hover:bg-selected min-h-11 flex-none rounded-[9px] border bg-transparent px-[15px] py-2.5 text-[13px] font-medium"
           >
             Adicionar
           </button>
         </div>
       </div>
+
       <div className="flex min-h-[44px] flex-col gap-[7px]">
         {f.oabs.map((o, i) => (
           <div
@@ -276,70 +390,146 @@ function Oab({ f }: { f: F }) {
           </div>
         ) : null}
       </div>
-      {f.erro ? (
-        <p className="text-destructive mt-3 text-[12px]" role="alert">
-          {f.erro}
-        </p>
-      ) : null}
-      <div className="mt-6 flex gap-2.5">
-        <button
-          onClick={f.voltarOrg}
-          className="border-line bg-panel text-foreground hover:bg-hover rounded-[9px] border px-4 py-2.5 text-[13px]"
-        >
-          Voltar
-        </button>
-        <button
-          onClick={f.concluir}
-          disabled={!f.podeConcluir || f.preparando}
-          className="bg-primary text-primary-foreground inline-flex flex-1 items-center justify-center gap-2 rounded-[9px] px-4 py-2.5 text-[13px] font-medium disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {f.preparando ? (
-            <>
-              <span className="spin size-[15px] rounded-full border-2 border-white/40 border-t-white" />
-              Preparando sua conta…
-            </>
-          ) : (
-            <>
-              <Sparkles className="size-[15px]" strokeWidth={1.8} />
-              Ativar captura e concluir
-            </>
-          )}
-        </button>
+
+      <div className="mt-4">
+        <CourtAccessNotice />
       </div>
+
+      <ErroLinha erro={f.erro} />
+      <Footer
+        onBack={f.voltarOrg}
+        cta={f.solo ? "Ativar captura e concluir" : "Continuar"}
+        icon={
+          f.solo ? <Sparkles className="size-[15px]" strokeWidth={1.8} /> : null
+        }
+        onCta={f.continuarOab}
+        disabled={!f.podeConcluir}
+        busy={f.saving}
+        busyLabel="Preparando sua conta…"
+      />
     </>
   );
 }
 
+// ── Passo 4: Time (só escritório, pulável) ────────────────────────────────────
+function TeamStep({ f }: { f: F }) {
+  return (
+    <>
+      <div className="font-display mb-1 text-[21px] font-medium">
+        Convide seu time
+      </div>
+      <p className="text-fg3 mb-[18px] text-[12.5px] leading-[1.5]">
+        Opcional — dá pra fazer depois. Cada pessoa recebe um e-mail para entrar
+        no escritório.
+      </p>
+
+      <div className="mb-3">
+        <Label htmlFor="onb-team-email">E-mail</Label>
+        <div className="flex gap-2">
+          <input
+            id="onb-team-email"
+            value={f.teamEmail}
+            onChange={(e) => f.setTeamEmail(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") f.addTeamRow();
+            }}
+            placeholder="advogado@escritorio.com.br"
+            className="border-line bg-panel text-foreground placeholder:text-fg3 focus:border-primary min-w-0 flex-1 rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+          />
+          <button
+            onClick={f.addTeamRow}
+            className="border-primary text-primary hover:bg-selected min-h-11 flex-none rounded-[9px] border bg-transparent px-[15px] py-2.5 text-[13px] font-medium"
+          >
+            Adicionar
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <span className="text-fg3 mb-1.5 block text-[11.5px]">
+          Papel dos próximos convidados
+        </span>
+        <Segmented
+          value={f.teamRole}
+          onChange={f.setTeamRole}
+          options={[
+            { k: "LAWYER", label: "Advogado" },
+            { k: "ADMIN", label: "Administrador" },
+          ]}
+        />
+      </div>
+
+      <div className="flex flex-col gap-[7px]">
+        {f.teamRows.map((r, i) => (
+          <div
+            key={`${r.email}-${i}`}
+            className="border-line bg-panel flex items-center gap-2.5 rounded-[9px] border px-[13px] py-2.5"
+          >
+            <span className="flex-1 truncate text-[13px]">{r.email}</span>
+            <span className="text-fg3 flex-none text-[11.5px]">
+              {r.role === "ADMIN" ? "Administrador" : "Advogado"}
+            </span>
+            <IconAction
+              label={`Remover ${r.email}`}
+              icon={X}
+              onClick={() => f.removeTeamRow(i)}
+              className="pointer-coarse:size-11"
+            />
+          </div>
+        ))}
+      </div>
+
+      <ErroLinha erro={f.erro} />
+      <Footer
+        onBack={f.voltarOab}
+        cta={f.teamRows.length > 0 ? "Enviar convites e concluir" : "Concluir"}
+        icon={<Sparkles className="size-[15px]" strokeWidth={1.8} />}
+        onCta={f.concluir}
+        busy={f.saving}
+        busyLabel="Preparando sua conta…"
+      />
+      <button
+        onClick={f.concluir}
+        disabled={f.saving}
+        className="text-fg3 hover:text-foreground mx-auto mt-3 block text-[12px]"
+      >
+        Pular por agora
+      </button>
+    </>
+  );
+}
+
+// ── Done ──────────────────────────────────────────────────────────────────────
 function Done({ f }: { f: F }) {
   return (
     <div className="flex flex-col gap-5">
-      <Check className="text-primary size-8" />
+      <span className="bg-selected text-primary grid size-11 place-items-center rounded-full">
+        <Check className="size-6" strokeWidth={2} />
+      </span>
       <div>
-        <h1 className="text-[22px] font-semibold">Captura solicitada</h1>
+        <h1 className="font-display text-[22px] font-medium">
+          Captura solicitada
+        </h1>
         <p className="text-fg3 mt-2 text-[13px] leading-relaxed">
           {f.capturasAtivadas > 0
-            ? "A busca de publicações será processada em segundo plano. As intimações encontradas aparecerão na triagem. Os autos dependem do acesso ao tribunal de cada processo."
-            : "Nenhuma OAB pôde ser ativada. Revise os dados em Fontes de dados para iniciar sua primeira captura."}
+            ? "A busca de publicações roda em segundo plano. As intimações aparecem na triagem em tempo real — sem precisar recarregar."
+            : "Nenhuma OAB pôde ser ativada. Revise em Configurações › Fontes de dados para iniciar sua primeira captura."}
         </p>
+        {f.convitesEnviados > 0 ? (
+          <p className="text-fg3 mt-2 text-[13px]">
+            {f.convitesEnviados} convite(s) enviado(s) — seu time recebe o link
+            de aceite por e-mail.
+          </p>
+        ) : null}
       </div>
-      {f.erro && (
-        <p role="alert" className="text-destructive text-[12px]">
-          {f.erro}
-        </p>
-      )}
-      <CourtAccessNotice />
+      <ErroLinha erro={f.erro} />
       <button
         onClick={f.abrirApp}
-        className="bg-primary text-primary-foreground h-9 w-full rounded-lg font-medium"
+        className="bg-primary text-primary-foreground inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg font-medium"
       >
+        <Sparkles className="size-[15px]" strokeWidth={1.8} />
         Abrir triagem
       </button>
-      <Link
-        className="text-primary block text-center text-[12px] hover:underline"
-        href="/primeira-importacao"
-      >
-        Revisar preparação e acompanhar importação
-      </Link>
     </div>
   );
 }

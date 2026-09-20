@@ -50,6 +50,8 @@ function item(
     assignee_user_id: null,
     assignee_user_name: null,
     work_stage: "RECEIVED",
+    recommended_providencia: null,
+    suggested_count: 0,
     ...overrides,
   };
 }

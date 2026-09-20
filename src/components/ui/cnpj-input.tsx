@@ -15,6 +15,7 @@ type CnpjInputProps = {
   placeholder?: string;
   autoFocus?: boolean;
   onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
+  onBlur?: React.FocusEventHandler<HTMLInputElement>;
 };
 
 export function CnpjInput({

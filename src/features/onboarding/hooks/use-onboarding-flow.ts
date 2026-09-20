@@ -1,43 +1,160 @@
 "use client";
 
-import { useAuth, useOrganization, useOrganizationList } from "@clerk/nextjs";
+import {
+  useAuth,
+  useOrganization,
+  useOrganizationList,
+  useUser,
+} from "@clerk/nextjs";
+import type { OrganizationCustomRoleKey } from "@clerk/shared/types";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { addWatchedOab } from "@/features/integrations/services/integrations.service";
 import { useApi } from "@/lib/api/use-api";
 
+import { lookupCnpj } from "../lib/cnpj-lookup";
+import type { AccountType } from "../types";
 import { useOnboarding } from "./use-onboarding";
 
-// Fluxo guiado: welcome → org → access → oab → done. A UI é nova, mas a MECÂNICA de conclusão é a mesma
-// do wizard antigo: cria a Clerk Organization → aguarda o BE provisionar o tenant
-// (poll /identity/me) → grava o perfil (updateOrgProfile marca onboarding_completed_at).
-export type OnbStep = "welcome" | "org" | "access" | "oab" | "done";
-export type OnbRole = "novo" | "solo";
+// Onboarding revamp por PERSONA: Usuário → Organização (toggle Autônomo/Escritório)
+// → OABs → Time (só escritório, pulável) → Done. A UI é JSX + binding; a lógica/
+// conclusão vive aqui. Mecânica de tenant = a mesma do wizard antigo: cria a Clerk
+// Organization → o BE provisiona o tenant SÍNCRONO (GetMe) → grava o perfil
+// (updateOrgProfile, agora com account_type) → OABs viram watched-oabs (dispara DJEN
+// async) → cai na Triagem que enche ao vivo. Autos (cert+2FA) é opt-in DEPOIS, nunca
+// pré-requisito.
+export type OnbStep = "user" | "org" | "oab" | "team" | "done";
 type Phase = "idle" | "creating" | "provisioning" | "saving";
 
-const ORDER: OnbStep[] = ["welcome", "org", "access", "oab", "done"];
-const STORED_STEPS = new Set<OnbStep>(ORDER);
+const STORED_STEPS = new Set<OnbStep>(["user", "org", "oab", "team", "done"]);
 const digits = (s: string) => s.replace(/\D/g, "");
 
-// Normaliza a OAB digitada ("OAB/SP 214.885", "SP 214885", "214885/SP") pra
-// chave canônica "UFNUMERO" que o BE espera (ex.: "SP214885"). Sem UF explícita,
-// assume SP (default do produto). Só a UF de 2 letras + os dígitos entram.
+// Normaliza a OAB digitada ("OAB/SP 214.885", "SP 214885", "214885/SP") pra chave
+// canônica "UFNUMERO" que o BE espera (ex.: "SP214885"). Sem UF explícita assume SP.
 function normalizeOab(raw: string): string {
   const semPrefixo = raw.replace(/oab/gi, "");
   const uf = (semPrefixo.match(/[A-Za-z]{2}/)?.[0] ?? "SP").toUpperCase();
   return uf + digits(semPrefixo);
 }
 
-// ── sub-hook: papel + campos da org ───────────────────────────────────────────
-function useDados() {
-  const [role, setRole] = useState<OnbRole | null>(null);
-  const [nome, setNome] = useState("");
-  const [doc, setDoc] = useState("");
-  return { role, setRole, nome, setNome, doc, setDoc };
+// ── Passo 1: Usuário (Nome/Sobrenome + avatar Clerk) ──────────────────────────
+function useUserStep() {
+  const { user } = useUser();
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [savingAvatar, setSavingAvatar] = useState(false);
+  const prefilled = useRef(false);
+
+  // Prefill do que veio do signup (Clerk) — sync one-time de sistema externo (Clerk)
+  // pro estado do form, guardado por ref pra rodar uma vez só (sem cascata). O
+  // usuário do Clerk chega async, então o effect é o ponto certo pra semear.
+  useEffect(() => {
+    if (prefilled.current || !user) return;
+    prefilled.current = true;
+    /* eslint-disable react-hooks/set-state-in-effect -- seed externo (Clerk), 1x */
+    if (user.firstName) setFirstName(user.firstName);
+    if (user.lastName) setLastName(user.lastName);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [user]);
+
+  const uploadAvatar = useCallback(
+    async (file: File) => {
+      if (!user) return;
+      setSavingAvatar(true);
+      try {
+        await user.setProfileImage({ file });
+      } finally {
+        setSavingAvatar(false);
+      }
+    },
+    [user],
+  );
+
+  // Persiste nome/sobrenome no Clerk (fonte da identidade) antes de avançar.
+  const persistName = useCallback(async () => {
+    if (!user) return;
+    await user.update({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+    });
+  }, [user, firstName, lastName]);
+
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  return {
+    firstName,
+    setFirstName,
+    lastName,
+    setLastName,
+    fullName,
+    avatarUrl: user?.hasImage ? user.imageUrl : null,
+    uploadAvatar,
+    savingAvatar,
+    persistName,
+  };
 }
 
-// ── sub-hook: lista de OABs a vigiar ──────────────────────────────────────────
+// ── Passo 2: Organização (persona + razão social/CNPJ + logo staged) ──────────
+function useOrgStep() {
+  const [persona, setPersona] = useState<AccountType>("solo");
+  const [razaoSocial, setRazaoSocial] = useState("");
+  const [cnpj, setCnpj] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [cnpjLoading, setCnpjLoading] = useState(false);
+  const cnpjAbort = useRef<AbortController | null>(null);
+
+  // O logo só sobe pro Clerk DEPOIS que a org existe (setLogo precisa da org ativa),
+  // então aqui a gente só encena: guarda o File + um preview local (objectURL).
+  const stageLogo = useCallback((file: File) => {
+    setLogoFile(file);
+    setLogoPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (logoPreview) URL.revokeObjectURL(logoPreview);
+    },
+    [logoPreview],
+  );
+
+  // No blur do CNPJ (14 dígitos) consulta a Receita e preenche a razão social se
+  // ainda estiver vazia — nunca sobrescreve o que o usuário digitou. Best-effort.
+  const onCnpjBlur = useCallback(async () => {
+    const bare = digits(cnpj);
+    if (bare.length !== 14) return;
+    cnpjAbort.current?.abort();
+    const ctrl = new AbortController();
+    cnpjAbort.current = ctrl;
+    setCnpjLoading(true);
+    try {
+      const info = await lookupCnpj(bare, ctrl.signal);
+      if (info) setRazaoSocial((atual) => atual.trim() || info.razaoSocial);
+    } finally {
+      if (cnpjAbort.current === ctrl) setCnpjLoading(false);
+    }
+  }, [cnpj]);
+
+  return {
+    persona,
+    setPersona,
+    razaoSocial,
+    setRazaoSocial,
+    cnpj,
+    setCnpj,
+    logoFile,
+    logoPreview,
+    stageLogo,
+    cnpjLoading,
+    onCnpjBlur,
+  };
+}
+
+// ── Passo 3: OABs a vigiar ────────────────────────────────────────────────────
 function useOabs() {
   const [oab, setOab] = useState("");
   const [oabs, setOabs] = useState<string[]>([]);
@@ -57,6 +174,34 @@ function useOabs() {
   return { oab, setOab, oabs, setOabs, add, remove };
 }
 
+// ── Passo 4: Time (só escritório, pulável) ────────────────────────────────────
+export type TeamRow = { email: string; role: "ADMIN" | "LAWYER" };
+
+function useTeam() {
+  const [rows, setRows] = useState<TeamRow[]>([]);
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<"ADMIN" | "LAWYER">("LAWYER");
+  const add = useCallback(() => {
+    setEmail((atual) => {
+      const t = atual.trim().toLowerCase();
+      if (t.includes("@")) {
+        setRows((lista) =>
+          lista.some((r) => r.email === t)
+            ? lista
+            : lista.concat({ email: t, role }),
+        );
+        return "";
+      }
+      return atual;
+    });
+  }, [role]);
+  const remove = useCallback(
+    (i: number) => setRows((lista) => lista.filter((_, j) => j !== i)),
+    [],
+  );
+  return { rows, email, setEmail, role, setRole, add, remove };
+}
+
 export function useOnboardingFlow() {
   const router = useRouter();
   const { userId, orgId } = useAuth();
@@ -64,15 +209,20 @@ export function useOnboardingFlow() {
     useOrganizationList({ userMemberships: { infinite: true } });
   const { organization: activeOrg } = useOrganization();
 
-  const [step, setStep] = useState<OnbStep>("welcome");
+  const [step, setStep] = useState<OnbStep>("user");
   const [phase, setPhase] = useState<Phase>("idle");
   const [capturasAtivadas, setCapturasAtivadas] = useState(0);
+  const [convitesEnviados, setConvitesEnviados] = useState(0);
   const [erro, setErro] = useState<string | null>(null);
   const restoredStepFor = useRef<string | null>(null);
+  const afterProvision = useRef<OnbStep | null>(null);
 
-  const dados = useDados();
+  const u = useUserStep();
+  const o = useOrgStep();
   const oabs = useOabs();
+  const team = useTeam();
   const api = useApi();
+  const solo = o.persona === "solo";
 
   const { tenantReady, updateOrgProfile } = useOnboarding({
     poll: phase === "provisioning",
@@ -80,17 +230,17 @@ export function useOnboardingFlow() {
 
   const stepStorageKey = userId ? `atjus:onboarding-step:${userId}` : null;
 
-  // O progresso visual é local, mas fica isolado por Clerk user. Etapas que
-  // dependem do tenant só são restauradas depois que a organização foi reativada
-  // e seu org_id voltou ao token da sessão.
+  // Progresso visual local, isolado por Clerk user. Passos que dependem do tenant só
+  // voltam depois que a org foi reativada e seu org_id voltou ao token.
   useEffect(() => {
     if (!stepStorageKey || restoredStepFor.current === stepStorageKey) return;
     const stored = window.localStorage.getItem(
       stepStorageKey,
     ) as OnbStep | null;
     if (stored && STORED_STEPS.has(stored)) {
-      if (!orgId && stored !== "welcome" && stored !== "org") return;
-      queueMicrotask(() => setStep(stored));
+      if (orgId || stored === "user" || stored === "org") {
+        queueMicrotask(() => setStep(stored));
+      }
     }
     restoredStepFor.current = stepStorageKey;
   }, [orgId, stepStorageKey]);
@@ -100,10 +250,8 @@ export function useOnboardingFlow() {
     window.localStorage.setItem(stepStorageKey, step);
   }, [step, stepStorageKey]);
 
-  // Clerk allows a personal session even when the user already belongs to an
-  // organization. That is exactly what happens after a hard refresh in this
-  // deployment. Restore the existing membership before the wizard can create a
-  // second organization; /identity/me only starts once the org claim is active.
+  // Clerk permite sessão pessoal mesmo já pertencendo a uma org (acontece após hard
+  // refresh). Reativa a membership existente antes que o wizard crie uma 2ª org.
   useEffect(() => {
     if (!isLoaded || orgId || phase !== "idle") return;
     const membership = userMemberships.data?.[0];
@@ -119,129 +267,234 @@ export function useOnboardingFlow() {
       });
   }, [isLoaded, orgId, phase, setActive, userMemberships.data]);
 
-  // Grava o perfil mínimo → o BE marca onboarding_completed_at → persiste as OABs
-  // como watched-oabs → avança pro done. O perfil é o gate do onboarding; as OABs
-  // são best-effort (allSettled): falha de uma não trava a conclusão, mas o erro
-  // (ApiError) fica visível pra o usuário reprocessar depois em Configurações.
-  const salvarPerfil = useCallback(() => {
-    const nome = dados.nome.trim() || "Meu escritório";
-    const doc = digits(dados.doc) || digits(oabs.oabs[0] ?? "") || "0";
-    const paraVigiar = oabs.oabs.filter(Boolean);
-    setPhase("saving");
-    updateOrgProfile({ cnpj: doc, legal_name: nome, trade_name: nome })
-      .then(async () => {
-        const res = await Promise.allSettled(
-          paraVigiar.map((oab) => addWatchedOab(api, oab)),
-        );
-        setCapturasAtivadas(res.filter((r) => r.status === "fulfilled").length);
-        const falhou = res.filter((r) => r.status === "rejected").length;
-        setPhase("idle");
-        setStep("done");
-        if (falhou > 0) {
-          setErro(
-            `Escritório criado. ${falhou} OAB(s) não puderam ser cadastradas — adicione-as depois em Configurações › Fontes.`,
-          );
-        }
-      })
-      .catch(() => {
-        setPhase("idle");
-        setErro("Não foi possível concluir agora. Tente de novo.");
-      });
-  }, [dados.nome, dados.doc, oabs.oabs, updateOrgProfile, api]);
-
-  const prepararAcesso = useCallback(async () => {
-    if (phase !== "idle") return;
+  // Passo 1 → 2: persiste nome no Clerk e avança. Nome/sobrenome obrigatórios.
+  const continuarUser = useCallback(async () => {
+    if (!u.firstName.trim() || !u.lastName.trim()) {
+      setErro("Informe nome e sobrenome.");
+      return;
+    }
     setErro(null);
-    if (tenantReady) {
-      setStep("access");
-      return;
-    }
-    if (activeOrg) {
-      setPhase("provisioning");
-      return;
-    }
-    if (!isLoaded || !createOrganization || !setActive) return;
-    setPhase("creating");
     try {
-      const org = await createOrganization({
-        name: dados.nome.trim() || "Meu escritório",
-      });
-      await setActive({ organization: org.id });
-      setPhase("provisioning");
+      await u.persistName();
+    } catch {
+      // nome é best-effort no Clerk; não trava o fluxo
+    }
+    setStep("org");
+  }, [u]);
+
+  // Provisiona o tenant: cria a Clerk Org (nome = solo? nome completo : razão social),
+  // ativa, e deixa o efeito de provisioning levar ao próximo passo (afterProvision).
+  const criarTenant = useCallback(
+    async (nome: string, next: OnbStep) => {
+      if (tenantReady || activeOrg) {
+        afterProvision.current = next;
+        setPhase("provisioning");
+        return;
+      }
+      if (!isLoaded || !createOrganization || !setActive) return;
+      afterProvision.current = next;
+      setPhase("creating");
+      try {
+        const org = await createOrganization({ name: nome });
+        await setActive({ organization: org.id });
+        setPhase("provisioning");
+      } catch {
+        setPhase("idle");
+        afterProvision.current = null;
+        setErro("Não foi possível preparar sua conta. Tente novamente.");
+      }
+    },
+    [tenantReady, activeOrg, isLoaded, createOrganization, setActive],
+  );
+
+  // Passo 2 → 3: valida os campos do escritório, cria o tenant e vai pra OABs.
+  const continuarOrg = useCallback(async () => {
+    if (phase !== "idle") return;
+    if (!solo) {
+      if (!o.razaoSocial.trim()) {
+        setErro("Informe a razão social.");
+        return;
+      }
+      if (digits(o.cnpj).length !== 14) {
+        setErro("Informe um CNPJ com 14 dígitos.");
+        return;
+      }
+    }
+    setErro(null);
+    const nome = solo ? u.fullName || "Meu escritório" : o.razaoSocial.trim();
+    await criarTenant(nome, "oab");
+  }, [phase, solo, o.razaoSocial, o.cnpj, u.fullName, criarTenant]);
+
+  // Quando o tenant fica pronto: sobe o logo staged (firm) e vai pro passo destino.
+  useEffect(() => {
+    if (phase !== "provisioning" || !tenantReady) return;
+    const next = afterProvision.current ?? "oab";
+    afterProvision.current = null;
+    const finish = () => {
+      setPhase("idle");
+      setStep(next);
+    };
+    if (!solo && o.logoFile && activeOrg) {
+      void activeOrg
+        .setLogo({ file: o.logoFile })
+        .catch(() => undefined)
+        .finally(finish);
+      return;
+    }
+    finish();
+  }, [phase, tenantReady, solo, o.logoFile, activeOrg]);
+
+  // Grava o perfil (com account_type) → persiste as OABs (dispara DJEN) → convites do
+  // time (best-effort) → done. O perfil é o gate; OABs/convites são allSettled.
+  const concluir = useCallback(async () => {
+    if (phase !== "idle" || !tenantReady || oabs.oabs.length === 0) return;
+    setErro(null);
+    setPhase("saving");
+    try {
+      await updateOrgProfile(
+        solo
+          ? { account_type: "solo" }
+          : {
+              account_type: "firm",
+              cnpj: digits(o.cnpj),
+              legal_name: o.razaoSocial.trim(),
+              trade_name: o.razaoSocial.trim(),
+            },
+      );
+
+      const resOab = await Promise.allSettled(
+        oabs.oabs.filter(Boolean).map((oab) => addWatchedOab(api, oab)),
+      );
+      setCapturasAtivadas(
+        resOab.filter((r) => r.status === "fulfilled").length,
+      );
+      const oabFalhou = resOab.filter((r) => r.status === "rejected").length;
+
+      let conviteFalhou = 0;
+      if (!solo && team.rows.length > 0 && activeOrg) {
+        const resInv = await Promise.allSettled(
+          team.rows.map((r) =>
+            activeOrg.inviteMember({
+              emailAddress: r.email,
+              role: (r.role === "ADMIN"
+                ? "org:admin"
+                : "org:member") as OrganizationCustomRoleKey,
+            }),
+          ),
+        );
+        setConvitesEnviados(
+          resInv.filter((r) => r.status === "fulfilled").length,
+        );
+        conviteFalhou = resInv.filter((r) => r.status === "rejected").length;
+      }
+
+      setPhase("idle");
+      setStep("done");
+      if (oabFalhou > 0 || conviteFalhou > 0) {
+        const partes: string[] = [];
+        if (oabFalhou > 0) partes.push(`${oabFalhou} OAB(s)`);
+        if (conviteFalhou > 0) partes.push(`${conviteFalhou} convite(s)`);
+        setErro(
+          `Tudo pronto, mas ${partes.join(" e ")} não foram concluídos — refaça em Configurações.`,
+        );
+      }
     } catch {
       setPhase("idle");
-      setErro("Não foi possível preparar o escritório. Tente novamente.");
+      setErro("Não foi possível concluir agora. Tente de novo.");
     }
   }, [
     phase,
     tenantReady,
+    oabs.oabs,
+    solo,
+    o.cnpj,
+    o.razaoSocial,
+    team.rows,
     activeOrg,
-    isLoaded,
-    createOrganization,
-    setActive,
-    dados.nome,
+    updateOrgProfile,
+    api,
   ]);
 
-  const concluir = useCallback(() => {
-    if (oabs.oabs.length === 0 || phase !== "idle" || !tenantReady) return;
-    setErro(null);
-    salvarPerfil();
-  }, [oabs.oabs.length, phase, tenantReady, salvarPerfil]);
-
-  useEffect(() => {
-    if (phase === "provisioning" && tenantReady) {
-      setPhase("idle");
-      setStep("access");
+  // Passo 3 → (firm: time · solo: conclui).
+  const continuarOab = useCallback(() => {
+    if (oabs.oabs.length === 0) {
+      setErro("Adicione ao menos uma OAB para ativar a captura.");
+      return;
     }
-  }, [phase, tenantReady]);
+    setErro(null);
+    if (solo) void concluir();
+    else setStep("team");
+  }, [oabs.oabs.length, solo, concluir]);
 
   // Teto do provisionamento (~40s) — devolve o controle em vez de pollar pra sempre.
   useEffect(() => {
     if (phase !== "provisioning") return;
     const timer = setTimeout(() => {
       setPhase("idle");
+      afterProvision.current = null;
       setErro("Demorou demais para preparar a conta. Tente de novo.");
     }, 40_000);
     return () => clearTimeout(timer);
   }, [phase]);
 
-  const idx = Math.max(0, ORDER.indexOf(step));
+  // Passos visíveis pra barra de progresso (solo não tem "team").
+  const visibleSteps: OnbStep[] = solo
+    ? ["user", "org", "oab"]
+    : ["user", "org", "oab", "team"];
+  const idx = Math.max(0, visibleSteps.indexOf(step));
 
   return {
     step,
-    role: dados.role,
-    // barra de progresso (passos 2-4)
-    temDots: step !== "welcome",
-    dots: ORDER.slice(1).map((_, i) => idx >= i + 1),
-    // welcome
-    escolherPapel: (r: OnbRole) => {
-      dados.setRole(r);
-      setStep("org");
-    },
-    // org
-    nome: dados.nome,
-    setNome: dados.setNome,
-    doc: dados.doc,
-    setDoc: dados.setDoc,
-    voltarWelcome: () => {
-      dados.setRole(null);
-      setStep("welcome");
-    },
-    prepararAcesso,
-    irOab: () => setStep("oab"),
-    // oab
+    solo,
+    busy: phase !== "idle",
+    saving: phase === "saving",
+    erro,
+    // progresso
+    dots: visibleSteps.map((_, i) => idx >= i),
+    // passo 1 — usuário
+    firstName: u.firstName,
+    setFirstName: u.setFirstName,
+    lastName: u.lastName,
+    setLastName: u.setLastName,
+    avatarUrl: u.avatarUrl,
+    uploadAvatar: (f: File) => void u.uploadAvatar(f),
+    savingAvatar: u.savingAvatar,
+    continuarUser: () => void continuarUser(),
+    // passo 2 — organização
+    persona: o.persona,
+    setPersona: o.setPersona,
+    razaoSocial: o.razaoSocial,
+    setRazaoSocial: o.setRazaoSocial,
+    cnpj: o.cnpj,
+    setCnpj: o.setCnpj,
+    cnpjLoading: o.cnpjLoading,
+    onCnpjBlur: () => void o.onCnpjBlur(),
+    logoPreview: o.logoPreview,
+    stageLogo: o.stageLogo,
+    voltarUser: () => setStep("user"),
+    continuarOrg: () => void continuarOrg(),
+    // passo 3 — oab
     oab: oabs.oab,
     setOab: oabs.setOab,
     oabs: oabs.oabs,
     addOab: oabs.add,
     removeOab: oabs.remove,
-    voltarOrg: () => setStep("access"),
+    voltarOrg: () => setStep("org"),
+    continuarOab,
     podeConcluir: oabs.oabs.length > 0,
-    preparando: phase !== "idle",
-    erro,
-    concluir,
+    // passo 4 — time
+    teamRows: team.rows,
+    teamEmail: team.email,
+    setTeamEmail: team.setEmail,
+    teamRole: team.role,
+    setTeamRole: team.setRole,
+    addTeamRow: team.add,
+    removeTeamRow: team.remove,
+    voltarOab: () => setStep("oab"),
+    concluir: () => void concluir(),
     // done
     capturasAtivadas,
+    convitesEnviados,
     abrirApp: () => router.push("/triagem"),
   };
 }

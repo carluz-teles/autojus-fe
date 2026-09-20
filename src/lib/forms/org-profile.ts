@@ -113,6 +113,10 @@ export function orgProfileToInput(
     : undefined;
 
   return {
+    // Este form de Configurações coleta CNPJ + razão social — campos de ESCRITÓRIO —,
+    // então a persona aqui é sempre "firm". A edição de persona (solo↔firm) é da
+    // Fase C do revamp; até lá o editor de perfil da org é firm-only.
+    account_type: "firm",
     cnpj: onlyDigits(values.cnpj),
     phone: onlyDigits(values.phone ?? "") || undefined,
     email: values.email?.trim() || undefined,
