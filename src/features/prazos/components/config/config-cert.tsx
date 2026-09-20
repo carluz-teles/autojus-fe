@@ -4,6 +4,7 @@ import { Plus, ShieldCheck } from "lucide-react";
 
 import { useCertWizard } from "../../hooks/use-cert-wizard";
 import { CertWizard } from "./cert-wizard";
+import { BRAND_GRADIENT, HeroBanner, SettingsSection } from "./config-kit";
 
 // Aba Certificados digitais (A1 real, BE): cabeçalho + "Adicionar certificado"
 // (wizard) + lista de certificados cadastrados com remoção.
@@ -11,22 +12,27 @@ export function ConfigCert() {
   const w = useCertWizard();
 
   return (
-    <>
-      <div className="mb-1.5 flex items-start justify-between gap-4">
-        <div className="font-display text-[20px] font-medium">
-          Certificados digitais
-        </div>
+    <SettingsSection
+      title="Certificados digitais"
+      subtitle="Certificados A1 usados para assinar e protocolar peças — e para conectar os tribunais."
+      action={
         <button
           onClick={w.abrir}
-          className="bg-primary text-primary-foreground inline-flex min-h-9 flex-none items-center gap-[7px] rounded-[9px] px-3.5 py-2 text-[12.5px] font-medium pointer-coarse:min-h-11"
+          style={{ backgroundImage: BRAND_GRADIENT }}
+          className="text-primary-foreground inline-flex min-h-9 flex-none items-center gap-[7px] rounded-[9px] px-3.5 py-2 text-[12.5px] font-medium shadow-sm transition-transform duration-200 hover:-translate-y-px pointer-coarse:min-h-11"
         >
-          <Plus className="size-3.5" strokeWidth={2} />
+          <Plus className="size-3.5" strokeWidth={2.2} />
           Adicionar certificado
         </button>
-      </div>
-      <p className="text-fg3 mb-[18px] text-[12.5px]">
-        Certificados usados para assinar e protocolar peças no tribunal.
-      </p>
+      }
+    >
+      <HeroBanner
+        icon={<ShieldCheck className="size-[18px]" strokeWidth={1.9} />}
+        title="Um certificado, dois usos"
+      >
+        Seu certificado A1 assina e protocola as peças no tribunal e, junto com
+        o 2FA, conecta o eproc para importar os autos automaticamente.
+      </HeroBanner>
 
       {w.listaErro ? (
         <p className="text-destructive text-[12.5px]">
@@ -90,6 +96,6 @@ export function ConfigCert() {
       )}
 
       <CertWizard w={w} />
-    </>
+    </SettingsSection>
   );
 }

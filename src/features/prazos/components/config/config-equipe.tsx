@@ -4,6 +4,7 @@ import { Mail } from "lucide-react";
 
 import { useEquipe } from "../../hooks/use-equipe";
 import { useInvite } from "../../hooks/use-invite";
+import { BRAND_GRADIENT, SettingsSection } from "./config-kit";
 import { InviteModal } from "./invite-modal";
 
 // Aba Equipe — port de Atjus - Convite.dc.html (persona admin): header +
@@ -14,24 +15,21 @@ export function ConfigEquipe() {
   const inv = useInvite();
 
   return (
-    <>
-      <div className="mb-[18px] flex items-start justify-between gap-4">
-        <div>
-          <div className="font-display text-[20px] font-medium">Equipe</div>
-          <p className="text-fg3 mt-[3px] text-[12.5px]">
-            Quem tem acesso e o papel de cada um.
-          </p>
-        </div>
-        {inv.isAdmin ? (
+    <SettingsSection
+      title="Equipe"
+      subtitle="Quem tem acesso e o papel de cada um."
+      action={
+        inv.isAdmin ? (
           <button
             onClick={inv.abrir}
-            className="bg-primary text-primary-foreground flex min-h-9 flex-none items-center rounded-lg border-none px-3.5 py-2 text-[12.5px] font-medium pointer-coarse:min-h-11"
+            style={{ backgroundImage: BRAND_GRADIENT }}
+            className="text-primary-foreground flex min-h-9 flex-none items-center rounded-lg px-3.5 py-2 text-[12.5px] font-medium shadow-sm transition-transform duration-200 hover:-translate-y-px pointer-coarse:min-h-11"
           >
             Convidar membro
           </button>
-        ) : null}
-      </div>
-
+        ) : undefined
+      }
+    >
       {equipe.error ? (
         <p className="text-destructive text-[12.5px]">
           Não foi possível carregar os membros. Tente novamente.
@@ -119,6 +117,6 @@ export function ConfigEquipe() {
       )}
 
       <InviteModal inv={inv} />
-    </>
+    </SettingsSection>
   );
 }

@@ -1,11 +1,13 @@
 "use client";
 
+import { Camera, ImagePlus } from "lucide-react";
 import { useRef } from "react";
 
-// Avatar (foto/logo) + botão que abre o seletor de arquivo, compartilhado por
-// Perfil (foto do usuário) e Organização (logo do escritório). Sem imagem, cai
-// no fallback de iniciais discreto. O upload real vive no hook chamador (Clerk
-// setProfileImage / setLogo); aqui é só binding do <input type=file>.
+// Avatar (foto/logo) + botão de upload, compartilhado por Perfil (foto do usuário)
+// e Organização (logo do escritório). Mesma linguagem do onboarding: anel em
+// degradê primário→latão, círculo clicável com overlay de câmera no hover, selo
+// dourado quando vazio, spinner no envio. Sem imagem, cai nas iniciais discretas.
+// O upload real vive no hook chamador (Clerk setProfileImage / setLogo).
 export function ConfigAvatarUpload({
   url,
   iniciais,
@@ -22,25 +24,64 @@ export function ConfigAvatarUpload({
   podeEditar?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const open = () => inputRef.current?.click();
 
   return (
-    <div className="surface-inset mb-[18px] flex items-center gap-3.5 p-3">
-      <span className="text-primary grid size-14 flex-none place-items-center overflow-hidden rounded-full text-[18px] font-semibold [background:color-mix(in_oklch,var(--primary)_14%,transparent)]">
-        {url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt="" className="size-full object-cover" />
-        ) : (
-          iniciais
-        )}
-      </span>
+    <div className="surface-inset mb-[18px] flex items-center gap-4 p-3.5">
+      <button
+        type="button"
+        onClick={podeEditar ? open : undefined}
+        disabled={!podeEditar}
+        aria-label={podeEditar ? label : undefined}
+        className="group focus-visible:ring-primary/40 relative flex-none rounded-full outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-default"
+      >
+        <span
+          className="grid size-14 place-items-center rounded-full p-[2.5px] transition-transform duration-200 group-enabled:group-hover:scale-[1.03]"
+          style={{
+            backgroundImage:
+              "linear-gradient(135deg, var(--primary), var(--gold))",
+          }}
+        >
+          <span className="bg-panel text-primary relative grid size-full place-items-center overflow-hidden rounded-full text-[17px] font-semibold">
+            {url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={url} alt="" className="size-full object-cover" />
+            ) : (
+              iniciais
+            )}
+            {podeEditar ? (
+              <span className="absolute inset-0 grid place-items-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                <Camera className="size-5 text-white" strokeWidth={1.8} />
+              </span>
+            ) : null}
+            {enviando ? (
+              <span className="absolute inset-0 grid place-items-center bg-black/45">
+                <span className="spin size-5 rounded-full border-2 border-white/40 border-t-white" />
+              </span>
+            ) : null}
+          </span>
+        </span>
+        {podeEditar && !url && !enviando ? (
+          <span
+            className="text-primary-foreground absolute -right-0.5 -bottom-0.5 grid size-6 place-items-center rounded-full ring-2 ring-[var(--panel)]"
+            style={{
+              backgroundImage:
+                "linear-gradient(135deg, var(--primary), var(--gold))",
+            }}
+          >
+            <ImagePlus className="size-3" strokeWidth={2} />
+          </span>
+        ) : null}
+      </button>
+
       {podeEditar ? (
         <>
           <button
-            onClick={() => inputRef.current?.click()}
+            onClick={open}
             disabled={enviando}
-            className="border-line bg-panel text-foreground hover:bg-hover min-h-9 rounded-lg border px-3.5 py-2 text-[12.5px] disabled:opacity-50 pointer-coarse:min-h-11"
+            className="border-line bg-panel text-foreground hover:bg-hover min-h-9 rounded-lg border px-3.5 py-2 text-[12.5px] transition-colors disabled:opacity-50 pointer-coarse:min-h-11"
           >
-            {enviando ? "Enviando…" : label}
+            {enviando ? "Enviando…" : url ? "Trocar imagem" : label}
           </button>
           <input
             ref={inputRef}

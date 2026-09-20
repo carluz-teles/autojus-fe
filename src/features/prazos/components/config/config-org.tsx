@@ -6,6 +6,7 @@ import { IconAction } from "@/components/ui/icon-action";
 
 import { useConfigOrg } from "../../hooks/use-config-org";
 import { ConfigAvatarUpload } from "./config-avatar-upload";
+import { SettingsSection } from "./config-kit";
 import { OrgEditModal } from "./org-edit-modal";
 
 // Aba Organização — dados fiscais do BE (useOrgProfile) + logo do Clerk
@@ -15,22 +16,20 @@ export function ConfigOrg() {
   const o = useConfigOrg();
 
   return (
-    <>
-      <div className="mb-1 flex items-start justify-between gap-4">
-        <div className="font-display text-[20px] font-medium">Organização</div>
-        {o.isAdmin && !o.profileLoadFailed ? (
+    <SettingsSection
+      title="Organização"
+      subtitle="Dados do escritório e identidade visual."
+      action={
+        o.isAdmin && !o.profileLoadFailed ? (
           <IconAction
             label="Editar dados do escritório"
             icon={Pencil}
             onClick={o.abrirEditar}
             className="pointer-coarse:size-11"
           />
-        ) : null}
-      </div>
-      <p className="text-fg3 mt-0 mb-[18px] text-[12.5px]">
-        Dados do escritório e identidade visual.
-      </p>
-
+        ) : undefined
+      }
+    >
       <ConfigAvatarUpload
         url={o.logoUrl}
         iniciais={o.iniciais}
@@ -75,6 +74,6 @@ export function ConfigOrg() {
       )}
 
       {o.editarAberto ? <OrgEditModal onFechar={o.fecharEditar} /> : null}
-    </>
+    </SettingsSection>
   );
 }

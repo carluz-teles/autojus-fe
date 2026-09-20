@@ -6,6 +6,7 @@ import { IconAction } from "@/components/ui/icon-action";
 
 import { useConfigPerfil } from "../../hooks/use-config-perfil";
 import { ConfigAvatarUpload } from "./config-avatar-upload";
+import { SettingsSection } from "./config-kit";
 import { ConfigPerfilSessoes } from "./config-perfil-sessoes";
 import { PerfilEditModal } from "./perfil-edit-modal";
 
@@ -16,20 +17,18 @@ export function ConfigPerfil() {
   const p = useConfigPerfil();
 
   return (
-    <>
-      <div className="mb-1 flex items-start justify-between gap-4">
-        <div className="font-display text-[20px] font-medium">Perfil</div>
+    <SettingsSection
+      title="Perfil"
+      subtitle="Seus dados pessoais e credenciais."
+      action={
         <IconAction
           label="Editar dados"
           icon={Pencil}
           onClick={p.abrirEditar}
           className="pointer-coarse:size-11"
         />
-      </div>
-      <p className="text-fg3 mt-0 mb-[18px] text-[12.5px]">
-        Seus dados pessoais e credenciais.
-      </p>
-
+      }
+    >
       <ConfigAvatarUpload
         url={p.avatarUrl}
         iniciais={p.iniciais}
@@ -57,6 +56,6 @@ export function ConfigPerfil() {
       <ConfigPerfilSessoes />
 
       {p.editarAberto ? <PerfilEditModal onFechar={p.fecharEditar} /> : null}
-    </>
+    </SettingsSection>
   );
 }
