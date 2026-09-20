@@ -161,7 +161,7 @@ export function useFontes(initialTab: FontesTab = "tribunais") {
   const fontesTabs = useMemo<FontesTabItem[]>(() => {
     const items: { key: FontesTab; label: string }[] = [
       { key: "tribunais", label: "Tribunais" },
-      { key: "termos", label: "Termos" },
+      { key: "termos", label: "OABs" },
       { key: "ingest", label: "Ingestões" },
     ];
     return items.map((it) => {
@@ -208,9 +208,9 @@ export function useFontes(initialTab: FontesTab = "tribunais") {
     const ativos = lista.filter((w) => w.enabled).length;
     return [
       {
-        rot: "Termos ativos",
+        rot: "OABs ativas",
         val: nf(ativos),
-        sub: `de ${nf(lista.length)} cadastrados`,
+        sub: `de ${nf(lista.length)} cadastradas`,
       },
       {
         rot: "OABs monitoradas",

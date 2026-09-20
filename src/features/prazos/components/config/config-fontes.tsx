@@ -1,10 +1,9 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Plus, Radio } from "lucide-react";
 
 import { OabInput } from "@/components/ui/oab-input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CourtAccessNotice } from "@/features/onboarding/components/court-access-notice";
 import { OabTermRow } from "@/features/shared/components/oab-term-row";
 
 import {
@@ -12,27 +11,27 @@ import {
   type ResumoCard,
   useFontes,
 } from "../../hooks/use-fontes";
+import {
+  SettingsSection,
+  type StatCard,
+  StatGrid,
+  StatusPill,
+  type Tone,
+} from "./config-kit";
 import { ConfigToggle } from "./config-toggle";
 import { ConfigTribunais } from "./config-tribunais";
 
-// Cards de resumo (rótulo / valor grande / sublinha) usados em Termos e Ingestões.
-function ResumoCards({ cards }: { cards: ResumoCard[] }) {
-  return (
-    <div className="mb-[18px] grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-      {cards.map((r) => (
-        <div key={r.rot} className="surface-panel min-w-0 px-[15px] py-[13px]">
-          <div className="text-fg3 mb-[5px] text-[11px]">{r.rot}</div>
-          <div className="font-display text-[22px] leading-none font-medium tabular-nums">
-            {r.val}
-          </div>
-          <div className="text-fg3 mt-[5px] text-[10.5px]">{r.sub}</div>
-        </div>
-      ))}
-    </div>
-  );
+// Mapeia os cards de resumo do hook (rot/val/sub) pro StatCard do kit, colorindo
+// por posição — o hook segue agnóstico de UI, o tom fica na borda visual.
+function toStats(cards: ResumoCard[], tones: Tone[]): StatCard[] {
+  return cards.map((c, i) => ({
+    label: c.rot,
+    value: c.val,
+    sub: c.sub,
+    tone: tones[i] ?? "neutral",
+  }));
 }
 
-// Linhas de esqueleto durante o carregamento das listas.
 function Skeleton({ linhas }: { linhas: number }) {
   return (
     <div className="surface-panel overflow-hidden">
@@ -53,7 +52,7 @@ function Skeleton({ linhas }: { linhas: number }) {
 
 function Vazio({ texto }: { texto: string }) {
   return (
-    <div className="surface-panel text-fg3 px-4 py-8 text-center text-[12.5px]">
+    <div className="surface-panel text-fg3 px-4 py-10 text-center text-[12.5px]">
       {texto}
     </div>
   );
@@ -63,8 +62,8 @@ function Erro({ texto }: { texto: string }) {
   return <p className="text-destructive text-[12.5px]">{texto}</p>;
 }
 
-// Aba Fontes de dados — port do template 1369-1453, ligada ao BE (ingestão):
-// Tribunais (court connections) / Termos (watched-oabs) / Ingestões (captures).
+// Aba Fontes de dados, ligada ao BE (ingestão): Tribunais (court connections) /
+// OABs (watched-oabs) / Ingestões (captures). Linguagem do onboarding (kit).
 export function ConfigFontes({
   initialTab,
   onPrepareAccess,
@@ -73,17 +72,15 @@ export function ConfigFontes({
   onPrepareAccess?: () => void;
 }) {
   const fon = useFontes(initialTab);
+  const goTribunais = () =>
+    fon.fontesTabs.find((t) => t.key === "tribunais")?.onClick();
+  const prepararAcesso = onPrepareAccess ?? goTribunais;
 
   return (
-    <>
-      <div className="font-display mb-1 text-[20px] font-medium">
-        Fontes de dados
-      </div>
-      <p className="text-fg3 mt-0 mb-4 text-[12.5px]">
-        Acessos aos sistemas dos tribunais, OABs monitoradas e histórico de
-        importações.
-      </p>
-
+    <SettingsSection
+      title="Fontes de dados"
+      subtitle="Acessos aos tribunais, OABs monitoradas e o histórico de cada importação."
+    >
       <Tabs
         defaultValue={initialTab ?? "tribunais"}
         value={fon.fontesTab}
@@ -100,63 +97,73 @@ export function ConfigFontes({
             ))}
           </TabsList>
         </div>
+
         <TabsContent value="tribunais">
           <ConfigTribunais />
         </TabsContent>
 
+        {/* ---- OABs monitoradas ---- */}
         <TabsContent value="termos">
-          <div className="mb-4">
-            <CourtAccessNotice onPrepare={onPrepareAccess} />
-          </div>
-          <div className="mb-[18px] flex items-start justify-between gap-4">
-            <p className="text-fg3 m-0 max-w-[440px] text-[12.5px]">
-              OABs que o sistema vigia no DJEN. Toda intimação chega porque
-              casou com um destes termos.
-            </p>
-            <button
-              onClick={fon.toggleAddTermo}
-              className="bg-primary text-primary-foreground flex min-h-9 flex-none items-center gap-1.5 rounded-lg border-none px-3.5 py-2 text-[12.5px] font-medium pointer-coarse:min-h-11"
-            >
-              <Plus className="size-3.5" strokeWidth={2} />
-              Adicionar termo
-            </button>
-          </div>
-
-          {fon.addAberto ? (
-            <div className="surface-inset mb-[18px] flex flex-wrap items-center gap-2 p-3">
-              <OabInput
-                autoFocus
-                value={fon.addValor}
-                onChange={fon.setAddValor}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") fon.addTermoSubmit();
-                }}
-                className="border-line bg-bg text-foreground min-w-0 flex-1 rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
-              />
-              <button
-                onClick={fon.addTermoSubmit}
-                disabled={fon.addTermoAdicionando}
-                className="bg-primary text-primary-foreground flex min-h-9 flex-none items-center rounded-[9px] px-4 py-2.5 text-[12.5px] font-medium disabled:opacity-50 pointer-coarse:min-h-11"
-              >
-                {fon.addTermoAdicionando ? "Adicionando…" : "Adicionar"}
-              </button>
-            </div>
-          ) : null}
-
           {fon.termosError ? (
-            <Erro texto="Não foi possível carregar os termos." />
+            <Erro texto="Não foi possível carregar as OABs." />
           ) : fon.termosPending ? (
             <Skeleton linhas={3} />
           ) : (
             <>
-              <ResumoCards cards={fon.termosResumo} />
+              <StatGrid
+                cards={toStats(fon.termosResumo, [
+                  "success",
+                  "info",
+                  "neutral",
+                ])}
+              />
+
+              <div className="mb-3 flex items-start justify-between gap-4">
+                <p className="text-fg3 m-0 max-w-[440px] text-[12.5px] leading-[1.5]">
+                  OABs que o Atjus vigia no DJEN. Toda intimação chega porque
+                  casou com uma destas.
+                </p>
+                <button
+                  onClick={fon.toggleAddTermo}
+                  className="text-primary-foreground flex min-h-9 flex-none items-center gap-1.5 rounded-lg px-3.5 py-2 text-[12.5px] font-medium shadow-sm transition-transform duration-200 hover:-translate-y-px pointer-coarse:min-h-11"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(135deg, var(--primary), var(--gold))",
+                  }}
+                >
+                  <Plus className="size-3.5" strokeWidth={2.2} />
+                  Adicionar OAB
+                </button>
+              </div>
+
+              {fon.addAberto ? (
+                <div className="surface-inset reveal mb-3 flex flex-wrap items-center gap-2 p-3">
+                  <OabInput
+                    autoFocus
+                    value={fon.addValor}
+                    onChange={fon.setAddValor}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") fon.addTermoSubmit();
+                    }}
+                    className="border-line bg-bg text-foreground focus:border-primary min-w-0 flex-1 rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+                  />
+                  <button
+                    onClick={fon.addTermoSubmit}
+                    disabled={fon.addTermoAdicionando}
+                    className="bg-primary text-primary-foreground flex min-h-9 flex-none items-center rounded-[9px] px-4 py-2.5 text-[12.5px] font-medium disabled:opacity-50 pointer-coarse:min-h-11"
+                  >
+                    {fon.addTermoAdicionando ? "Adicionando…" : "Adicionar"}
+                  </button>
+                </div>
+              ) : null}
+
               {fon.termos.length === 0 ? (
-                <Vazio texto="Nenhuma OAB monitorada. Adicione um termo para começar a capturar." />
+                <Vazio texto="Nenhuma OAB monitorada. Adicione uma para começar a capturar." />
               ) : (
                 <div className="surface-panel overflow-hidden">
                   <div className="border-line2 bg-hover flex items-center gap-3 border-b px-4 py-2">
                     <span className="text-fg3 flex-1 text-[10.5px] font-medium tracking-[0.04em] uppercase">
-                      Termo
+                      OAB
                     </span>
                     <span className="text-fg3 w-24 flex-none text-right text-[10.5px] font-medium tracking-[0.04em] uppercase">
                       Captura
@@ -183,82 +190,92 @@ export function ConfigFontes({
                   ))}
                 </div>
               )}
-              <p className="text-fg3 mx-0.5 mt-3.5 text-[11.5px]">
-                Termos pausados param de capturar novas intimações, mas o
-                histórico já recebido é mantido.
+              <p className="text-fg3 mx-0.5 mt-3.5 text-[11.5px] leading-[1.5]">
+                OABs pausadas param de capturar novas intimações, mas o
+                histórico já recebido é mantido.{" "}
+                <button
+                  onClick={prepararAcesso}
+                  className="text-primary hover:underline"
+                >
+                  Configurar acesso aos autos
+                </button>
               </p>
             </>
           )}
         </TabsContent>
+
+        {/* ---- Ingestões / varreduras ---- */}
         <TabsContent value="ingest">
-          <div className="mb-4">
-            <CourtAccessNotice onPrepare={onPrepareAccess} />
-          </div>
-          <p className="text-fg3 mt-0 mb-4 max-w-[440px] text-[12.5px]">
-            Cada varredura do DJEN — o que foi lido, o que casou com seus termos
-            e o que virou intimação.
-          </p>
           {fon.ingestError ? (
             <Erro texto="Não foi possível carregar as varreduras." />
           ) : fon.ingestPending ? (
             <Skeleton linhas={3} />
           ) : (
             <>
-              <ResumoCards cards={fon.ingestResumo} />
+              <StatGrid
+                cards={toStats(fon.ingestResumo, ["info", "success", "info"])}
+              />
+              <p className="text-fg3 mt-0 mb-3 max-w-[460px] text-[12.5px] leading-[1.5]">
+                Cada varredura do DJEN — o que foi lido, o que casou com suas
+                OABs e o que virou intimação.
+              </p>
               {fon.ingestoes.length === 0 ? (
-                <Vazio texto="Nenhuma varredura registrada ainda." />
+                <Vazio texto="Nenhuma varredura registrada ainda. Assim que uma OAB estiver ativa, a primeira captura roda em segundo plano." />
               ) : (
-                <div className="surface-panel overflow-hidden">
-                  <div className="border-line2 bg-hover flex items-center gap-3 border-b px-4 py-2">
-                    <span className="text-fg3 flex-1 text-[10.5px] font-medium tracking-[0.04em] uppercase">
-                      Varredura
-                    </span>
-                    <span className="text-fg3 w-[78px] flex-none text-right text-[10.5px] font-medium tracking-[0.04em] uppercase">
-                      Varridas
-                    </span>
-                    <span className="text-fg3 w-[66px] flex-none text-right text-[10.5px] font-medium tracking-[0.04em] uppercase">
-                      Novas
-                    </span>
-                    <span className="text-fg3 w-[120px] flex-none text-right text-[10.5px] font-medium tracking-[0.04em] uppercase">
-                      Status
-                    </span>
-                  </div>
-                  {fon.ingestoes.map((g) => (
-                    <button
-                      key={`${g.data}-${g.hora}`}
-                      onClick={g.onClick}
-                      className="border-line2 hover:bg-hover flex w-full items-center gap-3 border-b px-4 py-3 text-left last:border-b-0"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[13px] font-medium">
-                          {g.data} · {g.hora}
-                        </span>
-                        <span className="text-fg3 mt-px block text-[11.5px]">
-                          {g.gatilho} · {g.dur}
-                        </span>
-                      </span>
-                      <span className="text-fg2 w-[78px] flex-none text-right font-mono text-[12.5px]">
-                        {g.varridas}
-                      </span>
-                      <span className="w-[66px] flex-none text-right font-mono text-[12.5px]">
-                        {g.novas}
-                      </span>
-                      <span className="flex w-[120px] flex-none justify-end">
+                <div className="surface-panel divide-line2 reveal-stagger divide-y overflow-hidden">
+                  {fon.ingestoes.map((g) => {
+                    const live = g.st === "Em andamento";
+                    return (
+                      <button
+                        key={`${g.data}-${g.hora}`}
+                        onClick={g.onClick}
+                        className="hover:bg-hover flex w-full items-center gap-3 px-4 py-3 text-left transition-colors"
+                      >
                         <span
-                          className="rounded-full px-2.5 py-[3px] text-[10.5px] font-medium"
-                          style={{ background: g.stBg, color: g.stCor }}
+                          className="grid size-9 flex-none place-items-center rounded-xl"
+                          style={{
+                            background: `color-mix(in oklch, ${live ? "var(--blue)" : "var(--primary)"} 12%, transparent)`,
+                            color: live ? "var(--blue)" : "var(--primary)",
+                          }}
                         >
-                          {g.st}
+                          <Radio
+                            className={`size-4 ${live ? "animate-pulse" : ""}`}
+                            strokeWidth={1.9}
+                          />
                         </span>
-                      </span>
-                    </button>
-                  ))}
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[13px] font-medium">
+                            {g.data} · {g.hora}
+                          </span>
+                          <span className="text-fg3 mt-px block text-[11.5px]">
+                            {g.gatilho} · {g.dur} · {g.varridas} varridas ·{" "}
+                            <span className="text-foreground font-medium">
+                              {g.novas} novas
+                            </span>
+                          </span>
+                        </span>
+                        <StatusPill
+                          label={g.st}
+                          pulse={live}
+                          tone={
+                            g.st === "Concluída"
+                              ? "success"
+                              : g.st === "Falha parcial"
+                                ? "danger"
+                                : live
+                                  ? "info"
+                                  : "warning"
+                          }
+                        />
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </>
           )}
         </TabsContent>
       </Tabs>
-    </>
+    </SettingsSection>
   );
 }
