@@ -14,6 +14,9 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/convite(.*)",
+  // Playground de protótipos: só existe fora de produção (o layout de /dev
+  // devolve 404 em prod); liberado do gate pra iterar design sem sessão.
+  "/dev(.*)",
 ]);
 
 const platformMiddleware = clerkMiddleware(async (auth, req) => {
