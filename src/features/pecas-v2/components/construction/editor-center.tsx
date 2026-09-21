@@ -35,8 +35,8 @@ export function EditorCenter({
   );
 }
 
-/** Editing surface do editor rico (usada por EditorCenter). */
-function EditorCanvas({
+/** Shared editing surface: real bench and local visual prototype. */
+export function EditorCanvas({
   html,
   editorRef,
   onChange,
