@@ -4,10 +4,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 
 // Aba ativa da tela de configurações.
-type ConfigTab =
+export type ConfigTab =
   | "perfil"
   | "org"
-  | "papeis"
   | "plano"
   | "equipe"
   | "fontes"
@@ -36,7 +35,6 @@ export interface ToggleVM {
 const TABS: { key: ConfigTab; label: string }[] = [
   { key: "perfil", label: "Perfil" },
   { key: "org", label: "Organização" },
-  { key: "papeis", label: "Papéis timbrados" },
   { key: "plano", label: "Plano & cobrança" },
   { key: "equipe", label: "Equipe" },
   { key: "fontes", label: "Fontes de dados" },
