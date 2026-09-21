@@ -10,15 +10,31 @@ import { useActionItemDetalhe } from "@/features/action-items/hooks/use-action-i
 import { iniciarActionItem } from "@/features/action-items/services/action-items.service";
 import { useApi } from "@/lib/api/use-api";
 
+import {
+  clearInstructions,
+  peekInstructions,
+  setInstructions,
+} from "../../lib/instructions-storage";
 import { createDraft } from "../../services/pecas-v2.service";
 
-// Both origins resume the same draft; empty drafts open its preparation canvas.
+// NAVEGAR-PRIMEIRO: a ConstructionEntry só CRIA o rascunho e navega direto pra
+// /pecas/:id?auto=1 — a sequência de auto-partida (teses → conferência → generate)
+// roda LÁ, dirigindo o loader de 4 fases desde o início. Antes, o ciclo inteiro
+// rodava aqui ("Construindo a peça…") e só depois navegava, criando DUAS telas de
+// loading. Agora esta tela é uma transição curtíssima (só o createDraft).
+//
+// O prompt opcional (GerarPecaModal, gravado por actionItemId) é re-chaveado por
+// draftId antes de navegar — a tela da peça (use-construction) lê por draftId,
+// sem carregar o actionItemId na URL. BLOCKER-3: a limpeza do prompt só ocorre
+// após o generate 202 (na tela da peça), então sobrevive a retry.
 export function ConstructionEntry({
   actionItemId = "",
   intimationId = "",
+  auto = false,
 }: {
   actionItemId?: string;
   intimationId?: string;
+  auto?: boolean;
 }) {
   const api = useApi();
   const router = useRouter();
@@ -26,40 +42,57 @@ export function ConstructionEntry({
   const qc = useQueryClient();
   const work = useActionItemDetalhe(actionItemId);
   const started = useRef(false);
-  const origin = actionItemId
-    ? `/providencias/${actionItemId}`
-    : `/intimacoes/${intimationId}`;
+  // A intimação é o lar do trabalho: o "voltar" da construção aponta pra ela
+  // (não mais pra uma tela de providência). retorno explícito tem prioridade.
+  const origin = intimationId ? `/intimacoes/${intimationId}` : "/triagem";
   const back = params.get("retorno") || origin;
   const create = useMutation({
     mutationFn: async () => {
+      let draftId: string;
       if (!actionItemId) {
         if (!intimationId) throw new Error("Selecione a intimação de origem.");
-        return (await createDraft(api, { intimationId })).id;
+        draftId = (await createDraft(api, { intimationId })).id;
+      } else {
+        const item = work.data;
+        if (!item) throw new Error("Não foi possível iniciar a peça.");
+        if (!item.intimation_id)
+          throw new Error(
+            "A construção de uma peça deve começar por uma intimação. Abra a intimação de origem para continuar.",
+          );
+        if (item.draft_id) {
+          draftId = item.draft_id;
+        } else {
+          if (!item.gera_peca || item.tipo_status !== "confiavel")
+            throw new Error("Revise o tipo antes de gerar a peça.");
+          if (["DONE", "CANCELLED", "DISMISSED"].includes(item.status))
+            throw new Error("Este item já foi encerrado.");
+          // Atalho "Gerar peça": clicar aqui É concordar com a providência. Se ela
+          // ainda está SUGGESTED, iniciamos (SUGGESTED → TODO) antes de abrir a
+          // construção — sem um passo de curadoria separado. TODO/WORKING seguem direto.
+          if (item.status === "SUGGESTED") {
+            await iniciarActionItem(api, actionItemId);
+          }
+          draftId = (
+            await createDraft(api, {
+              actionItemId,
+              intimationId: item.intimation_id,
+              title: item.title,
+              instructions: `${item.title}\n\n${item.description || "Identificar dados pendentes para revisão do advogado."}`,
+            })
+          ).id;
+        }
       }
-      const item = work.data;
-      if (!item) throw new Error("Providência não encontrada.");
-      if (!item.intimation_id)
-        throw new Error(
-          "A construção de uma peça deve começar por uma intimação. Abra a intimação de origem para continuar.",
-        );
-      if (item.draft_id) return item.draft_id;
-      if (!item.gera_peca || item.tipo_status !== "confiavel")
-        throw new Error("Revise o tipo da providência antes de gerar a peça.");
-      if (["DONE", "CANCELLED", "DISMISSED"].includes(item.status))
-        throw new Error("Esta providência já foi encerrada.");
-      // Atalho "Criar peça": clicar aqui É concordar com a providência. Se ela ainda
-      // está SUGGESTED, iniciamos (SUGGESTED → TODO) antes de abrir a construção —
-      // sem exigir um passo de curadoria separado. TODO/WORKING já seguem direto.
-      if (item.status === "SUGGESTED") {
-        await iniciarActionItem(api, actionItemId);
+      // Re-chaveia o prompt opcional (modal) de actionItemId → draftId, pra a tela
+      // da peça lê-lo sem depender da URL. Só quando há prompt e é fluxo auto.
+      if (auto) {
+        const storageKey = actionItemId || intimationId;
+        const instr = peekInstructions(storageKey);
+        if (instr) {
+          setInstructions(draftId, instr);
+          clearInstructions(storageKey);
+        }
       }
-      const result = await createDraft(api, {
-        actionItemId,
-        intimationId: item.intimation_id,
-        title: item.title,
-        instructions: `${item.title}\n\n${item.description || "Identificar dados pendentes para revisão do advogado."}`,
-      });
-      return result.id;
+      return draftId;
     },
     onSuccess: async (draftId) => {
       await Promise.all([
@@ -68,7 +101,12 @@ export function ConstructionEntry({
         // para o card refletir o novo status ao voltar.
         qc.invalidateQueries({ queryKey: ["intimacoes"] }),
       ]);
-      router.replace(`/pecas/${draftId}?retorno=${encodeURIComponent(back)}`);
+      // auto=1 sinaliza pra tela da peça disparar a auto-partida (teses →
+      // conferência → generate) e mostrar o loader de 4 fases direto.
+      const q = auto ? "auto=1&" : "";
+      router.replace(
+        `/pecas/${draftId}?${q}retorno=${encodeURIComponent(back)}`,
+      );
     },
   });
   const { mutate } = create;
@@ -80,19 +118,13 @@ export function ConstructionEntry({
   }, [work.data, actionItemId, intimationId, mutate]);
   return (
     <PageFrame
-      header={
-        <ShellBackLink
-          href={origin}
-          label={actionItemId ? "Voltar à providência" : "Voltar à intimação"}
-        />
-      }
+      header={<ShellBackLink href={origin} label="Voltar à intimação" />}
     >
       <div className="flex flex-col items-start gap-4 p-6">
         {work.isError || create.isError ? (
           <>
             <p role="alert">
-              {create.error?.message ||
-                "Não foi possível carregar a providência."}
+              {create.error?.message || "Não foi possível carregar o trabalho."}
             </p>
             <Button
               onClick={() => (work.isError ? work.refetch() : create.mutate())}

@@ -12,9 +12,9 @@ import type { PageEnvelope } from "@/lib/api/types";
 // Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
 export type { PageEnvelope } from "@/lib/api/types";
 
-export type IntimacaoDegree = "UNKNOWN" | "G1" | "G2" | "JE" | "SUPERIOR";
+type IntimacaoDegree = "UNKNOWN" | "G1" | "G2" | "JE" | "SUPERIOR";
 export type IntimacaoType = "INTIMACAO" | "CITACAO" | "COMUNICACAO";
-export type IntimacaoStatus = "ACTIVE" | "CANCELLED";
+type IntimacaoStatus = "ACTIVE" | "CANCELLED";
 /** Situação de triagem do usuário sobre a intimação (inbox). */
 export type IntimacaoUserStatus = "PENDING" | "RESOLVED" | "IGNORED";
 
@@ -152,7 +152,7 @@ export interface IntimacaoRecipient {
  * Derivado no BE a partir de campos já fetchados — sem tabela de auditoria nova.
  * Espelha o IntimacaoHistoryEntry do BE.
  */
-export interface IntimacaoHistoryEntry {
+interface IntimacaoHistoryEntry {
   /** ISO timestamp do evento (timestamptz ou date→UTC do BE). */
   occurred_at: string;
   /** Rótulo humano, ex: "Capturada do DJEN", "Prazo confirmado por Luan". */
@@ -172,12 +172,12 @@ export type ProvidenciaTipo =
 
 /** Proveniência da classificação: declarada no teor, inferida pela IA, ou
  *  corrigida manualmente (reclassificar muda pra "manual"). */
-export type ProvidenciaTipoOrigem = "declarado" | "ia" | "manual";
+type ProvidenciaTipoOrigem = "declarado" | "ia" | "manual";
 
 /** Gate de TIPO: "confiavel" já pode ser iniciada direto; "a_confirmar" espera
  *  o usuário confirmar o tipo antes (POST /confirmar). É ortogonal ao `status`
  *  de trabalho. */
-export type ProvidenciaTipoStatus = "confiavel" | "a_confirmar";
+type ProvidenciaTipoStatus = "confiavel" | "a_confirmar";
 
 /**
  * Uma providência PERSISTIDA (action_item) — GET /v1/intimacoes/:id devolve este
@@ -217,7 +217,7 @@ export interface IntimacaoProvidencia {
  * AnaliseProvidenciaView do BE. `declarado` é o `tipo_origem === "declarado"`
  * já resolvido em bool pra facilitar a UI de prévia (se algum dia precisar).
  */
-export interface IntimacaoAnaliseCandidate {
+interface IntimacaoAnaliseCandidate {
   title: string;
   description: string;
   /** Id INTERNO do responsável sugerido pela IA (app_user); null quando não sugerido. */
@@ -258,7 +258,7 @@ export interface IntimacaoAnalise {
  * fonte ÚNICA que o stepper do detalhe consome. Projeção derivada no BE (prazo +
  * peça); espelha os WorkStage* de internal/acquisition/read.go.
  */
-export type IntimacaoWorkStage =
+type IntimacaoWorkStage =
   | "RECEIVED"
   | "AWAITING_CONFIRMATION"
   | "CONFIRMED"
@@ -299,23 +299,6 @@ export interface IntimacaoDetalheView extends IntimacaoView {
    * preenchido = pós-análise (o card mostra as providências).
    */
   ai_analyzed_at: string | null;
-}
-
-/**
- * Contadores agregados de intimações — GET /v1/intimacoes/summary. Objeto único
- * (sem envelope de cursor). Espelha o IntimacoesSummary do BE.
- */
-export interface IntimacoesSummary {
-  total: number;
-  pendentes: number;
-  resolvidas: number;
-  ignoradas: number;
-  /** Prazo vencido (days_left < 0). */
-  em_atraso: number;
-  /** Prazo vence hoje (days_left = 0). */
-  vencem_hoje: number;
-  /** Prazo derivado mas ainda não confirmado. */
-  nao_confirmado: number;
 }
 
 /**

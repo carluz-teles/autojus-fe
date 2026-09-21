@@ -14,11 +14,11 @@ export function ProvidenceContext({ id }: { id: string }) {
   const members = directory.members;
   return (
     <section
-      aria-label="Providência de origem"
+      aria-label="Origem do trabalho"
       className="mx-4 mb-4 flex flex-col gap-3 rounded-lg border p-4"
     >
       <p className="text-muted-foreground text-xs">
-        Providência de origem · {STATUS_LABEL[p.status]}
+        Origem · {STATUS_LABEL[p.status]}
       </p>
       <h3 className="font-display text-lg">{p.title}</h3>
       {p.description && (
@@ -40,7 +40,7 @@ export function ProvidenceContext({ id }: { id: string }) {
         }
       />
       <p className="text-muted-foreground text-xs">
-        Prazo da providência:{" "}
+        Prazo:{" "}
         {p.due_date
           ? new Date(p.due_date).toLocaleDateString("pt-BR", {
               timeZone: "UTC",

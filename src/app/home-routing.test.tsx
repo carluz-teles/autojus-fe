@@ -86,11 +86,11 @@ describe("public home and authenticated entry", () => {
     expect(redirect).not.toHaveBeenCalled();
   });
 
-  it("defaults sign-in and sign-up to the protected home without forcing explicit return URLs", () => {
+  it("sends sign-in to the protected home and sign-up straight to onboarding (no home flash for new users)", () => {
     renderToStaticMarkup(<PlatformProviders>App</PlatformProviders>);
     expect(clerkProvider.mock.calls[0][0]).toMatchObject({
       signInFallbackRedirectUrl: "/notificacoes",
-      signUpFallbackRedirectUrl: "/notificacoes",
+      signUpFallbackRedirectUrl: "/onboarding",
     });
     expect(clerkProvider.mock.calls[0][0]).not.toHaveProperty(
       "signInForceRedirectUrl",

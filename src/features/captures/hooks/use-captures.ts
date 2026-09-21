@@ -6,7 +6,7 @@ import { useApi } from "@/lib/api/use-api";
 
 import { getCaptures } from "../services/captures.service";
 
-export const CAPTURES_KEY = ["acquisition", "captures"] as const;
+const CAPTURES_KEY = ["acquisition", "captures"] as const;
 
 /**
  * Busca a lista de capturas. Enquanto alguma run estiver Em andamento, refaz

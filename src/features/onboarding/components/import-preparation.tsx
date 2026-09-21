@@ -78,21 +78,24 @@ export function ImportPreparation({ onContinue }: { onContinue: () => void }) {
           </span>
           <div className="min-w-0 flex-1">
             <p className="font-medium">
-              2. Acesso ao eproc e segundo fator (2FA)
+              2. Acesso ao tribunal e segundo fator (2FA)
             </p>
             <p className="text-fg3 mt-1 text-[12px]">
               {access === "connected"
                 ? `Conexão ativa: ${(connections.data ?? [])
                     .filter(
-                      (c) => c.system === "EPROC" && c.status === "CONNECTED",
+                      (c) =>
+                        ["EPROC", "ESAJ"].includes(c.system) &&
+                        c.status === "CONNECTED",
                     )
-                    .map((c) => `${c.court} · eproc`)
-                    .join(
-                      ", ",
-                    )}. Cada tribunal e sistema tem seu próprio acesso.`
+                    .map(
+                      (c) =>
+                        `${c.court} · ${c.system === "ESAJ" ? "e-SAJ" : "eproc"}`,
+                    )
+                    .join(", ")}.`
                 : access === "mfa"
                   ? "Conexão iniciada. Falta concluir o segundo fator para buscar os autos."
-                  : "Escolha o tribunal e conecte o eproc com o 2FA do seu autenticador. O e-SAJ é acessado separadamente ao preparar uma peça."}
+                  : "Escolha o tribunal e conecte com seu certificado. Um mesmo certificado atende os sistemas do tribunal; o segundo fator só é pedido quando o portal exige."}
             </p>
             <Button
               className="mt-3"

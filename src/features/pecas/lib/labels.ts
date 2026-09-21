@@ -6,7 +6,7 @@
 // Chaves legadas (PETITION/MANIFESTATION/COUNTERCLAIM/BLANK) permanecem só como
 // fallback pra rows persistidas antes do alinhamento — o novo insert usa só
 // os 5 valores acima.
-export const TIPO_PECA_LABEL: Record<string, string> = {
+const TIPO_PECA_LABEL: Record<string, string> = {
   DEFENSE: "Defesa",
   COMPLAINT: "Petição inicial",
   APPEAL: "Recurso",

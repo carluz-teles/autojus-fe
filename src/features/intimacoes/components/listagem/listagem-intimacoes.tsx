@@ -8,7 +8,6 @@ import {
   Loader2,
   PenLine,
   Sparkles,
-  X,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -24,13 +23,10 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { WORK_TYPES } from "@/features/action-items/components/new-providencia";
 import { ProvidenciaFulfillment } from "@/features/action-items/components/providencia-fulfillment";
-import {
-  useWorkMutation,
-  type WorkAction,
-} from "@/features/action-items/hooks/use-workspace";
 import { hasActionableFulfillment } from "@/features/action-items/lib/fulfillment";
+import { WORK_TYPES } from "@/features/action-items/lib/piece-labels";
+import { useResolverIntimacao } from "@/features/intimacoes/hooks/use-intimacoes";
 import { Responsavel } from "@/features/organization/components/responsavel";
 import { cn } from "@/lib/utils";
 
@@ -350,35 +346,15 @@ function TriageActions({
   r: Linha;
   m: Lista;
 }) {
-  const mutation = useWorkMutation();
-  const busy = mutation.isPending;
-  const run = (action: WorkAction) => {
-    if (!busy) mutation.mutate({ id: rec.id, action });
-  };
-  const pieceHref = `/pecas/nova?providencia=${rec.id}&intimacao=${r.id}&retorno=${encodeURIComponent(m.href(r.id))}`;
-  const cumprimento = hasActionableFulfillment(rec.fulfillment);
-  const ciencia = rec.tipo === "ciencia" || !rec.gera_peca;
+  const resolver = useResolverIntimacao();
+  const busy = resolver.isPending;
+  // auto=1 → navigate-first: cai direto no loader de geração (fluxo novo), sem a
+  // tela antiga de seleção de teses. Mesmo contrato do "Gerar peça" do detalhe.
+  // (providencia=<action_item_id> é só encanamento do fluxo de peça.)
+  const pieceHref = `/pecas/nova?providencia=${rec.id}&intimacao=${r.id}&auto=1&retorno=${encodeURIComponent(m.href(r.id))}`;
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {cumprimento ? (
-        <Button
-          size="sm"
-          disabled={busy}
-          onClick={() => run("accept_completed")}
-        >
-          <Check data-icon="inline-start" />
-          Criar já concluída
-        </Button>
-      ) : ciencia ? (
-        <Button
-          size="sm"
-          disabled={busy}
-          onClick={() => run("accept_completed")}
-        >
-          <Check data-icon="inline-start" />
-          Concluir
-        </Button>
-      ) : (
+      {rec.gera_peca ? (
         <Button
           size="sm"
           nativeButton={false}
@@ -387,29 +363,25 @@ function TriageActions({
           <PenLine data-icon="inline-start" />
           Gerar peça
         </Button>
-      )}
-      {!ciencia && !cumprimento ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={busy}
-          onClick={() => run("accept_completed")}
-        >
-          Concluir
-        </Button>
       ) : null}
       <Button
-        variant="ghost"
+        variant={rec.gera_peca ? "outline" : "default"}
         size="sm"
         disabled={busy}
-        onClick={() => run("dismiss")}
+        onClick={() => {
+          if (!busy) resolver.mutate(r.id);
+        }}
       >
-        <X data-icon="inline-start" />
-        Dispensar
+        {busy ? (
+          <Loader2 data-icon="inline-start" className="animate-spin" />
+        ) : (
+          <Check data-icon="inline-start" />
+        )}
+        Dar ciência
       </Button>
-      {mutation.isError ? (
+      {resolver.isError ? (
         <span role="alert" className="text-destructive text-xs">
-          Não foi possível concluir. Tente novamente.
+          Não foi possível dar ciência. Tente novamente.
         </span>
       ) : null}
     </div>
@@ -491,7 +463,7 @@ function LinhaIntimacao({
           <>
             <p className="section-label flex items-center gap-1.5">
               <Sparkles className="size-3" aria-hidden />
-              Ação recomendada
+              Trabalho necessário
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-display text-base font-medium">

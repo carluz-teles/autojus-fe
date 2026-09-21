@@ -8,7 +8,7 @@ import { apiErrorFromResponse, networkError } from "./errors";
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 /** Obtém o JWT do Clerk. No cliente: useAuth().getToken; no server: auth().getToken. */
-export type TokenGetter = () => Promise<string | null | undefined>;
+type TokenGetter = () => Promise<string | null | undefined>;
 
 export interface ApiRequest {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";

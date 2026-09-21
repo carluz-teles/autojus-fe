@@ -10,7 +10,6 @@ import type {
   PrazoDetalheView,
   PrazoPreviewInput,
   PrazoPreviewResult,
-  PrazosSummary,
   PrazoStatus,
   PrazoView,
 } from "../types";
@@ -71,26 +70,6 @@ export async function getPrazo(
  * F2 — o prazo (0 ou 1) derivado de uma intimação. O BE devolve um PageEnvelope
  * filtrado por intimation_id; pegamos o primeiro (ou null quando ainda não derivou).
  */
-export async function getPrazoPorIntimacao(
-  fetcher: ApiFetcher,
-  intimationId: string,
-): Promise<PrazoAgendaView | null> {
-  const page = await fetcher<PageEnvelope<PrazoAgendaView>>(ENDPOINT, {
-    query: { intimation_id: intimationId, limit: 1 },
-  });
-  return page.data[0] ?? null;
-}
-
-/**
- * Contadores da agenda — GET /v1/prazos/summary → objeto único (sem envelope de
- * cursor). Alimenta a KpiRow do topo da tela.
- */
-export async function getPrazosSummary(
-  fetcher: ApiFetcher,
-): Promise<PrazosSummary> {
-  return fetcher<PrazosSummary>(`${ENDPOINT}/summary`);
-}
-
 /** Registra a confirmação humana do tipo e prazo. */
 export async function confirmarPrazo(
   fetcher: ApiFetcher,
@@ -126,19 +105,6 @@ export async function noDeadlinePrazo(
   prazoId: string,
 ): Promise<void> {
   return fetcher<void>(`${ENDPOINT}/${prazoId}/no-deadline`, {
-    method: "POST",
-  });
-}
-
-/**
- * Reabre o prazo declarado como mera ciência — POST /v1/prazos/:id/reopen (sem corpo).
- * Transição: NO_DEADLINE → PENDING.
- */
-export async function reopenPrazo(
-  fetcher: ApiFetcher,
-  prazoId: string,
-): Promise<void> {
-  return fetcher<void>(`${ENDPOINT}/${prazoId}/reopen`, {
     method: "POST",
   });
 }

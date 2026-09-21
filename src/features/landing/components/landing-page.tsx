@@ -57,9 +57,10 @@ export function LandingPage() {
               </span>
             </h1>
             <p>
-              Processos, publicações e autos em um só lugar. O AtJud gera
-              providências automaticamente, prepara minutas com fundamento e
-              responde às suas perguntas com <strong>contexto e fontes.</strong>
+              Processos, publicações e autos em um só lugar. O AtJud identifica
+              os próximos passos automaticamente, prepara minutas com fundamento
+              e responde às suas perguntas com{" "}
+              <strong>contexto e fontes.</strong>
             </p>
             <div className="lp-hero-actions">
               <Link
@@ -129,8 +130,8 @@ export function LandingPage() {
             <div className="lp-section-heading">
               <div>
                 <span className="lp-eyebrow">
-                  <span className="lp-section-index">02 /</span> PROVIDÊNCIAS
-                  AUTOMÁTICAS
+                  <span className="lp-section-index">02 /</span> PRÓXIMOS PASSOS
+                  AUTOMÁTICOS
                 </span>
                 <h2 id="lp-platform-title">
                   É ciência? Exige atuação?
@@ -139,17 +140,17 @@ export function LandingPage() {
                 </h2>
               </div>
               <p>
-                Receba as providências sem começar pela leitura manual de todos
-                os autos. O AtJud analisa a intimação e o contexto disponível,
-                identifica o que exige trabalho e reconhece respostas já
-                apresentadas no histórico.
+                Receba os próximos passos sem começar pela leitura manual de
+                todos os autos. O AtJud analisa a intimação e o contexto
+                disponível, identifica o que exige trabalho e reconhece
+                respostas já apresentadas no histórico.
               </p>
             </div>
             <ProductDemo />
             <div className="lp-value-row">
               <span>
                 <Radar size={18} aria-hidden="true" />
-                Providências geradas automaticamente
+                Próximos passos gerados automaticamente
               </span>
               <span>
                 <Route size={18} aria-hidden="true" />
@@ -410,7 +411,7 @@ export function LandingPage() {
               <Layers3 size={25} strokeWidth={1.4} aria-hidden="true" />
               <h3>O trabalho tem continuidade.</h3>
               <p>
-                Distribua providências, defina responsáveis e acompanhe o
+                Distribua o trabalho, defina responsáveis e acompanhe o
                 andamento. A equipe compartilha o contexto para fazer a próxima
                 entrega.
               </p>
@@ -495,7 +496,7 @@ export function LandingPage() {
               <em>A advocacia continua sua.</em>
             </h2>
             <p>
-              Centralize o acervo. Receba as providências. Construa a peça.
+              Centralize o acervo. Receba os próximos passos. Construa a peça.
               <br />
               Seu próximo passo já tem contexto.
             </p>

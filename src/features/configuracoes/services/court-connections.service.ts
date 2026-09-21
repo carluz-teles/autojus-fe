@@ -101,6 +101,24 @@ export async function submitMfaSeed(
   return { kind: "connected", connection: raw as CourtConnectionView };
 }
 
+/**
+ * Envia o código do segundo fator por e-mail (EMAIL_CODE, ex.: e-SAJ). Diferente
+ * do mfa-seed (que não persiste segredo), o código é efêmero: o portal envia um
+ * novo a cada login. O BE devolve a conexão atualizada em caso de sucesso; um
+ * código inválido/expirado é um ApiError (kind INVALID), não um 200 com estado —
+ * o chamador mostra a mensagem e mantém o passo de código aberto.
+ */
+export async function submitMfaCode(
+  fetcher: ApiFetcher,
+  id: string,
+  code: string,
+): Promise<CourtConnectionView> {
+  return fetcher<CourtConnectionView>(`${ENDPOINT}/${id}/mfa-code`, {
+    method: "POST",
+    body: { code },
+  });
+}
+
 export async function listCourtCatalog(fetcher: ApiFetcher) {
   return fetcher<{
     data: CourtCatalogEntry[];

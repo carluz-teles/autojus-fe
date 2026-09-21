@@ -8,11 +8,10 @@ export type PrazoStatus =
   "PENDING" | "OPEN" | "MET" | "MISSED" | "CANCELLED" | "NO_DEADLINE";
 
 /** Evento de ancoragem do prazo — de onde começa a contagem. */
-export type PrazoAnchorEvent =
-  "MADE_AVAILABLE" | "PUBLISHED" | "DEADLINE_START";
+type PrazoAnchorEvent = "MADE_AVAILABLE" | "PUBLISHED" | "DEADLINE_START";
 
 /** Regime de contagem: BUSINESS = dias úteis; CALENDAR = dias corridos. */
-export type PrazoCounting = "BUSINESS" | "CALENDAR";
+type PrazoCounting = "BUSINESS" | "CALENDAR";
 
 // Prazo base (o que a aba do processo entrega).
 export interface PrazoView {
@@ -82,9 +81,9 @@ export interface PrazoDetalheView extends PrazoAgendaView {
 }
 
 export type PrazoOrigem = "declarado" | "calculado" | "ia" | "divergente";
-export type PrazoSelo = "confiavel" | "a_apurar";
+type PrazoSelo = "confiavel" | "a_apurar";
 
-export interface PrazoCalcMemory {
+interface PrazoCalcMemory {
   prazo_base: string;
   prazo_base_fonte: string;
   termo_inicial_regra: string;
@@ -97,20 +96,20 @@ export interface PrazoCalcMemory {
   calendar_provider_version?: string;
 }
 
-export interface PrazoAppliedHoliday {
+interface PrazoAppliedHoliday {
   data: string;
   nome?: string;
   ambito?: string;
   comarca?: string;
 }
 
-export type PrazoCrossValidationResultado = "convergente" | "divergente";
+type PrazoCrossValidationResultado = "convergente" | "divergente";
 
 /** "" até ser apurado; preenchido depois de POST .../apurar-divergencia. */
 export type PrazoCrossValidationDecisao =
   "" | "aceita_declarado" | "aceita_calculado" | "ajuste_manual";
 
-export interface PrazoCrossValidation {
+interface PrazoCrossValidation {
   data_declarada: string;
   data_calculada: string;
   dif_dias: number;
@@ -122,7 +121,7 @@ export interface PrazoCrossValidation {
 
 // ── Apuração de divergência (POST /v1/prazos/:id/apurar-divergencia) ──
 
-export type PrazoApurarDivergenciaDecisao =
+type PrazoApurarDivergenciaDecisao =
   "aceita_declarado" | "aceita_calculado" | "ajuste_manual";
 
 /** `end_date` só importa (e é obrigatório) quando decisao === "ajuste_manual":
@@ -198,20 +197,6 @@ export interface PrazoConfirmResult {
     end_date: string;
     confirmed_by: string;
   };
-}
-
-/**
- * Contadores agregados da agenda de prazos — GET /v1/prazos/summary. Objeto único
- * (sem envelope de cursor). Alimenta a KpiRow do topo da tela.
- */
-export interface PrazosSummary {
-  total: number;
-  criticos: number;
-  vencendo: number;
-  abertos: number;
-  futuros: number;
-  vencidos: number;
-  cumpridos: number;
 }
 
 // Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).

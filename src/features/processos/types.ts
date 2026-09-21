@@ -2,7 +2,7 @@
 // Processo consolidado a partir da captura (DJEN) + enriquecimento (DATAJUD).
 
 export type ProcessoDegree = "UNKNOWN" | "G1" | "G2" | "JE" | "SUPERIOR";
-export type ProcessoSecrecy = "PUBLIC" | "RESTRICTED" | "SECRET";
+type ProcessoSecrecy = "PUBLIC" | "RESTRICTED" | "SECRET";
 
 /** Fase processual — o stepper do cockpit. Conjunto fechado, alinhado ao BE (court_record.phase). */
 export type ProcessoPhase =
@@ -63,10 +63,35 @@ export interface ProcessoView {
    * cliente-side via useProcessosPrazos.
    */
   next_deadline?: NextDeadlineView | null;
+  /**
+   * Próximo passo processual sugerido — motor 100% determinístico no BE (regras
+   * por fase/classe/sinais), sem IA. Só vem no detalhe (GET /v1/processos/:id),
+   * nunca na listagem. `null` = nenhuma regra disparou → o FE omite o card.
+   * Contrato: docs/contrato-proximo-passo.md (backend).
+   */
+  proximo_passo?: ProximoPasso | null;
+}
+
+/** Conjunto fechado de ações do motor de próximo passo (espelha o BE). */
+export type ProximoPassoKind =
+  | "CUMPRIR_PRAZO"
+  | "INICIAR_PROVIDENCIA"
+  | "AVALIAR_SENTENCA"
+  | "ACOMPANHAR_RECURSO"
+  | "ACOMPANHAR_EXECUCAO"
+  | "PREPARAR_AUDIENCIA";
+
+/** Sugestão de próximo passo. Quando não-null, os três campos são não-vazios. */
+export interface ProximoPasso {
+  kind: ProximoPassoKind;
+  /** Rótulo curto para o card (ex.: "Protocolar contestação — vence em 3 dias"). */
+  label: string;
+  /** Explicação em PT-BR do porquê da sugestão. */
+  rationale: string;
 }
 
 /** Projeção do prazo mais próximo — shape minimal, suficiente para a coluna. */
-export interface NextDeadlineView {
+interface NextDeadlineView {
   /** Vencimento do prazo (RFC3339). */
   end_date: string;
   /** Dias restantes (negativo = vencido). */
@@ -95,14 +120,14 @@ export interface ProcessoFilters {
 // vazia = "sem partes identificadas ainda". document (CPF/CNPJ) pode ser null.
 
 /** Um advogado de uma parte (OAB + UF). */
-export interface PartyCounsel {
+interface PartyCounsel {
   name: string;
   oab: string;
   uf: string;
 }
 
 /** Uma parte (autor/réu/terceiro) com seus advogados. document pode ser null. */
-export interface Party {
+interface Party {
   name: string;
   document: string | null;
   counsels: PartyCounsel[];
@@ -115,64 +140,5 @@ export interface PartesView {
   terceiros: Party[];
 }
 
-/**
- * Contadores agregados de processos — GET /v1/processos/summary. Objeto único
- * (sem envelope de cursor). Alimenta a KpiRow da lista.
- */
-export interface ProcessosSummary {
-  total: number;
-  em_andamento: number;
-  suspensos: number;
-  arquivados: number;
-  baixados: number;
-}
-
 // Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
 export type { PageEnvelope } from "@/lib/api/types";
-
-// GET /v1/processos/:id/resume — o resumo do processo por IA (write-once
-// sync-on-first-GET: o BE gera na primeira abertura, persiste na court_record e
-// serve do cache nas seguintes). Slices SEMPRE vêm inicializados pelo BE (nunca
-// null); em modo degradado (sem LLM configurado) summary="" e risks/ações são [].
-export interface ProcessoResumoView {
-  summary: string;
-  current_status: string;
-  key_dates_and_deadlines: ResumoKeyDate[];
-  recent_movements: ResumoMovement[];
-  risks: ResumoRisk[];
-  recommended_actions: ResumoAction[];
-  /** Momento em que o resumo foi gerado (RFC3339) — informa a idade do cache. */
-  generated_at: string;
-}
-
-/** Prazo aberto com sinalização de urgência do resumo por IA. */
-export interface ResumoKeyDate {
-  kind: string;
-  /** Vencimento (YYYY-MM-DD). */
-  end_date: string;
-  /** Dias restantes (negativo = vencido). */
-  days_remaining: number;
-  /** OVERDUE | DUE_SOON | OK — determinístico no BE, espelha o prompt. */
-  urgency: "OVERDUE" | "DUE_SOON" | "OK";
-  /** deadline_id ou intimação de referência. */
-  source: string;
-}
-
-/** Andamento significativo citado no resumo. */
-export interface ResumoMovement {
-  occurred_at: string;
-  text: string;
-  source: string;
-}
-
-/** Sinal vermelho detectado no processo. */
-export interface ResumoRisk {
-  description: string;
-  source: string;
-}
-
-/** Próximo passo sugerido. */
-export interface ResumoAction {
-  action: string;
-  source: string;
-}

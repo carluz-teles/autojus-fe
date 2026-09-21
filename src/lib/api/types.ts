@@ -1,7 +1,7 @@
 // Contrato único da camada de API compartilhado entre features.
 
 /** Opção de filtro emitida pelo BE no envelope: label legível + value a enviar. */
-export interface FilterOption {
+interface FilterOption {
   label: string;
   value: string;
 }

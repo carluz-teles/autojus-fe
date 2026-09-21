@@ -6,7 +6,7 @@ import { useApi } from "@/lib/api/use-api";
 
 import { getSubscription } from "../services/billing.service";
 
-export const SUBSCRIPTION_KEY = ["billing", "subscription"] as const;
+const SUBSCRIPTION_KEY = ["billing", "subscription"] as const;
 
 /**
  * Assinatura do tenant atual. `subscription: null` cobre tanto "ainda

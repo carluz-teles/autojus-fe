@@ -14,30 +14,19 @@ import type { ApiFetcher } from "@/lib/api/use-api";
 import {
   mapChatMessageFromApi,
   mapPecaDetailToDraft,
-  mapSectionChangeFromApi,
   mapThesisFromApi,
 } from "../lib/api-mapper";
 import type {
-  AssumeAuthorshipResultAPI,
+  AssessmentInputAPI,
+  AssessmentRequestStateAPI,
+  AssessmentStateAPI,
   ChatMessageAPI,
   ChatThreadAPI,
   DataEnvelope,
-  IterateResultAPI,
   PecaDetailAPI,
   ThesisAPI,
 } from "../lib/api-types";
-import type {
-  ChatMessage,
-  Draft,
-  IterateScope,
-  IterationResult,
-  PendingChange,
-  QuickActionKind,
-  QuickAdjustKind,
-  StructuredContent,
-  Thesis,
-  ThesisState,
-} from "../types";
+import type { ChatMessage, Draft, Thesis, ThesisState } from "../types";
 
 const ENDPOINT = "/v1/pecas";
 
@@ -84,30 +73,6 @@ export async function createDraft(
 }
 
 // ── Teses da PARTIDA (intimation-scoped, sem draft) ──────────────────────────
-
-/** GET /v1/intimacoes/:id/theses — teses persistidas da intimação (state "off"). */
-export async function getIntimationTheses(
-  fetcher: ApiFetcher,
-  intimationId: string,
-): Promise<Thesis[]> {
-  const res = await fetcher<DataEnvelope<ThesisAPI[]>>(
-    `/v1/intimacoes/${intimationId}/theses`,
-  );
-  return (res.data ?? []).map(mapThesisFromApi);
-}
-
-/** POST /v1/intimacoes/:id/theses — (re)gera+persiste teses da intimação via IA,
- *  ancoradas nos autos do processo. Nascem em state "off". */
-export async function generateIntimationTheses(
-  fetcher: ApiFetcher,
-  intimationId: string,
-): Promise<Thesis[]> {
-  const res = await fetcher<DataEnvelope<ThesisAPI[]>>(
-    `/v1/intimacoes/${intimationId}/theses`,
-    { method: "POST" },
-  );
-  return (res.data ?? []).map(mapThesisFromApi);
-}
 
 // ── Leitura ──────────────────────────────────────────────────────────────────
 
@@ -176,14 +141,34 @@ export async function updateThesisState(
 
 // ── Geração da minuta (POST /pecas/:id/generate) ─────────────────────────────
 
+/** Dados da conferência (assessment) ligados a uma geração. Obrigatórios: o BE
+ *  barra o generate com `assessment_required`/`assessment_stale` sem eles. Os
+ *  três primeiros vêm da conferência validada; `expectedCurrentVersionId` é o
+ *  `current_version_id` do draft (null quando nunca gerou — chave presente com
+ *  valor null; o BE aceita e casa com o current vazio). */
+export interface GenerateAssessmentBinding {
+  assessmentVersionId: string;
+  assessmentContentHash: string;
+  inputFingerprint: string;
+  expectedCurrentVersionId: string | null;
+}
+
 /** Dispara a geração da minuta com as teses selecionadas (included ∪
  *  pending_add). O worker-ai gera; o polling do saga_state acontece no hook
- *  (useDraft refetch enquanto CREATED/EXTRACTING). */
+ *  (useDraft refetch enquanto CREATED/EXTRACTING).
+ *
+ *  `assessment` é OBRIGATÓRIO no fluxo atual: o BE exige uma conferência das
+ *  fontes validada antes do generate (senão 409 assessment_required). O
+ *  `thesis_ids`/`instructions` devem ser IDÊNTICOS ao input da conferência.
+ *
+ *  NB: o BE deriva `assessment_validation_id` do próprio registro da conferência
+ *  — NÃO se envia no corpo (o decode do BE rejeita campos desconhecidos). */
 export async function generateDraft(
   fetcher: ApiFetcher,
   id: string,
   thesisIds: string[],
   instructions?: string,
+  assessment?: GenerateAssessmentBinding,
   replacement?: { revision: string },
 ): Promise<{ updated_at: string }> {
   const response = await fetcher<DataEnvelope<{ updated_at: string }>>(
@@ -193,6 +178,17 @@ export async function generateDraft(
       body: {
         thesis_ids: thesisIds,
         instructions,
+        ...(assessment
+          ? {
+              assessment_version_id: assessment.assessmentVersionId,
+              assessment_content_hash: assessment.assessmentContentHash,
+              input_fingerprint: assessment.inputFingerprint,
+              // Chave sempre presente quando há assessment (o BE exige); null
+              // para fresh draft (current_version_id vazio no BE).
+              expected_current_version_id:
+                assessment.expectedCurrentVersionId ?? null,
+            }
+          : {}),
         ...(replacement
           ? { replace_existing: true, revision: replacement.revision }
           : {}),
@@ -202,130 +198,84 @@ export async function generateDraft(
   return response.data;
 }
 
-// ── Autosave (PATCH /pecas/:id — dual write) ─────────────────────────────────
+// ── Conferência das fontes (assessment) — gate obrigatório antes do generate ──
 
-export interface SaveDraftInput {
-  preambleParagraphs?: string[];
-  sections?: { id: string; paragraphs: string[] }[];
+/** Input canônico da conferência. UMA fonte de verdade por tentativa de generate
+ *  — o MESMO objeto vai para request, validate E generate (senão assessment_stale).
+ *  tone default "tecnico" para casar com o default server-side do generate. */
+export interface AssessmentInput {
+  thesisIds: string[];
+  instructions: string;
+  tone: string;
 }
 
-/**
- * PATCH /v1/pecas/:id — reconstrói o structured_content COMPLETO (BE espera o
- * objeto inteiro, não patch parcial) mergindo o que veio no input com o que já
- * está no cache do React Query. Escreve também o `content` plain-text serializado
- * pra manter compatibilidade legada (dual write). Requer draft atual pra o merge.
- */
-export async function saveDraft(
+/** Monta o input canônico com defaults (tone "tecnico" = default do generate). */
+export function buildAssessmentInput(
+  thesisIds: string[],
+  instructions: string,
+  tone = "tecnico",
+): AssessmentInput {
+  return { thesisIds, instructions: instructions.trim(), tone };
+}
+
+function assessmentInputBody(input: AssessmentInput): AssessmentInputAPI {
+  return {
+    thesis_ids: input.thesisIds,
+    instructions: input.instructions,
+    tone: input.tone,
+  };
+}
+
+/** POST /v1/pecas/:id/assessment — enfileira a conferência (202 async). Devolve
+ *  o estado do pedido (status queued/running). */
+export async function requestAssessment(
   fetcher: ApiFetcher,
   id: string,
-  patch: SaveDraftInput,
-  currentDraft: Draft,
-): Promise<{ updatedAt: string }> {
-  const merged = mergeIntoStructured(patch, currentDraft);
-  const body = {
-    content: serializeStructured(merged),
-    structured_content: {
-      preamble: { paragraphs: merged.preamble.paragraphs },
-      sections: merged.sections.map((s) => ({
-        id: s.id,
-        roman: s.roman,
-        title: s.title,
-        short_title: s.shortTitle,
-        paragraphs: s.paragraphs,
-      })),
+  input: AssessmentInput,
+): Promise<AssessmentRequestStateAPI> {
+  const res = await fetcher<
+    DataEnvelope<{ request: AssessmentRequestStateAPI }>
+  >(`${ENDPOINT}/${id}/assessment`, {
+    method: "POST",
+    body: { input: assessmentInputBody(input) },
+  });
+  return res.data.request;
+}
+
+/** GET /v1/pecas/:id/assessment — estado da conferência (para polling). */
+export async function getAssessment(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<AssessmentStateAPI> {
+  const res = await fetcher<DataEnvelope<AssessmentStateAPI>>(
+    `${ENDPOINT}/${id}/assessment`,
+  );
+  return res.data;
+}
+
+/** POST /v1/pecas/:id/assessment/:aid/validate — registra o usuário atual como
+ *  validated_by (sem revisor separado, sem edição obrigatória). O `input` deve
+ *  ser IDÊNTICO ao usado no request. */
+export async function validateAssessment(
+  fetcher: ApiFetcher,
+  id: string,
+  assessmentId: string,
+  expectedContentHash: string,
+  expectedInputFingerprint: string,
+  input: AssessmentInput,
+): Promise<AssessmentStateAPI> {
+  const res = await fetcher<DataEnvelope<AssessmentStateAPI>>(
+    `${ENDPOINT}/${id}/assessment/${assessmentId}/validate`,
+    {
+      method: "POST",
+      body: {
+        expected_content_hash: expectedContentHash,
+        expected_input_fingerprint: expectedInputFingerprint,
+        input: assessmentInputBody(input),
+      },
     },
-  };
-  const res = await fetcher<DataEnvelope<{ updated_at: string }>>(
-    `${ENDPOINT}/${id}`,
-    { method: "PATCH", body },
   );
-  return { updatedAt: res.data.updated_at };
-}
-
-// ── Iteração (POST /pecas/:id/iterate) ───────────────────────────────────────
-
-export async function iterateDraft(
-  fetcher: ApiFetcher,
-  id: string,
-  scope: IterateScope,
-  instruction: string,
-): Promise<IterationResult> {
-  const body = {
-    scope: mapScopeToApi(scope),
-    instruction,
-  };
-  const res = await fetcher<DataEnvelope<IterateResultAPI>>(
-    `${ENDPOINT}/${id}/iterate`,
-    { method: "POST", body },
-  );
-  return {
-    changes: (res.data.changes ?? []).map((c) => mapSectionChangeFromApi(c)),
-  };
-}
-
-export async function applyQuickAdjust(
-  fetcher: ApiFetcher,
-  id: string,
-  scope: IterateScope,
-  kind: QuickAdjustKind,
-): Promise<IterationResult> {
-  const body = {
-    scope: mapScopeToApi(scope),
-    kind,
-  };
-  const res = await fetcher<DataEnvelope<IterateResultAPI>>(
-    `${ENDPOINT}/${id}/iterate`,
-    { method: "POST", body },
-  );
-  return {
-    changes: (res.data.changes ?? []).map((c) => mapSectionChangeFromApi(c)),
-  };
-}
-
-/**
- * "Refazer seção" hoje só foca o painel Iterar (não dispara chamada). O hook
- * fica no repo pra futuras opcionalidades. Reusa iterate com scope=section +
- * instruction padrão.
- */
-export async function refazerSection(
-  fetcher: ApiFetcher,
-  id: string,
-  sectionId: string,
-): Promise<IterationResult> {
-  const body = {
-    scope: { kind: "section", section_id: sectionId },
-    instruction:
-      "Refaça esta seção mantendo o mesmo conteúdo com melhor redação.",
-  };
-  const res = await fetcher<DataEnvelope<IterateResultAPI>>(
-    `${ENDPOINT}/${id}/iterate`,
-    { method: "POST", body },
-  );
-  return {
-    changes: (res.data.changes ?? []).map((c) => mapSectionChangeFromApi(c)),
-  };
-}
-
-// ── Revisão (aba "Revisão" — reusa /iterate com instruction de revisão) ─────
-
-const REVIEW_INSTRUCTION =
-  "Faça uma revisão proativa da peça — clareza, fundamentação, completude e coerência. " +
-  "Sugira reescritas por seção com categoria (CLAREZA/FUNDAMENTAÇÃO/COMPLETUDE/COERÊNCIA/ÊNFASE) " +
-  "e explicação curta do porquê.";
-
-export async function runReview(
-  fetcher: ApiFetcher,
-  id: string,
-): Promise<PendingChange[]> {
-  const body = {
-    scope: { kind: "whole" },
-    instruction: REVIEW_INSTRUCTION,
-  };
-  const res = await fetcher<DataEnvelope<IterateResultAPI>>(
-    `${ENDPOINT}/${id}/iterate`,
-    { method: "POST", body },
-  );
-  return (res.data.changes ?? []).map((c) => mapSectionChangeFromApi(c));
+  return res.data;
 }
 
 // ── Chat ────────────────────────────────────────────────────────────────────
@@ -352,161 +302,4 @@ export async function sendChatMessage(
     grounded: false,
   };
   return { user, assistant };
-}
-
-export async function runQuickAction(
-  fetcher: ApiFetcher,
-  id: string,
-  action: QuickActionKind,
-): Promise<{ user: ChatMessage; assistant: ChatMessage }> {
-  const question = QUICK_ACTION_PROMPTS[action];
-  return sendChatMessage(fetcher, id, question);
-}
-
-const QUICK_ACTION_PROMPTS: Record<QuickActionKind, string> = {
-  summarize_case:
-    "Resuma os autos em 3-5 linhas, destacando partes, pedido e estágio.",
-  suggest_theses:
-    "Sugira as principais teses jurídicas aplicáveis a este caso, ordenadas por força.",
-  check_deadline:
-    "Confira o prazo desta peça: qual é o termo final e se é dias úteis ou corridos.",
-  find_precedents:
-    "Encontre precedentes STJ/STF/tribunais relevantes pra esta peça.",
-};
-
-// ── Ações (assumir autoria + refazer do zero) ───────────────────────────────
-
-export async function assumirAutoria(
-  fetcher: ApiFetcher,
-  id: string,
-): Promise<{ authorship: "human_taken" }> {
-  const res = await fetcher<DataEnvelope<AssumeAuthorshipResultAPI>>(
-    `${ENDPOINT}/${id}/assume-authorship`,
-    { method: "POST" },
-  );
-  return { authorship: res.data.authorship };
-}
-
-/**
- * "Refazer do zero" — chama POST /pecas/:id/generate reusando os últimos
- * parâmetros (tone/theses/instructions). O worker-ai regenera; polling do
- * saga_state acontece no hook (invalidateQueries → useDraft refetch).
- */
-export async function refazerDoZero(
-  fetcher: ApiFetcher,
-  id: string,
-): Promise<{ sagaState: "EXTRACTING" }> {
-  await fetcher(`${ENDPOINT}/${id}/generate`, {
-    method: "POST",
-    body: {}, // vazio → BE reusa params atuais no draft row
-  });
-  return { sagaState: "EXTRACTING" };
-}
-
-// ── Autosave do editor rico (PUT /pecas/:id/content-html) ───────────────────
-
-/** Autosave do editor rico (Fase B). Grava content_html direto na coluna.
- *  A partir do 1º save, content_html vira source-of-truth pro renderer PDF
- *  (Fase C, chromedp). structured_content fica congelado (a IA continua
- *  gerando pra novas gerações, mas edição humana só toca em content_html). */
-export async function saveContentHtml(
-  fetcher: ApiFetcher,
-  id: string,
-  contentHtml: string,
-): Promise<void> {
-  await fetcher(`${ENDPOINT}/${id}/content-html`, {
-    method: "PUT",
-    body: { content_html: contentHtml },
-  });
-}
-
-// ── Anexos (POST/DELETE /pecas/:id/anexos) ────────────────────────────────────
-
-/** Categorias de anexo — casadas com o CHECK do BE (migração 0043) e o enum
- *  `AttachmentCategory` em internal/draft/entity.go. */
-export type AttachmentCategory =
-  | "Procuração"
-  | "Comprovante de endereço"
-  | "Contrato"
-  | "Provas documentais"
-  | "Declaração de hipossuficiência"
-  | "Outro";
-
-export const ATTACHMENT_CATEGORIES: AttachmentCategory[] = [
-  "Procuração",
-  "Comprovante de endereço",
-  "Contrato",
-  "Provas documentais",
-  "Declaração de hipossuficiência",
-  "Outro",
-];
-
-/** Vincula um documento já uploadado (via document slice) à peça, com categoria. */
-export async function attachDocument(
-  fetcher: ApiFetcher,
-  draftId: string,
-  documentId: string,
-  category: AttachmentCategory,
-): Promise<void> {
-  await fetcher(`${ENDPOINT}/${draftId}/anexos`, {
-    method: "POST",
-    body: { document_id: documentId, category },
-  });
-}
-
-/** Remove o vínculo peça↔documento. O documento em si permanece (owned pelo slice document). */
-export async function removeAttachment(
-  fetcher: ApiFetcher,
-  draftId: string,
-  attachmentId: string,
-): Promise<void> {
-  await fetcher(`${ENDPOINT}/${draftId}/anexos/${attachmentId}`, {
-    method: "DELETE",
-  });
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function mapScopeToApi(scope: IterateScope): {
-  kind: string;
-  section_id?: string;
-} {
-  if (scope.kind === "section") {
-    return { kind: "section", section_id: scope.sectionId };
-  }
-  return { kind: "whole" };
-}
-
-/** Reconstrói o structured completo aplicando o patch (só o que mudou). */
-function mergeIntoStructured(
-  patch: SaveDraftInput,
-  current: Draft,
-): StructuredContent {
-  const preamble = patch.preambleParagraphs
-    ? { paragraphs: patch.preambleParagraphs }
-    : { paragraphs: current.preamble.paragraphs };
-
-  const patched = new Map<string, string[]>();
-  for (const s of patch.sections ?? []) {
-    patched.set(s.id, s.paragraphs);
-  }
-
-  const sections = current.sections.map((s) => ({
-    ...s,
-    paragraphs: patched.has(s.id) ? patched.get(s.id)! : s.paragraphs,
-  }));
-
-  return { preamble, sections };
-}
-
-/** Serializa o structured num plain text semelhante ao que o generate produz.
- *  Preâmbulo (parágrafos separados por \n\n) + cada seção com heading romano. */
-function serializeStructured(s: StructuredContent): string {
-  const parts: string[] = [];
-  parts.push(...s.preamble.paragraphs);
-  for (const sec of s.sections) {
-    parts.push(`${sec.roman} — ${sec.title}`);
-    parts.push(...sec.paragraphs);
-  }
-  return parts.join("\n\n");
 }

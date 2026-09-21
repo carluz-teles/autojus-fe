@@ -26,6 +26,10 @@ export interface PecaDetailAPI {
   content: string;
   status: string;
   saga_state: string;
+  /** Versão atual persistida da peça. null quando nunca gerou (fresh draft).
+   *  Necessário para o `expected_current_version_id` do generate quando há
+   *  assessment ligado (OCC guard). */
+  current_version_id: string | null;
   created_at: string;
   updated_at: string;
   structured_content: StructuredContentAPI | null;
@@ -56,6 +60,60 @@ export interface PecaDetailAPI {
   signed_pdf_url: string | null; // Fatia 2b — presigned GET (15 min); null antes de assinar
 }
 
+// ── Assessment ("conferência das fontes") — gate obrigatório antes do generate ──
+// Contrato do BE (internal/draft/assessment_entity.go). O `input` (thesis_ids/
+// instructions/tone) deve ser IDÊNTICO entre request → validate → generate, ou o
+// BE devolve `assessment_stale`. Ver AssessmentInput (canonical source of truth).
+
+/** Input canônico da conferência — o MESMO objeto em request/validate/generate. */
+export interface AssessmentInputAPI {
+  thesis_ids: string[];
+  instructions: string;
+  tone: string;
+}
+
+interface AssessmentValidationAPI {
+  id: string;
+  validated_by: string;
+  validated_at: string;
+}
+
+/** A conferência gerada (presente quando Request.status === "succeeded"). */
+interface AssessmentAPI {
+  id: string;
+  version_no: number;
+  content_hash: string;
+  input_fingerprint: string;
+  source_revision: string;
+  created_at: string;
+  validation: AssessmentValidationAPI | null;
+}
+
+interface AssessmentRequestErrorAPI {
+  code: string;
+  message: string;
+}
+
+/** Status do pedido async de conferência (queued/running/succeeded/failed/superseded). */
+export interface AssessmentRequestStateAPI {
+  id: string;
+  status: string;
+  input_fingerprint: string;
+  requested_at: string;
+  finished_at: string | null;
+  error: AssessmentRequestErrorAPI | null;
+}
+
+/** GET /v1/pecas/:id/assessment — estado completo. */
+export interface AssessmentStateAPI {
+  scope_type: string;
+  scope_id: string;
+  assessment: AssessmentAPI | null;
+  request: AssessmentRequestStateAPI | null;
+  needs_refresh: boolean;
+  input: AssessmentInputAPI | null;
+}
+
 // role é o enum bruto do BE — o mapper converte pra autor/reu/procurador
 // (que é a taxonomia da UI). counsels é sempre array (nunca null).
 export interface PartyAPI {
@@ -67,7 +125,7 @@ export interface PartyAPI {
   is_client?: boolean;
 }
 
-export interface CounselAPI {
+interface CounselAPI {
   name: string;
   oab: string;
   uf: string;
@@ -107,7 +165,7 @@ export interface ProcessAPI {
   claim_value?: string | null;
 }
 
-export interface DeadlineAPI {
+interface DeadlineAPI {
   id: string;
   end_date: string;
   days_left: number;
@@ -147,7 +205,7 @@ export interface ProvidenceAPI {
   status: string; // "OPEN" | "DONE"
 }
 
-export interface ReviewAPI {
+interface ReviewAPI {
   status: string;
   generated_at: string;
   grounded: boolean;
@@ -189,7 +247,7 @@ export interface ThesisAPI {
   n?: number;
 }
 
-export interface ThesisAnchorAPI {
+interface ThesisAnchorAPI {
   document_id: string;
   label: string;
   excerpt: string;
@@ -197,15 +255,11 @@ export interface ThesisAnchorAPI {
   grounded: boolean;
 }
 
-export interface ThesisSegmentAPI {
+interface ThesisSegmentAPI {
   /** Título da seção (ex.: "I — DAS PRELIMINARES"). O FE casa por texto pra ancorar. */
   heading: string;
   /** Corpo da seção (parágrafos) — o trecho real a exibir. */
   conteudo: string;
-}
-
-export interface ThesesListAPI {
-  theses: ThesisAPI[];
 }
 
 // ── Chat (GET/POST /v1/pecas/:id/chat) ──────────────────────────────────────
@@ -215,28 +269,10 @@ export interface ChatThreadAPI {
   grounded_capable: boolean;
 }
 
-export interface ChatCitationAPI {
+interface ChatCitationAPI {
   document_id: string;
   page: number;
   quote: string;
-}
-
-export interface ChatMessageAPI {
-  changes?: SectionChangeAPI[];
-  id: string;
-  draft_id: string;
-  role: "user" | "assistant";
-  content: string;
-  citations: ChatCitationAPI[];
-  grounded: boolean;
-  model_version?: string;
-  created_at: string;
-}
-
-// ── Iterate (POST /v1/pecas/:id/iterate) ────────────────────────────────────
-
-export interface IterateResultAPI {
-  changes: SectionChangeAPI[];
 }
 
 export interface SectionChangeAPI {
@@ -250,9 +286,14 @@ export interface SectionChangeAPI {
   base_revision: string;
 }
 
-// ── Assume authorship (POST /v1/pecas/:id/assume-authorship) ────────────────
-
-export interface AssumeAuthorshipResultAPI {
-  authorship: "human_taken";
-  updated_at: string;
+export interface ChatMessageAPI {
+  changes?: SectionChangeAPI[];
+  id: string;
+  draft_id: string;
+  role: "user" | "assistant";
+  content: string;
+  citations: ChatCitationAPI[];
+  grounded: boolean;
+  model_version?: string;
+  created_at: string;
 }

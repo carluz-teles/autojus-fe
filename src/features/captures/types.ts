@@ -1,11 +1,10 @@
-export type CaptureSource = "DJEN" | "DATAJUD";
-export type CaptureKind =
-  "DAILY_CAPTURE" | "ENRICHMENT" | "INITIAL_LOAD" | "CATCH_UP";
-export type CaptureDisplayStatus =
+type CaptureSource = "DJEN" | "DATAJUD";
+type CaptureKind = "DAILY_CAPTURE" | "ENRICHMENT" | "INITIAL_LOAD" | "CATCH_UP";
+type CaptureDisplayStatus =
   "Concluída" | "Concluída com avisos" | "Falha parcial" | "Em andamento";
-export type CaptureTriggerReason = "OAB_ADDED" | "OAB_REENABLED" | "OAB_DAILY";
+type CaptureTriggerReason = "OAB_ADDED" | "OAB_REENABLED" | "OAB_DAILY";
 
-export interface CaptureRunView {
+interface CaptureRunView {
   id: string;
   source: CaptureSource;
   kind: CaptureKind;
@@ -30,7 +29,7 @@ export interface CaptureRunView {
   trigger_oabs: string[] | null;
 }
 
-export interface CapturesSummary {
+interface CapturesSummary {
   last_capture_at: string | null; // RFC3339
   intimations_new_today: number;
   deadlines_derived_today: number;

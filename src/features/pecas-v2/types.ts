@@ -118,7 +118,7 @@ export interface DraftDeadline {
   daysLeft: number;
 }
 
-export type Authorship = "assistant" | "human_taken";
+type Authorship = "assistant" | "human_taken";
 
 /** Peça completa que a tela consome. */
 export interface Draft {
@@ -131,6 +131,9 @@ export interface Draft {
   title: string;
   status: Status;
   sagaState: SagaState;
+  /** Versão atual persistida (null quando nunca gerou). Usada como
+   *  `expected_current_version_id` no generate quando há assessment (OCC). */
+  currentVersionId: string | null;
   authorship: Authorship;
   updatedAt: string;
   preamble: DraftPreamble;
@@ -173,21 +176,6 @@ export interface Draft {
 
 // ── Iteração / ajustes rápidos ───────────────────────────────────────────────
 
-/** Escopo de uma iteração: "peça toda" ou uma seção específica (id estável da
- *  seção, o mesmo do structured_content — o BE valida contra ele). */
-export type IterateScope =
-  { kind: "whole" } | { kind: "section"; sectionId: string };
-
-export type QuickAdjustKind =
-  "emphatic" | "concise" | "reinforce_thesis" | "add_grounds";
-
-/** Resultado de qualquer iteração (livre ou ajuste rápido, peça toda ou seção).
- *  Cada mudança já vem com categoria/explicação/old+new paragraphs prontas
- *  pra virar um card no painel Ajuste proposto (Peça v2 — POST /iterate no BE). */
-export interface IterationResult {
-  changes: PendingChange[];
-}
-
 /** Uma mudança pendente numa seção — vira 1 card no painel Ajuste proposto.
  *  Cada card mostra categoria (badge âmbar), título da seção, explicação curta
  *  do porquê da mudança e o diff em blocos (removido/adicionado). */
@@ -206,22 +194,9 @@ export interface PendingChange {
   baseRevision: string;
 }
 
-/** Estado do painel "Ajuste proposto" — 1..N cards pendentes derivados de uma
- *  iteração (escopo "whole" gera N cards, escopo "section" gera 1). O painel
- *  fecha automaticamente quando pending fica vazio. */
-export interface PreviewState {
-  scope: IterateScope;
-  scopeLabel: string;
-  pending: PendingChange[];
-  onAcceptOne: (sectionId: string) => void;
-  onDismissOne: (sectionId: string) => void;
-  onAcceptAll: () => void;
-  onDismissAll: () => void;
-}
-
 // ── Chat ─────────────────────────────────────────────────────────────────────
 
-export type ChatRole = "user" | "assistant";
+type ChatRole = "user" | "assistant";
 
 /** Citação de uma resposta do chat — um trecho de um documento dos autos que
  *  sustenta a resposta. */
@@ -243,9 +218,6 @@ export interface ChatMessage {
   /** A resposta se apoia em trechos dos autos recuperados (RAG). */
   grounded: boolean;
 }
-
-export type QuickActionKind =
-  "summarize_case" | "suggest_theses" | "check_deadline" | "find_precedents";
 
 // ── Teses da peça (contrato Teses — provenance obrigatória) ──────────────────
 
@@ -290,7 +262,7 @@ export interface Thesis {
 }
 
 /** Um trecho da peça gerada atribuído a uma tese (seção casada por heading). */
-export interface ThesisSegment {
+interface ThesisSegment {
   /** Título da seção — o FE casa por texto pra ancorar/rolar no editor. */
   heading: string;
   /** Corpo da seção (parágrafos) — o trecho real a exibir na remoção. */
@@ -299,7 +271,7 @@ export interface ThesisSegment {
 
 /** Uma âncora de proveniência de uma tese — um documento dos autos (ou o teor)
  *  que sustenta a tese. Uma tese pode ter várias. */
-export interface ThesisAnchor {
+interface ThesisAnchor {
   /** FK ao documento de origem (item da "Fundada em"). */
   documentId: string;
   /** Rótulo humano da fonte (ex.: "Ato ordinatório · pág. 1"). Pode repetir. */

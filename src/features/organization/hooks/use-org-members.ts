@@ -7,7 +7,7 @@ import type { OrganizationCustomRoleKey } from "@clerk/shared/types";
 // Rótulos + descrição em pt-BR pra UI; o value é a chave que o Clerk espera.
 // Só existem estes DOIS papéis reais hoje (Estagiário do design ainda não é um
 // papel do Clerk/BE — entra quando for de fato configurado).
-export const ORG_ROLES: {
+const ORG_ROLES: {
   value: OrganizationCustomRoleKey;
   label: string;
   desc: string;

@@ -1,29 +1,23 @@
 "use client";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowRight,
   FileText,
   History,
-  LockKeyhole,
   MessageSquare,
   PanelLeft,
   PanelsTopLeft,
+  RotateCcw,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { PageFrame, ShellBackLink } from "@/components/shell/page-frame";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -34,7 +28,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { FilingStatusNotice } from "@/features/filing/filing-status";
 import { PreparationWorkspace } from "@/features/filing/preparation-popover";
@@ -46,9 +39,12 @@ import { useConstruction } from "../../hooks/use-construction";
 import { useContentSave } from "../../hooks/use-content-save";
 import { draftKeys } from "../../hooks/use-draft";
 import { useThesisBatch } from "../../hooks/use-thesis-batch";
+import { shouldForceAutoLoader } from "../../lib/auto-flow";
 import { draftToPecaContexto } from "../../lib/peca-contexto";
 import type { Draft } from "../../types";
 import { ContextRail } from "../pregen/context-rail";
+import { PreparationCanvas } from "../pregen/preparation-canvas";
+import { PreparationSources } from "../pregen/preparation-sources";
 import { TesesRail } from "../pregen/teses-rail";
 import { TopBar } from "../pregen/top-bar";
 import type { RichEditorHandle } from "../rich-editor/rich-editor";
@@ -69,6 +65,7 @@ export function ConstructionPage({ id }: { id: string }) {
   const thesisBatch = useThesisBatch(h.theses.theses);
   const fetcher = useApi();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const qc = useQueryClient();
   const save = useContentSave(id, draft);
   const editor = useRef<RichEditorHandle | null>(null);
@@ -251,19 +248,65 @@ export function ConstructionPage({ id }: { id: string }) {
     );
   const ready =
     h.stage === "pronta" || (h.stage === "falha" && !!draft.contentHtml);
-  if (h.stage === "pregen" || (h.stage === "falha" && !draft.contentHtml)) {
-    // Fluxo DIRETO: um único prompt → geração. Sem stepper "Preparação 01/02",
-    // sem conferência de fontes e sem seleção de teses. O BE faz grounding + um
-    // passo auto-verificador internamente. A coluna esquerda (ContextRail) fica
-    // como contexto de LEITURA (autos + resumo); a ação é o textarea + "Gerar
-    // peça".
-    const promptError =
-      h.generationError ||
-      (!h.hasTeor
-        ? "O teor da intimação ainda não está disponível. Confira a origem antes de gerar."
-        : h.stage === "falha"
-          ? "A geração falhou. Revise as orientações e tente novamente."
-          : undefined);
+  // NAVEGAR-PRIMEIRO: o fluxo auto (auto=1) agora dispara a sequência (teses →
+  // conferência → generate) AQUI, na tela da peça — não mais em /pecas/nova. O
+  // loader de 4 fases aparece direto:
+  //   • h.autoPending → janela antes/durante o disparo (teses chegando); OU
+  //   • shouldForceAutoLoader → geração em curso (isGenerating) ou saga EXTRACTING.
+  // Se a auto-partida FALHA (assessment_unavailable, timeout, erro), o hook zera
+  // autoPending (autoFailed) e isGenerating; o draft fica CREATED sem loader →
+  // cai no pregen recuperável (fix-3), cujo "Gerar minuta" re-roda o ciclo
+  // reaproveitando as instructions do sessionStorage. Sucesso (EXTRACTING) segue
+  // o caminho normal `gerando`.
+  const isFreshAutoPregen =
+    h.autoPending ||
+    shouldForceAutoLoader({
+      stage: h.stage,
+      isAutoFlow: searchParams.get("auto") === "1",
+      hasContent: !!draft.contentHtml,
+      isGenerating: h.isGenerating,
+      sagaState: draft.sagaState,
+    });
+
+  // Falha do fluxo auto (assessment/generate): estado de erro LIMPO na linguagem do
+  // fluxo novo + "Tentar de novo" (re-roda a geração com as mesmas teses/instructions).
+  // NÃO cai mais no pregen antigo de escolher tese — que só existe pra curadoria manual.
+  if (h.autoFailed) {
+    return (
+      <div className="bg-background flex min-h-0 flex-1 flex-col">
+        <TopBar
+          title={draft.title}
+          cnjShort={draft.process.cnj}
+          state="Geração"
+          onBack={h.voltar}
+        />
+        <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+          <span className="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-full">
+            <TriangleAlert className="size-6" aria-hidden />
+          </span>
+          <div>
+            <h2 className="font-display text-xl font-medium">
+              Não foi possível gerar a peça agora
+            </h2>
+            <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">
+              {h.generationError ||
+                "A conferência das fontes não pôde ser concluída. Isso costuma ser temporário — tente de novo. Nada foi assinado ou protocolado."}
+            </p>
+          </div>
+          <Button onClick={h.retryAuto} disabled={h.isGenerating}>
+            <RotateCcw data-icon="inline-start" />
+            Tentar de novo
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (
+    !isFreshAutoPregen &&
+    (h.stage === "pregen" || (h.stage === "falha" && !draft.contentHtml))
+  ) {
+    const docs = draftToPecaContexto(draft).autos;
     return (
       <div className="bg-background flex min-h-0 flex-1 flex-col">
         <TopBar
@@ -272,123 +315,65 @@ export function ConstructionPage({ id }: { id: string }) {
           state="Preparação"
           onBack={h.voltar}
         />
-        <div className="flex min-h-0 flex-1 gap-3 px-3 pb-3 sm:px-5 sm:pb-5 xl:pt-4">
-          <div
-            id="legal-workbench"
-            className="bg-card hidden min-h-0 w-full shrink-0 overflow-x-hidden overflow-y-auto rounded-xl border xl:block xl:w-80 2xl:w-88"
-          >
-            <div className="border-b p-5">
-              <p className="text-primary text-[10px] font-medium tracking-widest uppercase">
-                Bancada jurídica
-              </p>
-              <div className="mt-1 flex items-center gap-2.5">
-                <PanelsTopLeft
-                  aria-hidden
-                  className="text-primary size-4 shrink-0"
-                />
-                <h2 className="font-display text-xl">Resumo e autos</h2>
-              </div>
-            </div>
-            <ContextRail
-              activeTab={contextTab || "grounds"}
-              onTabChange={setContextTab}
-              contexto={draftToPecaContexto(draft)}
-              summarySlot={
-                <div className="bg-primary/5 border-primary/15 mx-4 mb-4 rounded-lg border p-4">
-                  <p className="text-primary text-[10px] font-medium tracking-widest uppercase">
-                    Direção da peça
-                  </p>
-                  <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap">
-                    {draft.instructions ||
-                      "Descreva ao lado o que esta peça precisa alcançar."}
-                  </p>
-                </div>
-              }
-              highlightedDocId={null}
-              onVerTeor={() => setTeorOpen(true)}
-              onVerAuto={h.verAuto}
-              openingDocId={null}
-              documentActions={
+        <PreparationCanvas
+          title={draft.title}
+          cnj={draft.process.cnj}
+          instructions={h.instructions}
+          onInstructionsChange={h.setInstructions}
+          selectedCount={h.theses.selectedCount}
+          onGenerate={h.gerarMinuta}
+          busy={h.isGenerating}
+          disabled={
+            !h.hasTeor ||
+            h.theses.isLoading ||
+            h.theses.isRegenerating ||
+            !!h.theses.isTogglingId ||
+            h.theses.isError
+          }
+          error={
+            h.generationError ||
+            (!h.hasTeor
+              ? "O teor da intimação ainda não está disponível. Confira a origem antes de gerar."
+              : h.stage === "falha"
+                ? "A geração falhou. Revise as orientações e tente novamente."
+                : undefined)
+          }
+          sources={
+            <PreparationSources
+              documents={docs}
+              publishedAt={draft.intimation.publishedAt}
+              hasIntimation={h.hasTeor}
+              onOpenIntimation={() => setTeorOpen(true)}
+              onOpenDocument={h.verAuto}
+              actions={
                 <SourceActions
                   courtRecordId={draft.process.courtRecordId}
                   draftId={id}
                 />
               }
             />
-          </div>
-          <section
-            aria-label="Instruções da peça"
-            className="bg-muted/40 min-w-0 flex-1 overflow-y-auto rounded-xl border"
-          >
-            <div className="mx-auto flex min-h-full max-w-2xl flex-col gap-6 p-6 sm:p-8">
-              <div className="flex flex-col gap-3">
-                <h1 className="font-display text-3xl leading-tight tracking-tight sm:text-4xl">
-                  O que esta peça precisa alcançar?
-                </h1>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  Descreva a estratégia em uma orientação. A partir dela, a peça
-                  é redigida e fica disponível para sua revisão.
-                </p>
-              </div>
-              <FieldGroup>
-                <Field data-disabled={h.isGenerating || undefined}>
-                  <FieldLabel htmlFor="piece-instructions">
-                    Orientações para a peça
-                  </FieldLabel>
-                  <Textarea
-                    id="piece-instructions"
-                    value={h.instructions}
-                    onChange={(event) => h.setInstructions(event.target.value)}
-                    disabled={h.isGenerating || !h.hasTeor}
-                    className="min-h-56"
-                    maxLength={2000}
-                    aria-describedby="piece-instructions-help"
-                    placeholder="Indique a parte representada, o pedido principal e os pontos que precisam ser enfrentados. Sinalize também o que não deve ser pedido."
-                  />
-                  <FieldDescription id="piece-instructions-help">
-                    Até 2.000 caracteres. Inclua orientações, não fatos
-                    presumidos. Informações ausentes permanecem como pendências
-                    para revisão.
-                  </FieldDescription>
-                </Field>
-              </FieldGroup>
-              {!h.hasTeor && (
-                <Button
-                  variant="outline"
-                  nativeButton={false}
-                  render={<Link href={`/intimacoes/${draft.intimation.id}`} />}
-                  className="self-start"
-                >
-                  Abrir intimação de origem
-                </Button>
-              )}
-              {promptError && (
-                <p role="alert" className="text-destructive text-sm">
-                  {promptError}
-                </p>
-              )}
-              <div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-muted-foreground flex items-center gap-2 text-xs">
-                  <LockKeyhole aria-hidden className="size-3.5" />
-                  Somente minuta. Nada será assinado ou protocolado.
-                </p>
-                <Button
-                  size="lg"
-                  disabled={
-                    !h.hasTeor ||
-                    h.isGenerating ||
-                    !h.instructions.trim() ||
-                    draft.status !== "DRAFT"
-                  }
-                  onClick={h.gerarMinuta}
-                >
-                  {h.isGenerating ? "Iniciando redação…" : "Gerar peça"}
-                  <ArrowRight data-icon="inline-end" />
-                </Button>
-              </div>
-            </div>
-          </section>
-        </div>
+          }
+          theses={
+            <TesesRail
+              theses={h.theses.theses}
+              selectedCount={h.theses.selectedCount}
+              isLoading={h.theses.isLoading}
+              isError={h.theses.isError}
+              onToggle={h.theses.toggle}
+              onFonte={source}
+              teorSourceId={draft.intimation.id}
+              isRegenerating={h.theses.isRegenerating}
+              disabled={
+                !!h.theses.isTogglingId ||
+                h.isGenerating ||
+                draft.status !== "DRAFT"
+              }
+              pregen
+              onRegenerate={h.theses.regenerate}
+              streaming={h.theses.streaming}
+            />
+          }
+        />
         <TeorDrawer
           open={teorOpen && h.hasTeor}
           onClose={() => setTeorOpen(false)}
@@ -668,7 +653,10 @@ export function ConstructionPage({ id }: { id: string }) {
                   )}
                 >
                   <ContextRail
-                    activeTab={contextTab || "summary"}
+                    activeTab={
+                      contextTab ||
+                      (h.stage === "pregen" ? "grounds" : "summary")
+                    }
                     onTabChange={setContextTab}
                     attachmentsSlot={attachments}
                     contexto={draftToPecaContexto(draft)}
@@ -704,11 +692,19 @@ export function ConstructionPage({ id }: { id: string }) {
                         selectedCount={h.theses.selectedCount}
                         isLoading={h.theses.isLoading}
                         isError={h.theses.isError}
-                        onToggle={(t) => thesisBatch.toggle(t)}
-                        batch={{
-                          ...thesisBatch,
-                          apply: () => applyTheses(thesisBatch.ids),
-                        }}
+                        onToggle={(t) =>
+                          h.stage === "pregen"
+                            ? h.theses.toggle(t)
+                            : thesisBatch.toggle(t)
+                        }
+                        batch={
+                          h.stage === "pregen"
+                            ? undefined
+                            : {
+                                ...thesisBatch,
+                                apply: () => applyTheses(thesisBatch.ids),
+                              }
+                        }
                         onFonte={source}
                         teorSourceId={draft.intimation.id}
                         isRegenerating={h.theses.isRegenerating}
@@ -718,6 +714,7 @@ export function ConstructionPage({ id }: { id: string }) {
                           !!h.theses.isTogglingId ||
                           draft.status !== "DRAFT"
                         }
+                        pregen={h.stage === "pregen"}
                         onRegenerate={h.theses.regenerate}
                         streaming={h.theses.streaming}
                       />
@@ -742,12 +739,54 @@ export function ConstructionPage({ id }: { id: string }) {
                       Minuta pronta para sua revisão.
                     </p>
                   )}
-                {generationActive && (
+                {h.stage === "pregen" && (
+                  <div className="mx-auto flex min-h-full max-w-2xl flex-col items-start justify-center gap-4 p-6 sm:p-8">
+                    <h1 className="font-display text-2xl">
+                      Construção da peça
+                    </h1>
+                    <p className="text-muted-foreground text-sm">
+                      {h.hasTeor
+                        ? "Revise as teses e as fontes do processo. A minuta será gerada aqui e ficará disponível para edição."
+                        : "O teor da intimação ainda não está disponível. Abra a intimação de origem para conferir os dados antes de gerar a minuta."}
+                    </p>
+                    {!h.hasTeor && (
+                      <Button
+                        variant="outline"
+                        nativeButton={false}
+                        render={
+                          <Link href={`/intimacoes/${draft.intimation.id}`} />
+                        }
+                      >
+                        Abrir intimação de origem
+                      </Button>
+                    )}
+                    <p className="text-sm">
+                      {h.theses.selectedCount} fundamentos selecionados
+                    </p>
+                    <Button
+                      onClick={h.gerarMinuta}
+                      disabled={
+                        !h.hasTeor ||
+                        h.isGenerating ||
+                        h.theses.isRegenerating ||
+                        h.theses.isLoading ||
+                        !!h.theses.isTogglingId ||
+                        h.theses.isError
+                      }
+                    >
+                      Gerar minuta
+                    </Button>
+                  </div>
+                )}
+                {(generationActive || isFreshAutoPregen) && (
                   <GerandoCenter
                     key={`${id}:${draft.updatedAt}`}
                     draftId={id}
                     streamEnabled={draft.sagaState === "EXTRACTING"}
                     startedAt={draft.updatedAt}
+                    thesesDone={h.theses.theses.length > 0}
+                    thesesCount={h.theses.streaming?.count}
+                    assessmentActive={h.assessmentActive}
                   />
                 )}
                 {ready && !generationActive && (
@@ -791,79 +830,83 @@ export function ConstructionPage({ id }: { id: string }) {
                   />
                 )}
               </section>
-              {!generationActive && ready && (
-                <div
-                  id="draft-assistant"
-                  className={cn(
-                    "bg-card min-h-0 w-full shrink-0 overflow-hidden rounded-xl border xl:w-72 xl:motion-safe:transition-[width] xl:motion-safe:duration-300 xl:motion-safe:ease-in-out 2xl:w-80",
-                    contextCollapsed &&
-                      "xl:w-[calc(18rem+20rem-3rem)] 2xl:w-[calc(20rem+22rem-3rem)]",
-                    assistantCollapsed && "xl:w-12 2xl:w-12",
-                    panel === "assistant" ? "block" : "hidden",
-                    "xl:block",
-                  )}
-                >
-                  {ready && !generationActive ? (
-                    <AssistentePanel
-                      collapsed={assistantCollapsed}
-                      columnToggle={
-                        <ColumnToggle
-                          side="right"
-                          collapsed={assistantCollapsed}
-                          controls="draft-assistant-content"
-                          onToggle={() =>
-                            setAssistantCollapsed((value) => !value)
-                          }
-                        />
-                      }
-                      key={id}
-                      draftId={id}
-                      contentRevision={save.queue.revision}
-                      beforeRequest={save.flush}
-                      onSource={source}
-                      applyToEditor={(roman, next, old) =>
-                        editor.current?.applySectionChange(roman, next, old) ??
-                        false
-                      }
-                    />
-                  ) : (
-                    <div
-                      className={cn(
-                        "flex flex-col gap-3 p-4",
-                        assistantCollapsed && "xl:px-1 xl:py-3",
-                      )}
-                    >
-                      <div className="flex justify-end">
-                        <ColumnToggle
-                          side="right"
-                          collapsed={assistantCollapsed}
-                          controls="draft-assistant-content"
-                          onToggle={() =>
-                            setAssistantCollapsed((value) => !value)
-                          }
-                        />
-                      </div>
+              {!generationActive &&
+                (ready || h.stage === "pregen" || h.stage === "gerando") && (
+                  <div
+                    id="draft-assistant"
+                    className={cn(
+                      "bg-card min-h-0 w-full shrink-0 overflow-hidden rounded-xl border xl:w-72 xl:motion-safe:transition-[width] xl:motion-safe:duration-300 xl:motion-safe:ease-in-out 2xl:w-80",
+                      contextCollapsed &&
+                        "xl:w-[calc(18rem+20rem-3rem)] 2xl:w-[calc(20rem+22rem-3rem)]",
+                      assistantCollapsed && "xl:w-12 2xl:w-12",
+                      panel === "assistant" ? "block" : "hidden",
+                      "xl:block",
+                    )}
+                  >
+                    {ready && !generationActive ? (
+                      <AssistentePanel
+                        collapsed={assistantCollapsed}
+                        columnToggle={
+                          <ColumnToggle
+                            side="right"
+                            collapsed={assistantCollapsed}
+                            controls="draft-assistant-content"
+                            onToggle={() =>
+                              setAssistantCollapsed((value) => !value)
+                            }
+                          />
+                        }
+                        key={id}
+                        draftId={id}
+                        contentRevision={save.queue.revision}
+                        beforeRequest={save.flush}
+                        onSource={source}
+                        applyToEditor={(roman, next, old) =>
+                          editor.current?.applySectionChange(
+                            roman,
+                            next,
+                            old,
+                          ) ?? false
+                        }
+                      />
+                    ) : (
                       <div
-                        id="draft-assistant-content"
                         className={cn(
-                          "flex flex-col gap-3",
-                          assistantCollapsed && "xl:hidden",
+                          "flex flex-col gap-3 p-4",
+                          assistantCollapsed && "xl:px-1 xl:py-3",
                         )}
                       >
-                        <h2 className="font-medium">Objetivo da peça</h2>
-                        <p className="text-muted-foreground text-xs whitespace-pre-wrap">
-                          {draft.instructions ||
-                            "Confira o objetivo e os documentos do processo antes de gerar."}
-                        </p>
-                        <p className="text-muted-foreground text-xs">
-                          O assistente ficará disponível para ajustar o texto
-                          após a geração.
-                        </p>
+                        <div className="flex justify-end">
+                          <ColumnToggle
+                            side="right"
+                            collapsed={assistantCollapsed}
+                            controls="draft-assistant-content"
+                            onToggle={() =>
+                              setAssistantCollapsed((value) => !value)
+                            }
+                          />
+                        </div>
+                        <div
+                          id="draft-assistant-content"
+                          className={cn(
+                            "flex flex-col gap-3",
+                            assistantCollapsed && "xl:hidden",
+                          )}
+                        >
+                          <h2 className="font-medium">Objetivo da peça</h2>
+                          <p className="text-muted-foreground text-xs whitespace-pre-wrap">
+                            {draft.instructions ||
+                              "Confira o objetivo e os documentos do processo antes de gerar."}
+                          </p>
+                          <p className="text-muted-foreground text-xs">
+                            O assistente ficará disponível para ajustar o texto
+                            após a geração.
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
             </div>
             <TeorDrawer
               open={

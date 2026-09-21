@@ -95,13 +95,3 @@ export const PendingRemoval = Extension.create({
     ];
   },
 });
-
-/** Extrai os romanos das seções a marcar a partir dos headings dos segmentos. */
-export function romansFromHeadings(headings: string[]): string[] {
-  const out: string[] = [];
-  for (const h of headings) {
-    const r = leadingRoman(h);
-    if (r && !out.includes(r)) out.push(r);
-  }
-  return out;
-}

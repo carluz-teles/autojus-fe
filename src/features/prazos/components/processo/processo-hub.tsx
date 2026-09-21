@@ -21,12 +21,12 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ProcessProvidencias } from "@/features/action-items/components/providencias-section";
 import { SyncAutosButton } from "@/features/configuracoes/components/sync-autos-button";
 import { PdfDrawer } from "@/features/documentos/components/pdf-drawer";
 import { CourtAccessNotice } from "@/features/onboarding/components/court-access-notice";
 import { Responsavel } from "@/features/organization/components/responsavel";
 import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
+import { ProximoPassoCard } from "@/features/processos/components/proximo-passo-card";
 import { ProcessoSituacao } from "@/features/processos/components/situacao-processo";
 import { FASE_STEPS } from "@/features/processos/lib/apresentacao";
 import type { ProcessoPhase } from "@/features/processos/types";
@@ -266,7 +266,22 @@ export function ProcessoHub({ numero }: { numero: string }) {
               </dl>
             </section>
 
-            {identity.prazo && (
+            {/* Hero único: o próximo passo absorve o prazo mais próximo (data + badge
+                + ato). A faixa "Prazo em atenção" vira fallback só quando o motor não
+                deriva um próximo passo. */}
+            {p.proximo_passo ? (
+              <ProximoPassoCard
+                passo={p.proximo_passo}
+                phase={p.phase}
+                prazo={identity.prazo}
+                onConferir={
+                  p.proximo_passo.kind === "CUMPRIR_PRAZO" ||
+                  p.proximo_passo.kind === "INICIAR_PROVIDENCIA"
+                    ? h.irParaTrabalho
+                    : undefined
+                }
+              />
+            ) : identity.prazo ? (
               <section
                 aria-label="Prazo em atenção"
                 className="bg-gold/5 border-gold/25 flex flex-col justify-between gap-3 rounded-xl border px-5 py-4 shadow-sm sm:flex-row sm:items-center"
@@ -290,7 +305,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                   <ArrowRight />
                 </Button>
               </section>
-            )}
+            ) : null}
 
             <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
               <div className="flex min-w-0 flex-col gap-5">
@@ -309,8 +324,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                         Trabalho do escritório
                       </h2>
                       <p className="text-muted-foreground mt-1 text-sm">
-                        Revise intimações, confira prazos e acompanhe
-                        providências.
+                        Revise as intimações do processo e confira os prazos.
                       </p>
                     </div>
                     <NativeSelect
@@ -335,9 +349,6 @@ export function ProcessoHub({ numero }: { numero: string }) {
                       <TabsList aria-label="Trabalho do processo">
                         <TabsTrigger value="intimacoes">Intimações</TabsTrigger>
                         <TabsTrigger value="prazos">Prazos</TabsTrigger>
-                        <TabsTrigger value="providencias">
-                          Providências
-                        </TabsTrigger>
                       </TabsList>
                     </div>
                     <TabsContent className="animate-none" value="intimacoes">
@@ -365,12 +376,6 @@ export function ProcessoHub({ numero }: { numero: string }) {
                       >
                         <Registros items={h.prazos} />
                       </Colecao>
-                    </TabsContent>
-                    <TabsContent className="animate-none" value="providencias">
-                      <ProcessProvidencias
-                        processId={numero}
-                        history={h.historico}
-                      />
                     </TabsContent>
                   </Tabs>
                 </section>
@@ -550,7 +555,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                       <Colecao
                         query={h.pecasQ}
                         count={h.pecas.length}
-                        empty="Nenhuma peça vinculada. Abra uma intimação ou providência para iniciar a elaboração com o contexto do processo."
+                        empty="Nenhuma peça vinculada. Abra uma intimação para iniciar a elaboração com o contexto do processo."
                       >
                         <Registros items={h.pecas} />
                       </Colecao>
@@ -631,8 +636,8 @@ export function ProcessoHub({ numero }: { numero: string }) {
                     {identity.movimento}
                   </p>
                   <p className="text-muted-foreground border-t pt-3 text-xs leading-relaxed">
-                    A situação do processo é inferida dos dados disponíveis.
-                    Prazos e providências são acompanhados separadamente.
+                    A situação do processo é inferida dos dados disponíveis. As
+                    intimações e seus prazos são acompanhados nas abas acima.
                   </p>
                 </section>
               </aside>

@@ -70,7 +70,7 @@ function TriagePreview() {
         ))}
         <div className="lp-list-note">
           <CheckCheck size={15} aria-hidden="true" />
-          Providências geradas a partir do teor e do contexto.
+          Próximos passos gerados a partir do teor e do contexto.
         </div>
       </div>
       <div className="lp-work-detail" aria-live="polite">

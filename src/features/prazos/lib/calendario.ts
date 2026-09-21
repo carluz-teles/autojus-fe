@@ -14,7 +14,7 @@ import { urg, type UrgKey } from "./derivar";
 // ── Vocabulário ───────────────────────────────────────────────────────────────
 // Zero "tarefa"/"IA" visível (diretiva app-wide): providência é a unidade de
 // trabalho; prazo é o vencimento fatal.
-export type CalEventoTipo = "prazo" | "providencia";
+type CalEventoTipo = "prazo" | "providencia";
 
 // Evento normalizado do calendário — a fonte única que alimenta Mês/Semana/Dia.
 // `dia` é a chave "YYYY-MM-DD" (sem hora/timezone) usada pra agrupar.
@@ -43,7 +43,7 @@ export interface CalEventoUI extends CalEvento {
   chipFundo: string;
 }
 
-export interface CalCelula {
+interface CalCelula {
   vazia: boolean;
   num?: number;
   dataISO?: string;
@@ -66,7 +66,7 @@ export interface CalDiaSemana {
   evs: CalEventoUI[];
 }
 
-export interface CalHora {
+interface CalHora {
   label: string;
   top: number;
 }
@@ -127,7 +127,7 @@ export function toISODate(d: Date): string {
 }
 
 /** Date (meia-noite local) a partir de "YYYY-MM-DD" — parse manual pra não cair no UTC. */
-export function fromISODate(iso: string): Date {
+function fromISODate(iso: string): Date {
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1);
 }

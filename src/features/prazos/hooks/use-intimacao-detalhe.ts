@@ -137,7 +137,7 @@ const DECISAO_LABEL: Partial<Record<PrazoCrossValidationDecisao, string>> = {
   ajuste_manual: "Ajustado manualmente",
 };
 
-export interface MemoriaCadeiaItem {
+interface MemoriaCadeiaItem {
   kicker: string;
   valor: string;
   sub: string;

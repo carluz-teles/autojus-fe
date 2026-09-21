@@ -38,29 +38,8 @@ export const ORIGEM_DESCRICAO: Partial<Record<IntimacaoOrigem, string>> = {
  * Os valores são classes utilitárias (bg/text) sobre os tokens do design system
  * (--green/--gold), aplicadas via className no selo do card.
  */
-export type OrigemTom = "confiavel" | "apurar" | "neutro";
-
-export const ORIGEM_TOM: Record<IntimacaoOrigem, OrigemTom> = {
-  declarado: "confiavel",
-  validado: "confiavel",
-  calculado: "confiavel",
-  divergente: "apurar",
-  ia: "apurar",
-  manual: "neutro",
-  a_classificar: "apurar",
-  sem_prazo: "neutro",
-};
-
-/** Classe do selo de origem por tom — fundo suave + texto do mesmo matiz, no
- *  espírito do selo "confiável/a apurar" do design (bg 10% + text token). */
-export const ORIGEM_TOM_CLASS: Record<OrigemTom, string> = {
-  confiavel: "bg-green/10 text-green",
-  apurar: "bg-gold/10 text-gold-foreground",
-  neutro: "bg-muted text-muted-foreground",
-};
-
 /** Ordem canônica das abas de origem (mais "confiável"/comum primeiro). */
-export const ORIGEM_ORDER: IntimacaoOrigem[] = [
+const ORIGEM_ORDER: IntimacaoOrigem[] = [
   "declarado",
   "validado",
   "calculado",

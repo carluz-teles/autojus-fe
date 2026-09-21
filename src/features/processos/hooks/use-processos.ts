@@ -17,18 +17,15 @@ const PAGE_SIZE = 30;
 
 import {
   assignResponsavel,
-  bulkAssignResponsavel,
   getPartes,
   getProcesso,
-  getProcessoResumo,
-  getProcessosSummary,
   listProcessos,
   updateProcessoManual,
 } from "../services/processos.service";
 import type { ProcessoFilters, ProcessoPhase } from "../types";
 
 // Chaves de query centralizadas para invalidação consistente.
-export const processosKeys = {
+const processosKeys = {
   all: ["processos"] as const,
   lists: () => [...processosKeys.all, "list"] as const,
   list: (params: Record<string, unknown>) =>
@@ -105,15 +102,6 @@ export function useProcessos(filters: ProcessosFiltersAtivos = {}) {
   };
 }
 
-/** Contadores da lista — GET /v1/processos/summary. */
-export function useProcessosSummary() {
-  const fetcher = useApi();
-  return useQuery({
-    queryKey: processosKeys.summary(),
-    queryFn: () => getProcessosSummary(fetcher),
-  });
-}
-
 /** Detalhe de um processo — GET /v1/processos/:id. */
 export function useProcesso(id: string) {
   const fetcher = useApi();
@@ -130,16 +118,6 @@ export function usePartes(id: string) {
   return useQuery({
     queryKey: processosKeys.partes(id),
     queryFn: () => getPartes(fetcher, id),
-    enabled: !!id,
-  });
-}
-
-/** Resumo IA do processo — GET /v1/processos/:id/resume. */
-export function useProcessoResumo(id: string) {
-  const fetcher = useApi();
-  return useQuery({
-    queryKey: processosKeys.resumo(id),
-    queryFn: () => getProcessoResumo(fetcher, id),
     enabled: !!id,
   });
 }
@@ -175,35 +153,6 @@ export function useUpdateProcessoManual(processoId: string) {
     }) => updateProcessoManual(fetcher, processoId, body),
     onSuccess: (processo) => {
       qc.setQueryData(processosKeys.detail(processoId), processo);
-      qc.invalidateQueries({ queryKey: processosKeys.lists() });
-    },
-  });
-}
-
-/**
- * Atribuição em massa da lista — POST /v1/processos/bulk/responsavel (mesmo padrão
- * de useBulkAssignResponsavel de Intimações). Uma única requisição, mesmo com N
- * ids marcados. A UI de Processos hoje só marca ids específicos (sem toggle "toda
- * a faixa"), então este hook só expõe o modo `ids`; `all` fica pronto no serviço
- * para quando a UI ganhar esse modo.
- */
-export function useBulkAssignResponsaveis() {
-  const fetcher = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      ids,
-      conductorUserId,
-    }: {
-      ids: string[];
-      conductorUserId: string | null;
-    }) =>
-      bulkAssignResponsavel(fetcher, {
-        userId: conductorUserId,
-        all: false,
-        ids,
-      }),
-    onSuccess: () => {
       qc.invalidateQueries({ queryKey: processosKeys.lists() });
     },
   });

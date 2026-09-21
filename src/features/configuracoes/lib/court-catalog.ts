@@ -19,7 +19,7 @@ export function courtSystemName(system: string) {
   return { EPROC: "eproc", ESAJ: "e-SAJ" }[system] ?? system;
 }
 
-export function courtName(entry: CourtCatalogEntry) {
+function courtName(entry: CourtCatalogEntry) {
   return /^TJ[A-Z]{2}$/.test(entry.court)
     ? `Tribunal de Justiça · ${entry.name}`
     : entry.name;

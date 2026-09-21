@@ -25,7 +25,7 @@ export interface FontesTabItem {
   onClick: () => void;
 }
 
-export interface ToggleVM {
+interface ToggleVM {
   trilho: string;
   knob: string;
   onToggle: () => void;

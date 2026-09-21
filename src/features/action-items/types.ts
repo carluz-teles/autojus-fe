@@ -19,17 +19,17 @@ export type ActionItemStatus =
 // Prioridade — flag de triagem HIGH|MEDIUM|LOW, ou ausente ("sem prioridade").
 // Espelha o priority do BE (text nullable). Os rótulos em PT vivem na UI; o wire
 // é sempre o enum em inglês.
-export type ActionItemPriority = "HIGH" | "MEDIUM" | "LOW";
+type ActionItemPriority = "HIGH" | "MEDIUM" | "LOW";
 
 // Proveniência da classificação do TIPO: declarada no teor, inferida pela IA, ou
 // corrigida manualmente (reclassificar muda pra "manual").
-export type ActionItemTipoOrigem = "declarado" | "ia" | "manual";
+type ActionItemTipoOrigem = "declarado" | "ia" | "manual";
 
 // Gate de tipo: "confiavel" já pode virar trabalho; "a_confirmar" espera o
 // usuário confirmar o tipo antes (POST /confirmar).
 export type ActionItemTipoStatus = "confiavel" | "a_confirmar";
 
-export type FulfillmentStatus =
+type FulfillmentStatus =
   "possible_fulfillment" | "no_indication" | "unverified";
 
 export interface AnalysisSources {
@@ -41,7 +41,7 @@ export interface AnalysisSources {
   stale: boolean;
 }
 
-export interface FulfillmentEvidence {
+interface FulfillmentEvidence {
   document_id: string;
   title: string;
   date: string;
@@ -128,38 +128,10 @@ export interface UpdateActionItemInput {
   assignee_user_id?: string;
 }
 
-/**
- * Contadores agregados do board de providências — GET /v1/action-items/summary.
- * Objeto único (sem envelope de cursor), nos 3 buckets de status de trabalho.
- * SUGGESTED nunca entra nas contagens. Espelha o ActionItemsSummary do BE.
- */
-export interface ActionItemsSummary {
-  /** TODO — "A Fazer". */
-  a_fazer: number;
-  /** WORKING — "Em elaboração". */
-  em_elaboracao: number;
-  /** DONE — "Concluída". */
-  concluida: number;
-}
-
-// Envelope paginado compartilhado — fonte única em @/lib/api/types (Regra nº1).
-export type { PageEnvelope } from "@/lib/api/types";
-
-export interface WorkActivity {
+interface WorkActivity {
   id: string;
   actor_user_id: string | null;
   kind: string;
   changes: Record<string, { before: unknown; after: unknown }>;
   created_at: string;
-}
-export interface CreateWorkInput {
-  court_record_id: string;
-  intimation_id?: string;
-  title: string;
-  description: string;
-  tipo: ActionItemTipo;
-  piece_profile_key: string;
-  assignee_user_id: string;
-  priority: string;
-  due_date: string;
 }

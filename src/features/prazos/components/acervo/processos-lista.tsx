@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ImportByCnjDialog } from "@/features/acquisition/components/import-by-cnj-dialog";
 import { FilterTabs } from "@/features/intimacoes/components/shared/filter-tabs";
 import { Responsavel } from "@/features/organization/components/responsavel";
 import { ProcessoSituacao } from "@/features/processos/components/situacao-processo";
@@ -32,6 +33,9 @@ export function ProcessosLista() {
           >
             {m.isLoading ? "Carregando…" : m.totalLabel}
           </span>
+          <div className="ml-auto shrink-0">
+            <ImportByCnjDialog />
+          </div>
         </>
       }
       toolbar={

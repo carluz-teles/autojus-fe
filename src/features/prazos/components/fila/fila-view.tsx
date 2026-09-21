@@ -1,8 +1,9 @@
 "use client";
-import { WorkList } from "@/features/action-items/components/work-list";
+import { PrazosAgenda } from "@/features/prazos/components/agenda/prazos-agenda";
+
+// "Meus Prazos" (meus, agenda por urgência) e "Fila" (todas ativas) são listas
+// de INTIMAÇÕES — a intimação é a tarefa e carrega o prazo. (Antes era o board
+// de action_items; agora é a agenda de intimações.)
 export function FilaView({ meus, titulo }: { meus?: boolean; titulo: string }) {
-  // Meus Prazos usa a vista "Prazo" (agenda por urgência); a Fila herdada segue lista plana.
-  return (
-    <WorkList title={titulo} mine={meus} activeOnly deadlineAgenda={meus} />
-  );
+  return <PrazosAgenda meus={meus} titulo={titulo} />;
 }

@@ -7,7 +7,7 @@ import type {
 } from "./types";
 
 const ALLOWED_DESTINATION =
-  /^\/(?:processos|intimacoes|providencias|pecas)\/[a-zA-Z0-9-]+(?:[?#][^\\\s]*)?$/;
+  /^\/(?:processos|intimacoes|pecas)\/[a-zA-Z0-9-]+(?:[?#][^\\\s]*)?$/;
 
 /** Destinations are app routes, never an external URL supplied in an event. */
 export function notificationHref(
@@ -17,9 +17,10 @@ export function notificationHref(
   if (href === "/primeira-importacao") return href;
   if (typeof href === "string" && ALLOWED_DESTINATION.test(href)) return href;
   // Legacy rows predate href. Only use an actual entity UUID, never deadline_id.
+  // action_item não tem tela própria (a intimação é a unidade): notificações de
+  // trabalho caem na intimação/processo pelo próximo id disponível no payload.
   for (const [key, route] of [
     ["draft_id", "pecas"],
-    ["action_item_id", "providencias"],
     ["intimation_id", "intimacoes"],
     ["court_record_id", "processos"],
   ]) {
@@ -43,9 +44,7 @@ export function preferenceChannels(
   );
 }
 
-export function notificationContext(
-  notification: Pick<NotificationView, "payload">,
-) {
+function notificationContext(notification: Pick<NotificationView, "payload">) {
   const text = (key: string) => {
     const value = notification.payload?.[key];
     return typeof value === "string" ? value.trim() : "";

@@ -7,20 +7,11 @@ import {
 } from "./fila-navigation";
 
 describe("navegação da fila", () => {
-  it("preserva o retorno à providência com o rótulo correspondente", () => {
-    const retorno = "/providencias/040d0c73-1e19-4446-b25a-e4e925ef8ff5";
-    expect(retornoDaFila(retorno)).toBe(retorno);
-    expect(rotuloRetornoDaFila(retorno)).toBe("Voltar à providência");
-    expect(
-      new URL(
-        detalheNaFila("origin", retorno),
-        "https://local.test",
-      ).searchParams.get("retorno"),
-    ).toBe(retorno);
+  it("rejeita retornos inválidos e cai nas intimações", () => {
     for (const invalid of [
-      "/providencias/../configuracoes",
-      "/providencias/not-an-id",
-      `${retorno}/../../configuracoes`,
+      "/providencias/040d0c73-1e19-4446-b25a-e4e925ef8ff5",
+      "/processos/../configuracoes",
+      "/processos/not-an-id",
     ]) {
       expect(retornoDaFila(invalid)).toBe("/intimacoes");
       expect(rotuloRetornoDaFila(invalid)).toBe("Voltar às intimações");

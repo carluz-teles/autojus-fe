@@ -41,7 +41,7 @@ import type { Thesis } from "../types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
-export type ThesesStreamStatus = "idle" | "streaming" | "done" | "error";
+type ThesesStreamStatus = "idle" | "streaming" | "done" | "error";
 
 export interface ThesesStreamState {
   /** Teses acumuladas incrementalmente (ids locais `stream-${n}` até o `done`). */

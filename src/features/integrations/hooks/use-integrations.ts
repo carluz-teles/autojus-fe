@@ -6,23 +6,11 @@ import { useApi } from "@/lib/api/use-api";
 
 import {
   addWatchedOab,
-  getIntegrations,
   getWatchedOabs,
   toggleWatchedOab,
 } from "../services/integrations.service";
 
-export const INTEGRATIONS_KEY = ["acquisition", "integrations"] as const;
-export const WATCHED_OABS_KEY = ["acquisition", "watched-oabs"] as const;
-
-/** Lista as integrações do tenant. Sem polling — dados são estáveis na aba de
- * configurações; revalidação acontece via invalidação após mutation. */
-export function useIntegrations() {
-  const fetcher = useApi();
-  return useQuery({
-    queryKey: INTEGRATIONS_KEY,
-    queryFn: () => getIntegrations(fetcher),
-  });
-}
+const WATCHED_OABS_KEY = ["acquisition", "watched-oabs"] as const;
 
 /** OABs monitoradas com nome do advogado (GET /v1/acquisition/watched-oabs).
  * Fonte primária da aba Termos: substitui extractDjenOabs para trazer o nome. */

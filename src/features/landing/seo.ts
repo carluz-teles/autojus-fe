@@ -42,7 +42,7 @@ export function getLlmsText() {
 
   return `# AtJud
 
-> Plataforma de assessoria jurídica para escritórios brasileiros. Centraliza processos, intimações, movimentações e autos; gera providências automáticas e auxilia na redação e revisão de minutas com contexto e fontes.
+> Plataforma de assessoria jurídica para escritórios brasileiros. Centraliza processos, intimações, movimentações e autos; identifica os próximos passos automaticamente e auxilia na redação e revisão de minutas com contexto e fontes.
 
 A captura diária acompanha as OABs cadastradas nas fontes monitoradas. DJEN fornece publicações e DataJud complementa dados e histórico processual. Autos são importados pelas conexões de tribunal disponíveis e podem exigir autenticação.
 
@@ -58,7 +58,7 @@ Os exemplos da landing page são fictícios. As áreas de processos, autos e doc
 
 - [Landing page do AtJud](${page}): Apresentação pública e demonstrações ilustrativas do produto.
 - [Captura diária e acervo centralizado](${page}#acervo): Novos processos, intimações, movimentações e autos no mesmo contexto.
-- [Providências automáticas](${page}#plataforma): Triagem de ciência, atuação necessária e cumprimento identificado.
+- [Próximos passos automáticos](${page}#plataforma): Triagem de ciência, atuação necessária e cumprimento identificado.
 - [Minutas inteligentes](${page}#inteligencia): Construção de peças com contexto, estrutura e fundamentos verificáveis.
 - [Chat jurídico](${page}#assistente): Resumos, assistência, revisão e ajustes de tom com fontes.
 - [Preparação para o tribunal](${page}#protocolo): Petição, anexos e dados; disponibilidade da integração e do protocolo.

@@ -13,12 +13,16 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { detalheNaFila } from "@/features/intimacoes/lib/fila-navigation";
 import { htmlToText } from "@/lib/html/html-to-text";
 import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
+import {
+  clearInstructions,
+  peekInstructions,
+} from "../lib/instructions-storage";
 import type { SagaState, Thesis } from "../types";
 import { useDraft } from "./use-draft";
 import { thesesKey, useGenerateDraft, useThesesController } from "./use-theses";
@@ -31,7 +35,7 @@ export type CenterStage = "pregen" | "gerando" | "pronta" | "falha";
  *  "acabei de clicar Gerar". O flag existe porque, entre o POST /generate e o
  *  saga entrar em CREATED/EXTRACTING no próximo poll, há uma janela em que o
  *  saga ainda é o anterior — sem o flag, o centro piscaria de volta pro CTA. */
-export function deriveStage(
+function deriveStage(
   saga: SagaState | undefined,
   firedGenerate: boolean,
   hasContent = false,
@@ -122,6 +126,9 @@ export function useConstruction(id: string) {
   const [highlightedDocId, setHighlightedDocId] = useState<string | null>(null);
   // Disparei "Gerar minuta" nesta sessão? Ponte otimista até o saga avançar.
   const [firedGenerate, setFiredGenerate] = useState(false);
+  // Conferência (assessment) em andamento? Sinal real da fase 2 do loader — o
+  // ciclo REST (request+poll+validate) roda antes do generate flipar EXTRACTING.
+  const [firedAssessment, setFiredAssessment] = useState(false);
   const [instructionsEdit, setInstructionsEdit] = useState<string | null>(null);
   const instructions = instructionsEdit ?? draftQuery.data?.instructions ?? "";
 
@@ -178,10 +185,18 @@ export function useConstruction(id: string) {
     if (!hasOrigin || !hasTeor || generate.isPending || saga === "EXTRACTING")
       throw new Error("Geração indisponível");
     setFiredGenerate(true);
+    setFiredAssessment(false);
     try {
-      await generate.mutateAsync({ thesisIds, revision });
+      await generate.mutateAsync({
+        thesisIds,
+        instructions: instructions.trim(),
+        expectedCurrentVersionId: draftQuery.data?.currentVersionId ?? null,
+        revision,
+        onAssessmentStarted: () => setFiredAssessment(true),
+      });
     } catch (error) {
       setFiredGenerate(false);
+      setFiredAssessment(false);
       throw error;
     }
   };
@@ -197,23 +212,29 @@ export function useConstruction(id: string) {
     if (!hasOrigin || !hasTeor || generate.isPending || saga === "EXTRACTING")
       return;
     setFiredGenerate(true);
+    setFiredAssessment(false);
     generate.mutate(
-      { thesisIds: theses.selectedIds, instructions: instructions.trim() },
       {
-        onError: () => setFiredGenerate(false),
+        thesisIds: theses.selectedIds,
+        instructions: instructions.trim(),
+        expectedCurrentVersionId: draftQuery.data?.currentVersionId ?? null,
+        onAssessmentStarted: () => setFiredAssessment(true),
+      },
+      {
+        onError: () => {
+          setFiredGenerate(false);
+          setFiredAssessment(false);
+        },
       },
     );
   };
 
   const voltar = () =>
     router.push(
-      params.get("retorno")?.startsWith("/providencias/")
+      params.get("retorno")
         ? params.get("retorno")!
         : draftQuery.data?.intimation.id
-          ? detalheNaFila(
-              draftQuery.data.intimation.id,
-              params.get("retorno") ?? "/intimacoes",
-            )
+          ? detalheNaFila(draftQuery.data.intimation.id, "/intimacoes")
           : "/fila",
     );
 
@@ -225,6 +246,83 @@ export function useConstruction(id: string) {
   const regenerating =
     stage === "pronta" &&
     (saga === "EXTRACTING" || (saga === "CREATED" && firedGenerate));
+
+  // ── NAVEGAR-PRIMEIRO: auto-partida NA TELA DA PEÇA ─────────────────────────
+  // Chegou via "Gerar peça" (auto=1) num rascunho fresco: assim que as teses
+  // (draft-scoped, via stream) estão prontas, dispara a geração com TODAS elas +
+  // o prompt opcional (sessionStorage por draftId). O loader de 4 fases aparece
+  // desde o início (sem a antiga tela intermediária "Construindo a peça…").
+  // Falha → autoFailed → estado de erro limpo + "Tentar de novo" (retryAuto), na
+  // linguagem do fluxo novo — sem cair no pregen antigo de escolher tese.
+  const autoParam = params.get("auto") === "1";
+  const [autoFailed, setAutoFailed] = useState(false);
+  const autoFired = useRef(false);
+  // Janela em que o loader deve aparecer antes/durante o disparo automático
+  // (evita um flash do pregen enquanto as teses ainda chegam).
+  const autoPending =
+    autoParam &&
+    saga === "CREATED" &&
+    !hasContent &&
+    !autoFailed &&
+    !theses.isError;
+  useEffect(() => {
+    if (!autoParam || autoFired.current || autoFailed) return;
+    if (saga !== "CREATED" || hasContent || firedGenerate) return;
+    if (!hasOrigin || !hasTeor) return;
+    if (theses.isError) {
+      setAutoFailed(true);
+      return;
+    }
+    if (theses.isLoading || theses.isRegenerating || theses.isTogglingId)
+      return;
+    if (theses.theses.length === 0) return; // aguarda as teses (stream) assentarem
+    autoFired.current = true;
+    const allIds = theses.theses.map((t) => t.id);
+    const instr = peekInstructions(id).trim();
+    setFiredGenerate(true);
+    setFiredAssessment(false);
+    generate.mutate(
+      {
+        thesisIds: allIds,
+        instructions: instr,
+        expectedCurrentVersionId: draftQuery.data?.currentVersionId ?? null,
+        onAssessmentStarted: () => setFiredAssessment(true),
+      },
+      {
+        onSuccess: () => clearInstructions(id), // BLOCKER-3: limpa só no 202
+        onError: () => {
+          setFiredGenerate(false);
+          setFiredAssessment(false);
+          setAutoFailed(true);
+        },
+      },
+    );
+  }, [
+    autoParam,
+    autoFailed,
+    saga,
+    hasContent,
+    firedGenerate,
+    hasOrigin,
+    hasTeor,
+    theses.isError,
+    theses.isLoading,
+    theses.isRegenerating,
+    theses.isTogglingId,
+    theses.theses,
+    generate,
+    id,
+    draftQuery.data?.currentVersionId,
+  ]);
+
+  // Retry do fluxo auto após falha (assessment_unavailable, timeout, erro): rearma
+  // o gatilho (autoFired=false) e limpa autoFailed → o efeito acima re-dispara a
+  // geração com as mesmas teses + instructions. É o "Tentar de novo" do estado de
+  // erro (substitui a queda no pregen antigo).
+  const retryAuto = useCallback(() => {
+    autoFired.current = false;
+    setAutoFailed(false);
+  }, []);
 
   // Fonte das teses a exibir: enquanto o stream está ativo (ou parou no meio com
   // cards já mostrados), usa a lista incremental do stream; senão a lista
@@ -276,6 +374,14 @@ export function useConstruction(id: string) {
     regenerateWithTheses,
     contentEdited: !!draftQuery.data?.contentEdited,
     isGenerating: generate.isPending,
+    // Conferência (assessment) em curso — sinal real da fase 2 do loader.
+    assessmentActive: firedAssessment && saga !== "EXTRACTING",
+    // Janela da auto-partida (auto=1, rascunho fresco): mostra o loader direto,
+    // antes mesmo do generate disparar (enquanto as teses chegam).
+    autoPending,
+    // Falha do fluxo auto (assessment/generate) → estado de erro + "Tentar de novo".
+    autoFailed: autoParam && autoFailed,
+    retryAuto,
     hasOrigin,
     hasTeor,
     voltar,
