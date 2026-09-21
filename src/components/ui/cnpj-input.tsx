@@ -9,6 +9,7 @@ import { IMaskInput } from "react-imask";
 // site (o submit do onboarding faz digits(doc)), como no OAB.
 
 type CnpjInputProps = {
+  id?: string;
   value: string;
   onChange: (value: string) => void;
   className?: string;

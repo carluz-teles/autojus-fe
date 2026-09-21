@@ -317,6 +317,7 @@ function OrgStep({ f }: { f: F }) {
           <div className="mb-4">
             <Label htmlFor="onb-cnpj">CNPJ</Label>
             <CnpjInput
+              id="onb-cnpj"
               value={f.cnpj}
               onChange={f.setCnpj}
               onBlur={f.onCnpjBlur}
