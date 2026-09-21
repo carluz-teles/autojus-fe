@@ -31,11 +31,11 @@ function useLookups() {
 
 /**
  * Hook público da feature — compõe /identity/me + escrita do perfil + lookups.
- * `poll` habilita o polling que se auto-desliga em useMe (usado durante o
- * "preparando sua conta" do passo da empresa).
+ * Sem poll: o provisionamento do tenant é síncrono no BE, então `tenantReady`
+ * reflete o primeiro (e único) fetch de /me disparado quando a org fica ativa.
  */
-export function useOnboarding({ poll = false } = {}) {
-  const me = useMe(poll);
+export function useOnboarding() {
+  const me = useMe();
   const profile = useUpdateOrgProfile();
   const { cep } = useLookups();
 

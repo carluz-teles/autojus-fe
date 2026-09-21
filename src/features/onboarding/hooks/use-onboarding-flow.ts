@@ -7,6 +7,7 @@ import {
   useUser,
 } from "@clerk/nextjs";
 import type { OrganizationCustomRoleKey } from "@clerk/shared/types";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -14,7 +15,9 @@ import { addWatchedOab } from "@/features/integrations/services/integrations.ser
 import { useApi } from "@/lib/api/use-api";
 
 import { lookupCnpj } from "../lib/cnpj-lookup";
+import { getMe } from "../services/onboarding.service";
 import type { AccountType } from "../types";
+import { ME_KEY } from "./use-me";
 import { useOnboarding } from "./use-onboarding";
 
 // Onboarding revamp por PERSONA: Usuário → Organização (toggle Autônomo/Escritório)
@@ -25,7 +28,7 @@ import { useOnboarding } from "./use-onboarding";
 // async) → cai na Triagem que enche ao vivo. Autos (cert+2FA) é opt-in DEPOIS, nunca
 // pré-requisito.
 export type OnbStep = "user" | "org" | "oab" | "team" | "done";
-type Phase = "idle" | "creating" | "provisioning" | "saving";
+type Phase = "idle" | "creating" | "saving";
 
 const STORED_STEPS = new Set<OnbStep>(["user", "org", "oab", "team", "done"]);
 const digits = (s: string) => s.replace(/\D/g, "");
@@ -215,18 +218,16 @@ export function useOnboardingFlow() {
   const [convitesEnviados, setConvitesEnviados] = useState(0);
   const [erro, setErro] = useState<string | null>(null);
   const restoredStepFor = useRef<string | null>(null);
-  const afterProvision = useRef<OnbStep | null>(null);
 
   const u = useUserStep();
   const o = useOrgStep();
   const oabs = useOabs();
   const team = useTeam();
   const api = useApi();
+  const qc = useQueryClient();
   const solo = o.persona === "solo";
 
-  const { tenantReady, updateOrgProfile } = useOnboarding({
-    poll: phase === "provisioning",
-  });
+  const { tenantReady, updateOrgProfile } = useOnboarding();
 
   const stepStorageKey = userId ? `atjus:onboarding-step:${userId}` : null;
 
@@ -252,19 +253,16 @@ export function useOnboardingFlow() {
 
   // Clerk permite sessão pessoal mesmo já pertencendo a uma org (acontece após hard
   // refresh). Reativa a membership existente antes que o wizard crie uma 2ª org.
+  // Com a org ativa, o `orgId` volta ao token e a query /me busca o tenant sozinha.
   useEffect(() => {
     if (!isLoaded || orgId || phase !== "idle") return;
     const membership = userMemberships.data?.[0];
     if (!membership || !setActive) return;
     void setActive({ organization: membership.organization.id })
-      .then(() => {
-        setErro(null);
-        setPhase("provisioning");
-      })
-      .catch(() => {
-        setPhase("idle");
-        setErro("Não foi possível restaurar o escritório. Tente novamente.");
-      });
+      .then(() => setErro(null))
+      .catch(() =>
+        setErro("Não foi possível restaurar o escritório. Tente novamente."),
+      );
   }, [isLoaded, orgId, phase, setActive, userMemberships.data]);
 
   // Passo 1 → 2: persiste nome no Clerk e avança. Nome/sobrenome obrigatórios.
@@ -282,29 +280,54 @@ export function useOnboardingFlow() {
     setStep("org");
   }, [u]);
 
-  // Provisiona o tenant: cria a Clerk Org (nome = solo? nome completo : razão social),
-  // ativa, e deixa o efeito de provisioning levar ao próximo passo (afterProvision).
+  // Provisiona o tenant SÍNCRONO: cria a Clerk Org (nome = solo? nome completo :
+  // razão social) e ativa; a PRIMEIRA leitura de /identity/me já provisiona o tenant
+  // na própria request (BE síncrono — sem webhook, sem poll, sem teto). O fetch
+  // popula o cache que o useMe lê. Sobe o logo staged (firm, pela org recém-criada)
+  // e avança. Erro em qualquer passo volta o controle na hora (try/catch).
   const criarTenant = useCallback(
     async (nome: string, next: OnbStep) => {
-      if (tenantReady || activeOrg) {
-        afterProvision.current = next;
-        setPhase("provisioning");
-        return;
-      }
-      if (!isLoaded || !createOrganization || !setActive) return;
-      afterProvision.current = next;
+      if (phase !== "idle" || !isLoaded) return;
       setPhase("creating");
       try {
-        const org = await createOrganization({ name: nome });
-        await setActive({ organization: org.id });
-        setPhase("provisioning");
+        let org = activeOrg ?? null;
+        if (!org) {
+          if (!createOrganization || !setActive) {
+            setPhase("idle");
+            return;
+          }
+          const created = await createOrganization({ name: nome });
+          await setActive({ organization: created.id });
+          org = created;
+        }
+        const me = await qc.fetchQuery({
+          queryKey: [...ME_KEY, org.id],
+          queryFn: () => getMe(api),
+        });
+        if (!me?.tenant_id) {
+          throw new Error("provisionamento não devolveu tenant");
+        }
+        if (!solo && o.logoFile) {
+          await org.setLogo({ file: o.logoFile }).catch(() => undefined);
+        }
+        setPhase("idle");
+        setStep(next);
       } catch {
         setPhase("idle");
-        afterProvision.current = null;
         setErro("Não foi possível preparar sua conta. Tente novamente.");
       }
     },
-    [tenantReady, activeOrg, isLoaded, createOrganization, setActive],
+    [
+      phase,
+      isLoaded,
+      activeOrg,
+      createOrganization,
+      setActive,
+      solo,
+      o.logoFile,
+      qc,
+      api,
+    ],
   );
 
   // Passo 2 → 3: valida os campos do escritório, cria o tenant e vai pra OABs.
@@ -324,25 +347,6 @@ export function useOnboardingFlow() {
     const nome = solo ? u.fullName || "Meu escritório" : o.razaoSocial.trim();
     await criarTenant(nome, "oab");
   }, [phase, solo, o.razaoSocial, o.cnpj, u.fullName, criarTenant]);
-
-  // Quando o tenant fica pronto: sobe o logo staged (firm) e vai pro passo destino.
-  useEffect(() => {
-    if (phase !== "provisioning" || !tenantReady) return;
-    const next = afterProvision.current ?? "oab";
-    afterProvision.current = null;
-    const finish = () => {
-      setPhase("idle");
-      setStep(next);
-    };
-    if (!solo && o.logoFile && activeOrg) {
-      void activeOrg
-        .setLogo({ file: o.logoFile })
-        .catch(() => undefined)
-        .finally(finish);
-      return;
-    }
-    finish();
-  }, [phase, tenantReady, solo, o.logoFile, activeOrg]);
 
   // Grava o perfil (com account_type) → persiste as OABs (dispara DJEN) → convites do
   // time (best-effort) → done. O perfil é o gate; OABs/convites são allSettled.
@@ -425,17 +429,6 @@ export function useOnboardingFlow() {
     if (solo) void concluir();
     else setStep("team");
   }, [oabs.oabs.length, solo, concluir]);
-
-  // Teto do provisionamento (~40s) — devolve o controle em vez de pollar pra sempre.
-  useEffect(() => {
-    if (phase !== "provisioning") return;
-    const timer = setTimeout(() => {
-      setPhase("idle");
-      afterProvision.current = null;
-      setErro("Demorou demais para preparar a conta. Tente de novo.");
-    }, 40_000);
-    return () => clearTimeout(timer);
-  }, [phase]);
 
   // Passos visíveis pra barra de progresso (solo não tem "team").
   const visibleSteps: OnbStep[] = solo

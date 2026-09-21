@@ -12,12 +12,12 @@ export const ME_KEY = ["identity", "me"] as const;
 /**
  * Sub-hook (responsabilidade: /identity/me). Server state via React Query.
  *
- * Polling que se AUTO-DESLIGA (regra do ERD): enquanto `poll` estiver ligado e o
- * BE ainda não provisionou o tenant, refaz a busca a cada 2s; quando `tenant_id`
- * deixa de ser null (estado terminal do saga de provisionamento), retorna `false`
- * e o timer para sozinho.
+ * Sem polling: o provisionamento do tenant é SÍNCRONO no BE (GetMe provisiona na
+ * própria request — sem webhook). A query é keyada pelo `orgId`, então dispara
+ * uma única vez assim que a org fica ativa (`setActive`), e o `tenant_id` já volta
+ * provisionado nesse primeiro fetch.
  */
-export function useMe(poll = false) {
+export function useMe() {
   const fetcher = useApi();
   const { isLoaded, orgId } = useAuth();
   return useQuery({
@@ -27,8 +27,5 @@ export function useMe(poll = false) {
     queryKey: [...ME_KEY, orgId],
     queryFn: () => getMe(fetcher),
     enabled: isLoaded && Boolean(orgId),
-    refetchInterval: (query) =>
-      poll && !query.state.data?.tenant_id ? 2000 : false,
-    refetchIntervalInBackground: false,
   });
 }
