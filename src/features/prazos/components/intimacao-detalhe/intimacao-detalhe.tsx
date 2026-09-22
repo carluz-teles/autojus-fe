@@ -39,6 +39,7 @@ import { useFilaNavigation } from "@/features/intimacoes/hooks/use-fila-navigati
 import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
 import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
 import { GerarPecaModal } from "@/features/pecas-v2/components/pregen/gerar-peca-modal";
+import { PecaGateModal } from "@/features/pecas-v2/components/pregen/peca-gate-modal";
 import { setInstructions } from "@/features/pecas-v2/lib/instructions-storage";
 import { cn, formatarData } from "@/lib/utils";
 
@@ -772,10 +773,25 @@ function AcoesPrimarias({ det }: { det: Detalhe }) {
     retorno: `/intimacoes/${m.id}`,
   });
 
-  const bloqueado =
-    bloqueiaProvidencias(det.prazoDetalhe, det.intimacao?.estado ?? "") ||
-    det.memoriaPending ||
-    det.memoriaErro;
+  // Pre-flight (gate) da geração de peça — o gate REAL. A análise é cosmética e
+  // nunca bloqueia; o gate roda ao clicar "Gerar peça".
+  const [gateOpen, setGateOpen] = useState(false);
+
+  // Enquanto o prazo/memória carrega, seguramos as ações (evita agir sobre estado
+  // incompleto). O tipo do ato NÃO bloqueia mais o botão: o gate cobre isso inline.
+  const carregando = det.memoriaPending || det.memoriaErro;
+
+  // "Dar ciência" mantém o bloqueio de revisão (a intimação vira ciência) — o gate
+  // é só do caminho da peça.
+  const cienciaBloqueada =
+    carregando ||
+    bloqueiaProvidencias(det.prazoDetalhe, det.intimacao?.estado ?? "");
+
+  // Tipo do ato confirmado? Check 1 do gate. Sem prazo derivado + estado a
+  // classificar/ia = ainda não confirmado.
+  const tipoConfirmado = det.prazoDetalhe
+    ? !precisaConfirmarPrazo(det.prazoDetalhe, det.intimacao?.estado ?? "")
+    : !bloqueiaProvidencias(det.prazoDetalhe, det.intimacao?.estado ?? "");
 
   // Peça-alvo do botão "Gerar peça": a 1ª que gera peça; se só houver ciência, usa
   // o próprio item de ciência (o BE deriva o tipo). "" quando nada há → botão off.
@@ -789,13 +805,20 @@ function AcoesPrimarias({ det }: { det: Detalhe }) {
     router.push(url);
   }
 
+  // Clique em "Gerar peça": peça já iniciada → abre direto; senão, abre o pre-flight.
   function onGerarPeca() {
     if (!alvoId) return;
     if (pecaAlvo?.jaIniciada) {
       router.push(buildGerarUrl(alvoId));
     } else {
-      openGerarModal(alvoId);
+      setGateOpen(true);
     }
+  }
+
+  // Pre-flight passou (ou o usuário optou por seguir) → modal de orientação → navega.
+  function onGatePassou() {
+    if (!alvoId) return;
+    openGerarModal(alvoId);
   }
 
   // Intimação em estado terminal (resolvida/ignorada) — a unidade de trabalho é a
@@ -806,14 +829,14 @@ function AcoesPrimarias({ det }: { det: Detalhe }) {
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
-      <Button size="sm" onClick={onGerarPeca} disabled={bloqueado || !alvoId}>
+      <Button size="sm" onClick={onGerarPeca} disabled={carregando || !alvoId}>
         <Sparkles data-icon="inline-start" />
         {pecaAlvo?.jaIniciada ? "Abrir peça" : "Gerar peça"}
       </Button>
       <Button
         size="sm"
         variant="outline"
-        disabled={bloqueado || dandoCiencia}
+        disabled={cienciaBloqueada || dandoCiencia}
         onClick={onDarCiencia}
       >
         {dandoCiencia ? (
@@ -829,6 +852,18 @@ function AcoesPrimarias({ det }: { det: Detalhe }) {
           Não foi possível dar ciência. Tente novamente.
         </p>
       ) : null}
+      <PecaGateModal
+        open={gateOpen}
+        onOpenChange={setGateOpen}
+        intimacaoId={m.id}
+        processoId={m.courtRecordId}
+        degree={det.intimacao?.degree}
+        prazo={det.prazoDetalhe}
+        tipoConfirmado={tipoConfirmado}
+        pecaLabel={pecaLabel || disposicao.pecas[0]?.label}
+        onProceed={onGatePassou}
+        onConfigurarTribunal={() => router.push("/configuracoes?tab=fontes")}
+      />
       <GerarPecaModal
         open={modalOpen}
         onOpenChange={(v) => {

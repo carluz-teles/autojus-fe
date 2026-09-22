@@ -1,10 +1,24 @@
 "use client";
 
-import { Building2, Check, Info, Sparkles, User, X } from "lucide-react";
+import {
+  Building2,
+  Check,
+  ChevronDown,
+  FileStack,
+  Info,
+  Landmark,
+  ScrollText,
+  ShieldCheck,
+  Sparkles,
+  User,
+  X,
+} from "lucide-react";
+import { useState } from "react";
 
 import { CnpjInput } from "@/components/ui/cnpj-input";
 import { IconAction } from "@/components/ui/icon-action";
 import { OabInput } from "@/components/ui/oab-input";
+import { ConfigTribunais } from "@/features/prazos/components/config/config-tribunais";
 import { OabTermRow } from "@/features/shared/components/oab-term-row";
 import { formatOabTermo } from "@/features/shared/lib/diario";
 
@@ -62,7 +76,11 @@ export function OnboardingFlow() {
 
       {/* corpo centralizado */}
       <div className="grid min-h-0 flex-1 place-items-center overflow-y-auto p-[30px]">
-        <div className="surface-panel relative w-[520px] max-w-full overflow-hidden p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.12)] sm:p-7">
+        <div
+          className={`surface-panel relative w-full max-w-full overflow-hidden p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.12)] sm:p-7 ${
+            f.step === "autos" ? "sm:w-[720px]" : "sm:w-[520px]"
+          }`}
+        >
           {/* fio de luz no topo do card (primário→latão) */}
           <span
             aria-hidden
@@ -76,6 +94,7 @@ export function OnboardingFlow() {
             {f.step === "user" ? <UserStep f={f} /> : null}
             {f.step === "org" ? <OrgStep f={f} /> : null}
             {f.step === "oab" ? <OabStep f={f} /> : null}
+            {f.step === "autos" ? <AutosStep f={f} /> : null}
             {f.step === "team" ? <TeamStep f={f} /> : null}
             {f.step === "done" ? <Done f={f} /> : null}
           </div>
@@ -438,20 +457,149 @@ function OabStep({ f }: { f: F }) {
       <ErroLinha erro={f.erro} />
       <Footer
         onBack={f.voltarOrg}
-        cta={f.solo ? "Ativar captura e concluir" : "Continuar"}
-        icon={
-          f.solo ? <Sparkles className="size-[15px]" strokeWidth={1.8} /> : null
-        }
+        cta="Continuar"
         onCta={f.continuarOab}
         disabled={!f.podeConcluir}
-        busy={f.saving}
-        busyLabel="Preparando sua conta…"
       />
     </>
   );
 }
 
-// ── Passo 4: Time (só escritório, pulável) ────────────────────────────────────
+// ── Passo 4: Acesso ao tribunal (INDUÇÃO — nudge, nunca bloqueio) ──────────────
+// Persuade a conectar o tribunal AGORA: com os autos, os prazos e as peças
+// trabalham com o processo INTEIRO; sem eles, ficam superficiais. Reusa o fluxo de
+// conexão real (ConfigTribunais). "Adiar" fica visível, mas claramente secundário.
+function AutosStep({ f }: { f: F }) {
+  const [expandido, setExpandido] = useState(false);
+
+  const beneficios = [
+    {
+      icon: <ScrollText className="size-4" strokeWidth={1.9} />,
+      titulo: "Prazos com base no processo inteiro",
+      texto:
+        "A contagem enxerga o que realmente aconteceu nos autos — não só a publicação.",
+    },
+    {
+      icon: <FileStack className="size-4" strokeWidth={1.9} />,
+      titulo: "Peças mais completas",
+      texto:
+        "Com os autos em mãos, cada peça sai fundamentada no que está no processo.",
+    },
+    {
+      icon: <ShieldCheck className="size-4" strokeWidth={1.9} />,
+      titulo: "Um acesso, tudo destravado",
+      texto:
+        "Um certificado + 2FA conecta o tribunal uma vez — os autos passam a chegar sozinhos.",
+    },
+  ];
+
+  return (
+    <>
+      <div className="mb-1 flex items-center gap-2">
+        <span
+          className="text-primary-foreground grid size-7 place-items-center rounded-lg shadow-sm"
+          style={{ backgroundImage: BRAND_GRADIENT }}
+        >
+          <Landmark className="size-4" strokeWidth={1.9} aria-hidden />
+        </span>
+        <div className="font-display text-[21px] font-medium">
+          Conecte o acesso aos autos
+        </div>
+      </div>
+      <p className="text-fg3 mb-4 text-[12.5px] leading-[1.5]">
+        As publicações já chegam pela OAB. Conectar o tribunal traz os{" "}
+        <strong className="text-foreground font-medium">autos completos</strong>{" "}
+        — e é aí que o Atjus faz a diferença de verdade.
+      </p>
+
+      <div className="mb-4 flex flex-col gap-2">
+        {beneficios.map((b) => (
+          <div
+            key={b.titulo}
+            className="border-line bg-bg flex items-start gap-3 rounded-[11px] border px-3.5 py-3"
+          >
+            <span className="text-primary bg-selected mt-px grid size-8 flex-none place-items-center rounded-lg">
+              {b.icon}
+            </span>
+            <div className="min-w-0">
+              <p className="text-[13px] font-medium">{b.titulo}</p>
+              <p className="text-fg3 text-[12px] leading-[1.5]">{b.texto}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* CTA primária: revela o fluxo real de conexão (ConfigTribunais). É o caminho
+          fácil e atraente. */}
+      {expandido ? (
+        <div className="reveal border-line bg-bg mb-2 max-h-[46vh] overflow-y-auto rounded-[12px] border p-3.5">
+          <ConfigTribunais />
+        </div>
+      ) : (
+        <button
+          onClick={() => setExpandido(true)}
+          className="border-primary/40 hover:bg-selected group mb-2 flex w-full items-center gap-3 rounded-[12px] border px-4 py-3.5 text-left transition-colors"
+          style={{
+            backgroundImage:
+              "radial-gradient(120% 120% at 0% 0%, color-mix(in oklch, var(--primary) 8%, transparent), transparent 60%)",
+          }}
+        >
+          <span
+            className="text-primary-foreground grid size-9 flex-none place-items-center rounded-xl shadow-sm"
+            style={{ backgroundImage: BRAND_GRADIENT }}
+          >
+            <ShieldCheck className="size-4" strokeWidth={1.9} aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-medium">
+              Configurar acesso ao tribunal agora
+            </span>
+            <span className="text-fg3 block text-[12px]">
+              Certificado A1 + 2FA — leva um minuto e vale pra todos os
+              tribunais.
+            </span>
+          </span>
+          <ChevronDown
+            className="text-fg3 group-hover:text-primary size-4 flex-none"
+            aria-hidden
+          />
+        </button>
+      )}
+
+      <div className="border-line bg-bg mt-2 flex items-start gap-2.5 rounded-[10px] border px-3.5 py-3">
+        <Info
+          className="text-primary mt-px size-4 flex-none"
+          strokeWidth={1.9}
+        />
+        <p className="text-fg3 text-[12px] leading-[1.5]">
+          Pode configurar depois em Configurações › Fontes de dados — mas quanto
+          antes conectar, mais completo o Atjus fica desde o primeiro processo.
+        </p>
+      </div>
+
+      <ErroLinha erro={f.erro} />
+      <Footer
+        onBack={f.voltarOabDeAutos}
+        cta={f.solo ? "Concluir" : "Continuar"}
+        icon={
+          f.solo ? <Sparkles className="size-[15px]" strokeWidth={1.8} /> : null
+        }
+        onCta={f.continuarAutos}
+        busy={f.saving}
+        busyLabel="Preparando sua conta…"
+      />
+      <button
+        onClick={f.continuarAutos}
+        disabled={f.saving}
+        className="text-fg3 hover:text-foreground mx-auto mt-3 block text-[12px]"
+      >
+        Adiar — configurar depois
+      </button>
+    </>
+  );
+}
+
+// ── Passo 5: Time (só escritório, pulável) ────────────────────────────────────
 function TeamStep({ f }: { f: F }) {
   return (
     <>

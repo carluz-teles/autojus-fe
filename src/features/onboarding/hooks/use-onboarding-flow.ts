@@ -27,10 +27,17 @@ import { useOnboarding } from "./use-onboarding";
 // (updateOrgProfile, agora com account_type) → OABs viram watched-oabs (dispara DJEN
 // async) → cai na Triagem que enche ao vivo. Autos (cert+2FA) é opt-in DEPOIS, nunca
 // pré-requisito.
-export type OnbStep = "user" | "org" | "oab" | "team" | "done";
+export type OnbStep = "user" | "org" | "oab" | "autos" | "team" | "done";
 type Phase = "idle" | "creating" | "saving";
 
-const STORED_STEPS = new Set<OnbStep>(["user", "org", "oab", "team", "done"]);
+const STORED_STEPS = new Set<OnbStep>([
+  "user",
+  "org",
+  "oab",
+  "autos",
+  "team",
+  "done",
+]);
 const digits = (s: string) => s.replace(/\D/g, "");
 
 // Normaliza a OAB digitada ("OAB/SP 214.885", "SP 214885", "214885/SP") pra chave
@@ -419,21 +426,29 @@ export function useOnboardingFlow() {
     api,
   ]);
 
-  // Passo 3 → (firm: time · solo: conclui).
+  // Passo 3 → 4 (autos): valida as OABs e segue para a INDUÇÃO de acesso ao
+  // tribunal. Persistência de OABs/perfil/convites continua no `concluir` (fim).
   const continuarOab = useCallback(() => {
     if (oabs.oabs.length === 0) {
       setErro("Adicione ao menos uma OAB para ativar a captura.");
       return;
     }
     setErro(null);
+    setStep("autos");
+  }, [oabs.oabs.length]);
+
+  // Passo 4 (autos) → (firm: time · solo: conclui). Nudge, não bloqueio: seguir
+  // sem configurar o tribunal é uma escolha válida (adiar).
+  const continuarAutos = useCallback(() => {
+    setErro(null);
     if (solo) void concluir();
     else setStep("team");
-  }, [oabs.oabs.length, solo, concluir]);
+  }, [solo, concluir]);
 
   // Passos visíveis pra barra de progresso (solo não tem "team").
   const visibleSteps: OnbStep[] = solo
-    ? ["user", "org", "oab"]
-    : ["user", "org", "oab", "team"];
+    ? ["user", "org", "oab", "autos"]
+    : ["user", "org", "oab", "autos", "team"];
   const idx = Math.max(0, visibleSteps.indexOf(step));
 
   return {
@@ -475,7 +490,10 @@ export function useOnboardingFlow() {
     voltarOrg: () => setStep("org"),
     continuarOab,
     podeConcluir: oabs.oabs.length > 0,
-    // passo 4 — time
+    // passo 4 — autos (indução de acesso ao tribunal — nudge, não bloqueio)
+    continuarAutos,
+    voltarOabDeAutos: () => setStep("oab"),
+    // passo 5 — time
     teamRows: team.rows,
     teamEmail: team.email,
     setTeamEmail: team.setEmail,
@@ -483,7 +501,7 @@ export function useOnboardingFlow() {
     setTeamRole: team.setRole,
     addTeamRow: team.add,
     removeTeamRow: team.remove,
-    voltarOab: () => setStep("oab"),
+    voltarOab: () => setStep("autos"),
     concluir: () => void concluir(),
     // done
     capturasAtivadas,
