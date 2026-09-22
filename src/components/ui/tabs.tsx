@@ -5,6 +5,7 @@ import { createContext, useContext, useId, useState } from "react";
 import { cn } from "@/lib/utils";
 
 import { tabListClassName, tabTriggerClassName } from "./tab-styles";
+import { useSlidingIndicator } from "./use-sliding-indicator";
 
 // Abas do design system: indicador verde, navegação por teclado e painéis associados.
 
@@ -57,8 +58,11 @@ export function TabsList({
   children: React.ReactNode;
   "aria-label"?: string;
 }) {
+  const ctx = useTabsCtx("TabsList");
+  const { containerRef, rect } = useSlidingIndicator(ctx.value);
   return (
     <div
+      ref={containerRef}
       role="tablist"
       aria-label={ariaLabel}
       onKeyDown={(e) => {
@@ -82,9 +86,19 @@ export function TabsList({
         next.focus();
         next.click();
       }}
-      className={tabListClassName}
+      className={cn(tabListClassName, "relative")}
     >
       {children}
+      {/* sublinhado deslizante (indicador ativo) — desliza suave ao trocar de aba */}
+      <span
+        aria-hidden
+        className="bg-primary pointer-events-none absolute bottom-0 h-0.5 rounded-full transition-all duration-300 ease-out"
+        style={{
+          left: rect.left,
+          width: rect.width,
+          opacity: rect.ready ? 1 : 0,
+        }}
+      />
     </div>
   );
 }
@@ -106,6 +120,7 @@ export function TabsTrigger({
       aria-selected={selected}
       aria-controls={`${ctx.baseId}-panel-${value}`}
       tabIndex={selected ? 0 : -1}
+      data-slide-active={selected}
       onClick={() => ctx.setValue(value)}
       className={tabTriggerClassName(selected)}
     >

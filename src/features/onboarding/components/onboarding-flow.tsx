@@ -18,6 +18,7 @@ import { useState } from "react";
 import { CnpjInput } from "@/components/ui/cnpj-input";
 import { IconAction } from "@/components/ui/icon-action";
 import { OabInput } from "@/components/ui/oab-input";
+import { useSlidingIndicator } from "@/components/ui/use-sliding-indicator";
 import { ConfigTribunais } from "@/features/prazos/components/config/config-tribunais";
 import { OabTermRow } from "@/features/shared/components/oab-term-row";
 import { formatOabTermo } from "@/features/shared/lib/diario";
@@ -243,20 +244,33 @@ function Segmented<T extends string>({
   options: { k: T; label: string; icon?: React.ReactNode }[];
   onChange: (v: T) => void;
 }) {
+  const { containerRef, rect } = useSlidingIndicator(value);
   return (
-    <div className="border-line bg-bg flex gap-1 rounded-[10px] border p-1">
+    <div
+      ref={containerRef}
+      className="border-line bg-bg relative flex gap-1 rounded-[10px] border p-1"
+    >
+      {/* pílula deslizante (indicador ativo) — mesma mecânica das abas */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute top-1 bottom-1 rounded-[7px] shadow-sm transition-all duration-200 ease-out"
+        style={{
+          left: rect.left,
+          width: rect.width,
+          opacity: rect.ready ? 1 : 0,
+          backgroundImage: BRAND_GRADIENT,
+        }}
+      />
       {options.map((op) => {
         const on = op.k === value;
         return (
           <button
             key={op.k}
+            type="button"
             onClick={() => onChange(op.k)}
-            className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-[7px] text-[13px] font-medium shadow-none transition-all duration-200 data-[on=true]:shadow-sm"
-            data-on={on}
-            style={{
-              backgroundImage: on ? BRAND_GRADIENT : "none",
-              color: on ? "var(--primary-foreground)" : "var(--fg2)",
-            }}
+            data-slide-active={on}
+            className="relative z-10 flex min-h-10 flex-1 items-center justify-center gap-2 rounded-[7px] text-[13px] font-medium transition-colors duration-200"
+            style={{ color: on ? "var(--primary-foreground)" : "var(--fg2)" }}
           >
             {op.icon}
             {op.label}
