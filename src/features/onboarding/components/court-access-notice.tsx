@@ -59,7 +59,7 @@ export function CourtAccessNotice({
         </button>
       ) : (
         <Link
-          href="/primeira-importacao"
+          href="/configuracoes?tab=fontes"
           className="text-primary shrink-0 font-medium hover:underline"
         >
           Preparar acesso

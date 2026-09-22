@@ -5,6 +5,7 @@ import { MoreHorizontal } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { MENU_ANIM } from "@/components/ui/menu-styles";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -56,7 +57,10 @@ export function RowActions({
           >
             <Menu.Popup
               data-slot="menu-content"
-              className="bg-popover text-popover-foreground shadow-float max-h-(--available-height) w-52 max-w-(--available-width) overflow-y-auto rounded-xl border p-1.5 outline-none"
+              className={cn(
+                "bg-popover text-popover-foreground shadow-float max-h-(--available-height) w-52 max-w-(--available-width) overflow-y-auto rounded-xl border p-1.5 outline-none",
+                MENU_ANIM,
+              )}
             >
               <Menu.Group>
                 {items?.map((item) => {

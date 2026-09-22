@@ -297,9 +297,20 @@ export function useProcessoHub(id: string) {
     }
   }
 
+  // Última sincronização de autos DESTE processo: a data do documento do TRIBUNAL
+  // (origin != UPLOAD) mais recente. Deriva dos autos já carregados — zero BE — e dá
+  // a clareza/histórico por-processo ("Autos sincronizados em DD/MM").
+  const ultimaSincronizacaoAutos = autos.documentos
+    .filter((d) => d.origin !== "UPLOAD")
+    .reduce<string | null>(
+      (max, d) => (!max || d.created_at > max ? d.created_at : max),
+      null,
+    );
+
   return {
     irParaTrabalho,
     processoQ,
+    ultimaSincronizacaoAutos,
     processo: p,
     identity: p ? linhaProcesso(p) : null,
     voltarHref,

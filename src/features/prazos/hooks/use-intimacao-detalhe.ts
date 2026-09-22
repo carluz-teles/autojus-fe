@@ -13,13 +13,16 @@ import {
   useReabrirIntimacao,
   useResolverIntimacao,
 } from "@/features/intimacoes/hooks/use-intimacoes";
+import { estadoIntimacao } from "@/features/intimacoes/lib/estado";
 import { TYPE_LABEL } from "@/features/intimacoes/lib/labels";
+import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
 import type {
   IntimacaoDetalheView,
   IntimacaoUserStatus,
 } from "@/features/intimacoes/types";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { nomeExibicao } from "@/features/organization/lib/labels";
+import { FASE_STEPS } from "@/features/processos/lib/apresentacao";
 import { formatarData } from "@/lib/utils";
 
 import { prazoVisivel } from "../lib/confirmacao";
@@ -297,6 +300,17 @@ function useModel(i: IntimacaoDetalheView | undefined) {
         ? formatarData(i.deadline_start_at)
         : "—",
       tipoLabel: TYPE_LABEL[i.type],
+      // fase — rótulo pt-BR da fase do processo (contexto no breadcrumb). Reusa FASE_STEPS
+      // (fonte única do stepper do cockpit, Regra nº1). "" quando não derivada.
+      fase: FASE_STEPS.find((s) => s.key === i.phase)?.label ?? "",
+      // ato — o TÍTULO do detalhe: o que ACONTECEU nesta publicação. Prioridade: ai_act (o
+      // ato classificado, ex.: "Sentença") > rótulo do tipo_ato do prazo (ex.: "Apelação",
+      // disponível já na ingestão determinística) > tipo genérico ("Intimação"). Substitui o
+      // título do PROCESSO no header (a intimação é a unidade de trabalho, não o processo).
+      ato:
+        i.ai_act?.trim() ||
+        (i.prazo?.tipo_ato ? tipoAtoLabel(i.prazo.tipo_ato) : "") ||
+        TYPE_LABEL[i.type],
       orgao: i.judging_body || i.court,
       publicadoEm: i.published_at ? formatarData(i.published_at) : "—",
 
@@ -313,6 +327,9 @@ function useModel(i: IntimacaoDetalheView | undefined) {
       })),
 
       statusLabel: status.label,
+      // estado (desfecho) — chip ÚNICO derivado de user_status+resolution+work_stage.
+      // Distingue Concluída·Ciência de Concluída·Protocolada; ver estadoIntimacao.
+      estado: estadoIntimacao(i),
 
       // prazo (contador grande). `fatalData` = data fatal real (end_date). O prazo
       // "interno" (folga de segurança) vem do motor de prazos — ainda 💀 (esqueleto).

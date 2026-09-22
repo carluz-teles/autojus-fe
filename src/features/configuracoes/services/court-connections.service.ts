@@ -25,6 +25,27 @@ export async function listCourtConnections(
   return raw.data;
 }
 
+/** Um lote de busca de autos (sync_run do court). `records` = PROCESSOS
+ *  fetchados no lote (não documentos — esses caem por-processo). */
+export interface AutosSyncRunView {
+  id: string;
+  records: number;
+  retried: number;
+  status: string; // "OK" | "FAILED"
+  finished_at: string;
+  error?: string;
+}
+
+/** Histórico de buscas de autos do tenant (mais recentes primeiro). */
+export async function getAutosHistory(
+  fetcher: ApiFetcher,
+): Promise<AutosSyncRunView[]> {
+  const raw = await fetcher<{ data: AutosSyncRunView[] }>(
+    `${ENDPOINT}/autos-history`,
+  );
+  return raw.data;
+}
+
 export interface CreateCourtConnectionInput {
   court: string;
   system: string;

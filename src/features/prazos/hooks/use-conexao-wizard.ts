@@ -10,6 +10,7 @@ import {
   useSubmitMfaSeed,
 } from "@/features/configuracoes/hooks/use-court-connections";
 import { courtSystemName } from "@/features/configuracoes/lib/court-catalog";
+import { syncCourtAutos } from "@/features/configuracoes/services/court-connections.service";
 import type {
   CourtCatalogEntry,
   CourtConnectionStatus,
@@ -19,6 +20,7 @@ import type {
 } from "@/features/configuracoes/types/court-connection";
 import { usableCertificates } from "@/features/onboarding/lib/import-readiness";
 import { ApiError } from "@/lib/api/errors";
+import { useApi } from "@/lib/api/use-api";
 
 // Motor do wizard UNIFICADO de conexão por tribunal: um certificado A1 serve os
 // vários sistemas do tribunal (eproc, e-SAJ). Para cada sistema o BE decide se
@@ -124,6 +126,7 @@ export function useConexaoWizard({
     [certificados],
   );
 
+  const api = useApi();
   const createMut = useCreateCourtConnection();
   const connectMut = useConnectCourtConnection();
   const mfaSeedMut = useSubmitMfaSeed();
@@ -282,6 +285,30 @@ export function useConexaoWizard({
     [patch],
   );
 
+  // Busca de autos ao conectar. A REGRA (do BE, RequestAutosSync): se há processos
+  // deste tribunal na base, enfileira a busca (queued > 0); se não há, nada a buscar
+  // (queued = 0). O sync é court-scoped, então basta acionar uma conexão do tribunal.
+  const [autos, setAutos] = useState<{
+    fase: "idle" | "buscando" | "ok" | "erro";
+    queued: number;
+    erro: string | null;
+  }>({ fase: "idle", queued: 0, erro: null });
+
+  const buscarAutos = useCallback(async () => {
+    const alvo = sistemas.find((s) => s.fase === "conectado" && s.connectionId);
+    if (!alvo?.connectionId) {
+      setAutos({ fase: "ok", queued: 0, erro: null });
+      return;
+    }
+    setAutos({ fase: "buscando", queued: 0, erro: null });
+    try {
+      const r = await syncCourtAutos(api, alvo.connectionId);
+      setAutos({ fase: "ok", queued: r.queued ?? 0, erro: null });
+    } catch (e) {
+      setAutos({ fase: "erro", queued: 0, erro: mensagemErro(e) });
+    }
+  }, [sistemas, api]);
+
   const iniciando = sistemas.some((s) => s.fase === "conectando");
   // O fluxo terminou quando nenhum sistema está pendente/conectando/aguardando 2FA.
   const resolvido =
@@ -315,6 +342,9 @@ export function useConexaoWizard({
     reconectar,
     enviarMfa,
     pular,
+    // busca de autos ao conectar
+    autos,
+    buscarAutos,
     // derivados
     iniciando,
     resolvido,

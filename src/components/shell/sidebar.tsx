@@ -27,6 +27,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { IconAction } from "@/components/ui/icon-action";
+import { MENU_ANIM } from "@/components/ui/menu-styles";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useUnreadNotifications } from "@/features/notifications/use-notifications";
@@ -390,7 +391,10 @@ function OrgSwitcher({ collapsed }: { collapsed: boolean }) {
         >
           <Menu.Popup
             data-slot="menu-content"
-            className="border-line bg-panel shadow-float w-56 max-w-(--available-width) overflow-hidden rounded-xl border p-1.5 outline-none"
+            className={cn(
+              "border-line bg-panel shadow-float w-56 max-w-(--available-width) overflow-hidden rounded-xl border p-1.5 outline-none",
+              MENU_ANIM,
+            )}
           >
             <Menu.Group>
               <div className="text-fg3 px-2.5 pt-[7px] pb-[5px] text-[10px] font-medium tracking-[0.05em] uppercase">
@@ -515,7 +519,10 @@ function UserSwitcher({
         >
           <Menu.Popup
             data-slot="menu-content"
-            className="border-line bg-panel shadow-float w-56 max-w-(--available-width) overflow-hidden rounded-xl border p-1.5 outline-none"
+            className={cn(
+              "border-line bg-panel shadow-float w-56 max-w-(--available-width) overflow-hidden rounded-xl border p-1.5 outline-none",
+              MENU_ANIM,
+            )}
           >
             <Menu.Group>
               <div className="border-line2 mb-[5px] flex items-center gap-[9px] border-b px-2.5 pt-2 pb-2.5">

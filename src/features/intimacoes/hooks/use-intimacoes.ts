@@ -19,7 +19,6 @@ import {
   isAnalysisMaterializationPending,
   isAnalysisPollTimedOut,
 } from "../lib/analysis-materialization";
-import { lifecycleDaLinha } from "../lib/listagem";
 import {
   analisarIntimacao,
   assignIntimacaoResponsavel,
@@ -148,17 +147,8 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     initialPageParam: "",
     getNextPageParam: (lastPage) => lastPage.page.next_cursor || undefined,
     enabled: filters.enabled ?? true,
-    // Lifecycle async da análise: enquanto alguma intimação estiver "Analisando…" (chegou,
-    // prazo real, ainda não materializou providência), poll a cada 4s pra a linha transicionar
-    // sozinha pra "Ação recomendada" quando o worker terminar. Para de pollar (false) assim que
-    // nenhuma linha está analisando — sem polling perpétuo. Só as páginas já carregadas contam.
-    refetchInterval: (q) => {
-      const pages = q.state.data?.pages ?? [];
-      const analyzing = pages.some((pg) =>
-        pg.data?.some((it) => lifecycleDaLinha(it).state === "analyzing"),
-      );
-      return analyzing ? 4000 : false;
-    },
+    // O trabalho necessário é determinístico (materializado na ingestão) — não há
+    // mais análise async pós-chegada, então a lista não faz poll esperando spinner.
     // Mantém os dados da faixa/filtro anterior enquanto a nova query carrega, pra
     // trocar tab/filtro NÃO derrubar a página inteira no skeleton (isPending só é
     // true no 1º load). O loading da troca fica scoped na lista via isFetching.

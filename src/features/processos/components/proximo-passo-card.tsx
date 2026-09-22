@@ -84,18 +84,44 @@ export function ProximoPassoCard({ passo, phase, prazo, onConferir }: Props) {
   const label = prazo
     ? passo.label.replace(/\s*—\s*(vence|vencido)\b.*$/iu, "")
     : passo.label;
-  const tone = urgent
-    ? "border-destructive/25 bg-destructive/5"
-    : "border-primary/20 bg-primary/5";
-  const iconTone = urgent
-    ? "bg-destructive/10 text-destructive"
-    : "bg-primary/10 text-primary";
+  // Hero premium (não-urgente): wash de teal em gradiente + top-shine interno +
+  // accent bar no topo — a mesma assinatura do herói da intimação. Urgente mantém a
+  // identidade vermelha (é sinal de ESTADO, não recebe o tratamento de marca).
+  const heroStyle = urgent
+    ? undefined
+    : {
+        backgroundImage:
+          "linear-gradient(158deg, color-mix(in oklch, var(--primary) 11%, var(--card)), color-mix(in oklch, var(--primary) 4%, var(--card)) 62%, var(--card))",
+        boxShadow:
+          "0 18px 48px -16px color-mix(in oklch, var(--primary) 34%, transparent), inset 0 1px 0 0 color-mix(in oklch, white 55%, transparent)",
+      };
+  const iconStyle = urgent
+    ? undefined
+    : {
+        backgroundImage:
+          "linear-gradient(135deg, var(--primary), color-mix(in oklch, var(--primary), black 14%))",
+      };
 
   return (
     <section
       aria-label="Próximo passo sugerido"
-      className={`flex flex-col gap-3 rounded-xl border px-5 py-4 shadow-sm ${tone}`}
+      className={`relative flex flex-col gap-3 overflow-hidden rounded-2xl border px-5 py-4 ${
+        urgent
+          ? "border-destructive/25 bg-destructive/5 shadow-sm"
+          : "border-primary/30"
+      }`}
+      style={heroStyle}
     >
+      {urgent ? null : (
+        <span
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-0.5"
+          style={{
+            backgroundImage:
+              "linear-gradient(90deg, transparent, var(--primary), var(--gold), transparent)",
+          }}
+        />
+      )}
       {fase ? (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-current/10 pb-2.5">
           <p className="text-sm font-medium">
@@ -123,15 +149,18 @@ export function ProximoPassoCard({ passo, phase, prazo, onConferir }: Props) {
       <div className="flex gap-3">
         <span
           aria-hidden
-          className={`flex size-9 shrink-0 items-center justify-center rounded-full ${iconTone}`}
+          className={`flex size-9 shrink-0 items-center justify-center rounded-full shadow-sm ${
+            urgent
+              ? "bg-destructive/10 text-destructive"
+              : "text-primary-foreground"
+          }`}
+          style={iconStyle}
         >
           <Icon className="size-[18px]" strokeWidth={1.8} />
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
-            {kicker}
-          </p>
-          <p className="font-display text-base leading-snug font-medium">
+          <p className="section-label">{kicker}</p>
+          <p className="font-display text-lg leading-snug font-medium">
             {label}
           </p>
           {prazo ? (

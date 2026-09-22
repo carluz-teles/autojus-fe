@@ -3,6 +3,8 @@
 import { Menu } from "@base-ui/react/menu";
 import { Check, ChevronDown, Loader2 } from "lucide-react";
 
+import { MENU_ANIM } from "@/components/ui/menu-styles";
+
 import { nomeExibicao } from "../lib/labels";
 import { Responsavel } from "./responsavel";
 
@@ -55,7 +57,9 @@ export function ResponsavelMenu({
           sideOffset={6}
           className="z-50"
         >
-          <Menu.Popup className="bg-popover text-popover-foreground ring-foreground/10 max-h-[min(18rem,var(--available-height))] w-64 max-w-[var(--available-width)] overflow-y-auto rounded-lg p-1 shadow-md ring-1 outline-none">
+          <Menu.Popup
+            className={`bg-popover text-popover-foreground ring-foreground/10 max-h-[min(18rem,var(--available-height))] w-64 max-w-[var(--available-width)] overflow-y-auto rounded-lg p-1 shadow-md ring-1 outline-none ${MENU_ANIM}`}
+          >
             <Menu.RadioGroup
               value={value ?? ""}
               onValueChange={(v) => {

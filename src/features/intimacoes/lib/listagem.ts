@@ -7,6 +7,7 @@ import type {
   IntimacaoView,
   RecommendedProvidencia,
 } from "../types";
+import { estadoIntimacao } from "./estado";
 import { tipoAtoLabel } from "./tipo-ato";
 
 export const SITUACAO_LABEL = {
@@ -58,25 +59,21 @@ function revisaoDaLinha(i: IntimacaoView) {
   return { label: "", pending: false };
 }
 
-// lifecycleDaLinha deriva o estado do lifecycle async da análise para o card da Triagem:
-//  • "recommended" — a análise materializou providência (mostra a Ação recomendada inline);
-//  • "analyzing"   — chegou com prazo real, não pendente de confirmação e ainda não analisada
-//                    (a análise async está rodando — mostra "Analisando…");
+// lifecycleDaLinha deriva o estado da linha para o card da Triagem:
+//  • "recommended" — há uma providência determinística (mostra a Ação recomendada inline);
 //  • "none"        — nada a sinalizar (resolvida/ignorada, sem prazo, ou pendente de confirmação,
 //                    caso já coberto por revisaoDaLinha → "Revisar tipo e prazo").
-// Pendentes de confirmação NÃO entram em "analyzing": não são auto-analisadas (o BE só dispara
-// a análise em prazo confiável), então a linha mostra o CTA de confirmação, não o spinner.
+// NÃO existe mais estado "analisando": o trabalho necessário é derivado DETERMINISTICAMENTE na
+// ingestão (não há mais análise async pós-chegada), então a linha nunca fica esperando um spinner.
 export type LinhaLifecycle =
   | { state: "recommended"; rec: RecommendedProvidencia; count: number }
-  | { state: "analyzing" }
   | { state: "none" };
 
 export function lifecycleDaLinha(i: IntimacaoView): LinhaLifecycle {
   const p = i.prazo;
   // A "Ação recomendada" (com Gerar peça/Concluir) só faz sentido num prazo ABERTO e real —
   // espelha o lane `ready`. VENCIDO (histórico, assume-se feito) e SEM PRAZO (mera ciência) NÃO
-  // recebem ação recomendada, mesmo que a análise tenha materializado uma providência (o backfill
-  // analisou tudo antes do skip de vencido). Aberto = PENDING/OPEN e não vencido (days_left >= 0).
+  // recebem ação recomendada. Aberto = PENDING/OPEN e não vencido (days_left >= 0).
   const abertoReal =
     !!p && ["PENDING", "OPEN"].includes(p.status) && p.days_left >= 0;
   if (i.recommended_providencia && abertoReal)
@@ -85,14 +82,6 @@ export function lifecycleDaLinha(i: IntimacaoView): LinhaLifecycle {
       rec: i.recommended_providencia,
       count: i.suggested_count,
     };
-  const pending = revisaoDaLinha(i).pending;
-  if (
-    i.user_status === "PENDING" &&
-    !pending &&
-    !i.ai_analyzed_at &&
-    abertoReal
-  )
-    return { state: "analyzing" };
   return { state: "none" };
 }
 
@@ -139,6 +128,10 @@ export function linhaIntimacao(i: IntimacaoView) {
     origemDescricao: ORIGEM_DESCRICAO[i.estado],
     revisao: revisaoDaLinha(i),
     lifecycle: lifecycleDaLinha(i),
+    // estado (desfecho) — chip único: Pendente/Em elaboração/Em revisão/Concluída·Ciência/
+    // Concluída·Protocolada/Ignorada. A linha só mostra quando NÃO é "Pendente" (a barra de
+    // prazo já cobre a intimação aberta comum); ver estadoIntimacao.
+    estado: estadoIntimacao(i),
     prazo: vencimentoDaLinha(i),
     responsavelId: i.assignee_user_id,
     responsavel:

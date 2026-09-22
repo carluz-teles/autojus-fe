@@ -421,7 +421,7 @@ function NotificationTime({
 }
 
 function notificationDestinationLabel(href: string) {
-  if (href === "/primeira-importacao") return "Ver importação";
+  if (href.startsWith("/configuracoes")) return "Ver importação";
   if (href.startsWith("/processos/")) return "Abrir processo";
   if (href.startsWith("/intimacoes/")) return "Abrir intimação";
   if (href.startsWith("/pecas/")) return "Abrir peça";

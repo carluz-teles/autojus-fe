@@ -32,6 +32,7 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller";
+import { SkeletonRows } from "@/components/ui/skeletons";
 import { Textarea } from "@/components/ui/textarea";
 import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 import { cn } from "@/lib/utils";
@@ -213,11 +214,7 @@ export function AssistentePanel({
                 aria-label="Conversa com o assistente"
               >
                 <MessageScrollerItem messageId="introduction">
-                  {thread.isPending && (
-                    <p role="status" className="text-muted-foreground text-xs">
-                      Carregando conversa…
-                    </p>
-                  )}
+                  {thread.isPending && <SkeletonRows rows={3} />}
                   {thread.isError && (
                     <p role="alert" className="text-xs">
                       Não foi possível carregar a conversa.{" "}

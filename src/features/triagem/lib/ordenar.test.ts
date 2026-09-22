@@ -38,6 +38,8 @@ function item(
     type: "INTIMACAO",
     status: "ACTIVE",
     user_status: "PENDING",
+    resolution: "",
+    resolved_at: null,
     source: "DJEN",
     source_url: "",
     made_available_at: "2026-09-01T00:00:00Z",

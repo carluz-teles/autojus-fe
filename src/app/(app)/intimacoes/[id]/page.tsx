@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { SkeletonDetail } from "@/components/ui/skeletons";
 import { IntimacaoDetalhe } from "@/features/prazos/components/intimacao-detalhe/intimacao-detalhe";
 
 export const metadata = { title: "Intimação · Prazos · jus·assessoria" };
@@ -12,9 +13,7 @@ export default async function IntimacaoDetalhePage({
 }) {
   const { id } = await params;
   return (
-    <Suspense
-      fallback={<p className="text-muted-foreground p-6">Carregando…</p>}
-    >
+    <Suspense fallback={<SkeletonDetail />}>
       {" "}
       <IntimacaoDetalhe id={id} />{" "}
     </Suspense>

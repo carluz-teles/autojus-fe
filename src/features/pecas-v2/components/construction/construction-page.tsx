@@ -28,6 +28,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { SkeletonDetail } from "@/components/ui/skeletons";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { FilingStatusNotice } from "@/features/filing/filing-status";
 import { PreparationWorkspace } from "@/features/filing/preparation-popover";
@@ -214,12 +215,7 @@ export function ConstructionPage({ id }: { id: string }) {
       setBusy(false);
     }
   };
-  if (h.isLoading)
-    return (
-      <p role="status" className="p-6">
-        Carregando peça…
-      </p>
-    );
+  if (h.isLoading) return <SkeletonDetail />;
   if (!draft || h.isError)
     return (
       <div className="p-6">

@@ -34,12 +34,16 @@ describe("notification preferences", () => {
 
 describe("notification destinations", () => {
   it.each([
-    "/primeira-importacao",
     "/processos/abc-123",
     "/intimacoes/abc-123",
     "/pecas/abc-123?retorno=%2Fnotificacoes",
   ])("accepts entity route %s", (href) => {
     expect(notificationHref({ payload: { href } })).toBe(href);
+  });
+  it("remaps the legacy import destination to Configurações › Fontes de dados", () => {
+    expect(
+      notificationHref({ payload: { href: "/primeira-importacao" } }),
+    ).toBe("/configuracoes?tab=fontes");
   });
   it.each([
     "https://example.com",

@@ -4,6 +4,7 @@ import { Plus, Radio } from "lucide-react";
 
 import { OabInput } from "@/components/ui/oab-input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AutosBuscasSection } from "@/features/configuracoes/components/autos-buscas-section";
 import { OabTermRow } from "@/features/shared/components/oab-term-row";
 
 import {
@@ -223,19 +224,20 @@ export function ConfigFontes({
                 <Vazio texto="Nenhuma varredura registrada ainda. Assim que uma OAB estiver ativa, a primeira captura roda em segundo plano." />
               ) : (
                 <div className="surface-panel divide-line2 reveal-stagger divide-y overflow-hidden">
-                  {fon.ingestoes.map((g) => {
+                  {fon.ingestoes.map((g, i) => {
                     const live = g.st === "Em andamento";
+                    const iconCor = live ? "var(--blue)" : g.tipoCor;
                     return (
                       <button
-                        key={`${g.data}-${g.hora}`}
+                        key={`${g.data}-${g.hora}-${g.tipo}-${i}`}
                         onClick={g.onClick}
                         className="hover:bg-hover flex w-full items-center gap-3 px-4 py-3 text-left transition-colors"
                       >
                         <span
                           className="grid size-9 flex-none place-items-center rounded-xl"
                           style={{
-                            background: `color-mix(in oklch, ${live ? "var(--blue)" : "var(--primary)"} 12%, transparent)`,
-                            color: live ? "var(--blue)" : "var(--primary)",
+                            background: `color-mix(in oklch, ${iconCor} 12%, transparent)`,
+                            color: iconCor,
                           }}
                         >
                           <Radio
@@ -244,14 +246,31 @@ export function ConfigFontes({
                           />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block text-[13px] font-medium">
-                            {g.data} · {g.hora}
+                          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span
+                              className="flex-none rounded-full px-2 py-0.5 text-[10.5px] font-medium"
+                              style={{
+                                background: `color-mix(in oklch, ${g.tipoCor} 14%, transparent)`,
+                                color: g.tipoCor,
+                              }}
+                            >
+                              {g.tipo}
+                            </span>
+                            <span className="text-[13px] font-medium">
+                              {g.data} · {g.hora}
+                            </span>
+                            {g.oabs.length > 0 && (
+                              <span className="text-fg3 text-[11.5px]">
+                                OAB {g.oabs.join(", ")}
+                              </span>
+                            )}
                           </span>
-                          <span className="text-fg3 mt-px block text-[11.5px]">
+                          <span className="text-fg3 mt-0.5 block text-[11.5px]">
                             {g.gatilho} · {g.dur} · {g.varridas} varridas ·{" "}
                             <span className="text-foreground font-medium">
                               {g.novas} novas
                             </span>
+                            {g.prazos !== "0" && ` · ${g.prazos} prazos`}
                           </span>
                         </span>
                         <StatusPill
@@ -274,6 +293,7 @@ export function ConfigFontes({
               )}
             </>
           )}
+          <AutosBuscasSection />
         </TabsContent>
       </Tabs>
     </SettingsSection>

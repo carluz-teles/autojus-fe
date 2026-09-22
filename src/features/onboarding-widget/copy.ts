@@ -39,7 +39,7 @@ export const ONBOARDING_STEPS_COPY: Record<
     description:
       "Prepare o certificado e o 2FA do tribunal antes de ativar a OAB.",
     ctaLabel: "Preparar importação",
-    href: "/primeira-importacao",
+    href: "/configuracoes?tab=fontes",
   },
   members_invited: {
     id: "members_invited",

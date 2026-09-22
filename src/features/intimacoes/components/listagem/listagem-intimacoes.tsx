@@ -400,10 +400,23 @@ function LinhaIntimacao({
   const rec = r.lifecycle.state === "recommended" ? r.lifecycle.rec : null;
   return (
     <article className="hover:bg-muted/25 flex min-w-0 flex-col gap-3 px-4 py-4 transition-colors sm:px-5">
-      {/* Header: prazo · situação · responsável */}
+      {/* Header: prazo · desfecho · responsável */}
       <div className="flex flex-wrap items-center gap-2">
         <PrazoBadge prazo={r.prazo} />
         {r.prazo.alert ? <Badge variant="warning">atenção</Badge> : null}
+        {r.estado.tone !== "pending" ? (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
+            style={{ color: r.estado.cor, backgroundColor: r.estado.fundo }}
+          >
+            <span
+              className="size-1.5 rounded-full"
+              style={{ backgroundColor: r.estado.cor }}
+              aria-hidden
+            />
+            {r.estado.label}
+          </span>
+        ) : null}
         <span className="ml-auto">
           <Responsavel value={r.responsavelId} nome={r.responsavel} />
         </span>
@@ -436,14 +449,9 @@ function LinhaIntimacao({
         ) : null}
       </div>
 
-      {/* Seção de ação (border-t) — analisando / revisar / ação recomendada */}
+      {/* Seção de ação (border-t) — revisar / trabalho necessário / abrir */}
       <div className="flex flex-col gap-3 border-t pt-3">
-        {r.lifecycle.state === "analyzing" ? (
-          <p className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-            Analisando… a ação recomendada preenche em instantes
-          </p>
-        ) : r.revisao.pending ? (
+        {r.revisao.pending ? (
           <div className="flex flex-wrap items-center gap-2">
             <RevisaoOrigem
               revisao={r.revisao}

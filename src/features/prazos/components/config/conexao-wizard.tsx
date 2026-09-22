@@ -1,7 +1,8 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import { AlertCircle, CheckCircle2, Loader2, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileStack, Loader2, X } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 import { IconAction } from "@/components/ui/icon-action";
 import { Input } from "@/components/ui/input";
@@ -255,6 +256,16 @@ export function ConexaoWizard({
   const wizard = useConexaoWizard({ court, entries, connections });
   const certWizard = useCertWizard();
 
+  // Ao conectar o tribunal, INICIA a busca dos autos dos processos já na base
+  // (uma vez). O BE aplica a regra tem-processo→busca / não-tem→nada.
+  const jaBuscouAutos = useRef(false);
+  useEffect(() => {
+    if (wizard.resolvido && wizard.algumConectado && !jaBuscouAutos.current) {
+      jaBuscouAutos.current = true;
+      void wizard.buscarAutos();
+    }
+  }, [wizard]);
+
   if (!aberto) return null;
 
   const {
@@ -273,6 +284,7 @@ export function ConexaoWizard({
     algumConectado,
     conectados,
     totalConectaveis,
+    autos,
   } = wizard;
 
   const nomesSistemas = sistemas.map((s) => s.nome).join(" e ");
@@ -391,11 +403,40 @@ export function ConexaoWizard({
                     wizard={wizard}
                   />
                 ))}
-                {resolvido && (
+                {resolvido && algumConectado && (
+                  <div className="surface-inset flex items-start gap-2.5 rounded-[10px] px-3.5 py-3">
+                    {autos.fase === "buscando" ? (
+                      <Loader2
+                        className="text-primary mt-px size-4 flex-none animate-spin"
+                        aria-hidden
+                      />
+                    ) : (
+                      <FileStack
+                        className="mt-px size-4 flex-none"
+                        style={{
+                          color:
+                            autos.fase === "ok" && autos.queued > 0
+                              ? "var(--green)"
+                              : "var(--fg3)",
+                        }}
+                        aria-hidden
+                      />
+                    )}
+                    <p className="text-[12px] leading-[1.5]">
+                      {autos.fase === "buscando"
+                        ? `Verificando quais processos do ${court} já estão na sua base…`
+                        : autos.fase === "erro"
+                          ? "Conectado. Não foi possível iniciar a busca dos autos agora — use “Sincronizar autos” em Fontes de dados › Tribunais."
+                          : autos.queued > 0
+                            ? `Buscando os autos de ${autos.queued} ${autos.queued === 1 ? "processo" : "processos"} do ${court} que já estão na sua base. Eles chegam em segundo plano.`
+                            : `Conectado. Nenhum processo do ${court} na sua base ainda — os autos serão buscados automaticamente assim que chegarem.`}
+                    </p>
+                  </div>
+                )}
+                {resolvido && !algumConectado && (
                   <p className="text-fg3 text-[12px] leading-[1.5]">
-                    {algumConectado
-                      ? "Alterações no certificado ou no 2FA podem exigir reconexão."
-                      : "Nenhum sistema conectou. Verifique o certificado e o segundo fator e tente novamente em Fontes de dados › Tribunais."}
+                    Nenhum sistema conectou. Verifique o certificado e o segundo
+                    fator e tente novamente em Fontes de dados › Tribunais.
                   </p>
                 )}
               </div>

@@ -57,6 +57,14 @@ export function ShellBackLink({
   );
 }
 
+// Atmosfera premium GLOBAL — brilho radial sutil (primary no topo-centro, gold no
+// topo-direito) + um sussurro de teal na base, saindo do branco puro. Aplicada aqui,
+// na única área de rolagem, TODA tela do app herda a mesma casca (fundo com tom +
+// profundidade) sem competir com o conteúdo. `local` ancora o brilho ao topo do
+// conteúdo (rola junto). Individual pages não precisam mais do próprio wrapper.
+const PAGE_BACKDROP =
+  "radial-gradient(ellipse 70% 40% at 50% -6%, color-mix(in oklch, var(--primary) 6%, transparent), transparent 60%), radial-gradient(ellipse 46% 36% at 100% 0%, color-mix(in oklch, var(--gold) 4%, transparent), transparent 55%)";
+
 /** O shell tem uma única área de rolagem; o cabeçalho permanece visível. */
 export function PageFrame({
   header,
@@ -75,6 +83,13 @@ export function PageFrame({
       <div
         data-slot="page-content"
         className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain"
+        style={{
+          backgroundColor:
+            "color-mix(in oklch, var(--primary) 2.5%, var(--background))",
+          backgroundImage: PAGE_BACKDROP,
+          backgroundAttachment: "local",
+          backgroundRepeat: "no-repeat",
+        }}
       >
         {children}
       </div>

@@ -236,7 +236,7 @@ export function useConstruction(id: string) {
         ? params.get("retorno")!
         : draftQuery.data?.intimation.id
           ? detalheNaFila(draftQuery.data.intimation.id, "/intimacoes")
-          : "/fila",
+          : "/intimacoes",
     );
 
   const hasContent =

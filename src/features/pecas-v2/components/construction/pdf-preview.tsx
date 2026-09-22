@@ -3,6 +3,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 const PdfCanvas = dynamic(
   () =>
     import("@/features/documentos/components/pdf-canvas").then(
@@ -42,6 +43,6 @@ export function PdfPreview({ url }: { url: string }) {
   return blob ? (
     <PdfCanvas blob={blob} />
   ) : (
-    <p role="status">Carregando prévia do PDF…</p>
+    <Skeleton className="h-[70vh] min-h-64 w-full rounded-xl" />
   );
 }

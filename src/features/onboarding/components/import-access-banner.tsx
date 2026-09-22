@@ -13,7 +13,6 @@ export function ImportAccessBanner() {
   const query = useCourtConnections();
   const access = courtAccess(query.data ?? []);
   if (
-    pathname === "/primeira-importacao" ||
     pathname.startsWith("/configuracoes") ||
     query.isPending ||
     query.isError ||
@@ -37,7 +36,7 @@ export function ImportAccessBanner() {
       </span>
       <Link
         className="text-primary font-medium hover:underline"
-        href="/primeira-importacao"
+        href="/configuracoes?tab=fontes"
       >
         {access === "error" ? "Tentar novamente" : "Concluir preparação"}
       </Link>

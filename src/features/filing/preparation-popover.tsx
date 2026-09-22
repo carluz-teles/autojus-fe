@@ -38,6 +38,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { SkeletonRows } from "@/components/ui/skeletons";
 import { listCertificados } from "@/features/configuracoes/services/certificado.service";
 import { PdfPreview } from "@/features/pecas-v2/components/construction/pdf-preview";
 import { useApi } from "@/lib/api/use-api";
@@ -442,9 +443,7 @@ export function PreparationWorkspace({
                   });
               }}
             />
-            {certificates.isPending && (
-              <p role="status">Carregando certificados…</p>
-            )}
+            {certificates.isPending && <SkeletonRows rows={2} />}
             {certificates.isError && (
               <p role="alert">Não foi possível carregar os certificados.</p>
             )}

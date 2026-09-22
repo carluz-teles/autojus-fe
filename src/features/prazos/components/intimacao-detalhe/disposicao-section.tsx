@@ -2,18 +2,16 @@
 
 // UNIDADE DE TRABALHO da intimação — sem o conceito de "providência". Responde em
 // texto "O QUE ACONTECEU" (o ato, ex.: "Sentença") + "TRABALHO NECESSÁRIO" (o que
-// precisa ser alcançado) e oferece DOIS botões: Gerar peça e Dar ciência. O
-// action_item por baixo é só encanamento (id do "Gerar peça" e o que "Dar ciência"
-// conclui) — nunca aparece como "providência". Reusa o fluxo de peça validado
-// (useDisposicao + GerarPecaModal).
+// precisa ser alcançado). Os DOIS botões primários (Gerar peça · Dar ciência) NÃO
+// vivem mais aqui: subiram para o topo do detalhe, ao lado do ⋮ (ver AcoesPrimarias
+// em intimacao-detalhe.tsx), sem gate. Aqui fica só o conteúdo + o botão "Analisar
+// intimação" (materializa o que aconteceu). O action_item por baixo é só encanamento
+// — nunca aparece como "providência".
 
 import { Check, FileText, LoaderCircle, Sparkles } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import type { IntimacaoProvidencia } from "@/features/intimacoes/types";
-import { GerarPecaModal } from "@/features/pecas-v2/components/pregen/gerar-peca-modal";
-import { setInstructions } from "@/features/pecas-v2/lib/instructions-storage";
 
 import { ANALYSIS_PROCESSING_MESSAGE } from "../../../intimacoes/lib/analysis-materialization";
 import { useDisposicao } from "../../hooks/use-disposicao";
@@ -29,6 +27,7 @@ export function DisposicaoSection({
   onAnalyze,
   reviewBlocked = false,
   checkingReview = false,
+  resolvida = false,
   ato,
   tipoLabel,
   assunto,
@@ -43,33 +42,17 @@ export function DisposicaoSection({
   onAnalyze: () => void;
   reviewBlocked?: boolean;
   checkingReview?: boolean;
+  /** Intimação resolvida (deu-se ciência) — a unidade de trabalho é a intimação. */
+  resolvida?: boolean;
   /** ai_act — o ato que ocorreu (ex.: "Sentença"). "" antes da análise. */
   ato: string;
   tipoLabel: string;
   assunto: string;
 }) {
-  const router = useRouter();
-  const {
-    disposicao,
-    onDarCiencia,
-    dandoCiencia,
-    cienciaErro,
-    modalOpen,
-    pendingActionItemId,
-    openGerarModal,
-    closeGerarModal,
-    buildGerarUrl,
-    pecaLabel,
-  } = useDisposicao({ intimationId, providencias, retorno });
+  const { disposicao } = useDisposicao({ intimationId, providencias, retorno });
 
   const bloqueado = reviewBlocked || checkingReview;
   const semAnalise = disposicao.vazia && !analyzed;
-
-  // Peça-alvo do botão "Gerar peça": a 1ª que gera peça; se só houver ciência,
-  // usa o próprio item de ciência (o BE deriva o tipo). "" quando nada há.
-  const pecaAlvo = disposicao.pecas[0] ?? null;
-  const alvoId =
-    pecaAlvo?.actionItemId ?? disposicao.ciencia?.actionItemId ?? "";
 
   // Texto do "trabalho necessário": descreve o que precisa ser alcançado.
   const descricaoTrabalho =
@@ -77,47 +60,32 @@ export function DisposicaoSection({
       ? disposicao.pecas.map((p) => p.label).join(" · ")
       : "Nenhuma peça a produzir — basta dar ciência para resolver a intimação.";
 
-  function handleGenerate(instructions: string) {
-    const url = buildGerarUrl(pendingActionItemId);
-    if (instructions) setInstructions(pendingActionItemId, instructions);
-    router.push(url);
-  }
-
-  function onGerarPeca() {
-    if (!alvoId) return;
-    if (pecaAlvo?.jaIniciada) {
-      router.push(buildGerarUrl(alvoId));
-    } else {
-      openGerarModal(alvoId);
-    }
-  }
-
-  const cienciaConcluida = !!disposicao.ciencia?.concluida;
-
   return (
     <section
       id="disposicao-intimacao"
       aria-label="Unidade de trabalho"
-      className="surface-panel flex scroll-mt-6 flex-col gap-5 p-4 sm:p-5"
+      className="border-primary/30 relative flex scroll-mt-6 flex-col gap-5 overflow-hidden rounded-2xl border p-5 sm:p-6"
+      style={{
+        backgroundImage:
+          "linear-gradient(158deg, color-mix(in oklch, var(--primary) 12%, var(--card)), color-mix(in oklch, var(--primary) 4%, var(--card)) 62%, var(--card))",
+        boxShadow:
+          "0 18px 48px -16px color-mix(in oklch, var(--primary) 34%, transparent), inset 0 1px 0 0 color-mix(in oklch, white 55%, transparent)",
+      }}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="section-label">Unidade de trabalho</p>
-          <h2 className="font-display mt-1 text-xl font-medium">
-            O que fazer com esta intimação
-          </h2>
-        </div>
-        {analyzed && !bloqueado ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={analyzing}
-            onClick={onAnalyze}
-          >
-            <Sparkles data-icon="inline-start" />
-            {analyzing ? "Atualizando…" : "Reanalisar"}
-          </Button>
-        ) : null}
+      {/* accent premium no topo — assinatura primary→gold; puxa o olho pro herói (o trabalho). */}
+      <span
+        className="absolute inset-x-0 top-0 h-0.5"
+        style={{
+          backgroundImage:
+            "linear-gradient(90deg, transparent, var(--primary), var(--gold), transparent)",
+        }}
+        aria-hidden
+      />
+      <div className="min-w-0">
+        <p className="brand-kicker">Unidade de trabalho</p>
+        <h2 className="font-display mt-1.5 text-2xl leading-tight font-medium tracking-tight">
+          O que fazer com esta intimação
+        </h2>
       </div>
 
       {bloqueado ? (
@@ -126,12 +94,17 @@ export function DisposicaoSection({
             ? "Verificando a revisão do tipo e do prazo…"
             : "Confirme o tipo e o prazo desta intimação antes de dar ciência ou construir a peça."}
         </p>
+      ) : resolvida ? (
+        <p className="text-primary flex items-center gap-2 text-sm font-medium">
+          <Check className="size-4" aria-hidden />
+          Ciência registrada — nada mais a fazer nesta intimação.
+        </p>
       ) : semAnalise ? (
         <div className="flex flex-col items-start gap-3">
           <p className="text-muted-foreground text-sm">
             {analyzing
               ? "Analisando a intimação para descobrir o que aconteceu e o que precisa ser feito…"
-              : "Esta intimação ainda não foi analisada. Descubra o que aconteceu e o trabalho necessário."}
+              : "Descubra o que aconteceu e o trabalho necessário — ou dê ciência / gere a peça pelos botões no topo."}
           </p>
           {analyzing ? (
             <p
@@ -144,7 +117,7 @@ export function DisposicaoSection({
                 : "Analisando…"}
             </p>
           ) : (
-            <Button onClick={onAnalyze}>
+            <Button variant="outline" onClick={onAnalyze}>
               <Sparkles data-icon="inline-start" />
               Analisar intimação
             </Button>
@@ -164,10 +137,16 @@ export function DisposicaoSection({
           </div>
 
           {/* TRABALHO NECESSÁRIO */}
-          <div className="surface-inset flex flex-col gap-1.5 p-4">
+          <div className="border-line bg-card flex flex-col gap-1.5 rounded-xl border p-4 shadow-[var(--shadow-surface)]">
             <p className="section-label">Trabalho necessário</p>
             <div className="flex items-start gap-3">
-              <span className="bg-primary/10 text-primary mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg">
+              <span
+                className="text-primary-foreground mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg shadow-sm"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(135deg, var(--primary), color-mix(in oklch, var(--primary), black 14%))",
+                }}
+              >
                 <FileText className="size-4" aria-hidden />
               </span>
               <p className="text-foreground min-w-0 text-sm leading-relaxed break-words">
@@ -176,57 +155,27 @@ export function DisposicaoSection({
             </div>
           </div>
 
-          {/* DOIS BOTÕES: Gerar peça · Dar ciência */}
-          {cienciaConcluida ? (
-            <p className="text-primary flex items-center gap-2 text-sm font-medium">
-              <Check className="size-4" aria-hidden />
-              Ciência registrada — nada mais a fazer nesta intimação.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={onGerarPeca} disabled={!alvoId}>
-                <Sparkles data-icon="inline-start" />
-                {pecaAlvo?.jaIniciada ? "Abrir peça" : "Gerar peça"}
-              </Button>
+          {analyzed && !bloqueado ? (
+            <div>
               <Button
-                variant="outline"
-                disabled={dandoCiencia}
-                onClick={onDarCiencia}
+                variant="ghost"
+                size="sm"
+                disabled={analyzing}
+                onClick={onAnalyze}
               >
-                {dandoCiencia ? (
-                  <LoaderCircle
-                    data-icon="inline-start"
-                    className="animate-spin"
-                  />
-                ) : (
-                  <Check data-icon="inline-start" />
-                )}
-                Dar ciência
+                <Sparkles data-icon="inline-start" />
+                {analyzing ? "Atualizando…" : "Analisar de novo"}
               </Button>
             </div>
-          )}
+          ) : null}
         </div>
       )}
 
-      {cienciaErro ? (
-        <p role="alert" className="text-destructive text-sm">
-          Não foi possível dar ciência. Tente novamente.
-        </p>
-      ) : null}
       {analysisError ? (
         <p role="alert" className="text-destructive text-sm">
           Não foi possível analisar a intimação. Tente novamente.
         </p>
       ) : null}
-
-      <GerarPecaModal
-        open={modalOpen}
-        onOpenChange={(v) => {
-          if (!v) closeGerarModal();
-        }}
-        onGenerate={handleGenerate}
-        pecaLabel={pecaLabel}
-      />
     </section>
   );
 }

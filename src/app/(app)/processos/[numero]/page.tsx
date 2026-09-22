@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { SkeletonDetail } from "@/components/ui/skeletons";
 import { ProcessoHub } from "@/features/prazos/components/processo/processo-hub";
 
 export const metadata = { title: "Processo · Prazos · jus·assessoria" };
@@ -11,11 +12,7 @@ export default async function ProcessoPage({
 }) {
   const { numero } = await params;
   return (
-    <Suspense
-      fallback={
-        <p className="text-muted-foreground p-6">Carregando processos…</p>
-      }
-    >
+    <Suspense fallback={<SkeletonDetail />}>
       {<ProcessoHub numero={decodeURIComponent(numero)} />}
     </Suspense>
   );

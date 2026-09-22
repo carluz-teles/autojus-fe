@@ -1,9 +1,8 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { useDocumentFile } from "../hooks/use-document-file";
 import { DocumentPreview } from "./document-preview";
@@ -39,12 +38,7 @@ export function PdfDrawer({
       >
         <div className="bg-muted/30 h-full min-h-64 overflow-hidden rounded-xl border shadow-inner">
           {loading ? (
-            <div
-              role="status"
-              className="text-muted-foreground flex h-full items-center justify-center gap-2 p-6 text-sm"
-            >
-              <Loader2 className="size-4 animate-spin" /> Carregando documento…
-            </div>
+            <Skeleton className="h-full w-full rounded-xl" />
           ) : error ? (
             <div
               role="alert"

@@ -275,17 +275,40 @@
 }
 
 @utility surface-inset {
-  background: color-mix(in oklch, var(--muted) 55%, var(--card));
-  border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--primary) 4.5%, var(--card));
+  border: 1px solid color-mix(in oklch, var(--primary) 12%, var(--border));
   border-radius: var(--radius-lg);
 }
 
+/* Rótulo estrutural — teal-muted (cor de marca como ESTRUTURA, não neutro cinza).
+   Threading a identidade por todo cabeçalho de seção. */
 @utility section-label {
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  font-weight: 500;
-  letter-spacing: 0.08em;
+  color: color-mix(in oklch, var(--primary) 68%, var(--muted-foreground));
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+/* Kicker de marca — o mesmo rótulo editorial, mas com um tick em gradiente primary→gold
+   antes do texto (assinatura). Usa em títulos-âncora (herói) pra dar identidade. */
+@utility brand-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: color-mix(in oklch, var(--primary) 72%, var(--muted-foreground));
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+
+  &::before {
+    content: "";
+    inline-size: 1.25rem;
+    block-size: 2px;
+    border-radius: 2px;
+    background-image: linear-gradient(90deg, var(--primary), var(--gold));
+  }
 }
 
 @utility ring-hairline {
@@ -484,6 +507,29 @@
 
 @utility fade-in {
   animation: fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Collapse GLOBAL — todo <details>/disclosure do app anima abrir/fechar (altura + fade) num
+   único ponto, sem tocar em componente nenhum. `interpolate-size: allow-keywords` habilita
+   transicionar de/para `auto`; `content-visibility` com `allow-discrete` mantém o conteúdo
+   visível durante o fecho. Só quando o usuário aceita movimento. */
+@media (prefers-reduced-motion: no-preference) {
+  :root {
+    interpolate-size: allow-keywords;
+  }
+  details::details-content {
+    overflow: clip;
+    block-size: 0;
+    opacity: 0;
+    transition:
+      block-size 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 0.26s ease,
+      content-visibility 0.3s allow-discrete;
+  }
+  details[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+  }
 }
 
 /* Respeita quem pediu menos movimento. */

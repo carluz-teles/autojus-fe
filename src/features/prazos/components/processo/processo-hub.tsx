@@ -4,14 +4,15 @@ import {
   Copy,
   FileText,
   FolderOpen,
-  Loader2,
   Pencil,
+  RefreshCw,
   Upload,
 } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useRef } from "react";
 
 import { PageFrame, ShellBackLink } from "@/components/shell/page-frame";
+import { SectionTitle } from "@/components/shell/section-title";
 import { TeorContent } from "@/components/teor-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,10 @@ import { IconAction } from "@/components/ui/icon-action";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonRows } from "@/components/ui/skeletons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AutosFetchingBadge } from "@/features/configuracoes/components/autos-fetching-badge";
 import { SyncAutosButton } from "@/features/configuracoes/components/sync-autos-button";
 import { PdfDrawer } from "@/features/documentos/components/pdf-drawer";
 import { CourtAccessNotice } from "@/features/onboarding/components/court-access-notice";
@@ -59,14 +63,7 @@ function Colecao({
 }) {
   return (
     <>
-      {query.isPending && (
-        <p
-          role="status"
-          className="text-muted-foreground flex items-center gap-2 py-10 text-sm"
-        >
-          <Loader2 className="size-4 animate-spin" /> Carregando registros…
-        </p>
-      )}
+      {query.isPending && <SkeletonRows rows={3} />}
       {query.isError && (
         <div
           role="alert"
@@ -195,8 +192,15 @@ export function ProcessoHub({ numero }: { numero: string }) {
           <div
             role="status"
             aria-label="Carregando processo"
-            className="bg-muted h-56 animate-pulse rounded-lg"
-          />
+            className="flex flex-col gap-5"
+          >
+            <Skeleton className="h-44 w-full rounded-2xl" />
+            <Skeleton className="h-28 w-full rounded-xl" />
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
+              <Skeleton className="h-80 w-full rounded-xl" />
+              <Skeleton className="h-80 w-full rounded-xl" />
+            </div>
+          </div>
         )}
         {h.processoQ.isError && (
           <div role="alert" className="bg-card space-y-4 rounded-xl border p-8">
@@ -217,9 +221,11 @@ export function ProcessoHub({ numero }: { numero: string }) {
             >
               <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
                 <div className="flex min-w-0 flex-col gap-2">
-                  <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
-                    <span>PROCESSO</span>
-                    <span aria-hidden="true">/</span>
+                  <div className="brand-kicker">
+                    <span>Processo</span>
+                    <span aria-hidden="true" className="opacity-40">
+                      /
+                    </span>
                     <span>{identity.tribunal}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-1">
@@ -241,6 +247,11 @@ export function ProcessoHub({ numero }: { numero: string }) {
                     </p>
                   )}
                   <ProcessoSituacao situacao={identity.situacaoDetalhe} />
+                  <AutosFetchingBadge
+                    court={p.court}
+                    courtRecordId={p.id}
+                    degree={p.degree}
+                  />
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
                   <IconAction
@@ -317,12 +328,12 @@ export function ProcessoHub({ numero }: { numero: string }) {
                 >
                   <div className="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                     <div>
-                      <h2
+                      <SectionTitle
                         id="trabalho-title"
-                        className="font-display text-xl font-medium"
+                        className="text-xl font-medium"
                       >
                         Trabalho do escritório
-                      </h2>
+                      </SectionTitle>
                       <p className="text-muted-foreground mt-1 text-sm">
                         Revise as intimações do processo e confira os prazos.
                       </p>
@@ -387,12 +398,12 @@ export function ProcessoHub({ numero }: { numero: string }) {
                   aria-labelledby="acervo-title"
                 >
                   <div className="mb-3">
-                    <h2
+                    <SectionTitle
                       id="acervo-title"
-                      className="font-display text-xl font-medium"
+                      className="text-xl font-medium"
                     >
                       Documentos e histórico
-                    </h2>
+                    </SectionTitle>
                     <p className="text-muted-foreground mt-1 text-sm">
                       Consulte as fontes e o histórico deste processo.
                     </p>
@@ -436,6 +447,13 @@ export function ProcessoHub({ numero }: { numero: string }) {
                             : "Adicionar PDF"}
                         </Button>
                       </SyncAutosButton>
+                      {h.ultimaSincronizacaoAutos ? (
+                        <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                          <RefreshCw className="size-3 shrink-0" aria-hidden />
+                          Autos do tribunal sincronizados em{" "}
+                          {formatDate(h.ultimaSincronizacaoAutos)}
+                        </p>
+                      ) : null}
                       <input
                         ref={uploadInput}
                         type="file"
@@ -602,9 +620,9 @@ export function ProcessoHub({ numero }: { numero: string }) {
                 aria-label="Informações do processo"
               >
                 <section className="surface-panel flex flex-col gap-4 p-4">
-                  <h2 className="font-display text-lg font-medium">
+                  <SectionTitle className="text-lg font-medium">
                     Ficha do processo
-                  </h2>
+                  </SectionTitle>
                   <div className="flex flex-col gap-2">
                     <p className="text-muted-foreground text-xs">
                       Responsável no escritório
@@ -626,9 +644,9 @@ export function ProcessoHub({ numero }: { numero: string }) {
                   </dl>
                 </section>
                 <section className="surface-panel flex flex-col gap-3 p-4">
-                  <h2 className="font-display text-lg font-medium">
+                  <SectionTitle className="text-lg font-medium">
                     Último andamento conhecido
-                  </h2>
+                  </SectionTitle>
                   <p className="text-muted-foreground text-xs tabular-nums">
                     {identity.movimentoData}
                   </p>

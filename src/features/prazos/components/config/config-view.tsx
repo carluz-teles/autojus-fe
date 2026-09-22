@@ -7,7 +7,6 @@ import { NotificationPreferences } from "@/features/notifications/notification-p
 import { cn } from "@/lib/utils";
 
 import { useConfig } from "../../hooks/use-config";
-import { ConfigCert } from "./config-cert";
 import { ConfigEquipe } from "./config-equipe";
 import { ConfigFontes } from "./config-fontes";
 import { BRAND_GRADIENT, SettingsSection } from "./config-kit";
@@ -92,7 +91,6 @@ export function ConfigView() {
 
             {cfg.tab === "equipe" ? <ConfigEquipe /> : null}
             {cfg.tab === "fontes" ? <ConfigFontes /> : null}
-            {cfg.tab === "cert" ? <ConfigCert /> : null}
             {cfg.tab === "notificacoes" ? (
               <div className="reveal">
                 <NotificationPreferences />

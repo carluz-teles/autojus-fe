@@ -7,6 +7,7 @@
 
 import { PageFrame } from "@/components/shell/page-frame";
 import { Button } from "@/components/ui/button";
+import { SkeletonRows } from "@/components/ui/skeletons";
 import { useIntimacoes } from "@/features/intimacoes/hooks/use-intimacoes";
 import type { IntimacaoView } from "@/features/intimacoes/types";
 
@@ -68,9 +69,7 @@ export function PrazosAgenda({
     <PageFrame header={header}>
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 sm:p-6">
         {q.isPending ? (
-          <p role="status" className="text-muted-foreground p-6">
-            Carregando…
-          </p>
+          <SkeletonRows rows={5} />
         ) : q.error ? (
           <div className="flex flex-col items-start gap-3 p-6">
             <p role="alert">Não foi possível carregar a agenda.</p>

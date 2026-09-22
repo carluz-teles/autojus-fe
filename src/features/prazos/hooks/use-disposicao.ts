@@ -1,9 +1,12 @@
 "use client";
 
-// Hook da DISPOSIÇÃO da intimação (a unidade de trabalho). Compõe a derivação
-// pura (derivarDisposicao) com os rótulos de peça e os handlers de ação:
-//   · "Dar ciência" → conclui o action_item de ciência (comecar → concluir).
-//     Sem item materializado, resolve a própria intimação (caminho equivalente).
+// Hook da DISPOSIÇÃO da intimação. A UNIDADE DE TRABALHO é a própria INTIMAÇÃO
+// (não há mais "providência"/action_item como unidade). Compõe a derivação pura
+// (derivarDisposicao) com os rótulos de peça e os handlers de ação:
+//   · "Dar ciência" → RESOLVE a intimação (POST /v1/intimacoes/:id/resolve). O
+//     status (PENDENTE→RESOLVIDA) mora na intimação; o ⋮ "Reabrir" desfaz. É o
+//     mesmo caminho do "dar ciência em lote" (resolveIntimacoesBatch). Não há mais
+//     máquina de estados de action_item aqui (SUGGESTED→TODO→WORKING→DONE).
 //   · "Gerar peça"  → abre modal de orientação opcional; ao confirmar, navega
 //     para /pecas/nova?...&auto=1&retorno=.. As instructions (se houver) viajam
 //     por sessionStorage (chave por actionItemId), não pela URL — evita 2000
@@ -21,15 +24,10 @@ import {
   WORK_TYPES,
 } from "@/features/action-items/lib/piece-labels";
 import {
-  comecarActionItem,
-  concluirActionItem,
-} from "@/features/action-items/services/action-items.service";
-import {
   intimacoesKeys,
   useResolverIntimacao,
 } from "@/features/intimacoes/hooks/use-intimacoes";
 import type { IntimacaoProvidencia } from "@/features/intimacoes/types";
-import { useApi } from "@/lib/api/use-api";
 
 import { derivarDisposicao, type DisposicaoPeca } from "../lib/disposicao";
 
@@ -49,7 +47,6 @@ export function useDisposicao({
   /** Para onde a construção volta (o próprio detalhe da intimação). */
   retorno: string;
 }) {
-  const api = useApi();
   const qc = useQueryClient();
   const resolver = useResolverIntimacao();
 
@@ -61,22 +58,11 @@ export function useDisposicao({
     };
   }, [providencias]);
 
-  // "Dar ciência" = levar o item de ciência a DONE. A partir de SUGGESTED/TODO,
-  // `comecar` avança para WORKING; `concluir` fecha em DONE. Concluir a ciência
-  // resolve a intimação (sem peça). O BE espelha o efeito na view do detalhe.
+  // "Dar ciência" RESOLVE a intimação — a unidade de trabalho é a própria
+  // intimação, não um action_item. Mesmo caminho do "dar ciência em lote"
+  // (POST /v1/intimacoes/:id/resolve). O ⋮ "Reabrir" desfaz.
   const darCiencia = useMutation({
-    mutationFn: async (ciencia: (typeof disposicao)["ciencia"]) => {
-      if (!ciencia) {
-        // Disposição de ciência sem item materializado: resolve a intimação.
-        await resolver.mutateAsync(intimationId);
-        return;
-      }
-      if (ciencia.status === "DONE") return;
-      if (ciencia.status !== "WORKING") {
-        await comecarActionItem(api, ciencia.actionItemId);
-      }
-      await concluirActionItem(api, ciencia.actionItemId);
-    },
+    mutationFn: () => resolver.mutateAsync(intimationId),
     onSuccess: async () => {
       await Promise.all(
         [
@@ -118,7 +104,7 @@ export function useDisposicao({
 
   return {
     disposicao,
-    onDarCiencia: () => darCiencia.mutate(disposicao.ciencia),
+    onDarCiencia: () => darCiencia.mutate(),
     dandoCiencia: darCiencia.isPending || resolver.isPending,
     cienciaErro: darCiencia.isError,
     // Modal state

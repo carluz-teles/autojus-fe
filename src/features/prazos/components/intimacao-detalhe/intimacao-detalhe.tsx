@@ -7,14 +7,18 @@ import {
   ChevronRight,
   Copy,
   ExternalLink,
+  LoaderCircle,
   MoreHorizontal,
+  Sparkles,
   TriangleAlert,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { DetailCard as Card } from "@/components/shell/detail-card";
 import { PageFrame, ShellBackLink } from "@/components/shell/page-frame";
+import { SectionTitle } from "@/components/shell/section-title";
 import { TeorContent } from "@/components/teor-content";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -28,11 +32,17 @@ import {
 import { Field, FieldLabel } from "@/components/ui/field";
 import { IconAction } from "@/components/ui/icon-action";
 import { Input } from "@/components/ui/input";
+import { MENU_ANIM } from "@/components/ui/menu-styles";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonDetail } from "@/components/ui/skeletons";
 import { useFilaNavigation } from "@/features/intimacoes/hooks/use-fila-navigation";
 import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
 import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
-import { formatarData } from "@/lib/utils";
+import { GerarPecaModal } from "@/features/pecas-v2/components/pregen/gerar-peca-modal";
+import { setInstructions } from "@/features/pecas-v2/lib/instructions-storage";
+import { cn, formatarData } from "@/lib/utils";
 
+import { useDisposicao } from "../../hooks/use-disposicao";
 import { useIntimacaoDetalhe } from "../../hooks/use-intimacao-detalhe";
 import {
   bloqueiaProvidencias,
@@ -46,7 +56,8 @@ import { DisposicaoSection } from "./disposicao-section";
 import { ExplicacaoPrazo } from "./explicacao-prazo";
 
 const POPUP_CLASS =
-  "bg-popover text-popover-foreground ring-foreground/10 max-h-72 min-w-48 overflow-y-auto rounded-lg p-1 shadow-md ring-1 outline-none";
+  "bg-popover text-popover-foreground ring-foreground/10 max-h-72 min-w-48 overflow-y-auto rounded-lg p-1 shadow-md ring-1 outline-none " +
+  MENU_ANIM;
 const ITEM_CLASS =
   "focus:bg-accent focus:text-accent-foreground data-highlighted:bg-accent relative flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-disabled:opacity-50";
 const DISCLOSURE =
@@ -121,9 +132,7 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
   if (det.isPending)
     return (
       <PageFrame header={shellHeader}>
-        <p role="status" className="text-muted-foreground p-6">
-          Carregando intimação…
-        </p>
+        <SkeletonDetail />
       </PageFrame>
     );
   if (det.isError || !m)
@@ -141,229 +150,257 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
 
   return (
     <PageFrame header={shellHeader}>
-      <div className="mx-auto flex max-w-[1320px] flex-col gap-5 px-4 py-4 sm:px-6 sm:py-5">
-        <section
-          aria-label="Identificação da intimação"
-          className="flex min-w-0 flex-col gap-2 border-b pb-4"
-        >
-          <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
-            <span>
-              {m.tipoLabel} · {m.fonte || "Fonte não informada"}
-            </span>
-            <span>Publicada em {m.publicadoEm}</span>
-            <Badge variant="outline">
-              Intimação {m.statusLabel.toLowerCase()}
-            </Badge>
-            <div className="ml-auto">
-              <AcoesIntimacao det={det} />
-            </div>
-          </div>
-          <h2 className="font-display max-w-4xl text-xl leading-tight font-medium tracking-tight text-balance break-words sm:text-2xl">
-            {m.titulo}
-          </h2>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <Link
-              href={`/processos/${encodeURIComponent(m.courtRecordId)}`}
-              className="text-primary focus-visible:ring-ring rounded font-mono text-sm underline-offset-4 hover:underline focus-visible:ring-2"
-            >
-              {m.cnj}
-            </Link>
-            <IconAction
-              icon={Copy}
-              label="Copiar número do processo"
-              onClick={det.onCopiarCNJ}
-            />
-            <span className="text-muted-foreground text-xs">{m.orgao}</span>
-          </div>
-          <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-muted-foreground text-xs">
-                Autor / polo ativo
-              </dt>
-              <dd className="mt-1 break-words">{m.autor || "Não informado"}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground text-xs">
-                Réu / polo passivo
-              </dt>
-              <dd className="mt-1 break-words">{m.reu || "Não informado"}</dd>
-            </div>
-          </dl>
-          <p className="text-muted-foreground text-xs">
-            {[m.classe, m.assunto, m.tribunalGrau]
-              .filter((value) => value && !m.titulo.includes(value))
-              .join(" · ")}
-          </p>
-        </section>
-
-        {reviewBlocked && (
-          <Alert variant="destructive" className="p-4">
-            <TriangleAlert />
-            <AlertTitle>
-              Confirmação obrigatória antes de gerar a peça
-            </AlertTitle>
-            <AlertDescription className="flex flex-col items-start gap-3">
-              <p>
-                O tipo ou o prazo desta intimação ainda precisa de revisão.
-                Gerar a peça e dar ciência ficam bloqueados até resolver essa
-                pendência.
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                render={<a href="#prazo-decisao" />}
-                nativeButton={false}
-              >
-                Revisar tipo e prazo
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <section
-          aria-label="Publicação e destinatários"
-          className="grid min-w-0 gap-4 border-b pb-4 xl:grid-cols-2 xl:gap-6"
-        >
-          <div className="min-w-0">
-            <h2 className="mb-3 text-sm font-medium">Publicação</h2>
-            <dl className="grid gap-3 text-sm sm:grid-cols-3">
-              <Dado label="Disponibilização" value={m.disponibilizadoEm} />
-              <Dado label="Publicação" value={m.publicadoEm} />
-              <Dado
-                label="Início informado da contagem"
-                value={m.inicioContagem}
-              />
-            </dl>
-          </div>
-          <div className="min-w-0">
-            <h2 className="mb-3 text-sm font-medium">
-              Destinatários da publicação
-            </h2>
-            {m.destinatarios.length ? (
-              <ul className="flex flex-col gap-2">
-                {m.destinatarios.map((r, index) => (
-                  <li
-                    key={`${r.nome}:${r.oab}:${index}`}
-                    className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm"
-                  >
-                    <span className="min-w-0 break-words">{r.nome}</span>
-                    {r.oab ? (
-                      <span className="text-muted-foreground">OAB {r.oab}</span>
-                    ) : null}
-                    {r.matched ? (
-                      <Badge variant="secondary">OAB monitorada</Badge>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                Destinatários não informados na captura.
-              </p>
-            )}
-          </div>
-        </section>
-
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[min-content_1fr] lg:gap-5 xl:grid-cols-[minmax(0,1fr)_410px]">
-          <div className="min-w-0 lg:col-start-1 lg:row-start-1">
-            <Disposicao det={det} />
-          </div>
-          <aside
-            id="prazo-decisao"
-            aria-label="Prazo e decisão"
-            className="flex min-w-0 scroll-mt-6 flex-col gap-4 lg:col-start-2 lg:row-span-2 lg:row-start-1"
+      <div>
+        <div className="reveal-stagger mx-auto flex max-w-[1320px] flex-col gap-6 px-4 py-5 sm:px-6 sm:py-7">
+          <section
+            aria-label="Identificação da intimação"
+            className="flex min-w-0 flex-col gap-2 border-b pb-4"
           >
-            <a
-              href="#teor-intimacao"
-              className="text-primary focus-visible:ring-ring rounded text-sm underline underline-offset-4 focus-visible:ring-2 lg:hidden"
-            >
-              Ler o teor da intimação
-            </a>
-            {det.memoria?.divergencia?.pendente ? (
-              <ApuracaoPrazo key={id} det={det} />
-            ) : null}
-            {det.prazoDetalhe &&
-            precisaConfirmarPrazo(
-              det.prazoDetalhe,
-              det.intimacao?.estado ?? "",
-            ) ? (
-              <ConfirmacaoPrazo
-                key={`${det.prazoDetalhe.id}:${det.prazoDetalhe.confirmed_at ?? "pending"}`}
-                id={id}
-                prazo={det.prazoDetalhe}
-                estado={det.intimacao?.estado ?? ""}
-              />
-            ) : null}
-            <PainelPrazo det={det} />
-          </aside>
-          <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-2">
-            <Card id="teor-intimacao" className="scroll-mt-6">
-              <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle>
-                    <h2>Teor da intimação</h2>
-                  </CardTitle>
-                  {m.documentoUrl ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      render={
-                        <a
-                          href={m.documentoUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        />
-                      }
-                      nativeButton={false}
-                    >
-                      Documento de origem
-                      <ExternalLink data-icon="inline-end" />
-                    </Button>
-                  ) : null}
-                </div>
-                <CardDescription>
-                  Publicação de {m.publicadoEm} ·{" "}
-                  {m.fonte || "Fonte não informada"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <TeorContent
-                  content={m.teor}
-                  emptyMessage={`Teor integral indisponível. ${m.documentoUrl ? "Consulte o documento de origem." : "Não há documento de origem disponível."}`}
-                />
-              </CardContent>
-            </Card>
-            <AutosSection processId={m.courtRecordId} />
-            <details className={DISCLOSURE}>
-              <summary className={SUMMARY}>
-                <span>
-                  Histórico da intimação
-                  <span className="text-muted-foreground ml-2 font-normal">
-                    {m.trilha.length} registros
-                  </span>
-                </span>
-                <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" />
-              </summary>
-              <ol className="flex flex-col px-4 pb-4">
-                {m.trilha.length ? (
-                  m.trilha.map((t, index) => (
-                    <li
-                      key={index}
-                      className="border-border grid gap-1 border-t py-3 text-sm sm:grid-cols-[110px_1fr]"
-                    >
-                      <span className="text-muted-foreground tabular-nums">
-                        {t.data}
-                      </span>
-                      <span>{t.label}</span>
-                    </li>
-                  ))
-                ) : (
-                  <li className="text-muted-foreground text-sm">
-                    Sem eventos registrados.
-                  </li>
+            <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+              <span>
+                {m.tipoLabel} · {m.fonte || "Fonte não informada"}
+              </span>
+              <span>Publicada em {m.publicadoEm}</span>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
+                  m.estado.tone === "done" && "pop",
                 )}
-              </ol>
-            </details>
+                style={{ color: m.estado.cor, backgroundColor: m.estado.fundo }}
+              >
+                <span
+                  className="size-1.5 rounded-full"
+                  style={{ backgroundColor: m.estado.cor }}
+                  aria-hidden
+                />
+                {m.estado.label}
+              </span>
+              <div className="ml-auto">
+                <AcoesPrimarias det={det} />
+              </div>
+            </div>
+            {/* TÍTULO = o ATO que aconteceu nesta publicação (não o título do processo — esse é
+              o herói do cockpit; aqui a intimação é a unidade de TRABALHO). */}
+            <h2 className="font-display max-w-4xl text-2xl leading-[1.1] font-medium tracking-tight text-balance break-words sm:text-[2rem]">
+              {m.ato}
+            </h2>
+            {/* Breadcrumb pro PROCESSO: identidade MÍNIMA pra situar (CNJ + partes) — a ficha
+              completa (classe/assunto/órgão/valor/sigilo) vive no cockpit, um clique adiante. */}
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-sm">
+              <Link
+                href={`/processos/${encodeURIComponent(m.courtRecordId)}`}
+                className="text-primary focus-visible:ring-ring rounded font-mono underline-offset-4 hover:underline focus-visible:ring-2"
+              >
+                {m.cnj}
+              </Link>
+              <IconAction
+                icon={Copy}
+                label="Copiar número do processo"
+                onClick={det.onCopiarCNJ}
+              />
+              {m.autor || m.reu ? (
+                <span className="text-muted-foreground min-w-0 truncate">
+                  {m.autor && m.reu ? (
+                    <>
+                      {m.autor}{" "}
+                      <span className="text-muted-foreground/50">×</span>{" "}
+                      {m.reu}
+                    </>
+                  ) : (
+                    m.autor || m.reu
+                  )}
+                </span>
+              ) : null}
+              {m.fase ? (
+                <Badge variant="secondary" className="shrink-0">
+                  {m.fase}
+                </Badge>
+              ) : null}
+              <Link
+                href={`/processos/${encodeURIComponent(m.courtRecordId)}`}
+                className="text-primary focus-visible:ring-ring ml-auto shrink-0 rounded text-xs font-medium underline-offset-4 hover:underline focus-visible:ring-2"
+              >
+                Abrir processo →
+              </Link>
+            </div>
+          </section>
+
+          {reviewBlocked && (
+            <Alert variant="destructive" className="p-4">
+              <TriangleAlert />
+              <AlertTitle>
+                Confirmação obrigatória antes de gerar a peça
+              </AlertTitle>
+              <AlertDescription className="flex flex-col items-start gap-3">
+                <p>
+                  O tipo ou o prazo desta intimação ainda precisa de revisão.
+                  Gerar a peça e dar ciência ficam bloqueados até resolver essa
+                  pendência.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  render={<a href="#prazo-decisao" />}
+                  nativeButton={false}
+                >
+                  Revisar tipo e prazo
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[min-content_1fr] lg:gap-5 xl:grid-cols-[minmax(0,1fr)_410px]">
+            <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+              <Disposicao det={det} />
+            </div>
+            <aside
+              id="prazo-decisao"
+              aria-label="Prazo e decisão"
+              className="flex min-w-0 scroll-mt-6 flex-col gap-4 lg:col-start-2 lg:row-span-2 lg:row-start-1"
+            >
+              <a
+                href="#teor-intimacao"
+                className="text-primary focus-visible:ring-ring rounded text-sm underline underline-offset-4 focus-visible:ring-2 lg:hidden"
+              >
+                Ler o teor da intimação
+              </a>
+              {det.memoria?.divergencia?.pendente ? (
+                <ApuracaoPrazo key={id} det={det} />
+              ) : null}
+              {det.prazoDetalhe &&
+              precisaConfirmarPrazo(
+                det.prazoDetalhe,
+                det.intimacao?.estado ?? "",
+              ) ? (
+                <ConfirmacaoPrazo
+                  key={`${det.prazoDetalhe.id}:${det.prazoDetalhe.confirmed_at ?? "pending"}`}
+                  id={id}
+                  prazo={det.prazoDetalhe}
+                  estado={det.intimacao?.estado ?? ""}
+                />
+              ) : null}
+              <PainelPrazo det={det} />
+            </aside>
+            <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-2">
+              {/* O ATO — tudo sobre a publicação que gerou o trabalho: datas, destinatários e o
+                teor (colapsado; o herói já resume "o que aconteceu"). Funde 3 seções antigas. */}
+              <Card id="teor-intimacao" className="scroll-mt-6">
+                <CardHeader>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <CardTitle>
+                      <SectionTitle>O ato</SectionTitle>
+                    </CardTitle>
+                    {m.documentoUrl ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        render={
+                          <a
+                            href={m.documentoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          />
+                        }
+                        nativeButton={false}
+                      >
+                        Documento de origem
+                        <ExternalLink data-icon="inline-end" />
+                      </Button>
+                    ) : null}
+                  </div>
+                  <CardDescription>
+                    Publicação de {m.publicadoEm} ·{" "}
+                    {m.fonte || "Fonte não informada"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <dl className="grid gap-3 text-sm sm:grid-cols-3">
+                    <Dado
+                      label="Disponibilização"
+                      value={m.disponibilizadoEm}
+                    />
+                    <Dado label="Publicação" value={m.publicadoEm} />
+                    <Dado label="Início da contagem" value={m.inicioContagem} />
+                  </dl>
+                  {m.destinatarios.length ? (
+                    <div>
+                      <p className="section-label mb-2">Destinatários</p>
+                      <ul className="flex flex-col gap-2">
+                        {m.destinatarios.map((r, index) => (
+                          <li
+                            key={`${r.nome}:${r.oab}:${index}`}
+                            className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+                          >
+                            <span className="min-w-0 break-words">
+                              {r.nome}
+                            </span>
+                            {r.oab ? (
+                              <span className="text-muted-foreground">
+                                OAB {r.oab}
+                              </span>
+                            ) : null}
+                            {r.matched ? (
+                              <Badge variant="secondary">OAB monitorada</Badge>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  <details className="group border-t pt-3">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-medium outline-none [&::-webkit-details-marker]:hidden">
+                      <span>Ler o teor da intimação</span>
+                      <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" />
+                    </summary>
+                    <div className="pt-3">
+                      <TeorContent
+                        content={m.teor}
+                        emptyMessage={`Teor integral indisponível. ${m.documentoUrl ? "Consulte o documento de origem." : "Não há documento de origem disponível."}`}
+                      />
+                    </div>
+                  </details>
+                </CardContent>
+              </Card>
+              <div className="flex min-w-0 flex-col gap-2">
+                <AutosSection processId={m.courtRecordId} />
+                <Link
+                  href={`/processos/${encodeURIComponent(m.courtRecordId)}`}
+                  className="text-primary focus-visible:ring-ring self-start rounded text-xs font-medium underline-offset-4 hover:underline focus-visible:ring-2"
+                >
+                  Ver e sincronizar todos os autos no processo →
+                </Link>
+              </div>
+              <details className={DISCLOSURE}>
+                <summary className={SUMMARY}>
+                  <span>
+                    Atividade
+                    <span className="text-muted-foreground ml-2 font-normal">
+                      {m.trilha.length} registros
+                    </span>
+                  </span>
+                  <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" />
+                </summary>
+                <ol className="flex flex-col px-4 pb-4">
+                  {m.trilha.length ? (
+                    m.trilha.map((t, index) => (
+                      <li
+                        key={index}
+                        className="border-border grid gap-1 border-t py-3 text-sm sm:grid-cols-[110px_1fr]"
+                      >
+                        <span className="text-muted-foreground tabular-nums">
+                          {t.data}
+                        </span>
+                        <span>{t.label}</span>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="text-muted-foreground text-sm">
+                      Sem eventos registrados.
+                    </li>
+                  )}
+                </ol>
+              </details>
+            </div>
           </div>
         </div>
       </div>
@@ -388,7 +425,7 @@ function PainelPrazo({ det }: { det: Detalhe }) {
     <Card>
       <CardHeader>
         <CardTitle>
-          <h2>Prazo e responsável</h2>
+          <SectionTitle>Prazo e responsável</SectionTitle>
         </CardTitle>
         <CardDescription>
           {det.memoria?.origem?.label ??
@@ -398,14 +435,31 @@ function PainelPrazo({ det }: { det: Detalhe }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <div className="surface-inset p-4">
+        <div
+          className="surface-inset relative overflow-hidden p-4 pl-5"
+          style={
+            hasDate
+              ? {
+                  backgroundColor: `color-mix(in oklch, ${m.prazoCor} 5%, transparent)`,
+                }
+              : undefined
+          }
+        >
+          {/* accent lateral reflete a urgência (vermelho=atraso, gold=hoje, neutro=folga) */}
+          {hasDate ? (
+            <span
+              className="absolute inset-y-0 left-0 w-1"
+              style={{ backgroundColor: m.prazoCor }}
+              aria-hidden
+            />
+          ) : null}
           <p className="text-muted-foreground text-xs">
             {hasDate && det.revisao.pendente
               ? "Vencimento registrado · sujeito à revisão"
               : "Vencimento"}
           </p>
           <p
-            className="font-display mt-1 text-2xl leading-tight font-semibold tabular-nums"
+            className="font-display mt-1 text-3xl leading-tight font-semibold tracking-tight tabular-nums transition-colors duration-300"
             style={{ color: hasDate ? m.prazoCor : undefined }}
           >
             {m.fatalData ||
@@ -449,9 +503,10 @@ function PainelPrazo({ det }: { det: Detalhe }) {
           </div>
         </div>
         {det.memoriaPending ? (
-          <p role="status" className="text-muted-foreground text-sm">
-            Carregando situação do prazo…
-          </p>
+          <div role="status" aria-label="Carregando situação do prazo">
+            <Skeleton className="h-4 w-44" />
+            <Skeleton className="mt-2 h-3 w-28" />
+          </div>
         ) : det.memoriaErro ? (
           <div role="alert">
             <p className="text-sm">Não foi possível consultar o prazo.</p>
@@ -684,10 +739,105 @@ function Disposicao({ det }: { det: Detalhe }) {
         det.intimacao?.estado ?? "",
       )}
       checkingReview={det.memoriaPending || det.memoriaErro}
+      resolvida={m.userStatus === "RESOLVED"}
       ato={det.intimacao?.ai_act ?? ""}
       tipoLabel={m.tipoLabel}
       assunto={m.assunto}
     />
+  );
+}
+
+// AcoesPrimarias — as duas ações primárias da intimação (Gerar peça · Dar ciência)
+// no TOPO do detalhe, ao lado do ⋮, SEM gate de análise: valem direto, sem precisar
+// "analisar" antes. Gerar peça exige uma providência (alvoId); Dar ciência sempre
+// funciona (sem item materializado, resolve a intimação). São bloqueadas apenas
+// quando o tipo/prazo ainda precisa de revisão (mesmo bloqueio do Alert do topo).
+function AcoesPrimarias({ det }: { det: Detalhe }) {
+  const router = useRouter();
+  const m = det.model!;
+  const {
+    disposicao,
+    onDarCiencia,
+    dandoCiencia,
+    cienciaErro,
+    modalOpen,
+    pendingActionItemId,
+    openGerarModal,
+    closeGerarModal,
+    buildGerarUrl,
+    pecaLabel,
+  } = useDisposicao({
+    intimationId: m.id,
+    providencias: m.providencias,
+    retorno: `/intimacoes/${m.id}`,
+  });
+
+  const bloqueado =
+    bloqueiaProvidencias(det.prazoDetalhe, det.intimacao?.estado ?? "") ||
+    det.memoriaPending ||
+    det.memoriaErro;
+
+  // Peça-alvo do botão "Gerar peça": a 1ª que gera peça; se só houver ciência, usa
+  // o próprio item de ciência (o BE deriva o tipo). "" quando nada há → botão off.
+  const pecaAlvo = disposicao.pecas[0] ?? null;
+  const alvoId =
+    pecaAlvo?.actionItemId ?? disposicao.ciencia?.actionItemId ?? "";
+
+  function handleGenerate(instructions: string) {
+    const url = buildGerarUrl(pendingActionItemId);
+    if (instructions) setInstructions(pendingActionItemId, instructions);
+    router.push(url);
+  }
+
+  function onGerarPeca() {
+    if (!alvoId) return;
+    if (pecaAlvo?.jaIniciada) {
+      router.push(buildGerarUrl(alvoId));
+    } else {
+      openGerarModal(alvoId);
+    }
+  }
+
+  // Intimação em estado terminal (resolvida/ignorada) — a unidade de trabalho é a
+  // própria intimação, então nada mais a gerar/concluir: só o menu (⋮ Reabrir).
+  if (m.podeReabrir) {
+    return <AcoesIntimacao det={det} />;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <Button size="sm" onClick={onGerarPeca} disabled={bloqueado || !alvoId}>
+        <Sparkles data-icon="inline-start" />
+        {pecaAlvo?.jaIniciada ? "Abrir peça" : "Gerar peça"}
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={bloqueado || dandoCiencia}
+        onClick={onDarCiencia}
+      >
+        {dandoCiencia ? (
+          <LoaderCircle data-icon="inline-start" className="animate-spin" />
+        ) : (
+          <Check data-icon="inline-start" />
+        )}
+        Dar ciência
+      </Button>
+      <AcoesIntimacao det={det} />
+      {cienciaErro ? (
+        <p role="alert" className="text-destructive w-full text-right text-xs">
+          Não foi possível dar ciência. Tente novamente.
+        </p>
+      ) : null}
+      <GerarPecaModal
+        open={modalOpen}
+        onOpenChange={(v) => {
+          if (!v) closeGerarModal();
+        }}
+        onGenerate={handleGenerate}
+        pecaLabel={pecaLabel}
+      />
+    </div>
   );
 }
 

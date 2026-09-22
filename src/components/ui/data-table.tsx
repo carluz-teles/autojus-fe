@@ -1,4 +1,5 @@
 import { type RowActionItem, RowActions } from "@/components/ui/row-actions";
+import { Skeleton } from "@/components/ui/skeleton";
 import { DOT_CLASS, type StatusTone } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 
@@ -109,9 +110,23 @@ export function DataTable<T>({
               ) : null}
             </tr>
           </thead>
-          <tbody className="divide-border/70 divide-y">
+          <tbody
+            className="divide-border/70 divide-y"
+            aria-label={
+              isLoading && typeof loadingLabel === "string"
+                ? loadingLabel
+                : undefined
+            }
+          >
             {isLoading ? (
-              <StateRow span={span}>{loadingLabel}</StateRow>
+              // Loading de FETCH = skeleton rows (nunca texto "Carregando…").
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={`skeleton-${i}`} aria-hidden>
+                  <td colSpan={span} className="px-5 py-3.5">
+                    <Skeleton className="h-4 w-full" />
+                  </td>
+                </tr>
+              ))
             ) : error ? (
               <StateRow span={span} tone="danger">
                 {error}

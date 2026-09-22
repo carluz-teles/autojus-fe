@@ -18,6 +18,9 @@ type IntimacaoStatus = "ACTIVE" | "CANCELLED";
 /** Situação de triagem do usuário sobre a intimação (inbox). */
 export type IntimacaoUserStatus = "PENDING" | "RESOLVED" | "IGNORED";
 
+/** Sub-desfecho de uma intimação RESOLVED; "" quando PENDING/IGNORED (sem desfecho). */
+export type IntimacaoResolution = "CIENCIA" | "PROTOCOLADA" | "";
+
 /**
  * Prazo derivado embutido na IntimacaoView — o "prazo.days_left" é a fonte de
  * urgência (negativo=vencido, 0=hoje, positivo=futuro). `null` quando ainda não
@@ -76,6 +79,14 @@ export interface IntimacaoView {
   status: IntimacaoStatus;
   /** Situação de triagem (Pendente/Resolvida/Ignorada) — dirige o StatusBadge. */
   user_status: IntimacaoUserStatus;
+  /**
+   * Sub-desfecho quando RESOLVED — COMO a intimação foi concluída: "CIENCIA" (deu-se
+   * ciência) | "PROTOCOLADA" (a peça gerada foi protocolada) | "" (PENDING/IGNORED).
+   * Junto de user_status + work_stage, dirige o chip único de desfecho (ver estadoIntimacao).
+   */
+  resolution: IntimacaoResolution;
+  /** Instante ISO da conclusão; null antes do desfecho (ou histórico sem instante). */
+  resolved_at: string | null;
   source: string;
   source_url: string;
   made_available_at: string;
@@ -276,6 +287,9 @@ export interface IntimacaoDetalheView extends IntimacaoView {
   ai_act: string;
   /** Órgão julgador (court_record.judging_body). */
   judging_body: string;
+  /** Fase efetiva do processo (phase_override ?? phase); "" quando não derivada.
+   *  Contexto mínimo no breadcrumb da intimação (chip); ficha completa no cockpit. */
+  phase: string;
   /** Data de distribuição/ajuizamento (court_record.filed_at) — "YYYY-MM-DD".
    *  Vazio quando o processo ainda não foi enriquecido pelo DATAJUD (DJEN não
    *  carrega). A UI só renderiza a linha "Distribuição" quando não-vazio. */
