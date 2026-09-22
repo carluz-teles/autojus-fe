@@ -260,8 +260,7 @@ function UserStep({ f }: { f: F }) {
     formState: { errors },
   } = f.userForm;
   const [first, last] = watch(["firstName", "lastName"]);
-  const iniciais =
-    `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
+  const iniciais = `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
 
   const onEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -331,7 +330,9 @@ function OrgStep({ f }: { f: F }) {
     watch,
     formState: { errors },
   } = f.orgForm;
-  const iniciais = ((watch("razaoSocial") ?? "").trim()[0] ?? "E").toUpperCase();
+  const iniciais = (
+    (watch("razaoSocial") ?? "").trim()[0] ?? "E"
+  ).toUpperCase();
   const CNPJ_CLASS =
     "border-line bg-panel text-foreground placeholder:text-fg3 focus:border-primary aria-invalid:border-destructive w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none";
 

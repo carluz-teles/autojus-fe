@@ -2,7 +2,7 @@
 
 import { Menu } from "@base-ui/react/menu";
 import { Check, ChevronRight, ListFilter, type LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,12 @@ export function FacetedFilter({
   className?: string;
 }) {
   // Busca das CATEGORIAS (o "Filtrar…" do topo do popover), não das opções.
-  const [busca, setBusca] = useState("");
+  // É um filtro → é um formulário: estado via RHF, reação por useWatch (dispara
+  // na digitação, filtrando a lista de categorias visíveis). Sem validação.
+  const { control, register, setValue } = useForm({
+    defaultValues: { busca: "" },
+  });
+  const busca = useWatch({ control, name: "busca" });
   const ativos = facets.filter((f) => values[f.key]);
   const termo = busca.trim().toLowerCase();
   const visiveis = termo
@@ -60,7 +65,7 @@ export function FacetedFilter({
   return (
     <Menu.Root
       onOpenChange={(open) => {
-        if (!open) setBusca("");
+        if (!open) setValue("busca", "");
       }}
     >
       <Menu.Trigger
@@ -93,8 +98,7 @@ export function FacetedFilter({
             {/* "Filtrar…" — filtra a lista de categorias (como no design) */}
             <div className="border-border mb-1 border-b px-2 pt-0.5 pb-1.5">
               <input
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
+                {...register("busca")}
                 onKeyDown={(e) => e.stopPropagation()}
                 placeholder="Filtrar…"
                 aria-label="Filtrar categorias"
