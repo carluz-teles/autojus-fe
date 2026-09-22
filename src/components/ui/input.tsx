@@ -17,41 +17,4 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   );
 }
 
-// InputField — Input padrão de formulário. Estende o Input shadcn com `errorMessage`:
-// se houver mensagem, o campo assume o ESTADO DE ERRO (aria-invalid → borda/anel
-// vermelhos, herdados das classes aria-invalid do Input) e a mensagem aparece SEMPRE
-// ABAIXO do campo (role="alert" + aria-describedby, ligada ao input pra leitores de
-// tela). Padrão único de validação de formulário: erro vermelho no input + texto embaixo.
-function InputField({
-  errorMessage,
-  id,
-  "aria-invalid": ariaInvalid,
-  ...props
-}: React.ComponentProps<"input"> & { errorMessage?: string }) {
-  const generatedId = React.useId();
-  const fieldId = id ?? generatedId;
-  const errorId = `${fieldId}-error`;
-  const hasError = Boolean(errorMessage);
-
-  return (
-    <div className="w-full">
-      <Input
-        id={fieldId}
-        aria-invalid={hasError || ariaInvalid}
-        aria-describedby={hasError ? errorId : undefined}
-        {...props}
-      />
-      {hasError ? (
-        <p
-          id={errorId}
-          role="alert"
-          className="text-destructive mt-1.5 text-[12px] leading-snug"
-        >
-          {errorMessage}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-export { Input, InputField };
+export { Input };
