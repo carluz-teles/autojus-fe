@@ -180,11 +180,17 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
                 <AcoesPrimarias det={det} />
               </div>
             </div>
-            {/* TÍTULO = o ATO que aconteceu nesta publicação (não o título do processo — esse é
-              o herói do cockpit; aqui a intimação é a unidade de TRABALHO). */}
+            {/* TÍTULO = a identidade do PROCESSO (m.titulo = BuildCaseTitle do BE, fonte única) —
+              o MESMO título usado em toda lista/superfície, pra a intimação ter título CONSISTENTE
+              onde quer que apareça. O ATO que aconteceu (m.ato) vira subtítulo secundário abaixo. */}
             <h2 className="font-display max-w-4xl text-2xl leading-[1.1] font-medium tracking-tight text-balance break-words sm:text-[2rem]">
-              {m.ato}
+              {m.titulo}
             </h2>
+            {m.ato ? (
+              <p className="text-muted-foreground max-w-4xl text-sm leading-snug">
+                {m.ato}
+              </p>
+            ) : null}
             {/* Breadcrumb pro PROCESSO: identidade MÍNIMA pra situar (CNJ + partes) — a ficha
               completa (classe/assunto/órgão/valor/sigilo) vive no cockpit, um clique adiante. */}
             <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-sm">
