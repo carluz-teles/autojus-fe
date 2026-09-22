@@ -49,10 +49,12 @@ import {
   bloqueiaProvidencias,
   precisaConfirmarPrazo,
   tipoIncompativelComPrazo,
+  tipoIndeterminado,
 } from "../../lib/confirmacao";
 import { dataEscolhidaNaApuracao } from "../../lib/detalhe-apresentacao";
 import { AutosSection } from "./autos-section";
 import { ConfirmacaoPrazo } from "./confirmacao-prazo";
+import { DefinirTipoAto } from "./definir-tipo-ato";
 import { DisposicaoSection } from "./disposicao-section";
 import { ExplicacaoPrazo } from "./explicacao-prazo";
 
@@ -274,18 +276,7 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
               {det.memoria?.divergencia?.pendente ? (
                 <ApuracaoPrazo key={id} det={det} />
               ) : null}
-              {det.prazoDetalhe &&
-              precisaConfirmarPrazo(
-                det.prazoDetalhe,
-                det.intimacao?.estado ?? "",
-              ) ? (
-                <ConfirmacaoPrazo
-                  key={`${det.prazoDetalhe.id}:${det.prazoDetalhe.confirmed_at ?? "pending"}`}
-                  id={id}
-                  prazo={det.prazoDetalhe}
-                  estado={det.intimacao?.estado ?? ""}
-                />
-              ) : null}
+              <DecisaoTipoPrazo id={id} det={det} />
               <PainelPrazo det={det} />
             </aside>
             <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-2">
@@ -422,6 +413,56 @@ function Dado({ label, value }: { label: string; value: string }) {
       <dd className="mt-1">{value}</dd>
     </div>
   );
+}
+
+// DecisaoTipoPrazo — o control de tipo/prazo do detalhe, com DUAS portas:
+//   (a) o prazo precisa de confirmação/definição (revisão, divergência de tipo,
+//       estado a_classificar/ia) → ConfirmacaoPrazo (form completo, com contagem,
+//       ajustes e "revisei"). Fluxo inalterado.
+//   (b) o prazo NÃO exige confirmação (declarado/aceito/futuro), mas o TIPO DO ATO
+//       ainda está indeterminado ("" ou "indeterminado") → DefinirTipoAto, o dropdown
+//       autônomo que resolve só o tipo (e o prazo em dias), SEMPRE disponível.
+// Sem prazo detalhado ainda → nada a decidir aqui.
+function DecisaoTipoPrazo({ id, det }: { id: string; det: Detalhe }) {
+  const p = det.prazoDetalhe;
+  if (!p) return null;
+  const estado = det.intimacao?.estado ?? "";
+
+  if (precisaConfirmarPrazo(p, estado)) {
+    return (
+      <ConfirmacaoPrazo
+        key={`${p.id}:${p.confirmed_at ?? "pending"}`}
+        id={id}
+        prazo={p}
+        estado={estado}
+      />
+    );
+  }
+
+  if (tipoIndeterminado(p, estado)) {
+    return (
+      <Card role="region" aria-label="Definir tipo do ato">
+        <CardHeader>
+          <CardTitle>
+            <SectionTitle>Definir tipo do ato</SectionTitle>
+          </CardTitle>
+          <CardDescription>
+            O tipo do ato ainda não foi classificado. Informe o tipo do ato (e a
+            contagem) para completar a análise desta intimação.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DefinirTipoAto
+            intimacaoId={id}
+            prazo={p}
+            onConfirmado={det.recarregarPrazo}
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return null;
 }
 
 function PainelPrazo({ det }: { det: Detalhe }) {

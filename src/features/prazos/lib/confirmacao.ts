@@ -40,6 +40,19 @@ export const definirTipoSchema = confirmacaoSchema.pick({
 
 export type DefinirTipoForm = z.infer<typeof definirTipoSchema>;
 
+/**
+ * Tipo do ato ainda indeterminado — "" (nunca preenchido) ou "indeterminado"
+ * (classificação pendente). Enquanto isso, o usuário precisa poder DEFINIR o tipo,
+ * independente do estado do prazo (mesmo com prazo declarado/aceito).
+ */
+export function tipoIndeterminado(
+  p: PrazoDetalheView | null,
+  estado: string,
+): boolean {
+  const tipo = p?.tipo_ato ?? "";
+  return tipo === "" || tipo === "indeterminado" || estado === "a_classificar";
+}
+
 /** Legacy automatic classifications may contradict an otherwise valid declared date. */
 export function tipoIncompativelComPrazo(p: PrazoDetalheView): boolean {
   return (
