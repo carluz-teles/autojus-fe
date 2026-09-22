@@ -1,14 +1,25 @@
 "use client";
 
 import { Check, X } from "lucide-react";
+import { Controller } from "react-hook-form";
 
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { IconAction } from "@/components/ui/icon-action";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 import type { useInvite } from "../../hooks/use-invite";
 
 // Modal "Convidar membro" (port de Atjus - Convite.dc.html): compondo (e-mail +
-// chips + papel + protocolar + mensagem) → enviado (sucesso + link). JSX + bind.
+// chips + papel + protocolar + mensagem) → enviado (sucesso + link). E-mail e
+// mensagem são campos de formulário RHF (mensagem de erro por campo).
 export function InviteModal({ inv }: { inv: ReturnType<typeof useInvite> }) {
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = inv.form;
+
   if (!inv.aberto) return null;
 
   return (
@@ -69,30 +80,44 @@ export function InviteModal({ inv }: { inv: ReturnType<typeof useInvite> }) {
             </button>
           </div>
         ) : (
-          <>
+          <form onSubmit={handleSubmit(inv.enviar)} noValidate>
             <div className="px-[22px] py-[18px]">
-              <label className="text-fg3 mb-1.5 block text-[11.5px]">
-                Convidar por e-mail
-              </label>
-              <div className="mb-2.5 flex gap-2">
-                <input
-                  value={inv.email}
-                  onChange={(e) => inv.setEmail(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") inv.addEmail();
-                  }}
-                  placeholder="nome@escritorio.adv.br"
-                  className="border-line bg-bg text-foreground flex-1 rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
-                />
-                <button
-                  onClick={inv.addEmail}
-                  className="border-primary text-primary flex-none rounded-[9px] border bg-transparent px-[15px] py-2.5 text-[13px] font-medium"
-                >
-                  Adicionar
-                </button>
-              </div>
+              <Field data-invalid={!!errors.email}>
+                <FieldLabel htmlFor="invite-email">
+                  Convidar por e-mail
+                </FieldLabel>
+                <div className="flex gap-2">
+                  <Controller
+                    name="email"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        id="invite-email"
+                        placeholder="nome@escritorio.adv.br"
+                        aria-invalid={!!errors.email}
+                        className="flex-1"
+                        {...field}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            inv.addEmail();
+                          }
+                        }}
+                      />
+                    )}
+                  />
+                  <button
+                    type="button"
+                    onClick={inv.addEmail}
+                    className="border-primary text-primary flex-none rounded-[9px] border bg-transparent px-[15px] py-2.5 text-[13px] font-medium"
+                  >
+                    Adicionar
+                  </button>
+                </div>
+                <FieldError errors={[errors.email]} />
+              </Field>
               {inv.temChips ? (
-                <div className="mb-4 flex flex-wrap gap-1.5">
+                <div className="mt-2.5 mb-4 flex flex-wrap gap-1.5">
                   {inv.chips.map((c) => (
                     <span
                       key={c.email}
@@ -102,19 +127,23 @@ export function InviteModal({ inv }: { inv: ReturnType<typeof useInvite> }) {
                       <IconAction
                         label={`Remover convite para ${c.email}`}
                         icon={X}
+                        type="button"
                         onClick={c.rm}
                         className="size-9 rounded-full pointer-coarse:size-11"
                       />
                     </span>
                   ))}
                 </div>
-              ) : null}
+              ) : (
+                <div className="mb-4" />
+              )}
 
               <label className="text-fg3 mb-2 block text-[11.5px]">Papel</label>
               <div className="mb-4 flex flex-col gap-2">
                 {inv.papeis.map((p) => (
                   <button
                     key={p.k}
+                    type="button"
                     onClick={p.pick}
                     className="flex items-start gap-[11px] rounded-[10px] border px-[13px] py-[11px] text-left"
                     style={{ borderColor: p.borda, background: p.bg }}
@@ -168,16 +197,24 @@ export function InviteModal({ inv }: { inv: ReturnType<typeof useInvite> }) {
                 </button>
               </div>
 
-              <label className="text-fg3 mb-1.5 block text-[11.5px]">
-                Mensagem <span className="text-fg3">(opcional)</span>
-              </label>
-              <textarea
-                value={inv.msg}
-                onChange={(e) => inv.setMsg(e.target.value)}
-                placeholder="Uma nota pessoal no convite…"
-                rows={2}
-                className="border-line bg-bg text-foreground w-full resize-y rounded-[9px] border px-[13px] py-2.5 text-[13px] outline-none"
-              />
+              <Field>
+                <FieldLabel htmlFor="invite-msg">
+                  Mensagem <span className="text-fg3">(opcional)</span>
+                </FieldLabel>
+                <Controller
+                  name="msg"
+                  control={control}
+                  render={({ field }) => (
+                    <Textarea
+                      id="invite-msg"
+                      placeholder="Uma nota pessoal no convite…"
+                      rows={2}
+                      className="min-h-0"
+                      {...field}
+                    />
+                  )}
+                />
+              </Field>
               {inv.erroEnvio ? (
                 <p
                   className="text-destructive mt-3 text-[11.5px] leading-[1.45]"
@@ -189,20 +226,21 @@ export function InviteModal({ inv }: { inv: ReturnType<typeof useInvite> }) {
             </div>
             <div className="border-line2 flex justify-end gap-2 border-t px-[22px] py-3.5">
               <button
+                type="button"
                 onClick={inv.fechar}
                 className="border-line bg-panel text-foreground hover:bg-hover rounded-lg border px-3.5 py-2 text-[12.5px] font-medium"
               >
                 Cancelar
               </button>
               <button
-                onClick={inv.enviar}
+                type="submit"
                 disabled={!inv.podeEnviar}
                 className="bg-primary text-primary-foreground rounded-lg px-4 py-2 text-[12.5px] font-medium disabled:cursor-not-allowed disabled:opacity-45"
               >
                 {inv.enviando ? "Enviando…" : "Enviar convite"}
               </button>
             </div>
-          </>
+          </form>
         )}
       </div>
     </div>

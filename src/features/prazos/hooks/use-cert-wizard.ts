@@ -1,7 +1,10 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useCallback, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import {
   useCertificados,
@@ -10,6 +13,14 @@ import {
 } from "@/features/configuracoes/hooks/use-cert-upload";
 import type { CertificateView } from "@/features/configuracoes/types/certificado";
 import { ApiError } from "@/lib/api/errors";
+
+// Só a SENHA é campo de formulário (RHF); o arquivo .pfx/.p12 é plumbing de UI
+// (input file controlado à parte). Senha obrigatória — o BE valida o resto.
+const certSchema = z.object({
+  senha: z.string().min(1, "Informe a senha do certificado."),
+});
+
+export type CertForm = z.infer<typeof certSchema>;
 
 // Wizard "Adicionar certificado" — direto ao ponto (A1, BE real): escolher o
 // arquivo .pfx/.p12 + senha → POST /v1/certificates. Sem etapa de escolha de
@@ -88,21 +99,26 @@ export function useCertWizard() {
 
   const [aberto, setAberto] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [removendoId, setRemovendoId] = useState<string | null>(null);
 
+  const form = useForm<CertForm>({
+    resolver: zodResolver(certSchema),
+    defaultValues: { senha: "" },
+  });
+  const { handleSubmit, reset } = form;
+
   const abrir = useCallback(() => {
     setFile(null);
-    setSenha("");
+    reset({ senha: "" });
     setErro(null);
     setAberto(true);
-  }, []);
+  }, [reset]);
   const fechar = useCallback(() => {
     setAberto(false);
-    setSenha("");
+    reset({ senha: "" });
     setFile(null);
-  }, []);
+  }, [reset]);
 
   const selecionarArquivo = useCallback((f: File) => {
     setErro(null);
@@ -110,14 +126,12 @@ export function useCertWizard() {
   }, []);
   const trocar = useCallback(() => {
     setFile(null);
-    setSenha("");
+    reset({ senha: "" });
     setErro(null);
-  }, []);
+  }, [reset]);
 
-  const podeAdicionar = !!file && senha.length > 0 && !uploadMut.isPending;
-
-  const adicionar = useCallback(() => {
-    if (!file || !senha) return;
+  const adicionar = handleSubmit(({ senha }) => {
+    if (!file) return;
     setErro(null);
     uploadMut.mutate(
       { file, password: senha },
@@ -125,7 +139,7 @@ export function useCertWizard() {
         onSuccess: () => {
           toast.success("Certificado adicionado.");
           setAberto(false);
-          setSenha("");
+          reset({ senha: "" });
           setFile(null);
         },
         onError: (e) => {
@@ -137,7 +151,7 @@ export function useCertWizard() {
         },
       },
     );
-  }, [file, senha, uploadMut]);
+  });
 
   const remover = useCallback(
     (id: string) => {
@@ -182,10 +196,11 @@ export function useCertWizard() {
     file: file ? { nome: file.name, tam: fmtTam(file.size) } : null,
     selecionarArquivo,
     trocar,
-    senha,
-    setSenha,
+    form,
     erro,
-    podeAdicionar,
+    // Botão liga só com arquivo escolhido e sem upload em voo; a senha é validada
+    // por RHF ao submeter (mensagem por campo).
+    podeAdicionar: !!file && !uploadMut.isPending,
     adicionar,
     adicionando: uploadMut.isPending,
   };

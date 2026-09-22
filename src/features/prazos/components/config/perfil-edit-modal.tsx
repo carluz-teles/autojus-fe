@@ -1,8 +1,11 @@
 "use client";
 
 import { X } from "lucide-react";
+import { Controller } from "react-hook-form";
 
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { IconAction } from "@/components/ui/icon-action";
+import { Input } from "@/components/ui/input";
 
 import { usePerfilEditForm } from "../../hooks/use-perfil-edit-form";
 
@@ -10,6 +13,10 @@ import { usePerfilEditForm } from "../../hooks/use-perfil-edit-form";
 // mesmo chrome Linear do OrgEditModal. Componente = JSX + binding.
 export function PerfilEditModal({ onFechar }: { onFechar: () => void }) {
   const f = usePerfilEditForm({ onDone: onFechar });
+  const {
+    control,
+    formState: { errors },
+  } = f.form;
 
   return (
     <div
@@ -36,32 +43,39 @@ export function PerfilEditModal({ onFechar }: { onFechar: () => void }) {
           />
         </div>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            f.salvar();
-          }}
-        >
+        <form onSubmit={f.salvar} noValidate>
           <div className="grid grid-cols-2 gap-3 px-[22px] py-[18px]">
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-medium">Nome</span>
-              <input
-                autoFocus
-                value={f.firstName}
-                onChange={(e) => f.setFirstName(e.target.value)}
-                className="border-line bg-bg text-foreground w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+            <Field data-invalid={!!errors.firstName}>
+              <FieldLabel htmlFor="perfil-first-name">Nome</FieldLabel>
+              <Controller
+                name="firstName"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    id="perfil-first-name"
+                    autoFocus
+                    aria-invalid={!!errors.firstName}
+                    {...field}
+                  />
+                )}
               />
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-medium">
-                Sobrenome
-              </span>
-              <input
-                value={f.lastName}
-                onChange={(e) => f.setLastName(e.target.value)}
-                className="border-line bg-bg text-foreground w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+              <FieldError errors={[errors.firstName]} />
+            </Field>
+            <Field data-invalid={!!errors.lastName}>
+              <FieldLabel htmlFor="perfil-last-name">Sobrenome</FieldLabel>
+              <Controller
+                name="lastName"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    id="perfil-last-name"
+                    aria-invalid={!!errors.lastName}
+                    {...field}
+                  />
+                )}
               />
-            </label>
+              <FieldError errors={[errors.lastName]} />
+            </Field>
           </div>
 
           <div className="border-line2 flex justify-end gap-2 border-t px-[22px] py-3.5">

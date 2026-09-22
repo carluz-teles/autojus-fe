@@ -1,12 +1,30 @@
 "use client";
 
 import type { OrganizationCustomRoleKey } from "@clerk/shared/types";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useCallback, useMemo, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { z } from "zod";
 
 import {
   roleLabel as clerkRoleLabel,
   useOrgMembers,
 } from "@/features/organization/hooks/use-org-members";
+
+// Só e-mail e mensagem são campos de formulário RHF. O e-mail é validado por
+// campo (formato) ao adicionar um convidado; a mensagem é livre/opcional. Chips,
+// papel e "pode protocolar" seguem como estado de UI (fidelidade ao design).
+const inviteSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), {
+      message: "Informe um e-mail válido.",
+    }),
+  msg: z.string(),
+});
+
+export type InviteForm = z.infer<typeof inviteSchema>;
 
 // Modal "Convidar membro" (port de Atjus - Convite.dc.html, persona admin):
 // chips de e-mail → papel → "pode protocolar" → mensagem → enviar. Ligado ao
@@ -62,48 +80,69 @@ export interface InvitePendente {
 export function useInvite() {
   const { organization, invitations, isAdmin } = useOrgMembers();
   const [aberto, setAberto] = useState(false);
-  const [email, setEmail] = useState("");
   const [chips, setChips] = useState<string[]>([]);
   const [papel, setPapel] = useState<Papel>("Advogado");
   const [proto, setProto] = useState(false);
-  const [msg, setMsg] = useState("");
   const [enviado, setEnviado] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erroEnvio, setErroEnvio] = useState<string | null>(null);
   const [revogandoId, setRevogandoId] = useState<string | null>(null);
   const [totalEnviados, setTotalEnviados] = useState(0);
 
+  const form = useForm<InviteForm>({
+    resolver: zodResolver(inviteSchema),
+    mode: "onSubmit",
+    defaultValues: { email: "", msg: "" },
+  });
+  const { reset, getValues, setValue, setError, clearErrors, control } = form;
+  const email = useWatch({ control, name: "email" });
+
   const abrir = useCallback(() => {
     setAberto(true);
     setEnviado(false);
     setErroEnvio(null);
     setChips([]);
-    setEmail("");
-    setMsg("");
-  }, []);
+    reset({ email: "", msg: "" });
+  }, [reset]);
   const fechar = useCallback(() => setAberto(false), []);
 
+  // Adiciona o e-mail digitado à lista de convidados (chip). Valida o formato
+  // por campo: se inválido, mostra a mensagem abaixo do input e NÃO adiciona.
   const addEmail = useCallback(() => {
-    setEmail((v) => {
-      const t = v.trim();
-      if (t && t.includes("@")) setChips((c) => c.concat(t));
-      return t.includes("@") ? "" : v;
-    });
-  }, []);
+    const t = getValues("email").trim();
+    if (!t) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) {
+      setError("email", {
+        type: "manual",
+        message: "Informe um e-mail válido.",
+      });
+      return;
+    }
+    clearErrors("email");
+    setChips((c) => c.concat(t));
+    setValue("email", "");
+  }, [getValues, setError, clearErrors, setValue]);
   const removeChip = useCallback(
     (i: number) => setChips((c) => c.filter((_, j) => j !== i)),
     [],
   );
 
   const podeEnviar =
-    !enviando && (chips.length > 0 || email.trim().includes("@"));
+    !enviando && (chips.length > 0 || (email ?? "").trim().includes("@"));
 
   const enviar = useCallback(async () => {
     if (!organization) return;
-    const extra = email.trim();
-    const todos = (
-      extra.includes("@") ? chips.concat(extra) : chips.slice()
-    ).map((e) => e.toLowerCase());
+    const extra = getValues("email").trim();
+    if (extra && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(extra)) {
+      setError("email", {
+        type: "manual",
+        message: "Informe um e-mail válido.",
+      });
+      return;
+    }
+    const todos = (extra ? chips.concat(extra) : chips.slice()).map((e) =>
+      e.toLowerCase(),
+    );
     if (todos.length === 0) return;
     const role =
       PAPEL_DEFS.find((p) => p.k === papel)?.role ??
@@ -132,9 +171,9 @@ export function useInvite() {
       );
     }
     setChips([]);
-    setEmail("");
+    reset({ email: "", msg: "" });
     setEnviado(true);
-  }, [organization, invitations, email, chips, papel]);
+  }, [organization, invitations, getValues, chips, papel, reset, setError]);
 
   const revogar = useCallback(
     async (
@@ -181,7 +220,7 @@ export function useInvite() {
     [invitations?.data, revogandoId, revogar],
   );
 
-  const totalCompondo = chips.length + (email.includes("@") ? 1 : 0);
+  const totalCompondo = chips.length + ((email ?? "").includes("@") ? 1 : 0);
 
   return {
     aberto,
@@ -195,8 +234,7 @@ export function useInvite() {
     enviado,
     enviando,
     erroEnvio,
-    email,
-    setEmail,
+    form,
     addEmail,
     chips: chips.map((e, i) => ({ email: e, rm: () => removeChip(i) })),
     temChips: chips.length > 0,
@@ -205,8 +243,6 @@ export function useInvite() {
     protoTrilho: proto ? "var(--primary)" : "var(--line)",
     protoKnob: proto ? "translateX(16px)" : "translateX(0)",
     toggleProto: () => setProto((p) => !p),
-    msg,
-    setMsg,
     podeEnviar,
     enviar: () => void enviar(),
     enviadoTitulo: totalEnviados > 1 ? "Convites enviados" : "Convite enviado",

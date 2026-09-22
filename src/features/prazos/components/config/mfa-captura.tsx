@@ -1,29 +1,36 @@
 "use client";
 
 import { ImageUp, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
+import { Field, FieldLabel } from "@/components/ui/field";
 import { IconAction } from "@/components/ui/icon-action";
+import { Textarea } from "@/components/ui/textarea";
 
 // Captura do segundo fator: o advogado tira um print do QR que o tribunal mostra
 // ao configurar o 2º fator (ou exporta as contas do autenticador) e sobe a imagem;
 // alternativamente cola o código. Controlado pelo pai (precisa reenviar o MESMO
 // print quando o BE pede para escolher a conta). Design da tela de Configurações.
+// Não tem submit próprio: é um controlado (file + secret) do wizard de conexão; a
+// mensagem de erro do 2FA fica no pai. Aqui usamos os componentes Field/Textarea.
 export function MfaCaptura({
   file,
   onFile,
   secret,
   onSecret,
   disabled,
+  invalid,
 }: {
   file: File | null;
   onFile: (f: File | null) => void;
   secret: string;
   onSecret: (s: string) => void;
   disabled?: boolean;
+  invalid?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const secretId = useId();
 
   const preview = useMemo(
     () => (file ? URL.createObjectURL(file) : null),
@@ -105,17 +112,23 @@ export function MfaCaptura({
         <span className="bg-line h-px flex-1" />
       </div>
 
-      <textarea
-        value={secret}
-        disabled={disabled}
-        onChange={(e) => onSecret(e.target.value)}
-        aria-label="Chave de configuração TOTP"
-        placeholder="Chave de configuração, não o código de seis dígitos"
-        rows={2}
-        spellCheck={false}
-        autoComplete="off"
-        className="border-line bg-bg text-foreground w-full resize-none rounded-[9px] border px-[13px] py-2.5 text-[13px] outline-none"
-      />
+      <Field data-invalid={!!invalid}>
+        <FieldLabel htmlFor={secretId} className="sr-only">
+          Chave de configuração TOTP
+        </FieldLabel>
+        <Textarea
+          id={secretId}
+          value={secret}
+          disabled={disabled}
+          onChange={(e) => onSecret(e.target.value)}
+          placeholder="Chave de configuração, não o código de seis dígitos"
+          rows={2}
+          spellCheck={false}
+          autoComplete="off"
+          aria-invalid={!!invalid}
+          className="min-h-0 resize-none"
+        />
+      </Field>
     </div>
   );
 }
