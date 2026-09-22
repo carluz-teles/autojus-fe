@@ -27,7 +27,11 @@ const TOKEN: Record<IntimacaoEstadoTone, string> = {
   muted: "var(--fg3)",
 };
 
-function make(label: string, tone: IntimacaoEstadoTone, encerrada: boolean): IntimacaoEstado {
+function make(
+  label: string,
+  tone: IntimacaoEstadoTone,
+  encerrada: boolean,
+): IntimacaoEstado {
   const cor = TOKEN[tone];
   return {
     label,
@@ -48,10 +52,13 @@ export function estadoIntimacao(i: {
   // (o consumidor de petition.filed é assíncrono) — a UI já reflete o fato.
   if (i.work_stage === "FILED" || i.resolution === "PROTOCOLADA")
     return make("Concluída · Protocolada", "done", true);
-  if (i.user_status === "RESOLVED") return make("Concluída · Ciência", "done", true);
+  if (i.user_status === "RESOLVED")
+    return make("Concluída · Ciência", "done", true);
   if (i.user_status === "IGNORED") return make("Ignorada", "muted", true);
   // Aberta com trabalho andando — a peça foi gerada e está sendo produzida/revisada.
-  if (i.work_stage === "PARTNER_REVIEW") return make("Em revisão", "progress", false);
-  if (i.work_stage === "DRAFTING") return make("Peça em elaboração", "progress", false);
+  if (i.work_stage === "PARTNER_REVIEW")
+    return make("Em revisão", "progress", false);
+  if (i.work_stage === "DRAFTING")
+    return make("Peça em elaboração", "progress", false);
   return make("Pendente", "pending", false);
 }
