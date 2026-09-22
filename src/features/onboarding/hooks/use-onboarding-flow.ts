@@ -7,9 +7,12 @@ import {
   useUser,
 } from "@clerk/nextjs";
 import type { OrganizationCustomRoleKey } from "@clerk/shared/types";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { z } from "zod";
 
 import { addWatchedOab } from "@/features/integrations/services/integrations.service";
 import { useApi } from "@/lib/api/use-api";
@@ -60,13 +63,61 @@ function normalizeOab(raw: string): string {
   return uf + digits(semPrefixo);
 }
 
-// ── Passo 1: Usuário (Nome/Sobrenome + avatar Clerk) ──────────────────────────
+// ── Schemas por passo (validação declarada UMA vez, via zod) ──────────────────
+// Passo 1 (usuário): nome e sobrenome obrigatórios.
+const userSchema = z.object({
+  firstName: z.string().trim().min(1, "Informe seu nome."),
+  lastName: z.string().trim().min(1, "Informe seu sobrenome."),
+});
+type UserForm = z.infer<typeof userSchema>;
+
+// Passo 2 (organização): persona SEM erro (segmented). Razão social/CNPJ só são
+// obrigatórios quando escritório (firm) — validação condicional por superRefine,
+// pra que solo passe sem exigir campos que nem aparecem.
+const orgSchema = z
+  .object({
+    persona: z.enum(["solo", "firm"]),
+    razaoSocial: z.string().trim(),
+    cnpj: z.string(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.persona !== "firm") return;
+    if (!val.razaoSocial.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["razaoSocial"],
+        message: "Informe a razão social.",
+      });
+    }
+    if (digits(val.cnpj).length !== 14) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["cnpj"],
+        message: "Informe um CNPJ com 14 dígitos.",
+      });
+    }
+  });
+type OrgForm = z.infer<typeof orgSchema>;
+
+// Passo 3 (add-OAB): o input de adicionar uma OAB. Vazio é válido (o "obrigatório"
+// de fato é ter ≥1 na LISTA, checado no continuarOab) — aqui só barra lixo curto.
+const oabSchema = z.object({
+  oab: z.string(),
+});
+type OabForm = z.infer<typeof oabSchema>;
+
+// ── Passo 1: Usuário (Nome/Sobrenome via RHF + avatar Clerk) ──────────────────
 function useUserStep() {
   const { user } = useUser();
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
   const [savingAvatar, setSavingAvatar] = useState(false);
   const prefilled = useRef(false);
+
+  const form = useForm<UserForm>({
+    resolver: zodResolver(userSchema),
+    defaultValues: { firstName: "", lastName: "" },
+    mode: "onSubmit",
+  });
+  const { reset, getValues } = form;
 
   // Prefill do que veio do signup (Clerk) — sync one-time de sistema externo (Clerk)
   // pro estado do form, guardado por ref pra rodar uma vez só (sem cascata). O
@@ -74,11 +125,11 @@ function useUserStep() {
   useEffect(() => {
     if (prefilled.current || !user) return;
     prefilled.current = true;
-    /* eslint-disable react-hooks/set-state-in-effect -- seed externo (Clerk), 1x */
-    if (user.firstName) setFirstName(user.firstName);
-    if (user.lastName) setLastName(user.lastName);
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [user]);
+    reset({
+      firstName: user.firstName ?? "",
+      lastName: user.lastName ?? "",
+    });
+  }, [user, reset]);
 
   const uploadAvatar = useCallback(
     async (file: File) => {
@@ -94,21 +145,24 @@ function useUserStep() {
   );
 
   // Persiste nome/sobrenome no Clerk (fonte da identidade) antes de avançar.
-  const persistName = useCallback(async () => {
-    if (!user) return;
-    await user.update({
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-    });
-  }, [user, firstName, lastName]);
+  const persistName = useCallback(
+    async (values: UserForm) => {
+      if (!user) return;
+      await user.update({
+        firstName: values.firstName.trim(),
+        lastName: values.lastName.trim(),
+      });
+    },
+    [user],
+  );
 
-  const fullName = `${firstName} ${lastName}`.trim();
+  const fullName = useCallback(() => {
+    const { firstName, lastName } = getValues();
+    return `${firstName} ${lastName}`.trim();
+  }, [getValues]);
 
   return {
-    firstName,
-    setFirstName,
-    lastName,
-    setLastName,
+    form,
     fullName,
     avatarUrl: user?.hasImage ? user.imageUrl : null,
     uploadAvatar,
@@ -117,15 +171,20 @@ function useUserStep() {
   };
 }
 
-// ── Passo 2: Organização (persona + razão social/CNPJ + logo staged) ──────────
+// ── Passo 2: Organização (persona + razão social/CNPJ via RHF + logo staged) ──
 function useOrgStep() {
-  const [persona, setPersona] = useState<AccountType>("solo");
-  const [razaoSocial, setRazaoSocial] = useState("");
-  const [cnpj, setCnpj] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const cnpjAbort = useRef<AbortController | null>(null);
+
+  const form = useForm<OrgForm>({
+    resolver: zodResolver(orgSchema),
+    defaultValues: { persona: "solo", razaoSocial: "", cnpj: "" },
+    mode: "onSubmit",
+  });
+  const { control, getValues, setValue } = form;
+  const persona = useWatch({ control, name: "persona" });
 
   // O logo só sobe pro Clerk DEPOIS que a org existe (setLogo precisa da org ativa),
   // então aqui a gente só encena: guarda o File + um preview local (objectURL).
@@ -147,7 +206,7 @@ function useOrgStep() {
   // No blur do CNPJ (14 dígitos) consulta a Receita e preenche a razão social se
   // ainda estiver vazia — nunca sobrescreve o que o usuário digitou. Best-effort.
   const onCnpjBlur = useCallback(async () => {
-    const bare = digits(cnpj);
+    const bare = digits(getValues("cnpj"));
     if (bare.length !== 14) return;
     cnpjAbort.current?.abort();
     const ctrl = new AbortController();
@@ -155,19 +214,17 @@ function useOrgStep() {
     setCnpjLoading(true);
     try {
       const info = await lookupCnpj(bare, ctrl.signal);
-      if (info) setRazaoSocial((atual) => atual.trim() || info.razaoSocial);
+      if (info && !getValues("razaoSocial").trim()) {
+        setValue("razaoSocial", info.razaoSocial, { shouldValidate: false });
+      }
     } finally {
       if (cnpjAbort.current === ctrl) setCnpjLoading(false);
     }
-  }, [cnpj]);
+  }, [getValues, setValue]);
 
   return {
+    form,
     persona,
-    setPersona,
-    razaoSocial,
-    setRazaoSocial,
-    cnpj,
-    setCnpj,
     logoFile,
     logoPreview,
     stageLogo,
@@ -176,24 +233,31 @@ function useOrgStep() {
   };
 }
 
-// ── Passo 3: OABs a vigiar ────────────────────────────────────────────────────
+// ── Passo 3: OABs a vigiar (input add via RHF + lista em estado) ──────────────
 function useOabs() {
-  const [oab, setOab] = useState("");
   const [oabs, setOabs] = useState<string[]>([]);
+
+  const form = useForm<OabForm>({
+    resolver: zodResolver(oabSchema),
+    defaultValues: { oab: "" },
+    mode: "onSubmit",
+  });
+  const { getValues, setValue } = form;
+
   const add = useCallback(() => {
-    setOab((atual) => {
-      const v = normalizeOab(atual);
-      if (v && v.length > 2) {
-        setOabs((lista) => (lista.includes(v) ? lista : lista.concat(v)));
-      }
-      return "";
-    });
-  }, []);
+    const v = normalizeOab(getValues("oab"));
+    if (v && v.length > 2) {
+      setOabs((lista) => (lista.includes(v) ? lista : lista.concat(v)));
+    }
+    setValue("oab", "");
+  }, [getValues, setValue]);
+
   const remove = useCallback(
     (i: number) => setOabs((lista) => lista.filter((_, j) => j !== i)),
     [],
   );
-  return { oab, setOab, oabs, setOabs, add, remove };
+
+  return { form, oabs, setOabs, add, remove };
 }
 
 // ── Passo 4: Time (só escritório, pulável) ────────────────────────────────────
@@ -284,20 +348,17 @@ export function useOnboardingFlow() {
       );
   }, [isLoaded, orgId, phase, setActive, userMemberships.data]);
 
-  // Passo 1 → 2: persiste nome no Clerk e avança. Nome/sobrenome obrigatórios.
-  const continuarUser = useCallback(async () => {
-    if (!u.firstName.trim() || !u.lastName.trim()) {
-      setErro("Informe nome e sobrenome.");
-      return;
-    }
+  // Passo 1 → 2: valida (RHF) → persiste nome no Clerk e avança. handleSubmit só
+  // chama isto com nome/sobrenome já preenchidos (schema); erro trava no campo.
+  const continuarUser = u.form.handleSubmit(async (values) => {
     setErro(null);
     try {
-      await u.persistName();
+      await u.persistName(values);
     } catch {
       // nome é best-effort no Clerk; não trava o fluxo
     }
     setStep("org");
-  }, [u]);
+  });
 
   // Provisiona o tenant SÍNCRONO: cria a Clerk Org (nome = solo? nome completo :
   // razão social) e ativa; a PRIMEIRA leitura de /identity/me já provisiona o tenant
@@ -349,28 +410,23 @@ export function useOnboardingFlow() {
     ],
   );
 
-  // Passo 2 → 3: valida os campos do escritório, cria o tenant e vai pra OABs.
-  const continuarOrg = useCallback(async () => {
+  // Passo 2 → 3: valida os campos do escritório (RHF/zod condicional por persona),
+  // cria o tenant e vai pra OABs. handleSubmit só entra com os campos válidos.
+  const continuarOrg = o.form.handleSubmit(async (values) => {
     if (phase !== "idle") return;
-    if (!solo) {
-      if (!o.razaoSocial.trim()) {
-        setErro("Informe a razão social.");
-        return;
-      }
-      if (digits(o.cnpj).length !== 14) {
-        setErro("Informe um CNPJ com 14 dígitos.");
-        return;
-      }
-    }
     setErro(null);
-    const nome = solo ? u.fullName || "Meu escritório" : o.razaoSocial.trim();
+    const nome =
+      values.persona === "solo"
+        ? u.fullName() || "Meu escritório"
+        : values.razaoSocial.trim();
     await criarTenant(nome, "oab");
-  }, [phase, solo, o.razaoSocial, o.cnpj, u.fullName, criarTenant]);
+  });
 
   // Grava o perfil (com account_type) → persiste as OABs (dispara DJEN) → convites do
   // time (best-effort) → done. O perfil é o gate; OABs/convites são allSettled.
   const concluir = useCallback(async () => {
     if (phase !== "idle" || !tenantReady || oabs.oabs.length === 0) return;
+    const orgValues = o.form.getValues();
     setErro(null);
     setPhase("saving");
     try {
@@ -379,9 +435,9 @@ export function useOnboardingFlow() {
           ? { account_type: "solo" }
           : {
               account_type: "firm",
-              cnpj: digits(o.cnpj),
-              legal_name: o.razaoSocial.trim(),
-              trade_name: o.razaoSocial.trim(),
+              cnpj: digits(orgValues.cnpj),
+              legal_name: orgValues.razaoSocial.trim(),
+              trade_name: orgValues.razaoSocial.trim(),
             },
       );
 
@@ -430,8 +486,7 @@ export function useOnboardingFlow() {
     tenantReady,
     oabs.oabs,
     solo,
-    o.cnpj,
-    o.razaoSocial,
+    o.form,
     team.rows,
     activeOrg,
     updateOrgProfile,
@@ -477,31 +532,25 @@ export function useOnboardingFlow() {
       done: idx > i,
       current: idx === i,
     })),
-    // passo 1 — usuário
-    firstName: u.firstName,
-    setFirstName: u.setFirstName,
-    lastName: u.lastName,
-    setLastName: u.setLastName,
+    // passo 1 — usuário (RHF)
+    userForm: u.form,
     avatarUrl: u.avatarUrl,
     uploadAvatar: (f: File) => void u.uploadAvatar(f),
     savingAvatar: u.savingAvatar,
     continuarUser: () => void continuarUser(),
-    // passo 2 — organização
+    // passo 2 — organização (RHF)
+    orgForm: o.form,
     persona: o.persona,
-    setPersona: o.setPersona,
-    razaoSocial: o.razaoSocial,
-    setRazaoSocial: o.setRazaoSocial,
-    cnpj: o.cnpj,
-    setCnpj: o.setCnpj,
+    setPersona: (v: AccountType) =>
+      o.form.setValue("persona", v, { shouldValidate: false }),
     cnpjLoading: o.cnpjLoading,
     onCnpjBlur: () => void o.onCnpjBlur(),
     logoPreview: o.logoPreview,
     stageLogo: o.stageLogo,
     voltarUser: () => setStep("user"),
     continuarOrg: () => void continuarOrg(),
-    // passo 3 — oab
-    oab: oabs.oab,
-    setOab: oabs.setOab,
+    // passo 3 — oab (RHF no input de adicionar)
+    oabForm: oabs.form,
     oabs: oabs.oabs,
     addOab: oabs.add,
     removeOab: oabs.remove,

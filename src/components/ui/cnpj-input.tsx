@@ -17,6 +17,7 @@ type CnpjInputProps = {
   autoFocus?: boolean;
   onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
   onBlur?: React.FocusEventHandler<HTMLInputElement>;
+  "aria-invalid"?: boolean;
 };
 
 export function CnpjInput({

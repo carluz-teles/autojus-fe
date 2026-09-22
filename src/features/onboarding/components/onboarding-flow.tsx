@@ -14,9 +14,12 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { Controller } from "react-hook-form";
 
 import { CnpjInput } from "@/components/ui/cnpj-input";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { IconAction } from "@/components/ui/icon-action";
+import { Input } from "@/components/ui/input";
 import { OabInput } from "@/components/ui/oab-input";
 import { useSlidingIndicator } from "@/components/ui/use-sliding-indicator";
 import { ConfigTribunais } from "@/features/prazos/components/config/config-tribunais";
@@ -141,38 +144,6 @@ function Label({ htmlFor, children }: { htmlFor?: string; children: string }) {
   );
 }
 
-function Campo({
-  id,
-  label,
-  value,
-  onChange,
-  placeholder,
-  onEnter,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder: string;
-  onEnter?: () => void;
-}) {
-  return (
-    <div>
-      <Label htmlFor={id}>{label}</Label>
-      <input
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && onEnter) onEnter();
-        }}
-        placeholder={placeholder}
-        className="border-line bg-panel text-foreground placeholder:text-fg3 focus:border-primary w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
-      />
-    </div>
-  );
-}
-
 function ErroLinha({ erro }: { erro: string | null }) {
   if (!erro) return null;
   return (
@@ -283,8 +254,22 @@ function Segmented<T extends string>({
 
 // ── Passo 1: Usuário ──────────────────────────────────────────────────────────
 function UserStep({ f }: { f: F }) {
+  const {
+    register,
+    watch,
+    formState: { errors },
+  } = f.userForm;
+  const [first, last] = watch(["firstName", "lastName"]);
   const iniciais =
-    `${f.firstName[0] ?? ""}${f.lastName[0] ?? ""}`.toUpperCase() || "?";
+    `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
+
+  const onEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      f.continuarUser();
+    }
+  };
+
   return (
     <>
       <div className="font-display mb-1 text-[21px] font-medium">
@@ -304,37 +289,52 @@ function UserStep({ f }: { f: F }) {
       />
 
       <div className="grid grid-cols-2 gap-3">
-        <Campo
-          id="onb-first"
-          label="Nome"
-          value={f.firstName}
-          onChange={f.setFirstName}
-          placeholder="Renata"
-          onEnter={f.continuarUser}
-        />
-        <Campo
-          id="onb-last"
-          label="Sobrenome"
-          value={f.lastName}
-          onChange={f.setLastName}
-          placeholder="Marcondes"
-          onEnter={f.continuarUser}
-        />
+        <Field data-invalid={!!errors.firstName}>
+          <FieldLabel htmlFor="onb-first">
+            Nome<span className="text-destructive"> *</span>
+          </FieldLabel>
+          <Input
+            id="onb-first"
+            placeholder="Renata"
+            aria-invalid={!!errors.firstName}
+            onKeyDown={onEnter}
+            {...register("firstName")}
+          />
+          <FieldError errors={[errors.firstName]} />
+        </Field>
+        <Field data-invalid={!!errors.lastName}>
+          <FieldLabel htmlFor="onb-last">
+            Sobrenome<span className="text-destructive"> *</span>
+          </FieldLabel>
+          <Input
+            id="onb-last"
+            placeholder="Marcondes"
+            aria-invalid={!!errors.lastName}
+            onKeyDown={onEnter}
+            {...register("lastName")}
+          />
+          <FieldError errors={[errors.lastName]} />
+        </Field>
       </div>
 
       <ErroLinha erro={f.erro} />
-      <Footer
-        cta="Continuar"
-        onCta={f.continuarUser}
-        disabled={!f.firstName.trim() || !f.lastName.trim()}
-      />
+      <Footer cta="Continuar" onCta={f.continuarUser} />
     </>
   );
 }
 
 // ── Passo 2: Organização ──────────────────────────────────────────────────────
 function OrgStep({ f }: { f: F }) {
-  const iniciais = (f.razaoSocial.trim()[0] ?? "E").toUpperCase();
+  const {
+    control,
+    register,
+    watch,
+    formState: { errors },
+  } = f.orgForm;
+  const iniciais = ((watch("razaoSocial") ?? "").trim()[0] ?? "E").toUpperCase();
+  const CNPJ_CLASS =
+    "border-line bg-panel text-foreground placeholder:text-fg3 focus:border-primary aria-invalid:border-destructive w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none";
+
   return (
     <>
       <div className="font-display mb-1 text-[21px] font-medium">
@@ -383,30 +383,46 @@ function OrgStep({ f }: { f: F }) {
               onFile={f.stageLogo}
             />
           </div>
-          <div className="mb-4">
-            <Label htmlFor="onb-cnpj">CNPJ</Label>
-            <CnpjInput
-              id="onb-cnpj"
-              value={f.cnpj}
-              onChange={f.setCnpj}
-              onBlur={f.onCnpjBlur}
-              className="border-line bg-panel text-foreground placeholder:text-fg3 focus:border-primary w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+          <Field data-invalid={!!errors.cnpj} className="mb-4">
+            <FieldLabel htmlFor="onb-cnpj">
+              CNPJ<span className="text-destructive"> *</span>
+            </FieldLabel>
+            <Controller
+              name="cnpj"
+              control={control}
+              render={({ field }) => (
+                <CnpjInput
+                  id="onb-cnpj"
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={() => {
+                    field.onBlur();
+                    f.onCnpjBlur();
+                  }}
+                  aria-invalid={!!errors.cnpj}
+                  className={CNPJ_CLASS}
+                />
+              )}
             />
             <p className="text-fg3 mt-1 text-[11px]">
               {f.cnpjLoading
                 ? "Consultando a Receita…"
                 : "Buscamos a razão social automaticamente."}
             </p>
-          </div>
-          <div className="mb-1">
-            <Campo
+            <FieldError errors={[errors.cnpj]} />
+          </Field>
+          <Field data-invalid={!!errors.razaoSocial} className="mb-1">
+            <FieldLabel htmlFor="onb-razao">
+              Razão social<span className="text-destructive"> *</span>
+            </FieldLabel>
+            <Input
               id="onb-razao"
-              label="Razão social"
-              value={f.razaoSocial}
-              onChange={f.setRazaoSocial}
               placeholder="Prolheti & Marcondes Advogados"
+              aria-invalid={!!errors.razaoSocial}
+              {...register("razaoSocial")}
             />
-          </div>
+            <FieldError errors={[errors.razaoSocial]} />
+          </Field>
         </>
       )}
 
@@ -424,6 +440,10 @@ function OrgStep({ f }: { f: F }) {
 
 // ── Passo 3: OABs ─────────────────────────────────────────────────────────────
 function OabStep({ f }: { f: F }) {
+  const {
+    control,
+    formState: { errors },
+  } = f.oabForm;
   return (
     <>
       <div className="font-display mb-1 text-[21px] font-medium">
@@ -434,28 +454,40 @@ function OabStep({ f }: { f: F }) {
         segundo plano assim que você concluir.
       </p>
 
-      <div className="mb-3.5">
-        <Label>OAB monitorada</Label>
+      <Field data-invalid={!!errors.oab} className="mb-3.5">
+        <FieldLabel htmlFor="onb-oab">OAB monitorada</FieldLabel>
         <div className="flex gap-2">
-          <label className="min-w-0 flex-1">
-            <span className="sr-only">OAB monitorada</span>
-            <OabInput
-              value={f.oab}
-              onChange={f.setOab}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") f.addOab();
-              }}
-              className="border-line bg-panel text-foreground placeholder:text-fg3 focus:border-primary w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+          <div className="min-w-0 flex-1">
+            <Controller
+              name="oab"
+              control={control}
+              render={({ field }) => (
+                <OabInput
+                  id="onb-oab"
+                  value={field.value}
+                  onChange={field.onChange}
+                  aria-invalid={!!errors.oab}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      f.addOab();
+                    }
+                  }}
+                  className="border-line bg-panel text-foreground placeholder:text-fg3 focus:border-primary aria-invalid:border-destructive w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+                />
+              )}
             />
-          </label>
+          </div>
           <button
+            type="button"
             onClick={f.addOab}
             className="border-primary text-primary hover:bg-selected min-h-11 flex-none rounded-[9px] border bg-transparent px-[15px] py-2.5 text-[13px] font-medium"
           >
             Adicionar
           </button>
         </div>
-      </div>
+        <FieldError errors={[errors.oab]} />
+      </Field>
 
       {f.oabs.length === 0 ? (
         <div className="border-line text-fg3 rounded-[10px] border border-dashed px-[13px] py-3 text-[12px]">
