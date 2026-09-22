@@ -52,7 +52,32 @@ export interface IntimacaoPrazoView {
    * indeterminado|… "" quando não derivado. Rotulado via TIPO_ATO_LABEL.
    */
   tipo_ato: string;
+  /**
+   * Data INTERNA do prazo (deadline.prazo_interno do BE) — o fatal menos o buffer
+   * de segurança. O dual date que a Triagem mostra ("interno: DD/MM") ao lado do
+   * `end_date` (o fatal). null quando o motor ainda não materializou o piso interno.
+   */
+  prazo_interno: string | null;
 }
+
+/**
+ * Categoria coarse determinística do document_type (pipeline U0 — categoria.go do
+ * BE). Segmenta a Triagem ("Pra trabalhar" × "Ciências") de graça; o FE mapeia o
+ * rótulo pt-BR (CATEGORIA_COARSE_LABEL). Closed set espelhado do BE.
+ */
+export type IntimacaoCategoriaCoarse =
+  "recurso" | "manifestacao" | "ciencia" | "despacho" | "intimacao" | "outros";
+
+/** Sinal A do motor v3 (deadline.acionabilidade) — o "o que a intimação exige".
+ *  "" quando o motor ainda não populou. */
+export type IntimacaoAcionabilidade = "ato" | "ciencia" | "a_classificar" | "";
+
+/** Lane de ciclo de vida derivada no BE (aba de topo da Triagem-pipeline). */
+export type IntimacaoLifecycle = "a_triar" | "em_andamento" | "concluido";
+
+/** Motivo (de maior peso) de a intimação ser exceção; "" quando não é exceção. */
+export type IntimacaoExcecaoMotivo =
+  "provisorio" | "ia_inferido" | "divergente" | "sem_responsavel" | "";
 
 export interface IntimacaoView {
   id: string;
@@ -127,6 +152,22 @@ export interface IntimacaoView {
   recommended_providencia: RecommendedProvidencia | null;
   /** Total de providências SUGGESTED da intimação (o snapshot mostra só a 1ª). */
   suggested_count: number;
+  // ── Sinais da pipeline de Triagem (docs/erd-triagem-pipeline.md §9 U0) ──
+  /** Categoria coarse determinística do document_type; sempre presente ("outros"
+   *  no fallback). Alimenta o chip de categoria da linha densa. */
+  categoria_coarse: IntimacaoCategoriaCoarse;
+  /** Sinal A do motor v3 — ato|ciencia|a_classificar; "" quando não populado.
+   *  Segmenta a fila "A triar" (Pra trabalhar × Ciências × Sem prazo). */
+  acionabilidade: IntimacaoAcionabilidade;
+  /** true = a data veio do piso supletivo 218§3 (não confiar) — hint "provisório". */
+  provisorio: boolean;
+  /** Lane de ciclo de vida derivada — dirige as abas de topo (A triar/Em
+   *  andamento/Concluído). Fonte única do pipeline. */
+  lifecycle: IntimacaoLifecycle;
+  /** true = a intimação exige olhar humano (é exceção). */
+  is_excecao: boolean;
+  /** Motivo (de maior peso) da exceção; "" quando is_excecao=false. */
+  excecao_motivo: IntimacaoExcecaoMotivo;
 }
 
 // RecommendedProvidencia é o subset enxuto da 1ª providência que a LISTA carrega (o conjunto

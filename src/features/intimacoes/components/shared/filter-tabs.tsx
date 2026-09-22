@@ -1,5 +1,7 @@
 "use client";
 
+import type { LucideIcon } from "lucide-react";
+
 import {
   tabListClassName,
   tabTriggerClassName,
@@ -14,6 +16,10 @@ export interface FilterTab {
   count?: number;
   ativo: boolean;
   onClick: () => void;
+  /** Ícone opcional à esquerda do rótulo (ex.: ⚠ do tab "Exceções"). */
+  icon?: LucideIcon;
+  /** Realce âmbar/gold do tab (destaca-o dos neutros — ex.: "Exceções"). */
+  emphasis?: boolean;
 }
 
 export function FilterTabs({
@@ -37,20 +43,33 @@ export function FilterTabs({
         </span>
       ) : null}
       {tabs.map((tab) => {
+        const Icon = tab.icon;
         const trigger = (
           <button
             key={tab.key || "todas"}
             type="button"
             aria-pressed={tab.ativo}
             onClick={tab.onClick}
-            className={tabTriggerClassName(tab.ativo)}
+            className={cn(
+              tabTriggerClassName(tab.ativo),
+              tab.ativo && tab.emphasis && "border-gold",
+              tab.emphasis &&
+                (tab.ativo
+                  ? "text-gold-foreground"
+                  : "text-gold-foreground/80 hover:text-gold-foreground"),
+            )}
           >
+            {Icon ? <Icon className="size-3.5" aria-hidden /> : null}
             {tab.label}
             {tab.count != null && tab.count > 0 ? (
               <span
                 className={cn(
                   "font-mono text-[10.5px] tabular-nums",
-                  tab.ativo ? "text-fg2" : "text-fg3",
+                  tab.emphasis
+                    ? "text-gold-foreground/90"
+                    : tab.ativo
+                      ? "text-fg2"
+                      : "text-fg3",
                 )}
               >
                 {tab.count.toLocaleString("pt-BR")}

@@ -169,12 +169,20 @@ export async function resolveIntimacoesBatch(
   return ids.length;
 }
 
+/**
+ * Confirma os prazos da faixa CONFIÁVEL (low-risk) em lote — POST /v1/prazos/confirm-batch.
+ * Sem `intimationIds` (ou vazio) confirma TODOS os confiáveis (`all: true`). Com uma lista,
+ * confirma só os prazos confiáveis dessas intimações (o BE filtra a faixa low-risk mesmo com
+ * ids — exceções nunca entram). O contador `affected` reflete só os efetivamente confirmados.
+ */
 export async function confirmTrustedDeadlinesBatch(
   fetcher: ApiFetcher,
+  intimationIds?: string[],
 ): Promise<{ affected: number }> {
+  const all = !intimationIds || intimationIds.length === 0;
   return fetcher<{ affected: number }>("/v1/prazos/confirm-batch", {
     method: "POST",
-    body: { all: true, intimation_ids: [] },
+    body: { all, intimation_ids: all ? [] : intimationIds },
   });
 }
 

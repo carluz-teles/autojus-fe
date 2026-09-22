@@ -17,6 +17,7 @@ function prazo(days_left: number, confirmed = false): IntimacaoPrazoView {
     origem: "calculado",
     selo: confirmed ? "confiavel" : "a_apurar",
     tipo_ato: "manifestacao",
+    prazo_interno: null,
   };
 }
 
@@ -54,6 +55,12 @@ function item(
     work_stage: "RECEIVED",
     recommended_providencia: null,
     suggested_count: 0,
+    categoria_coarse: "intimacao",
+    acionabilidade: "",
+    provisorio: false,
+    lifecycle: "a_triar",
+    is_excecao: false,
+    excecao_motivo: "",
     ...overrides,
   };
 }

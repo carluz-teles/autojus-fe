@@ -345,11 +345,18 @@ export function useResolverIntimacao() {
   });
 }
 
+/**
+ * Confirma os prazos confiáveis em lote. Sem argumento (ou undefined) confirma TODOS os
+ * confiáveis do escritório; com uma lista de intimation ids, confirma só os confiáveis
+ * dessas intimações (o BE nunca inclui exceção) — usado pela seleção manual e pelo
+ * "Confirmar" de uma linha só.
+ */
 export function useConfirmarPrazosConfiaveisEmLote() {
   const fetcher = useApi();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => confirmTrustedDeadlinesBatch(fetcher),
+    mutationFn: (intimationIds?: string[]) =>
+      confirmTrustedDeadlinesBatch(fetcher, intimationIds),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: intimacoesKeys.all }),
   });
@@ -429,5 +436,31 @@ export function useAssignIntimacaoResponsavel(intimacaoId: string) {
     onSuccess: (detalhe) => {
       qc.setQueryData(intimacoesKeys.detail(intimacaoId), detalhe);
     },
+  });
+}
+
+/**
+ * Atribui/desatribui o mesmo responsável a VÁRIAS intimações — o PUT
+ * /v1/intimacoes/:id/responsavel disparado em paralelo por id (não há endpoint em
+ * lote no BE). Usado pela seleção em lote e pelo "Atribuir a mim" da linha da
+ * Triagem-pipeline. Invalida toda a árvore de intimações ao final.
+ */
+export function useAssignIntimacaoResponsavelBatch() {
+  const fetcher = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      ids,
+      assigneeUserId,
+    }: {
+      ids: string[];
+      assigneeUserId: string | null;
+    }) =>
+      Promise.all(
+        ids.map((id) =>
+          assignIntimacaoResponsavel(fetcher, id, { assigneeUserId }),
+        ),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: intimacoesKeys.all }),
   });
 }
