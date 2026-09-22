@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 // Máscara progressiva do número CNJ (NNNNNNN-DD.AAAA.J.TR.OOOO), aplicada enquanto
 // o usuário digita. Puro — sem React. Aceita colar com ou sem separadores; corta em
 // 20 dígitos. O dígito verificador e o tribunal são validados no backend.
@@ -16,3 +18,17 @@ export function maskCnj(value: string): string {
 export function cnjDigits(value: string): string {
   return value.replace(/\D/g, "");
 }
+
+// Schema do form de importação por CNJ. O cliente só garante que o número está
+// completo (20 dígitos); o dígito verificador e o tribunal são validados no
+// servidor — a mensagem de erro abaixo do campo é a barreira de UX.
+export const importCnjSchema = z.object({
+  cnj: z
+    .string()
+    .refine(
+      (value) => cnjDigits(value).length === 20,
+      "Informe o número CNJ completo (20 dígitos).",
+    ),
+});
+
+export type ImportCnjForm = z.infer<typeof importCnjSchema>;

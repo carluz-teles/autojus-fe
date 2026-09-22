@@ -283,6 +283,7 @@ export function ConfirmacaoPrazo({
                 <FieldLabel htmlFor="confirmacao-revisado">
                   Revisei o tipo do ato e a contagem do prazo.
                 </FieldLabel>
+                <FieldError errors={[errors.revisado]} />
               </Field>
               <div className="flex flex-col gap-2">
                 <Button type="submit" disabled={!c.podeConfirmar}>

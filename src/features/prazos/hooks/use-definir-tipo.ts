@@ -8,15 +8,21 @@
 // set TIPOS_COM_PRAZO — sem duplicar regra (Regra nº1). O componente chama só este
 // hook (JSX + binding).
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
 import { intimacoesKeys } from "@/features/intimacoes/hooks/use-intimacoes";
 import { useApi } from "@/lib/api/use-api";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 
-import { TIPOS_COM_PRAZO } from "../lib/confirmacao";
+import {
+  type DefinirTipoForm,
+  definirTipoSchema,
+  TIPOS_COM_PRAZO,
+} from "../lib/confirmacao";
 import {
   confirmarPrazo,
   noDeadlinePrazo,
@@ -44,13 +50,19 @@ export function useDefinirTipo({
   const api = useApi();
   const qc = useQueryClient();
 
-  const [tipo, setTipo] = useState(prazo?.tipo_ato?.toLowerCase() ?? "");
-  const [days, setDays] = useState<number | undefined>(
-    prazo && prazo.status !== "NO_DEADLINE" ? prazo.days : undefined,
-  );
-  const [counting, setCounting] = useState<"BUSINESS" | "CALENDAR">(
-    prazo?.counting ?? "BUSINESS",
-  );
+  const form = useForm<DefinirTipoForm>({
+    resolver: zodResolver(definirTipoSchema),
+    mode: "onChange",
+    defaultValues: {
+      tipo_ato: prazo?.tipo_ato?.toLowerCase() ?? "",
+      days: prazo && prazo.status !== "NO_DEADLINE" ? prazo.days : undefined,
+      counting: prazo?.counting ?? "BUSINESS",
+    },
+  });
+  const values = useWatch({ control: form.control });
+  const tipo = values.tipo_ato ?? "";
+  const days = values.days;
+  const counting = values.counting ?? "BUSINESS";
 
   const tipoValido = TIPOS_COM_PRAZO.some(([t]) => t === tipo);
   const diasValidos = (days ?? 0) >= 1;
@@ -128,14 +140,14 @@ export function useDefinirTipo({
 
   const options = useMemo(() => TIPOS_COM_PRAZO, []);
 
+  const onConfirmar = form.handleSubmit(() => {
+    if (!previewOk || emVoo) return;
+    confirmar.mutate();
+  });
+
   return {
+    form,
     options,
-    tipo,
-    setTipo,
-    days,
-    setDays,
-    counting,
-    setCounting,
     tipoValido,
     diasValidos,
     // preview
@@ -144,7 +156,7 @@ export function useDefinirTipo({
     preview: previewOk ? preview.data : undefined,
     onRetryPreview: () => void preview.refetch(),
     // ações
-    onConfirmar: () => confirmar.mutate(),
+    onConfirmar,
     podeConfirmar: tipoValido && diasValidos && previewOk && !emVoo,
     onSemPrazo: () => semPrazo.mutate(),
     podeSemPrazo: !!prazo?.id && prazo.status !== "MISSED",

@@ -30,6 +30,16 @@ export const confirmacaoSchema = z.object({
 
 export type ConfirmacaoForm = z.infer<typeof confirmacaoSchema>;
 
+// Subconjunto para o control "Definir tipo do ato" (tipo + dias + contagem).
+// Reusa exatamente as regras de tipo_ato/days do confirmacaoSchema — uma só fonte.
+export const definirTipoSchema = confirmacaoSchema.pick({
+  tipo_ato: true,
+  days: true,
+  counting: true,
+});
+
+export type DefinirTipoForm = z.infer<typeof definirTipoSchema>;
+
 /** Legacy automatic classifications may contradict an otherwise valid declared date. */
 export function tipoIncompativelComPrazo(p: PrazoDetalheView): boolean {
   return (

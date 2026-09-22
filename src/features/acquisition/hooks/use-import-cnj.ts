@@ -1,12 +1,11 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
 
 import { ApiError } from "@/lib/api/errors";
 import { useApi } from "@/lib/api/use-api";
 
-import { cnjDigits, maskCnj } from "../lib/cnj";
+import { cnjDigits } from "../lib/cnj";
 import { createImport, getImport } from "../services/acquisition.service";
 import type { CreateImportInput } from "../types";
 
@@ -70,7 +69,6 @@ function errorPhase(error: unknown): ImportPhase {
  */
 export function useImportByCnj() {
   const create = useCreateImport();
-  const [cnj, setCnjRaw] = useState("");
 
   const result = create.data;
   const importId =
@@ -89,21 +87,19 @@ export function useImportByCnj() {
     return "running";
   })();
 
-  function setCnj(value: string) {
-    // Editar o número depois de um resultado/erro volta a máquina para "input".
+  // Editar o número depois de um resultado/erro volta a máquina para "input".
+  function resetPhase() {
     if (create.isError || create.data) create.reset();
-    setCnjRaw(maskCnj(value));
   }
 
-  function submit() {
+  function submit(cnj: string) {
     const digits = cnjDigits(cnj);
     create.reset();
     create.mutate({ cnj: digits || cnj });
   }
 
   return {
-    cnj,
-    setCnj,
+    resetPhase,
     submit,
     phase,
     courtRecordId: result?.court_record_id ?? null,

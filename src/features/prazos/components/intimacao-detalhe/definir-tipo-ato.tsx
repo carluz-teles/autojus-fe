@@ -7,8 +7,10 @@
 // nativo). Só JSX + binding; a lógica vive em useDefinirTipo.
 
 import { Check, LoaderCircle } from "lucide-react";
+import { Controller } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -18,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TIPO_ATO_LABEL } from "@/features/intimacoes/lib/tipo-ato";
 import { useDefinirTipo } from "@/features/prazos/hooks/use-definir-tipo";
 import { formatarData } from "@/lib/utils";
 
@@ -39,43 +42,52 @@ export function DefinirTipoAto({
   compact?: boolean;
 }) {
   const c = useDefinirTipo({ intimacaoId, prazo, onConfirmado });
+  const {
+    control,
+    formState: { errors },
+  } = c.form;
 
   return (
-    <div className="flex flex-col gap-4">
+    <form onSubmit={c.onConfirmar} noValidate className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor="definir-tipo-ato"
-            className="text-muted-foreground text-xs font-medium"
-          >
-            Tipo do ato
-          </label>
-          <Select value={c.tipo} onValueChange={(v) => c.setTipo(v ?? "")}>
-            <SelectTrigger id="definir-tipo-ato" className="w-full">
-              <SelectValue placeholder="Selecione o tipo">
-                {c.options.find(([t]) => t === c.tipo)?.[1] ??
-                  "Selecione o tipo"}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {c.options.map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
+        <Field data-invalid={!!errors.tipo_ato}>
+          <FieldLabel htmlFor="definir-tipo-ato">Tipo do ato</FieldLabel>
+          <Controller
+            name="tipo_ato"
+            control={control}
+            render={({ field }) => (
+              <Select
+                value={field.value || ""}
+                onValueChange={(v) => field.onChange(v ?? "")}
+              >
+                <SelectTrigger
+                  id="definir-tipo-ato"
+                  className="w-full"
+                  aria-invalid={!!errors.tipo_ato}
+                >
+                  <SelectValue placeholder="Selecione o tipo">
+                    {field.value
+                      ? (TIPO_ATO_LABEL[field.value] ?? "Selecione o tipo")
+                      : "Selecione o tipo"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {c.options.map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <FieldError errors={[errors.tipo_ato]} />
+        </Field>
 
-        <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor="definir-tipo-dias"
-            className="text-muted-foreground text-xs font-medium"
-          >
-            Prazo em dias
-          </label>
+        <Field data-invalid={!!errors.days}>
+          <FieldLabel htmlFor="definir-tipo-dias">Prazo em dias</FieldLabel>
           <Input
             id="definir-tipo-dias"
             type="number"
@@ -83,45 +95,48 @@ export function DefinirTipoAto({
             step={1}
             inputMode="numeric"
             placeholder="Informe os dias"
-            value={c.days ?? ""}
-            onChange={(e) => {
-              const v = e.target.valueAsNumber;
-              c.setDays(Number.isNaN(v) ? undefined : v);
-            }}
+            aria-invalid={!!errors.days}
+            {...c.form.register("days", { valueAsNumber: true })}
           />
-        </div>
+          <FieldError errors={[errors.days]} />
+        </Field>
       </div>
 
       {compact ? null : (
-        <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor="definir-tipo-contagem"
-            className="text-muted-foreground text-xs font-medium"
-          >
-            Contagem
-          </label>
-          <Select
-            value={c.counting}
-            onValueChange={(v) =>
-              c.setCounting((v as "BUSINESS" | "CALENDAR") ?? "BUSINESS")
-            }
-          >
-            <SelectTrigger
-              id="definir-tipo-contagem"
-              className="w-full sm:w-56"
-            >
-              <SelectValue>
-                {c.counting === "CALENDAR" ? "Dias corridos" : "Dias úteis"}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="BUSINESS">Dias úteis</SelectItem>
-                <SelectItem value="CALENDAR">Dias corridos</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
+        <Field data-invalid={!!errors.counting}>
+          <FieldLabel htmlFor="definir-tipo-contagem">Contagem</FieldLabel>
+          <Controller
+            name="counting"
+            control={control}
+            render={({ field }) => (
+              <Select
+                value={field.value}
+                onValueChange={(v) =>
+                  field.onChange((v as "BUSINESS" | "CALENDAR") ?? "BUSINESS")
+                }
+              >
+                <SelectTrigger
+                  id="definir-tipo-contagem"
+                  className="w-full sm:w-56"
+                  aria-invalid={!!errors.counting}
+                >
+                  <SelectValue>
+                    {field.value === "CALENDAR"
+                      ? "Dias corridos"
+                      : "Dias úteis"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="BUSINESS">Dias úteis</SelectItem>
+                    <SelectItem value="CALENDAR">Dias corridos</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <FieldError errors={[errors.counting]} />
+        </Field>
       )}
 
       <div
@@ -150,7 +165,7 @@ export function DefinirTipoAto({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button disabled={!c.podeConfirmar} onClick={c.onConfirmar}>
+        <Button type="submit" disabled={!c.podeConfirmar}>
           {c.emVoo ? (
             <LoaderCircle data-icon="inline-start" className="animate-spin" />
           ) : (
@@ -175,6 +190,6 @@ export function DefinirTipoAto({
           Não foi possível salvar. Tente novamente.
         </p>
       ) : null}
-    </div>
+    </form>
   );
 }

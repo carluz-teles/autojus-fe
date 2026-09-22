@@ -1,5 +1,6 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowRight,
   CheckCircle2,
@@ -12,12 +13,14 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
@@ -27,6 +30,7 @@ import { useMe } from "@/features/onboarding/hooks/use-me";
 import { cn } from "@/lib/utils";
 
 import { type ImportPhase, useImportByCnj } from "../hooks/use-import-cnj";
+import { type ImportCnjForm, importCnjSchema, maskCnj } from "../lib/cnj";
 
 // Metadados dos estados terminais/de erro (tom + ícone + textos). O estado
 // "running" é tratado à parte por ter spinner e badges.
@@ -106,9 +110,23 @@ export function ImportByCnjDialog() {
 function ImportForm({ onClose }: { onClose: () => void }) {
   const uid = useId();
   const router = useRouter();
-  const { cnj, setCnj, submit, phase, courtRecordId } = useImportByCnj();
+  const { resetPhase, submit, phase, courtRecordId } = useImportByCnj();
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ImportCnjForm>({
+    resolver: zodResolver(importCnjSchema),
+    mode: "onSubmit",
+    defaultValues: { cnj: "" },
+  });
   const terminalGoto = phase === "ok" || phase === "already";
   const running = phase === "running";
+
+  const onSubmit = handleSubmit(({ cnj }) => {
+    if (running) return;
+    submit(cnj);
+  });
 
   function openProcess() {
     if (!courtRecordId) return;
@@ -138,7 +156,7 @@ function ImportForm({ onClose }: { onClose: () => void }) {
             <Button variant="outline" onClick={onClose} disabled={running}>
               Cancelar
             </Button>
-            <Button type="submit" form={uid} disabled={!cnj || running}>
+            <Button type="submit" form={uid} disabled={running}>
               {running ? (
                 <LoaderCircle
                   data-icon="inline-start"
@@ -151,26 +169,33 @@ function ImportForm({ onClose }: { onClose: () => void }) {
         )
       }
     >
-      <form
-        id={uid}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!cnj || running) return;
-          submit();
-        }}
-      >
+      <form id={uid} onSubmit={onSubmit} noValidate>
         <FieldGroup className="gap-5">
-          <Field>
+          <Field data-invalid={!!errors.cnj}>
             <FieldLabel htmlFor={`${uid}-cnj`}>Número CNJ</FieldLabel>
-            <Input
-              id={`${uid}-cnj`}
-              className="font-mono"
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="0000000-00.0000.0.00.0000"
-              value={cnj}
-              onChange={(e) => setCnj(e.target.value)}
+            <Controller
+              name="cnj"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  id={`${uid}-cnj`}
+                  className="font-mono"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="0000000-00.0000.0.00.0000"
+                  aria-invalid={!!errors.cnj}
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                  onChange={(e) => {
+                    // Editar o número depois de um resultado/erro volta a máquina para "input".
+                    resetPhase();
+                    field.onChange(maskCnj(e.target.value));
+                  }}
+                />
+              )}
             />
+            <FieldError errors={[errors.cnj]} />
             <FieldDescription>
               Formato NNNNNNN-DD.AAAA.J.TR.OOOO (ou 20 dígitos). O dígito
               verificador e o tribunal são validados no servidor.
