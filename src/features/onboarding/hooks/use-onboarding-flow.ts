@@ -38,6 +38,18 @@ const STORED_STEPS = new Set<OnbStep>([
   "team",
   "done",
 ]);
+
+// Rótulos curtos do stepper — o passo "autos" (acesso ao tribunal) NÃO pode ficar
+// mudo na barra: sem rótulo, parecia que a OAB era o último passo (a confusão que
+// motivou isto). "Tribunal" deixa explícito que a config de autos vem a seguir.
+const STEP_LABEL: Record<OnbStep, string> = {
+  user: "Você",
+  org: "Perfil",
+  oab: "OABs",
+  autos: "Tribunal",
+  team: "Equipe",
+  done: "Pronto",
+};
 const digits = (s: string) => s.replace(/\D/g, "");
 
 // Normaliza a OAB digitada ("OAB/SP 214.885", "SP 214885", "214885/SP") pra chave
@@ -457,8 +469,14 @@ export function useOnboardingFlow() {
     busy: phase !== "idle",
     saving: phase === "saving",
     erro,
-    // progresso
+    // progresso — dots (compat) + steps rotulados (barra legível)
     dots: visibleSteps.map((_, i) => idx >= i),
+    steps: visibleSteps.map((s, i) => ({
+      key: s,
+      label: STEP_LABEL[s],
+      done: idx > i,
+      current: idx === i,
+    })),
     // passo 1 — usuário
     firstName: u.firstName,
     setFirstName: u.setFirstName,

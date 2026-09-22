@@ -21,6 +21,7 @@ import { OabInput } from "@/components/ui/oab-input";
 import { ConfigTribunais } from "@/features/prazos/components/config/config-tribunais";
 import { OabTermRow } from "@/features/shared/components/oab-term-row";
 import { formatOabTermo } from "@/features/shared/lib/diario";
+import { cn } from "@/lib/utils";
 
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
 import { OnboardingImageUpload } from "./image-upload";
@@ -58,19 +59,42 @@ export function OnboardingFlow() {
         </span>
         <span className="font-display text-[16px]">Atjus</span>
         {f.step !== "done" ? (
-          <div className="ml-3.5 flex items-center gap-1.5">
-            {f.dots.map((on, i) => (
-              <span
-                key={i}
-                className="h-1.5 rounded-full transition-all duration-300"
-                style={
-                  on
-                    ? { width: 28, backgroundImage: BRAND_GRADIENT }
-                    : { width: 18, backgroundColor: "var(--line)" }
-                }
-              />
+          <ol
+            className="ml-3.5 flex items-center gap-2.5 sm:gap-3"
+            aria-label="Progresso do cadastro"
+          >
+            {f.steps.map((s) => (
+              <li
+                key={s.key}
+                className="flex items-center gap-1.5"
+                aria-current={s.current ? "step" : undefined}
+              >
+                <span
+                  className="h-1.5 rounded-full transition-all duration-300"
+                  style={
+                    s.done || s.current
+                      ? {
+                          width: s.current ? 26 : 18,
+                          backgroundImage: BRAND_GRADIENT,
+                        }
+                      : { width: 14, backgroundColor: "var(--line)" }
+                  }
+                />
+                <span
+                  className={cn(
+                    "hidden text-[10.5px] leading-none tracking-[0.01em] transition-colors sm:inline",
+                    s.current
+                      ? "text-foreground font-medium"
+                      : s.done
+                        ? "text-fg3"
+                        : "text-fg3/55",
+                  )}
+                >
+                  {s.label}
+                </span>
+              </li>
             ))}
-          </div>
+          </ol>
         ) : null}
       </div>
 
@@ -333,6 +357,18 @@ function OrgStep({ f }: { f: F }) {
         </div>
       ) : (
         <>
+          <div className="mb-5">
+            <span className="text-fg3 mb-2 block text-center text-[11.5px]">
+              Logo do escritório
+            </span>
+            <OnboardingImageUpload
+              url={f.logoPreview}
+              initials={iniciais}
+              label="Adicionar logo"
+              hint="Usada no papel timbrado"
+              onFile={f.stageLogo}
+            />
+          </div>
           <div className="mb-4">
             <Label htmlFor="onb-cnpj">CNPJ</Label>
             <CnpjInput
@@ -348,25 +384,13 @@ function OrgStep({ f }: { f: F }) {
                 : "Buscamos a razão social automaticamente."}
             </p>
           </div>
-          <div className="mb-4">
+          <div className="mb-1">
             <Campo
               id="onb-razao"
               label="Razão social"
               value={f.razaoSocial}
               onChange={f.setRazaoSocial}
               placeholder="Prolheti & Marcondes Advogados"
-            />
-          </div>
-          <div className="mb-1">
-            <span className="text-fg3 mb-2 block text-center text-[11.5px]">
-              Logo do escritório
-            </span>
-            <OnboardingImageUpload
-              url={f.logoPreview}
-              initials={iniciais}
-              label="Adicionar logo"
-              hint="Opcional — usada no papel timbrado"
-              onFile={f.stageLogo}
             />
           </div>
         </>
