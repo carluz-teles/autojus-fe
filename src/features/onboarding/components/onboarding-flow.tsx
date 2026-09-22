@@ -752,7 +752,7 @@ function TeamStep({ f }: { f: F }) {
         disabled={f.saving}
         className="text-fg3 hover:text-foreground mx-auto mt-3 block text-[12px]"
       >
-        Pular por agora
+        Adiar — configurar depois
       </button>
     </>
   );
