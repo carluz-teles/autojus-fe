@@ -14,8 +14,8 @@ import {
 } from "../../intimacoes/lib/estado";
 import { tipoAtoLabel } from "../../intimacoes/lib/tipo-ato";
 import type {
-  IntimacaoAcionabilidade,
   IntimacaoCategoriaCoarse,
+  IntimacaoDisposicao,
   IntimacaoExcecaoMotivo,
   IntimacaoView,
   RecommendedProvidencia,
@@ -39,19 +39,28 @@ export const EXCECAO_MOTIVO_LABEL: Record<IntimacaoExcecaoMotivo, string> = {
   provisorio: "Prazo provisório (piso supletivo) — confirme a contagem.",
   ia_inferido: "Tipo de ato inferido — revise antes de confirmar.",
   divergente: "Divergência entre a publicação e o cálculo do prazo.",
-  sem_responsavel: "Sem responsável atribuído.",
   "": "Precisa de revisão.",
 };
 
-/** Segmento derivado da acionabilidade — as abas internas de "A triar". */
-export type PipelineSegment = "trabalhar" | "ciencia" | "sem-prazo";
+/** Segmento da linha = a DISPOSIÇÃO disjunta do BE (docs/erd-intimacao-triagem §4).
+ *  Exceção é seu próprio segmento (disjunto de "trabalhar"), então "Pra trabalhar" não
+ *  mistura mais exceção/ciência. Deriva 1:1 de IntimacaoView.disposicao (fonte única do BE). */
+export type PipelineSegment =
+  "trabalhar" | "excecao" | "ciencia" | "sem-prazo" | "analisando";
 
-export function segmentDaAcionabilidade(
-  a: IntimacaoAcionabilidade,
-): PipelineSegment {
-  if (a === "ciencia") return "ciencia";
-  if (a === "a_classificar") return "sem-prazo";
-  return "trabalhar"; // "ato" e "" (não populado) caem em "pra trabalhar"
+export function segmentDaDisposicao(d: IntimacaoDisposicao): PipelineSegment {
+  switch (d) {
+    case "trabalho":
+      return "trabalhar";
+    case "excecao":
+      return "excecao";
+    case "ciencia":
+      return "ciencia";
+    case "sem_prazo":
+      return "sem-prazo";
+    case "analisando":
+      return "analisando";
+  }
 }
 
 /** Tom de urgência do prazo, reusando a mesma leitura de days_left da listagem. */
@@ -104,7 +113,6 @@ export interface PipelineRow {
   geraPeca: boolean;
   prazo: PipelinePrazo;
   segment: PipelineSegment;
-  acionabilidade: IntimacaoAcionabilidade;
   isExcecao: boolean;
   excecaoMotivo: string;
   responsavelId: string | null;
@@ -138,19 +146,34 @@ export function pipelineRow(i: IntimacaoView): PipelineRow {
     p.days_left >= 0
       ? i.recommended_providencia
       : null;
+  // Chip coerente com o segmento (docs/erd-intimacao-triagem §5, §11): o chip é a categoria
+  // coarse, MAS um item acionável (trabalho/excecao) NUNCA mostra "Ciência" — se o
+  // document_type disser ciência num item que o motor marcou acionável (ex.: Ato ordinatório
+  // com "manifeste-se"), mostramos o ATO. Analisando (motor não classificou) vira chip neutro.
+  const acionavel = i.disposicao === "trabalho" || i.disposicao === "excecao";
+  let chipCategoria: IntimacaoCategoriaCoarse = i.categoria_coarse;
+  let chipLabel =
+    CATEGORIA_COARSE_LABEL[i.categoria_coarse] ?? CATEGORIA_COARSE_LABEL.outros;
+  if (i.disposicao === "analisando") {
+    chipCategoria = "outros";
+    chipLabel = "Analisando";
+  } else if (acionavel && i.categoria_coarse === "ciencia") {
+    chipCategoria = "manifestacao";
+    chipLabel = p?.tipo_ato ? tipoAtoLabel(p.tipo_ato) : "Providência";
+  }
   return {
     id: i.id,
     courtRecordId: i.court_record_id,
-    categoria: i.categoria_coarse,
-    categoriaLabel:
-      CATEGORIA_COARSE_LABEL[i.categoria_coarse] ??
-      CATEGORIA_COARSE_LABEL.outros,
+    categoria: chipCategoria,
+    categoriaLabel: chipLabel,
     title: i.title.replace(/\s*·\s*$/, ""),
     meta: [formatarCNJ(i.cnj_number), i.court, grau]
       .filter(Boolean)
       .join(" · "),
     ato: p?.tipo_ato ? tipoAtoLabel(p.tipo_ato) : "Tipo a definir",
-    geraPeca: !!i.recommended_providencia?.gera_peca,
+    // Alinhado ao `rec` GUARDADO (só oferece peça com prazo ativo e não-vencido): o badge
+    // e o botão inline usam isto, então não sobra "Peça" morto num prazo vencido (QA D4).
+    geraPeca: !!rec?.gera_peca,
     prazo: {
       tone: toneDoPrazo(daysLeft),
       fatalISO: daysLeft !== null && p ? p.end_date.slice(0, 10) : "",
@@ -163,8 +186,7 @@ export function pipelineRow(i: IntimacaoView): PipelineRow {
         : "",
       provisorio: i.provisorio,
     },
-    segment: segmentDaAcionabilidade(i.acionabilidade),
-    acionabilidade: i.acionabilidade,
+    segment: segmentDaDisposicao(i.disposicao),
     isExcecao: i.is_excecao,
     excecaoMotivo: i.is_excecao
       ? (EXCECAO_MOTIVO_LABEL[i.excecao_motivo] ?? EXCECAO_MOTIVO_LABEL[""])

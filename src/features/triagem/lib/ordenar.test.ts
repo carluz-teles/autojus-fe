@@ -59,6 +59,7 @@ function item(
     acionabilidade: "",
     provisorio: false,
     lifecycle: "a_triar",
+    disposicao: "analisando",
     is_excecao: false,
     excecao_motivo: "",
     ...overrides,

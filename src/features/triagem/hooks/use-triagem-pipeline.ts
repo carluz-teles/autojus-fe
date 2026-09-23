@@ -1,16 +1,14 @@
 "use client";
 
-// Hook de integração da Triagem-pipeline (Fase U-FE). É a ÚNICA cola entre o read
-// model real (useIntimacoes — infinite query por cursor) e a UI da pipeline. Não
-// inventa fetch: reusa useIntimacoes; não duplica mutação: reusa os hooks já
-// existentes em use-intimacoes.ts (resolver, confirmar em lote, ciência em lote,
-// atribuir responsável). Faz o mapeamento IntimacaoView → PipelineRow (lib/pipeline)
-// e o particionamento por lifecycle/segmento CLIENT-SIDE sobre as páginas carregadas.
-//
-// TODO U0-followup: quando o BE expuser `?lifecycle=`, trocar o particionamento
-// client-side (partitionByLifecycle) por três queries server-side (uma por lane),
-// pra paginação correta em backlogs de milhares — hoje só as páginas carregadas
-// entram na contagem/segmentação.
+// Hook de integração da Triagem-pipeline (Fase U-FE + U0 follow-up). É a ÚNICA cola
+// entre o read model real (useIntimacoes — infinite query por cursor) e a UI. Não
+// inventa fetch: reusa useIntimacoes/usePipelineCounts; não duplica mutação: reusa os
+// hooks de use-intimacoes.ts. Agora o particionamento é SERVER-SIDE:
+//   • a lista pede só a lane ativa (?lifecycle=) + o segmento de "A triar" (?segmento=/
+//     ?is_excecao=), então os rows já vêm certos — sem .filter() client-side por lane;
+//   • os badges de aba/segmento leem do GET /v1/intimacoes/pipeline-counts (full backlog),
+//     não do comprimento da página. Os filtros COMPARTILHADOS (busca/urgência/responsável)
+//     vão pros dois (lista e counts), pra concordarem.
 
 import { TriangleAlert } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -20,6 +18,7 @@ import type { FilterTab } from "@/features/intimacoes/components/shared/filter-t
 import { useMe } from "@/features/onboarding/hooks/use-me";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { nomeExibicao } from "@/features/organization/lib/labels";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 
 import {
   useAssignIntimacaoResponsavelBatch,
@@ -27,41 +26,47 @@ import {
   useDarCienciaEmLote,
   useIgnorarIntimacao,
   useIntimacoes,
+  usePipelineCounts,
   useResolverIntimacao,
 } from "../../intimacoes/hooks/use-intimacoes";
 import { rotuloIntervalo } from "../../intimacoes/lib/intervalo-vencimento";
-import type {
-  IntimacaoCategoriaCoarse,
-  IntimacaoView,
-} from "../../intimacoes/types";
-import {
-  CATEGORIA_COARSE_LABEL,
-  type PipelineRow,
-  pipelineRow,
-} from "../lib/pipeline";
+import type { IntimacaoView } from "../../intimacoes/types";
+import { type PipelineRow, pipelineRow } from "../lib/pipeline";
 
 export type PipelineLifecycle = "a_triar" | "em_andamento" | "concluido";
-/** Segmento interno de "A triar" — os cortes transversais (excecoes/all) + segmentos. */
+/** Segmento interno de "A triar" — "all" (todos) + a PARTIÇÃO DISJUNTA (docs §4). */
 export type PipelineSegTab =
-  "excecoes" | "all" | "trabalhar" | "ciencia" | "sem-prazo";
+  "all" | "trabalhar" | "excecoes" | "ciencia" | "sem-prazo" | "analisando";
 
-/** Atalhos de urgência do UrgenciaFilter (mesma semântica das tabs de Intimações). */
+/** Atalhos de urgência do UrgenciaFilter — valores de wire ?urgencia= do BE
+ *  (closed set espelhado de URGENCIA_TABS). */
 const URGENCIA_OPTIONS: { key: string; label: string }[] = [
-  { key: "vencidos", label: "Vencidos" },
+  { key: "atraso", label: "Em atraso" },
   { key: "hoje", label: "Hoje" },
+  { key: "proximos_dois_dias", label: "Próximos 2 dias" },
   { key: "semana", label: "Esta semana" },
-  { key: "mes", label: "Este mês" },
+  { key: "este_mes", label: "Este mês" },
+  { key: "sem_data_definida", label: "Sem data" },
 ];
 
-/** Categorias coarse na ordem canônica — o facet "Categoria" do popover Filtrar. */
-const CATEGORIA_ORDER: IntimacaoCategoriaCoarse[] = [
-  "recurso",
-  "manifestacao",
-  "ciencia",
-  "despacho",
-  "intimacao",
-  "outros",
-];
+/** Mapa segmento (aba) → o filtro server-side ?disposicao (partição disjunta). */
+function segmentoParaFiltro(segment: PipelineSegTab): { disposicao?: string } {
+  switch (segment) {
+    case "trabalhar":
+      return { disposicao: "trabalho" };
+    case "excecoes":
+      return { disposicao: "excecao" };
+    case "ciencia":
+      return { disposicao: "ciencia" };
+    case "sem-prazo":
+      return { disposicao: "sem_prazo" };
+    case "analisando":
+      return { disposicao: "analisando" };
+    case "all":
+    default:
+      return {};
+  }
+}
 
 export function useTriagemPipeline() {
   const me = useMe();
@@ -69,28 +74,75 @@ export function useTriagemPipeline() {
 
   // Estado local da UI (client-side; sem URL params neste 1º incremento).
   const [tab, setTab] = useState<PipelineLifecycle>("a_triar");
-  const [segment, setSegment] = useState<PipelineSegTab>("excecoes");
-  const [venc, setVenc] = useState<string>(""); // "" = Todas
+  // Default "all": surface o VOLUME de trabalho (QA), não o subconjunto menor (Exceções).
+  const [segment, setSegment] = useState<PipelineSegTab>("all");
+  const [venc, setVenc] = useState<string>(""); // "" = Todas (valor de wire ?urgencia=)
   const [dueFrom, setDueFrom] = useState<string>("");
   const [dueTo, setDueTo] = useState<string>("");
-  // Facetas do popover "Filtrar" — mesma forma que o ListToolbar espera.
+  // Faceta do popover "Filtrar" — Responsável (única suportada server-side).
   const [respFilter, setRespFilter] = useState<string>(""); // ""|me|unassigned|<userId>
-  const [categoria, setCategoria] = useState<string>(""); // ""|<IntimacaoCategoriaCoarse>
   const [query, setQuery] = useState("");
   const [density, setDensity] = useState<"confortavel" | "compacto">(
     "confortavel",
   );
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // Lista real: SEM user_status/workStage/triageLane pra trazer TODAS as lanes de
-  // ciclo de vida (a_triar/em_andamento/concluido) — o pipeline particiona client-
-  // side. Busca server-side; ordena por prazo (o mais urgente primeiro).
+  const meId = me.data?.user_id ?? null;
+  const debouncedQuery = useDebounce(query, 400);
+
+  // Filtros COMPARTILHADOS (busca/urgência/responsável) — vão pra lista E pros counts,
+  // pra os badges concordarem com o que a lista mostra. "me" resolve pro id interno.
+  const assignee =
+    respFilter === "me" ? (meId ?? undefined) : respFilter || undefined;
+  const sharedFilters = {
+    search: debouncedQuery || undefined,
+    urgencia: dueFrom || dueTo ? undefined : venc || undefined,
+    dueFrom: dueFrom || undefined,
+    dueTo: dueTo || undefined,
+    assignee,
+  };
+  // "unassigned" não é um id — o BE não tem filtro nativo. Mantemos como client-side
+  // (filtra a lista carregada); os counts então não o refletem (documentado abaixo).
+  const assigneeUnassigned = respFilter === "unassigned";
+  const sharedForServer = {
+    ...sharedFilters,
+    assignee: assigneeUnassigned ? undefined : sharedFilters.assignee,
+  };
+
+  const segFiltro = segmentoParaFiltro(segment);
+
+  // Lista real da LANE ativa: ?lifecycle=<tab> + (dentro de a_triar) ?disposicao=<segmento>.
+  // O BE já devolve o conjunto certo (partição disjunta) — sem partição client-side. Por prazo.
   const list = useIntimacoes({
-    search: query || undefined,
+    ...sharedForServer,
+    lifecycle: tab,
+    disposicao: tab === "a_triar" ? segFiltro.disposicao : undefined,
     sort: "deadline",
     limit: 50,
     prefetchNextPage: true,
   });
+
+  // Counts full-backlog — só os filtros compartilhados (NÃO lifecycle/segmento).
+  const pipeline = usePipelineCounts({
+    search: sharedForServer.search,
+    urgencia: sharedForServer.urgencia,
+    due_from: sharedForServer.dueFrom,
+    due_to: sharedForServer.dueTo,
+    assignee: sharedForServer.assignee,
+  });
+  const counts = {
+    a_triar: pipeline.counts.a_triar,
+    em_andamento: pipeline.counts.em_andamento,
+    concluido: pipeline.counts.concluido,
+  };
+  const segCounts = {
+    all: pipeline.counts.a_triar,
+    trabalhar: pipeline.counts.trabalho,
+    excecoes: pipeline.counts.excecao,
+    ciencia: pipeline.counts.ciencia,
+    "sem-prazo": pipeline.counts.sem_prazo,
+    analisando: pipeline.counts.analisando,
+  };
 
   const memberOptions = useMemo(
     () =>
@@ -113,89 +165,18 @@ export function useTriagemPipeline() {
     }));
   }, [list.intimacoes, memberOptions]);
 
-  const rows = useMemo(() => enriched.map(pipelineRow), [enriched]);
+  // "Sem responsável" (unassigned) fica como recorte client-side sobre a lane já
+  // filtrada pelo servidor (o BE não tem esse filtro nativo).
+  const rows = useMemo(() => {
+    const mapped = enriched.map(pipelineRow);
+    return assigneeUnassigned
+      ? mapped.filter((r) => r.responsavelId === null)
+      : mapped;
+  }, [enriched, assigneeUnassigned]);
 
-  // Partição por lifecycle (client-side sobre as páginas carregadas).
-  const byLifecycle = useMemo(() => {
-    const lanes: Record<PipelineLifecycle, PipelineRow[]> = {
-      a_triar: [],
-      em_andamento: [],
-      concluido: [],
-    };
-    enriched.forEach((i, idx) => {
-      const lane = (i.lifecycle as PipelineLifecycle) ?? "a_triar";
-      (lanes[lane] ?? lanes.a_triar).push(rows[idx]);
-    });
-    return lanes;
-  }, [enriched, rows]);
-
-  const triarAll = byLifecycle.a_triar;
-
-  const counts = {
-    a_triar: triarAll.length,
-    em_andamento: byLifecycle.em_andamento.length,
-    concluido: byLifecycle.concluido.length,
-  };
-
-  const segCounts = useMemo(
-    () => ({
-      excecoes: triarAll.filter((r) => r.isExcecao).length,
-      all: triarAll.length,
-      trabalhar: triarAll.filter((r) => r.segment === "trabalhar").length,
-      ciencia: triarAll.filter((r) => r.segment === "ciencia").length,
-      "sem-prazo": triarAll.filter((r) => r.segment === "sem-prazo").length,
-    }),
-    [triarAll],
-  );
-
-  // Filtros client-side da fila "A triar".
-  const meId = me.data?.user_id ?? null;
-  const filtered = useMemo(() => {
-    function passaSegmento(r: PipelineRow): boolean {
-      if (segment === "all") return true;
-      if (segment === "excecoes") return r.isExcecao;
-      return r.segment === segment;
-    }
-    function passaVenc(r: PipelineRow): boolean {
-      // Intervalo do calendário tem precedência sobre o atalho de urgência.
-      if (dueFrom || dueTo) {
-        if (!r.prazo.fatalISO) return false;
-        if (dueFrom && r.prazo.fatalISO < dueFrom) return false;
-        if (dueTo && r.prazo.fatalISO > dueTo) return false;
-        return true;
-      }
-      if (!venc) return true;
-      const t = r.prazo.tone;
-      if (t === "sem-prazo") return false;
-      if (venc === "vencidos") return t === "vencido";
-      if (venc === "hoje") return r.prazo.relativo === "hoje";
-      if (venc === "semana") return t === "urgente";
-      if (venc === "mes") return t === "urgente" || t === "futuro";
-      return true;
-    }
-    function passaResp(r: PipelineRow): boolean {
-      if (!respFilter) return true;
-      if (respFilter === "me") return r.responsavelId === meId;
-      if (respFilter === "unassigned") return r.responsavelId === null;
-      return r.responsavelId === respFilter;
-    }
-    function passaCategoria(r: PipelineRow): boolean {
-      return !categoria || r.categoria === categoria;
-    }
-    return triarAll.filter(
-      (r) =>
-        passaSegmento(r) && passaVenc(r) && passaResp(r) && passaCategoria(r),
-    );
-  }, [triarAll, segment, venc, dueFrom, dueTo, respFilter, categoria, meId]);
-
-  // Varredura em lote: os CONFIÁVEIS (não-exceção) do recorte atual.
-  const sweepable = filtered.filter((r) => !r.isExcecao);
-  const sweepKind: "ciencia" | "confirmar" | null =
-    segment === "excecoes"
-      ? null
-      : segment === "ciencia"
-        ? "ciencia"
-        : "confirmar";
+  // A lista JÁ vem filtrada pela lane/segmento no servidor — o que está carregado é
+  // exatamente o recorte a exibir.
+  const filtered = rows;
 
   // ── Mutações reais ──────────────────────────────────────────────────────────
   const resolver = useResolverIntimacao();
@@ -221,25 +202,18 @@ export function useTriagemPipeline() {
     if (ids.length === 0) return;
     try {
       const { affected } = await confirmBatch.mutateAsync(ids);
-      toast.success(
-        `${affected.toLocaleString("pt-BR")} ${affected === 1 ? "prazo confirmado" : "prazos confirmados"}.`,
-      );
+      // O BE só confirma a faixa confiável (exceções/vencidos ficam de fora): affected=0 NÃO
+      // é sucesso — avisa em vez de um "0 prazos confirmados" verde enganoso (QA D3).
+      if (affected === 0) {
+        toast.info("Nenhum prazo confiável para confirmar neste recorte.");
+      } else {
+        toast.success(
+          `${affected.toLocaleString("pt-BR")} ${affected === 1 ? "prazo confirmado" : "prazos confirmados"}.`,
+        );
+      }
       deselecionar(ids);
     } catch {
       toast.error("Não foi possível confirmar os prazos.");
-    }
-  }
-
-  async function confirmarTodosConfiaveis() {
-    // sweep: sem ids = confirma TODOS os confiáveis do escritório (all: true).
-    try {
-      const { affected } = await confirmBatch.mutateAsync(undefined);
-      toast.success(
-        `${affected.toLocaleString("pt-BR")} ${affected === 1 ? "prazo confirmado" : "prazos confirmados"}.`,
-      );
-      setSelected(new Set());
-    } catch {
-      toast.error("Não foi possível confirmar os prazos em lote.");
     }
   }
 
@@ -314,17 +288,14 @@ export function useTriagemPipeline() {
     return map;
   }, [rows]);
 
-  // ── Facetas do popover "Filtrar" (ListToolbar) ──────────────────────────────
-  // Mesma forma que o useListagemIntimacoes monta m.filters/m.active/m.clear.
+  // ── Faceta do popover "Filtrar" (ListToolbar) ───────────────────────────────
+  // Só "Responsável" — é o único filtro compartilhado que o BE (lista E counts)
+  // suporta. Mesma forma que o useListagemIntimacoes monta m.filters/m.active/m.clear.
   const respOptions = [
     { value: "me", label: "Minhas" },
     { value: "unassigned", label: "Sem responsável" },
     ...memberOptions.map((m) => ({ value: m.id, label: m.nome })),
   ];
-  const categoriaOptions = CATEGORIA_ORDER.map((c) => ({
-    value: c,
-    label: CATEGORIA_COARSE_LABEL[c],
-  }));
   const filters = [
     {
       key: "assignee",
@@ -332,13 +303,6 @@ export function useTriagemPipeline() {
       value: respFilter,
       options: respOptions,
       onChange: setRespFilter,
-    },
-    {
-      key: "categoria",
-      label: "Categoria",
-      value: categoria,
-      options: categoriaOptions,
-      onChange: setCategoria,
     },
   ];
   const active = filters
@@ -366,7 +330,6 @@ export function useTriagemPipeline() {
   }
   function clear() {
     setRespFilter("");
-    setCategoria("");
     limparUrgencia();
   }
   function setIntervalo(from: string, to: string) {
@@ -395,17 +358,10 @@ export function useTriagemPipeline() {
     })),
   ];
 
-  // Tabs de ciclo de vida (Tabs do DS) e de segmento (FilterTabs do DS).
+  // Tabs de segmento (FilterTabs do DS) = a PARTIÇÃO DISJUNTA de "A triar". "Tudo" é o
+  // landing (volume); "Pra trabalhar" EXCLUI exceções (o bug do overlap morreu). "Analisando"
+  // só aparece quando há item transiente (motor ainda classificando), pra não poluir.
   const segmentTabs: FilterTab[] = [
-    {
-      key: "excecoes",
-      label: "Exceções",
-      count: segCounts.excecoes,
-      ativo: segment === "excecoes",
-      onClick: () => setSegment("excecoes"),
-      icon: TriangleAlert,
-      emphasis: true,
-    },
     {
       key: "all",
       label: "Tudo",
@@ -421,6 +377,15 @@ export function useTriagemPipeline() {
       onClick: () => setSegment("trabalhar"),
     },
     {
+      key: "excecoes",
+      label: "Exceções",
+      count: segCounts.excecoes,
+      ativo: segment === "excecoes",
+      onClick: () => setSegment("excecoes"),
+      icon: TriangleAlert,
+      emphasis: true,
+    },
+    {
       key: "ciencia",
       label: "Ciências",
       count: segCounts.ciencia,
@@ -434,6 +399,17 @@ export function useTriagemPipeline() {
       ativo: segment === "sem-prazo",
       onClick: () => setSegment("sem-prazo"),
     },
+    ...(segCounts.analisando > 0 || segment === "analisando"
+      ? [
+          {
+            key: "analisando",
+            label: "Analisando",
+            count: segCounts.analisando,
+            ativo: segment === "analisando",
+            onClick: () => setSegment("analisando"),
+          },
+        ]
+      : []),
   ];
 
   return {
@@ -461,6 +437,8 @@ export function useTriagemPipeline() {
     density,
     setDensity,
     counts,
+    segCounts,
+    countsPending: pipeline.isPending,
     // toolbar padrão
     filters,
     active,
@@ -470,13 +448,10 @@ export function useTriagemPipeline() {
     dueFrom,
     dueTo,
     setIntervalo,
-    // dados por lane
+    // dados da lane ATIVA (o BE já devolve só ela) — a_triar usa triarFiltered;
+    // em_andamento/concluido usam laneRows (mesma fonte, tab diferente).
     triarFiltered: filtered,
-    emAndamento: byLifecycle.em_andamento,
-    concluido: byLifecycle.concluido,
-    // sweep
-    sweepable,
-    sweepKind,
+    laneRows: filtered,
     // seleção
     selected,
     selectedIds,
@@ -490,7 +465,6 @@ export function useTriagemPipeline() {
     darCiencia,
     darCienciaUnica,
     confirmar,
-    confirmarTodosConfiaveis,
     descartar,
     atribuir,
     // flags "sem endpoint real" (ver TODO na view)

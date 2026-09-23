@@ -6,6 +6,7 @@ import type {
   IntimacaoDetalheView,
   IntimacaoView,
   PageEnvelope,
+  TriagemBucketCounts,
 } from "../types";
 
 const ENDPOINT = "/v1/intimacoes";
@@ -66,6 +67,14 @@ export interface ListIntimacoesParams {
    * `buckets` (limitação conhecida do BE).
    */
   assignee?: string;
+  // ── Dimensões da pipeline de Triagem (docs/erd-triagem-pipeline.md §9 U0 follow-up) ──
+  /** ?lifecycle — lane de ciclo de vida derivada (a_triar|em_andamento|concluido);
+   *  "" = todas. Filtra a lista server-side pra retornar SÓ aquela lane. */
+  lifecycle?: string;
+  /** ?disposicao — a PARTIÇÃO DISJUNTA de a_triar (analisando|trabalho|excecao|ciencia|
+   *  sem_prazo); "" = todos. Só faz sentido com lifecycle=a_triar. Substitui os antigos
+   *  ?is_excecao/?segmento (exceção agora é um valor disjunto de trabalho). */
+  disposicao?: string;
 }
 
 export async function listIntimacoes(
@@ -88,6 +97,8 @@ export async function listIntimacoes(
     triage_lane,
     nao_confirmado,
     assignee,
+    lifecycle,
+    disposicao,
   }: ListIntimacoesParams = {},
   signal?: AbortSignal,
 ): Promise<IntimacaoBucketsEnvelope> {
@@ -108,6 +119,8 @@ export async function listIntimacoes(
       due_to,
       origem,
       triage_lane,
+      lifecycle,
+      disposicao,
       // Array vira CSV pro BE (que hoje aceita 1 valor mas está sendo
       // estendido em paralelo pra aceitar múltiplos separados por vírgula) —
       // `apiFetch.query` só serializa string|number|boolean, então o join
@@ -117,6 +130,64 @@ export async function listIntimacoes(
         : work_stage,
       nao_confirmado,
       assignee,
+    },
+  });
+}
+
+/**
+ * Contagens da pipeline de Triagem — GET /v1/intimacoes/pipeline-counts. Aceita os
+ * mesmos filtros compartilhados da lista (search/urgência/responsável/origem/…) MENOS
+ * as dimensões que ele particiona (lifecycle/is_excecao/segmento) e a paginação. Uma
+ * agregação por request; as abas/segmentos leem daqui (nunca da página carregada).
+ */
+export interface PipelineCountsParams {
+  search?: string;
+  type?: string;
+  user_status?: string;
+  court?: string;
+  urgencia?: string;
+  due_from?: string;
+  due_to?: string;
+  origem?: string;
+  triage_lane?: "attention" | "ready" | "science" | "historical";
+  nao_confirmado?: boolean;
+  assignee?: string;
+  cnj?: string;
+}
+
+export async function getPipelineCounts(
+  fetcher: ApiFetcher,
+  {
+    search,
+    type,
+    user_status,
+    court,
+    urgencia,
+    due_from,
+    due_to,
+    origem,
+    triage_lane,
+    nao_confirmado,
+    assignee,
+    cnj,
+  }: PipelineCountsParams = {},
+  signal?: AbortSignal,
+): Promise<TriagemBucketCounts> {
+  return fetcher<TriagemBucketCounts>(`${ENDPOINT}/pipeline-counts`, {
+    signal,
+    query: {
+      search,
+      type,
+      user_status,
+      court,
+      urgencia,
+      due_from,
+      due_to,
+      origem,
+      triage_lane,
+      nao_confirmado,
+      assignee,
+      cnj,
     },
   });
 }

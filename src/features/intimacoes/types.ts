@@ -31,7 +31,8 @@ export interface IntimacaoPrazoView {
   end_date: string;
   /** Dias restantes (negativo = vencido, 0 = hoje). Inteiro calculado no BE. */
   days_left: number;
-  /** PENDING|OPEN|MET|MISSED|CANCELLED */
+  /** PENDING|OPEN|MET|MISSED|CANCELLED|NO_DEADLINE (o read model usa NO_DEADLINE p/ mera
+   *  ciência / sem prazo — ver pipeline.ts, que ramifica nele). */
   status: string;
   /** false = derivado mas ainda não confirmado por um humano. */
   confirmed: boolean;
@@ -75,9 +76,16 @@ export type IntimacaoAcionabilidade = "ato" | "ciencia" | "a_classificar" | "";
 /** Lane de ciclo de vida derivada no BE (aba de topo da Triagem-pipeline). */
 export type IntimacaoLifecycle = "a_triar" | "em_andamento" | "concluido";
 
+/** Disposição — a PARTIÇÃO DISJUNTA de "A triar" (docs/erd-intimacao-triagem.md §4),
+ *  derivada no BE (deriveDisposicao). Cada intimação de a_triar cai em EXATAMENTE UM
+ *  bucket: exceção é seu próprio segmento (disjunto de trabalho), então "Pra trabalhar"
+ *  não mistura mais exceção/ciência. Substitui o antigo eixo acionabilidade-segment. */
+export type IntimacaoDisposicao =
+  "analisando" | "trabalho" | "excecao" | "ciencia" | "sem_prazo";
+
 /** Motivo (de maior peso) de a intimação ser exceção; "" quando não é exceção. */
 export type IntimacaoExcecaoMotivo =
-  "provisorio" | "ia_inferido" | "divergente" | "sem_responsavel" | "";
+  "provisorio" | "ia_inferido" | "divergente" | "";
 
 export interface IntimacaoView {
   id: string;
@@ -164,7 +172,11 @@ export interface IntimacaoView {
   /** Lane de ciclo de vida derivada — dirige as abas de topo (A triar/Em
    *  andamento/Concluído). Fonte única do pipeline. */
   lifecycle: IntimacaoLifecycle;
-  /** true = a intimação exige olhar humano (é exceção). */
+  /** Disposição disjunta — dirige os segmentos de "A triar" (analisando|trabalho|
+   *  excecao|ciencia|sem_prazo). Fonte única do segmento; exceção é bucket próprio. */
+  disposicao: IntimacaoDisposicao;
+  /** true = a intimação exige olhar humano (é exceção). Equivalente a disposicao==="excecao";
+   *  mantido para o marcador ⚠ + motivo na linha. */
   is_excecao: boolean;
   /** Motivo (de maior peso) da exceção; "" quando is_excecao=false. */
   excecao_motivo: IntimacaoExcecaoMotivo;
@@ -382,6 +394,32 @@ export interface IntimacoesBuckets {
   mais_adiante: number;
   /** sem prazo derivado (deadline IS NULL) + user_status != RESOLVED|IGNORED */
   sem_data_definida: number;
+}
+
+/**
+ * Contagens da pipeline de Triagem (full-backlog) — GET /v1/intimacoes/pipeline-counts.
+ * Espelha o TriagemBucketCounts do BE (docs/erd-intimacao-triagem.md §7): as três lanes de
+ * ciclo de vida (a_triar/em_andamento/concluido) + a PARTIÇÃO DISJUNTA de "A triar"
+ * (analisando/trabalho/excecao/ciencia/sem_prazo). INVARIANTE do BE: analisando+trabalho+
+ * excecao+ciencia+sem_prazo == a_triar (disjunção). Cada número é computado sobre o conjunto
+ * INTEIRO do filtro atual (não a página), respeitando os filtros compartilhados (search/
+ * urgência/responsável/…) mas NÃO a dimensão lifecycle/disposição que ele particiona. As
+ * abas/segmentos leem daqui — nunca de `.filter().length` sobre a página.
+ */
+export interface TriagemBucketCounts {
+  a_triar: number;
+  em_andamento: number;
+  concluido: number;
+  /** Analisando — motor ainda não classificou (transiente); dentro de a_triar. */
+  analisando: number;
+  /** Pra trabalhar — acionável, confiável, classificado (EXCLUI exceção); dentro de a_triar. */
+  trabalho: number;
+  /** Exceções — acionável mas o motor está incerto; dentro de a_triar. */
+  excecao: number;
+  /** Ciências — mera ciência; dentro de a_triar. */
+  ciencia: number;
+  /** Sem prazo — não datável (motor não soube); dentro de a_triar. */
+  sem_prazo: number;
 }
 
 /** Origem do prazo — closed set espelhado do BE (?origem=<v>). */

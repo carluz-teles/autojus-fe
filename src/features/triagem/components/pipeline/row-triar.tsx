@@ -1,9 +1,8 @@
 "use client";
 
-// Linha densa da fila "A triar" — o coração da Triagem-pipeline. Extraída do mockup
-// dev/triagem-v2 e ligada ao contrato real (PipelineRow) + mutações reais via os
-// callbacks (a view injeta). SEMPRE mostra as ações compactas (Confirmar/Ciência/
-// Definir prazo · Peça · ⋮). O título é um deep-link ao detalhe da intimação.
+// Linha da fila "A triar" — o coração da Triagem. Duas linhas com HIERARQUIA: título serif
+// (deep-link) como foco, prazo à direita; linha 2 secundária (CNJ · tribunal · ato). Exceções
+// ganham accent + tint âmbar (destaque visual). Ações uniformes — mesmo tamanho, sempre visíveis.
 
 import {
   CalendarDays,
@@ -16,7 +15,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -66,6 +64,10 @@ export function RowTriar({
   onAssign: (row: PipelineRow, memberId: string | null) => void;
 }) {
   const compact = density === "compacto";
+  // Ação primária pela DISPOSIÇÃO (segmento disjunto): ciência dá ciência; trabalho (confiável)
+  // confirma; exceção/sem-prazo/analisando pedem REVISÃO (o motor está incerto ou não classificou).
+  // O ato fino é escolhido no gerar-peça (lazy), nunca aqui.
+  const acionavelConfiavel = row.segment === "trabalhar";
   const primary =
     row.segment === "ciencia"
       ? {
@@ -74,29 +76,41 @@ export function RowTriar({
           kind: "ciencia" as RowAction,
           icon: CheckCheck,
         }
-      : row.segment === "sem-prazo"
+      : acionavelConfiavel
         ? {
-            label: "Revisar tipo e prazo",
-            short: "Revisar",
-            kind: "definir" as RowAction,
-            icon: CalendarDays,
-          }
-        : {
             label: "Confirmar prazo",
             short: "Confirmar",
             kind: "confirmar" as RowAction,
             icon: Check,
+          }
+        : {
+            label: "Revisar tipo e prazo",
+            short: "Revisar",
+            kind: "definir" as RowAction,
+            icon: CalendarDays,
           };
   const Primary = primary.icon;
+  // Gera peça é oferecido nos itens ACIONÁVEIS (trabalho e exceção).
+  const acionavel = row.segment === "trabalhar" || row.segment === "excecao";
+  const isExc = row.isExcecao;
 
   return (
     <div
       className={cn(
-        "flex items-center gap-2.5 px-3 sm:px-4",
-        compact ? "py-1.5" : "py-2.5",
-        selected ? "bg-primary/[0.05]" : "hover:bg-muted/30",
+        "relative flex items-center gap-3 pr-3 pl-4 transition-colors",
+        compact ? "py-2" : "py-3",
+        selected
+          ? "bg-selected"
+          : isExc
+            ? "bg-gold/[0.045] hover:bg-gold/[0.08]"
+            : "hover:bg-muted/40",
       )}
     >
+      {/* accent âmbar das exceções — o realce visual do segmento */}
+      {isExc ? (
+        <span className="bg-gold absolute inset-y-0 left-0 w-[3px]" aria-hidden />
+      ) : null}
+
       <Checkbox
         checked={selected}
         onCheckedChange={onToggleSelect}
@@ -104,15 +118,15 @@ export function RowTriar({
         className="shrink-0"
       />
 
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        {/* Linha 1: categoria · exceção · título · prazo */}
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        {/* Linha 1 (foco): categoria · exceção · TÍTULO · prazo */}
         <div className="flex min-w-0 items-center gap-2">
           <CategoriaChip categoria={row.categoria} label={row.categoriaLabel} />
-          {row.isExcecao && <ExcecaoDot motivo={row.excecaoMotivo} />}
+          {isExc ? <ExcecaoDot motivo={row.excecaoMotivo} /> : null}
           <Link
             href={href}
             title={row.preview || row.title}
-            className="font-display text-foreground hover:text-primary min-w-0 truncate text-left text-[13.5px] leading-tight font-medium underline-offset-4 outline-none hover:underline"
+            className="font-display text-foreground hover:text-primary min-w-0 truncate text-left text-[14px] leading-snug font-medium underline-offset-4 outline-none hover:underline"
           >
             {row.title}
           </Link>
@@ -121,18 +135,15 @@ export function RowTriar({
           </span>
         </div>
 
-        {/* Linha 2: meta mono · ato · gera peça */}
-        <div className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-[11px]">
+        {/* Linha 2 (secundária): CNJ · tribunal · ato */}
+        <div className="text-fg3 flex min-w-0 items-center gap-1.5 text-[11.5px]">
           <span className="min-w-0 truncate font-mono">{row.meta}</span>
-          <span className="text-fg3 shrink-0">·</span>
+          <span aria-hidden className="shrink-0">
+            ·
+          </span>
           <span className="text-foreground/70 shrink-0 truncate">
             {row.ato}
           </span>
-          {row.geraPeca && row.segment === "trabalhar" && (
-            <Badge variant="secondary" className="ml-0.5 hidden sm:inline-flex">
-              gera peça
-            </Badge>
-          )}
         </div>
       </div>
 
@@ -180,57 +191,33 @@ export function RowTriar({
         )}
       </MenuDropdown>
 
-      {/* Ações inline — SEMPRE visíveis, compactas (icon-only no Compacto) */}
-      <div className="flex shrink-0 items-center gap-1">
-        {compact ? (
-          <Button
-            size="icon-sm"
-            className="size-7"
-            onClick={() => onAction(primary.kind, row)}
-            aria-label={primary.label}
-            title={primary.label}
-          >
-            <Primary />
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            className="h-7 px-2.5"
-            onClick={() => onAction(primary.kind, row)}
-          >
-            <Primary data-icon="inline-start" />
-            {primary.short}
-          </Button>
-        )}
+      {/* Ações — UNIFORMES (mesmo tamanho), sempre visíveis */}
+      <div className="flex shrink-0 items-center gap-1.5">
+        <Button
+          size="sm"
+          className="h-8 min-w-[104px] justify-center"
+          onClick={() => onAction(primary.kind, row)}
+        >
+          <Primary data-icon="inline-start" />
+          {primary.short}
+        </Button>
 
-        {row.segment === "trabalhar" &&
-          row.geraPeca &&
-          (compact ? (
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="size-7"
-              onClick={() => onAction("peca", row)}
-              aria-label="Gerar peça"
-              title="Gerar peça"
-            >
-              <PenLine />
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2.5"
-              onClick={() => onAction("peca", row)}
-            >
-              Peça
-            </Button>
-          ))}
+        {acionavel && row.geraPeca ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 min-w-[104px] justify-center"
+            onClick={() => onAction("peca", row)}
+          >
+            <PenLine data-icon="inline-start" />
+            Peça
+          </Button>
+        ) : null}
 
         <MenuDropdown
           trigger={
             <span
-              className="hover:bg-muted text-muted-foreground grid size-7 shrink-0 place-content-center rounded-md transition-colors"
+              className="hover:bg-muted text-muted-foreground grid size-8 shrink-0 place-content-center rounded-md transition-colors"
               aria-label="Mais ações"
             >
               <MoreHorizontal className="size-4" />
@@ -239,7 +226,7 @@ export function RowTriar({
         >
           {(close) => (
             <>
-              {row.segment !== "trabalhar" && row.rec?.gera_peca && (
+              {!acionavel && row.rec?.gera_peca ? (
                 <MenuItem
                   onClick={() => {
                     onAction("peca", row);
@@ -249,8 +236,8 @@ export function RowTriar({
                   <PenLine className="size-4" aria-hidden />
                   Gerar peça
                 </MenuItem>
-              )}
-              {row.segment !== "ciencia" && (
+              ) : null}
+              {row.segment !== "ciencia" && row.segment !== "analisando" ? (
                 <MenuItem
                   onClick={() => {
                     onAction("ciencia", row);
@@ -260,7 +247,7 @@ export function RowTriar({
                   <CheckCheck className="size-4" aria-hidden />
                   Dar ciência
                 </MenuItem>
-              )}
+              ) : null}
               <MenuItem
                 disabled={!adiarDisponivel}
                 title={adiarDisponivel ? undefined : "em breve"}
@@ -306,17 +293,17 @@ export function RowReadonly({
   return (
     <div
       className={cn(
-        "hover:bg-muted/30 flex items-center gap-2.5 px-3 sm:px-4",
-        compact ? "py-1.5" : "py-2.5",
+        "hover:bg-muted/40 flex items-center gap-3 pr-3 pl-4 transition-colors",
+        compact ? "py-2" : "py-3",
       )}
     >
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex min-w-0 items-center gap-2">
           <CategoriaChip categoria={row.categoria} label={row.categoriaLabel} />
           <Link
             href={href}
             title={row.title}
-            className="font-display text-foreground hover:text-primary min-w-0 truncate text-[13.5px] leading-tight font-medium underline-offset-4 outline-none hover:underline"
+            className="font-display text-foreground hover:text-primary min-w-0 truncate text-[14px] leading-snug font-medium underline-offset-4 outline-none hover:underline"
           >
             {row.title}
           </Link>
@@ -325,12 +312,16 @@ export function RowReadonly({
             <RespAvatar nome={row.responsavelNome} />
           </span>
         </div>
-        <div className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-[11px]">
+        <div className="text-fg3 flex min-w-0 items-center gap-1.5 text-[11.5px]">
           <span className="min-w-0 truncate font-mono">{row.meta}</span>
-          <span className="text-fg3 shrink-0">·</span>
-          <span className="shrink-0">{row.ato}</span>
+          <span aria-hidden className="shrink-0">
+            ·
+          </span>
+          <span className="text-foreground/70 shrink-0 truncate">
+            {row.ato}
+          </span>
           <span
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium"
+            className="ml-1 inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium"
             style={{ color: row.estado.cor, backgroundColor: row.estado.fundo }}
           >
             <span

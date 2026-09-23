@@ -165,8 +165,8 @@ export function GerandoCenter({
       </div>
 
       <div className="text-fg3 mt-3 flex items-center justify-center gap-2 text-[12px]">
-        <Sparkles aria-hidden className="text-primary size-3.5" />A IA redige a
-        partir da intimação e das teses — você revisa e assina.
+        <Sparkles aria-hidden className="text-primary size-3.5" />A minuta é
+        redigida a partir da intimação e das teses — você revisa e assina.
       </div>
     </div>
   );
