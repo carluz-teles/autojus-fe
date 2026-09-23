@@ -108,7 +108,10 @@ export function RowTriar({
     >
       {/* accent âmbar das exceções — o realce visual do segmento */}
       {isExc ? (
-        <span className="bg-gold absolute inset-y-0 left-0 w-[3px]" aria-hidden />
+        <span
+          className="bg-gold absolute inset-y-0 left-0 w-[3px]"
+          aria-hidden
+        />
       ) : null}
 
       <Checkbox
