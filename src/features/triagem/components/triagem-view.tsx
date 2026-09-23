@@ -17,9 +17,8 @@
 // TODO U0-followup: `?lifecycle=` server-side (hoje a partição é client-side sobre
 // as páginas carregadas — ver useTriagemPipeline). Group-by-process adiado.
 
-import { Check, CheckCheck, Inbox, TriangleAlert } from "lucide-react";
+import { CheckCheck, Inbox, TriangleAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 
 import { InfiniteListFooter } from "@/components/shell/infinite-list-footer";
 import { ListToolbar } from "@/components/shell/list-toolbar";
@@ -33,8 +32,7 @@ import {
 } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GerarPecaModal } from "@/features/pecas-v2/components/pregen/gerar-peca-modal";
-import { setInstructions } from "@/features/pecas-v2/lib/instructions-storage";
+import { usePecaGeracao } from "@/features/pecas-v2/components/pregen/gerar-peca-button";
 
 import { FilterTabs } from "../../intimacoes/components/shared/filter-tabs";
 import { UrgenciaFilter } from "../../intimacoes/components/shared/urgencia-filter";
@@ -58,26 +56,23 @@ function quantidade(n: number, singular: string, plural: string) {
 export function TriagemView() {
   const m = useTriagemPipeline();
   const router = useRouter();
-  const [pecaModal, setPecaModal] = useState<PipelineRow | null>(null);
+  // Geração de peça: FLUXO CANÔNICO ÚNICO (mesmo da intimação) — pre-flight de autos
+  // + orientação opcional + navegação. `iniciar` abre o fluxo; `modais` renderiza uma
+  // vez. Tanto o botão inline quanto o item de menu da linha chamam o MESMO fluxo.
+  const pecaGen = usePecaGeracao();
 
   const href = (id: string) => detalheNaFila(id, RETORNO);
 
-  // Gerar peça: abre modal de orientação; ao confirmar, guarda as instructions
-  // (sessionStorage, keyed pelo action_item) e navega pra construção. Mesmo caminho
-  // do detalhe (use-disposicao.buildGerarUrl).
+  // Gerar peça a partir de uma linha da triagem → o fluxo único (gate + modal).
   function abrirPeca(row: PipelineRow) {
     if (!row.rec?.gera_peca) return;
-    setPecaModal(row);
-  }
-  function gerarPeca(instructions: string) {
-    const row = pecaModal;
-    if (!row?.rec) return;
-    const actionItemId = row.rec.id;
-    if (instructions) setInstructions(actionItemId, instructions);
-    router.push(
-      `/pecas/nova?providencia=${actionItemId}&intimacao=${row.id}&auto=1&retorno=${encodeURIComponent(RETORNO)}`,
-    );
-    setPecaModal(null);
+    pecaGen.iniciar({
+      intimacaoId: row.id,
+      processoId: row.courtRecordId,
+      actionItemId: row.rec.id,
+      retorno: RETORNO,
+      pecaLabel: row.rec.title ?? row.ato,
+    });
   }
 
   // Roteamento das ações de UMA linha para a mutação real.
@@ -122,11 +117,6 @@ export function TriagemView() {
     }
   }
 
-  const sweepLabel =
-    m.sweepKind === "ciencia"
-      ? `Dar ciência em ${m.sweepable.length}`
-      : `Confirmar ${m.sweepable.length} ${m.sweepable.length === 1 ? "prazo confiável" : "prazos confiáveis"}`;
-
   return (
     <PageFrame
       header={
@@ -136,9 +126,9 @@ export function TriagemView() {
             className="text-fg3 min-w-0 truncate font-mono text-[11px]"
             aria-live="polite"
           >
-            {m.isPending
+            {m.countsPending
               ? "Carregando…"
-              : `${quantidade(m.total, "intimação", "intimações")} · ${quantidade(m.processCount, "processo", "processos")}`}
+              : quantidade(m.counts[m.tab], "intimação", "intimações")}
           </span>
         </>
       }
@@ -204,14 +194,7 @@ export function TriagemView() {
       }
     >
       <div className="flex w-full min-w-0 flex-col gap-4 px-3 py-4 sm:px-4 sm:py-5">
-        <GerarPecaModal
-          open={!!pecaModal}
-          onOpenChange={(v) => {
-            if (!v) setPecaModal(null);
-          }}
-          onGenerate={gerarPeca}
-          pecaLabel={pecaModal?.rec?.title ?? pecaModal?.ato}
-        />
+        {pecaGen.modais}
 
         {m.isPending ? (
           <div className="flex flex-col gap-3">
@@ -230,16 +213,10 @@ export function TriagemView() {
             </Button>
           </div>
         ) : m.tab === "a_triar" ? (
-          <ATriar
-            m={m}
-            href={href}
-            sweepLabel={sweepLabel}
-            onRowAction={onRowAction}
-            onBulk={onBulk}
-          />
+          <ATriar m={m} href={href} onRowAction={onRowAction} onBulk={onBulk} />
         ) : (
           <ReadonlyLane
-            rows={m.tab === "em_andamento" ? m.emAndamento : m.concluido}
+            rows={m.laneRows}
             density={m.density}
             href={href}
             vazio={
@@ -281,59 +258,28 @@ type Pipeline = ReturnType<typeof useTriagemPipeline>;
 function ATriar({
   m,
   href,
-  sweepLabel,
   onRowAction,
   onBulk,
 }: {
   m: Pipeline;
   href: (id: string) => string;
-  sweepLabel: string;
   onRowAction: (kind: RowAction, row: PipelineRow) => void;
   onBulk: (kind: BulkKind) => void;
 }) {
   return (
     <div className="flex flex-col gap-3">
-      {/* header do segmento Exceções */}
-      {m.segment === "excecoes" && m.triarFiltered.length > 0 && (
+      {/* header do segmento Exceções — contagem REAL (full backlog) do pipeline-counts */}
+      {m.segment === "excecoes" && m.segCounts.excecoes > 0 && (
         <div className="border-gold/25 bg-gold/8 text-gold-foreground flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-sm">
           <TriangleAlert className="size-4 shrink-0" aria-hidden />
           <span className="font-medium">
-            {m.triarFiltered.length}{" "}
-            {m.triarFiltered.length === 1 ? "exceção" : "exceções"} — revise
-            cada uma.
+            {m.segCounts.excecoes.toLocaleString("pt-BR")}{" "}
+            {m.segCounts.excecoes === 1 ? "exceção" : "exceções"} — revise cada
+            uma.
           </span>
           <span className="text-gold-foreground/80 text-xs">
-            Prazo provisório, tipo inferido, divergência ou sem responsável.
+            Prazo provisório, tipo inferido ou divergência.
           </span>
-        </div>
-      )}
-
-      {/* VARREDURA EM LOTE — não aparece em Exceções */}
-      {m.sweepKind && m.sweepable.length > 0 && (
-        <div className="border-primary/25 bg-primary/[0.06] flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2.5">
-          <CheckCheck className="text-primary size-5 shrink-0" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">
-              {m.sweepable.length} deste recorte{" "}
-              {m.sweepable.length === 1 ? "está confiável" : "estão confiáveis"}{" "}
-              e {m.sweepable.length === 1 ? "pronta" : "prontas"}.
-            </p>
-            <p className="text-muted-foreground text-xs">
-              As exceções ficam de fora — revise-as à parte.
-            </p>
-          </div>
-          <Button
-            size="sm"
-            disabled={m.mutating}
-            onClick={() =>
-              m.sweepKind === "ciencia"
-                ? void m.darCiencia(m.sweepable.map((r) => r.id))
-                : void m.confirmarTodosConfiaveis()
-            }
-          >
-            <Check data-icon="inline-start" />
-            {sweepLabel}
-          </Button>
         </div>
       )}
 
