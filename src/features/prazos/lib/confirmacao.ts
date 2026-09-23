@@ -30,6 +30,29 @@ export const confirmacaoSchema = z.object({
 
 export type ConfirmacaoForm = z.infer<typeof confirmacaoSchema>;
 
+// Subconjunto para o control "Definir tipo do ato" (tipo + dias + contagem).
+// Reusa exatamente as regras de tipo_ato/days do confirmacaoSchema — uma só fonte.
+export const definirTipoSchema = confirmacaoSchema.pick({
+  tipo_ato: true,
+  days: true,
+  counting: true,
+});
+
+export type DefinirTipoForm = z.infer<typeof definirTipoSchema>;
+
+/**
+ * Tipo do ato ainda indeterminado — "" (nunca preenchido) ou "indeterminado"
+ * (classificação pendente). Enquanto isso, o usuário precisa poder DEFINIR o tipo,
+ * independente do estado do prazo (mesmo com prazo declarado/aceito).
+ */
+export function tipoIndeterminado(
+  p: PrazoDetalheView | null,
+  estado: string,
+): boolean {
+  const tipo = p?.tipo_ato ?? "";
+  return tipo === "" || tipo === "indeterminado" || estado === "a_classificar";
+}
+
 /** Legacy automatic classifications may contradict an otherwise valid declared date. */
 export function tipoIncompativelComPrazo(p: PrazoDetalheView): boolean {
   return (
@@ -39,44 +62,24 @@ export function tipoIncompativelComPrazo(p: PrazoDetalheView): boolean {
   );
 }
 
+// v3 (docs/erd-motor-de-prazos-v3.md §3 · erd-intimacao-triagem §10.4): o tipo é escolhido no
+// GERAR-PEÇA (lazy) e a data é DEFENSÁVEL (declarada ou piso supletivo 218§3) — o detalhe NÃO
+// força mais confirmação de tipo+prazo, e nada bloqueia Gerar peça / Dar ciência. A única
+// revisão que sobra é a divergência declarado×calculado real, que tem form próprio (ApuracaoPrazo,
+// renderizado por memoria.divergencia.pendente) e é NÃO-bloqueante. Assim estas duas viram no-op:
+// mantemos as assinaturas para não churnar os call sites, mas o gate morreu.
 export function bloqueiaProvidencias(
-  p: PrazoDetalheView | null,
-  estado: string,
+  _p: PrazoDetalheView | null,
+  _estado: string,
 ): boolean {
-  if (!p) return estado === "ia" || estado === "a_classificar";
-  if (p.status === "CANCELLED" || p.status === "MET") return false;
-  const divergencia =
-    p.origem !== "declarado" &&
-    p.cross_validation?.resultado === "divergente" &&
-    !p.cross_validation.decisao;
-  if (divergencia) return true;
-  if (p.confirmed) return false;
-  return (
-    precisaConfirmarPrazo(p, estado) ||
-    (p.status !== "NO_DEADLINE" && p.confirmacao_exigida === true)
-  );
+  return false;
 }
 
 export function precisaConfirmarPrazo(
-  p: PrazoDetalheView,
-  estado: string,
+  _p: PrazoDetalheView,
+  _estado: string,
 ): boolean {
-  if (p.confirmed || p.status === "CANCELLED" || p.status === "MET")
-    return false;
-  // A date divergence has its own decision form; do not bypass it with a type confirmation.
-  if (
-    p.origem !== "declarado" &&
-    p.cross_validation?.resultado === "divergente" &&
-    !p.cross_validation.decisao
-  )
-    return false;
-  return (
-    p.reopened_for_review === true ||
-    tipoIncompativelComPrazo(p) ||
-    (p.status !== "NO_DEADLINE" && p.confirmacao_exigida === true) ||
-    estado === "a_classificar" ||
-    estado === "ia"
-  );
+  return false;
 }
 
 export { prazoVisivel } from "@/features/intimacoes/lib/prazo-visivel";

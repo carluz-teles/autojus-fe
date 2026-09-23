@@ -284,7 +284,7 @@ export function useListagemIntimacoes(triagem: boolean) {
               )
                 return;
               try {
-                const result = await confirmBatch.mutateAsync();
+                const result = await confirmBatch.mutateAsync(undefined);
                 toast.success(
                   `${result.affected.toLocaleString("pt-BR")} prazos confirmados`,
                 );

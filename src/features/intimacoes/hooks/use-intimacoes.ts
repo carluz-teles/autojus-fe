@@ -25,8 +25,10 @@ import {
   type AssignResponsavelParams,
   confirmTrustedDeadlinesBatch,
   getIntimacao,
+  getPipelineCounts,
   ignoreIntimacao,
   listIntimacoes,
+  type PipelineCountsParams,
   reopenIntimacao,
   resolveIntimacao,
   resolveIntimacoesBatch,
@@ -35,6 +37,7 @@ import type {
   IntimacaoDetalheView,
   IntimacoesBuckets,
   OrigemFacets,
+  TriagemBucketCounts,
 } from "../types";
 
 const EMPTY_BUCKETS: IntimacoesBuckets = {
@@ -68,6 +71,19 @@ export const intimacoesKeys = {
     [...intimacoesKeys.lists(), params] as const,
   detail: (id: string) => [...intimacoesKeys.all, "detail", id] as const,
   summary: () => [...intimacoesKeys.all, "summary"] as const,
+  pipelineCounts: (params: Record<string, unknown>) =>
+    [...intimacoesKeys.all, "pipeline-counts", params] as const,
+};
+
+const EMPTY_PIPELINE_COUNTS: TriagemBucketCounts = {
+  a_triar: 0,
+  em_andamento: 0,
+  concluido: 0,
+  analisando: 0,
+  trabalho: 0,
+  excecao: 0,
+  ciencia: 0,
+  sem_prazo: 0,
 };
 
 export interface IntimacoesFilters {
@@ -97,6 +113,12 @@ export interface IntimacoesFilters {
   naoConfirmado?: boolean;
   /** "me" (toggle "Minhas") ou um uuid; casa contra condutor OU revisor. */
   assignee?: string;
+  /** Lane de ciclo de vida da pipeline (a_triar|em_andamento|concluido); "" = todas.
+   *  Filtra a lista server-side pra retornar SÓ aquela lane. */
+  lifecycle?: string;
+  /** Disposição disjunta de a_triar (analisando|trabalho|excecao|ciencia|sem_prazo);
+   *  "" = todas. Substitui os antigos isExcecao/segmento. */
+  disposicao?: string;
   /** Default true. false pula o fetch — ex: NovaPecaModal no contexto de um
    *  processo específico usa useIntimacoesByProcesso em vez desta lista geral. */
   enabled?: boolean;
@@ -129,6 +151,8 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     triage_lane: filters.triageLane || undefined,
     nao_confirmado: filters.naoConfirmado || undefined,
     assignee: filters.assignee || undefined,
+    lifecycle: filters.lifecycle || undefined,
+    disposicao: filters.disposicao || undefined,
     limit: filters.limit ?? PAGE_SIZE,
   };
 
@@ -187,6 +211,32 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     hasMore: pagination.hasMore,
     isLoadingMore: query.isFetchingNextPage,
     loadMore: pagination.loadMore,
+  };
+}
+
+/**
+ * Contagens full-backlog da pipeline de Triagem — GET /v1/intimacoes/pipeline-counts.
+ * Keyada pelos filtros COMPARTILHADOS ativos (search/urgência/responsável/origem/…),
+ * NÃO pela lifecycle/segmento (o BE particiona nessas dimensões). Alimenta os badges das
+ * abas de ciclo de vida e dos segmentos — números reais sobre o conjunto inteiro, não a
+ * página carregada. Invalidada junto do resto (intimacoesKeys.all) por qualquer mutação.
+ */
+export function usePipelineCounts(
+  params: PipelineCountsParams = {},
+  enabled = true,
+) {
+  const fetcher = useApi();
+  const query = useQuery({
+    queryKey: intimacoesKeys.pipelineCounts({ ...params }),
+    queryFn: ({ signal }) => getPipelineCounts(fetcher, params, signal),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+  return {
+    counts: query.data ?? EMPTY_PIPELINE_COUNTS,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    error: query.error,
   };
 }
 
@@ -345,11 +395,18 @@ export function useResolverIntimacao() {
   });
 }
 
+/**
+ * Confirma os prazos confiáveis em lote. Sem argumento (ou undefined) confirma TODOS os
+ * confiáveis do escritório; com uma lista de intimation ids, confirma só os confiáveis
+ * dessas intimações (o BE nunca inclui exceção) — usado pela seleção manual e pelo
+ * "Confirmar" de uma linha só.
+ */
 export function useConfirmarPrazosConfiaveisEmLote() {
   const fetcher = useApi();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => confirmTrustedDeadlinesBatch(fetcher),
+    mutationFn: (intimationIds?: string[]) =>
+      confirmTrustedDeadlinesBatch(fetcher, intimationIds),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: intimacoesKeys.all }),
   });
@@ -429,5 +486,31 @@ export function useAssignIntimacaoResponsavel(intimacaoId: string) {
     onSuccess: (detalhe) => {
       qc.setQueryData(intimacoesKeys.detail(intimacaoId), detalhe);
     },
+  });
+}
+
+/**
+ * Atribui/desatribui o mesmo responsável a VÁRIAS intimações — o PUT
+ * /v1/intimacoes/:id/responsavel disparado em paralelo por id (não há endpoint em
+ * lote no BE). Usado pela seleção em lote e pelo "Atribuir a mim" da linha da
+ * Triagem-pipeline. Invalida toda a árvore de intimações ao final.
+ */
+export function useAssignIntimacaoResponsavelBatch() {
+  const fetcher = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      ids,
+      assigneeUserId,
+    }: {
+      ids: string[];
+      assigneeUserId: string | null;
+    }) =>
+      Promise.all(
+        ids.map((id) =>
+          assignIntimacaoResponsavel(fetcher, id, { assigneeUserId }),
+        ),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: intimacoesKeys.all }),
   });
 }

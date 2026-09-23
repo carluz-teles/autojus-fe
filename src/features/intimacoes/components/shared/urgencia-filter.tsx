@@ -5,6 +5,7 @@ import { CalendarDays } from "lucide-react";
 import { useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { ptBR } from "react-day-picker/locale";
+import { useForm, useWatch } from "react-hook-form";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,10 +39,17 @@ export function UrgenciaFilter({
   to: string;
   onRange: (from: string, to: string) => void;
 }) {
+  // O intervalo em rascunho (De/Até + o flag "editing") É um formulário — dois
+  // campos com validação cruzada ("data final ≥ inicial"). Estado via RHF; as
+  // derivações (validade, range do calendário) reagem por useWatch. O `open` do
+  // popover é estado de UI puro, não valor de campo — segue como useState.
   const [open, setOpen] = useState(false);
-  const [draftFrom, setDraftFrom] = useState(from);
-  const [draftTo, setDraftTo] = useState(to);
-  const [editing, setEditing] = useState(false);
+  const { control, setValue, getValues, reset } = useForm({
+    defaultValues: { from, to, editing: false },
+  });
+  const draftFrom = useWatch({ control, name: "from" });
+  const draftTo = useWatch({ control, name: "to" });
+  const editing = useWatch({ control, name: "editing" });
   const inicio = dataDoFiltro(draftFrom);
   const fim = dataDoFiltro(draftTo);
   const valid = !!inicio && !!fim && draftFrom <= draftTo;
@@ -54,9 +62,7 @@ export function UrgenciaFilter({
       open={open}
       onOpenChange={(next) => {
         if (next) {
-          setDraftFrom(from);
-          setDraftTo(to);
-          setEditing(false);
+          reset({ from, to, editing: false });
         }
         setOpen(next);
       }}
@@ -115,9 +121,12 @@ export function UrgenciaFilter({
               defaultMonth={inicio}
               className="mx-auto [--cell-size:--spacing(8)]"
               onSelect={(next) => {
-                setEditing(true);
-                setDraftFrom(next?.from ? format(next.from, "yyyy-MM-dd") : "");
-                setDraftTo(next?.to ? format(next.to, "yyyy-MM-dd") : "");
+                setValue("editing", true);
+                setValue(
+                  "from",
+                  next?.from ? format(next.from, "yyyy-MM-dd") : "",
+                );
+                setValue("to", next?.to ? format(next.to, "yyyy-MM-dd") : "");
               }}
             />
             <div className="grid grid-cols-2 gap-2">
@@ -128,8 +137,8 @@ export function UrgenciaFilter({
                   type="date"
                   value={draftFrom}
                   onChange={(e) => {
-                    setEditing(true);
-                    setDraftFrom(e.target.value);
+                    setValue("editing", true);
+                    setValue("from", e.target.value);
                   }}
                 />
               </Field>
@@ -142,8 +151,8 @@ export function UrgenciaFilter({
                   min={draftFrom || undefined}
                   aria-invalid={!!inicio && !!fim && !valid}
                   onChange={(e) => {
-                    setEditing(true);
-                    setDraftTo(e.target.value);
+                    setValue("editing", true);
+                    setValue("to", e.target.value);
                   }}
                 />
               </Field>
@@ -164,7 +173,7 @@ export function UrgenciaFilter({
             size="sm"
             disabled={!valid}
             onClick={() => {
-              onRange(draftFrom, draftTo);
+              onRange(getValues("from"), getValues("to"));
               setOpen(false);
             }}
           >

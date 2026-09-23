@@ -2,7 +2,9 @@
 
 import { X } from "lucide-react";
 
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { IconAction } from "@/components/ui/icon-action";
+import { Input } from "@/components/ui/input";
 import { useOrgProfileEditForm } from "@/features/organization/hooks/use-org-profile-edit-form";
 import { maskCnpj, maskPhone } from "@/lib/masks";
 
@@ -11,6 +13,7 @@ import { maskCnpj, maskPhone } from "@/lib/masks";
 // aqui só o chrome Linear + binding. Estilo alinhado ao invite-modal.
 export function OrgEditModal({ onFechar }: { onFechar: () => void }) {
   const f = useOrgProfileEditForm({ onDone: onFechar });
+  const { errors } = f;
   const cnpj = f.register("cnpj");
   const phone = f.register("phone");
 
@@ -41,66 +44,84 @@ export function OrgEditModal({ onFechar }: { onFechar: () => void }) {
 
         <form onSubmit={f.submit} noValidate>
           <div className="flex flex-col gap-3.5 px-[22px] py-[18px]">
-            <Campo
-              label="Nome do escritório"
-              erro={f.errors.trade_name?.message}
-            >
-              <input
+            <Field data-invalid={!!errors.trade_name}>
+              <FieldLabel htmlFor="org-trade-name">
+                Nome do escritório
+              </FieldLabel>
+              <Input
+                id="org-trade-name"
+                aria-invalid={!!errors.trade_name}
                 {...f.register("trade_name")}
-                className="border-line bg-bg text-foreground w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
               />
-            </Campo>
+              <FieldError errors={[errors.trade_name]} />
+            </Field>
 
-            <Campo label="CNPJ" erro={f.errors.cnpj?.message}>
-              <input
+            <Field data-invalid={!!errors.cnpj}>
+              <FieldLabel htmlFor="org-cnpj">CNPJ</FieldLabel>
+              <Input
+                id="org-cnpj"
                 inputMode="numeric"
+                aria-invalid={!!errors.cnpj}
                 {...cnpj}
                 onChange={(e) => {
                   e.target.value = maskCnpj(e.target.value);
                   void cnpj.onChange(e);
                 }}
-                className="border-line bg-bg text-foreground w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
               />
-            </Campo>
+              <FieldError errors={[errors.cnpj]} />
+            </Field>
 
-            <Campo label="E-mail administrativo" erro={f.errors.email?.message}>
-              <input
+            <Field data-invalid={!!errors.email}>
+              <FieldLabel htmlFor="org-email">E-mail administrativo</FieldLabel>
+              <Input
+                id="org-email"
                 type="email"
                 inputMode="email"
+                aria-invalid={!!errors.email}
                 {...f.register("email")}
-                className="border-line bg-bg text-foreground w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
               />
-            </Campo>
+              <FieldError errors={[errors.email]} />
+            </Field>
 
-            <Campo label="Telefone" erro={f.errors.phone?.message}>
-              <input
+            <Field data-invalid={!!errors.phone}>
+              <FieldLabel htmlFor="org-phone">Telefone</FieldLabel>
+              <Input
+                id="org-phone"
                 type="tel"
                 inputMode="tel"
+                aria-invalid={!!errors.phone}
                 {...phone}
                 onChange={(e) => {
                   e.target.value = maskPhone(e.target.value);
                   void phone.onChange(e);
                 }}
-                className="border-line bg-bg text-foreground w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
               />
-            </Campo>
+              <FieldError errors={[errors.phone]} />
+            </Field>
 
             <div className="grid grid-cols-[1fr_80px] gap-3">
-              <Campo label="Cidade" erro={f.errors.address?.cidade?.message}>
-                <input
+              <Field data-invalid={!!errors.address?.cidade}>
+                <FieldLabel htmlFor="org-cidade">Cidade</FieldLabel>
+                <Input
+                  id="org-cidade"
                   placeholder="Franca"
+                  aria-invalid={!!errors.address?.cidade}
                   {...f.register("address.cidade")}
-                  className="border-line bg-bg text-foreground w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
                 />
-              </Campo>
-              <Campo label="UF" erro={f.errors.address?.uf?.message}>
-                <input
+                <FieldError errors={[errors.address?.cidade]} />
+              </Field>
+              <Field data-invalid={!!errors.address?.uf}>
+                <FieldLabel htmlFor="org-uf">UF</FieldLabel>
+                <Input
+                  id="org-uf"
                   maxLength={2}
                   placeholder="SP"
+                  className="uppercase"
+                  aria-invalid={!!errors.address?.uf}
                   {...f.register("address.uf")}
-                  className="border-line bg-bg text-foreground w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] uppercase outline-none"
                 />
-              </Campo>
+                <FieldError errors={[errors.address?.uf]} />
+              </Field>
             </div>
           </div>
 
@@ -123,25 +144,5 @@ export function OrgEditModal({ onFechar }: { onFechar: () => void }) {
         </form>
       </div>
     </div>
-  );
-}
-
-function Campo({
-  label,
-  erro,
-  children,
-}: {
-  label: string;
-  erro?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-[12px] font-medium">{label}</span>
-      {children}
-      {erro ? (
-        <span className="text-destructive mt-1 block text-[11px]">{erro}</span>
-      ) : null}
-    </label>
   );
 }

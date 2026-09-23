@@ -20,12 +20,14 @@ const OAB_BLOCKS = {
 };
 
 type OabInputProps = {
+  id?: string;
   value: string;
   onChange: (value: string) => void;
   className?: string;
   placeholder?: string;
   autoFocus?: boolean;
   onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
+  "aria-invalid"?: boolean;
 };
 
 export function OabInput({

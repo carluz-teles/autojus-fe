@@ -17,35 +17,26 @@ const prazo = {
   confirmacao_exigida: true,
 } as PrazoDetalheView;
 
-describe("confirmação de prazo", () => {
-  it.each(["ciencia", "sem_ato"])(
-    "pede revisão do tipo %s com prazo declarado ativo, preservando a data",
-    (tipo_ato) => {
-      const p = {
-        ...prazo,
-        tipo_ato,
-        origem: "declarado",
-        confirmacao_exigida: false,
-        end_date: "2026-09-08",
-      } as PrazoDetalheView;
-      expect(tipoIncompativelComPrazo(p)).toBe(true);
-      expect(precisaConfirmarPrazo(p, "declarado")).toBe(true);
-      expect(bloqueiaProvidencias(p, "declarado")).toBe(true);
-      expect(p.end_date).toBe("2026-09-08");
-      for (const patch of [
-        { confirmed: true },
-        { status: "MET" },
-        { status: "CANCELLED" },
-        { status: "NO_DEADLINE" },
-      ]) {
-        const revised = { ...p, ...patch } as PrazoDetalheView;
-        expect(tipoIncompativelComPrazo(revised)).toBe(false);
-        expect(bloqueiaProvidencias(revised, "declarado")).toBe(false);
-      }
-    },
-  );
-  it("bloqueia divergência até a decisão, sem oferecer confirmação que a contorne", () => {
-    const p = {
+describe("confirmação de prazo (v3: gate morto)", () => {
+  // v3 (erd-motor-de-prazos-v3 §3 · erd-intimacao-triagem §10.4): o tipo é lazy (gerar-peça) e a
+  // data é defensável — o detalhe NÃO força mais confirmação de tipo+prazo, e NADA bloqueia Gerar
+  // peça / Dar ciência. precisaConfirmarPrazo e bloqueiaProvidencias viraram no-op (sempre false),
+  // inclusive nos casos que ANTES bloqueavam: confirmacao_exigida, a_classificar, ia, divergência,
+  // reopened, tipo incompatível. A revisão da divergência real vive no ApuracaoPrazo (não-bloqueante).
+  it.each([
+    ["ia", "OPEN"],
+    ["ia", "MISSED"],
+    ["a_classificar", "NO_DEADLINE"],
+    ["declarado", "PENDING"],
+    ["calculado", "PENDING"],
+  ])("precisaConfirmarPrazo é sempre false — %s/%s", (estado, status) => {
+    expect(
+      precisaConfirmarPrazo({ ...prazo, status } as PrazoDetalheView, estado),
+    ).toBe(false);
+  });
+
+  it("bloqueiaProvidencias é sempre false — inclusive divergência e confirmacao_exigida", () => {
+    const divergente = {
       ...prazo,
       origem: "calculado",
       cross_validation: {
@@ -55,81 +46,31 @@ describe("confirmação de prazo", () => {
         dif_dias: 1,
       },
     } as PrazoDetalheView;
-    expect(bloqueiaProvidencias(p, "calculado")).toBe(true);
-    expect(precisaConfirmarPrazo(p, "calculado")).toBe(false);
+    expect(bloqueiaProvidencias(divergente, "calculado")).toBe(false);
+    expect(bloqueiaProvidencias(prazo, "ia")).toBe(false);
+    expect(bloqueiaProvidencias(null, "a_classificar")).toBe(false);
   });
-  it.each([
-    ["ia", "OPEN", false, true],
-    ["ia", "MISSED", false, true],
-    ["ia", "OPEN", true, false],
-    ["ia", "MET", false, false],
-    ["ia", "CANCELLED", false, false],
-    ["a_classificar", "NO_DEADLINE", false, true],
-    ["sem_prazo", "NO_DEADLINE", false, false],
-  ])(
-    "bloqueio em %s/%s confirmado=%s: %s",
-    (estado, status, confirmed, expected) => {
-      expect(
-        bloqueiaProvidencias(
-          { ...prazo, status, confirmed } as PrazoDetalheView,
-          estado as string,
-        ),
-      ).toBe(expected);
+
+  // tipoIncompativelComPrazo continua vivo (usado em detalhe-apresentacao.ts para a UI de aviso):
+  // detecta uma classificação legada (ciencia/sem_ato) contradizendo um prazo ativo não confirmado.
+  it.each(["ciencia", "sem_ato"])(
+    "tipoIncompativelComPrazo detecta tipo %s legado num prazo ativo",
+    (tipo_ato) => {
+      const p = { ...prazo, tipo_ato } as PrazoDetalheView;
+      expect(tipoIncompativelComPrazo(p)).toBe(true);
+      for (const patch of [
+        { confirmed: true },
+        { status: "MET" },
+        { status: "CANCELLED" },
+        { status: "NO_DEADLINE" },
+      ]) {
+        expect(
+          tipoIncompativelComPrazo({ ...p, ...patch } as PrazoDetalheView),
+        ).toBe(false);
+      }
     },
   );
-  it("oferece revisão para prazo declarado recuperado, até a confirmação humana", () => {
-    expect(
-      precisaConfirmarPrazo(
-        { ...prazo, reopened_for_review: true },
-        "declarado",
-      ),
-    ).toBe(true);
-    expect(
-      precisaConfirmarPrazo(
-        { ...prazo, reopened_for_review: true, confirmed: true },
-        "declarado",
-      ),
-    ).toBe(false);
-  });
-  it.each(["declarado", "calculado", "validado", "divergente", "manual"])(
-    "oferece confirmação exigida pela política para %s",
-    (estado) => {
-      expect(precisaConfirmarPrazo(prazo, estado)).toBe(true);
-    },
-  );
-  it("exige revisão do inferido, inclusive importação já vencida", () => {
-    expect(precisaConfirmarPrazo(prazo, "ia")).toBe(true);
-    expect(precisaConfirmarPrazo({ ...prazo, status: "MISSED" }, "ia")).toBe(
-      true,
-    );
-  });
-  it("exige definição de a classificar mesmo com status NO_DEADLINE", () => {
-    expect(
-      precisaConfirmarPrazo(
-        { ...prazo, status: "NO_DEADLINE" },
-        "a_classificar",
-      ),
-    ).toBe(true);
-  });
-  it("não exige revisão novamente pela origem histórica", () => {
-    expect(precisaConfirmarPrazo({ ...prazo, confirmed: true }, "ia")).toBe(
-      false,
-    );
-    expect(
-      precisaConfirmarPrazo(
-        { ...prazo, confirmacao_exigida: false },
-        "calculado",
-      ),
-    ).toBe(false);
-  });
-  it("não reabre prazo cancelado ou cumprido", () => {
-    expect(precisaConfirmarPrazo({ ...prazo, status: "CANCELLED" }, "ia")).toBe(
-      false,
-    );
-    expect(precisaConfirmarPrazo({ ...prazo, status: "MET" }, "ia")).toBe(
-      false,
-    );
-  });
+
   it("oculta vencimento de preenchimento para NO_DEADLINE", () => {
     const p = {
       status: "NO_DEADLINE",
@@ -140,7 +81,8 @@ describe("confirmação de prazo", () => {
     const aberto = { ...p, status: "OPEN" } as IntimacaoDetalheView["prazo"];
     expect(prazoVisivel({ prazo: aberto })).toBe(aberto);
   });
-  it("rejeita tipo indefinido, dias vazios e ausência de revisão", () => {
+
+  it("confirmacaoSchema rejeita tipo indefinido, dias vazios e ausência de revisão", () => {
     const form = {
       tipo_ato: "manifestacao",
       days: 5,

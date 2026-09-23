@@ -24,6 +24,15 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { TIPO_ATO_LABEL } from "@/features/intimacoes/lib/tipo-ato";
 import { formatarData } from "@/lib/utils";
 
 import { useConfirmacaoPrazo } from "../../hooks/use-confirmacao-prazo";
@@ -98,21 +107,38 @@ export function ConfirmacaoPrazo({
                   <FieldLabel htmlFor="confirmacao-tipo">
                     Tipo do ato
                   </FieldLabel>
-                  <NativeSelect
-                    id="confirmacao-tipo"
-                    className="w-full"
-                    aria-invalid={!!errors.tipo_ato}
-                    {...register("tipo_ato")}
-                  >
-                    <NativeSelectOption value="">
-                      Selecione o tipo
-                    </NativeSelectOption>
-                    {TIPOS_COM_PRAZO.map(([value, label]) => (
-                      <NativeSelectOption key={value} value={value}>
-                        {label}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
+                  <Controller
+                    name="tipo_ato"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        value={field.value || ""}
+                        onValueChange={(v) => field.onChange(v ?? "")}
+                      >
+                        <SelectTrigger
+                          id="confirmacao-tipo"
+                          className="w-full"
+                          aria-invalid={!!errors.tipo_ato}
+                        >
+                          <SelectValue placeholder="Selecione o tipo">
+                            {field.value
+                              ? (TIPO_ATO_LABEL[field.value] ??
+                                "Selecione o tipo")
+                              : "Selecione o tipo"}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {TIPOS_COM_PRAZO.map(([value, label]) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                   <FieldError errors={[errors.tipo_ato]} />
                 </Field>
                 <Field data-invalid={!!errors.days}>
@@ -257,6 +283,7 @@ export function ConfirmacaoPrazo({
                 <FieldLabel htmlFor="confirmacao-revisado">
                   Revisei o tipo do ato e a contagem do prazo.
                 </FieldLabel>
+                <FieldError errors={[errors.revisado]} />
               </Field>
               <div className="flex flex-col gap-2">
                 <Button type="submit" disabled={!c.podeConfirmar}>

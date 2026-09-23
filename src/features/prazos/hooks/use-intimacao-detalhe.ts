@@ -76,17 +76,21 @@ function prazoInfo(daysLeft: number | null): {
 } {
   if (daysLeft === null)
     return { num: "—", frase: "sem prazo", cor: "var(--fg3)" };
+  // Rótulo NEUTRO: o countdown é o delta de calendário (wall-clock) até a data fatal — não é
+  // "corridos" nem "úteis". A CONTAGEM real (dias úteis vs corridos) aparece no "Por que essa
+  // data?", com o regime correto (counting). Dizer "dias corridos" aqui contradizia o prazo em
+  // dias úteis e confundia (QA Fase 4).
   if (daysLeft < 0)
     return {
       num: String(-daysLeft),
-      frase: "dias corridos em atraso",
+      frase: "dias em atraso",
       cor: "var(--red)",
     };
   if (daysLeft === 0)
     return { num: "", frase: "Vence hoje", cor: "var(--gold)" };
   return {
     num: String(daysLeft),
-    frase: "dias corridos até o vencimento",
+    frase: "dias até o vencimento",
     cor: "var(--fg2)",
   };
 }

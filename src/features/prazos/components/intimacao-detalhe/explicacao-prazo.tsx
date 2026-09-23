@@ -30,7 +30,7 @@ export function ExplicacaoPrazo({
       : p.origem === "declarado"
         ? "A duração do prazo foi extraída da publicação."
         : p.origem === "ia"
-          ? "A regra de prazo foi aplicada a um tipo de ato sugerido por IA."
+          ? "A regra de prazo foi aplicada a um tipo de ato inferido automaticamente."
           : p.origem === "calculado"
             ? "A duração vem da regra associada ao tipo de ato registrado."
             : p.origem === "divergente"

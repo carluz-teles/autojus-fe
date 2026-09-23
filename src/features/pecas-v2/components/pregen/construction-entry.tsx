@@ -15,6 +15,7 @@ import {
   peekInstructions,
   setInstructions,
 } from "../../lib/instructions-storage";
+import { preconditionFromError } from "../../lib/peca-precondition";
 import { createDraft } from "../../services/pecas-v2.service";
 
 // NAVEGAR-PRIMEIRO: a ConstructionEntry só CRIA o rascunho e navega direto pra
@@ -124,13 +125,18 @@ export function ConstructionEntry({
         {work.isError || create.isError ? (
           <>
             <p role="alert">
-              {create.error?.message || "Não foi possível carregar o trabalho."}
+              {preconditionFromError(create.error)
+                ? `${preconditionFromError(create.error)!.title} ${preconditionFromError(create.error)!.description}`
+                : create.error?.message ||
+                  "Não foi possível carregar o trabalho."}
             </p>
             <Button
               onClick={() => (work.isError ? work.refetch() : create.mutate())}
               disabled={create.isPending}
             >
-              Tentar novamente
+              {preconditionFromError(create.error)
+                ? preconditionFromError(create.error)!.cta
+                : "Tentar novamente"}
             </Button>
           </>
         ) : (

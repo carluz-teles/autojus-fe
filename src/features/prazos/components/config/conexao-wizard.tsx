@@ -3,7 +3,9 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { AlertCircle, CheckCircle2, FileStack, Loader2, X } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { Controller, useForm } from "react-hook-form";
 
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { IconAction } from "@/components/ui/icon-action";
 import { Input } from "@/components/ui/input";
 import {
@@ -82,20 +84,26 @@ function Segundo2FA({
             cadastrado no portal. Informe o código mais recente — ele expira a
             cada tentativa.
           </p>
-          <label htmlFor={codeId} className="sr-only">
-            Código do segundo fator do {sistema.nome}
-          </label>
-          <Input
-            id={codeId}
-            value={sistema.code}
-            disabled={enviando}
-            onChange={(e) => wizard.setCode(sistema.system, e.target.value)}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            placeholder="000000"
-            className="w-40 tracking-[0.3em] tabular-nums"
-          />
+          <Field data-invalid={!!sistema.erro}>
+            <FieldLabel htmlFor={codeId} className="sr-only">
+              Código do segundo fator do {sistema.nome}
+            </FieldLabel>
+            <Input
+              id={codeId}
+              value={sistema.code}
+              disabled={enviando}
+              onChange={(e) => wizard.setCode(sistema.system, e.target.value)}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              placeholder="000000"
+              aria-invalid={!!sistema.erro}
+              className="w-40 tracking-[0.3em] tabular-nums"
+            />
+            <FieldError
+              errors={[sistema.erro ? { message: sistema.erro } : undefined]}
+            />
+          </Field>
         </>
       ) : (
         <>
@@ -111,13 +119,17 @@ function Segundo2FA({
             secret={sistema.secret}
             onSecret={(s) => wizard.setSecret(sistema.system, s)}
             disabled={enviando}
+            invalid={!!sistema.erro}
           />
+          {sistema.erro && (
+            <p
+              role="alert"
+              className="text-destructive text-[12px] leading-[1.45]"
+            >
+              {sistema.erro}
+            </p>
+          )}
         </>
-      )}
-      {sistema.erro && (
-        <p role="alert" className="text-destructive text-[12px] leading-[1.45]">
-          {sistema.erro}
-        </p>
       )}
       <div className="flex flex-wrap items-center gap-3">
         <button
@@ -256,6 +268,15 @@ export function ConexaoWizard({
   const wizard = useConexaoWizard({ court, entries, connections });
   const certWizard = useCertWizard();
 
+  // Seleção do certificado = campo de formulário (RHF). Com vários certificados
+  // válidos, o advogado precisa escolher um antes de conectar; a validação por
+  // campo mostra a mensagem abaixo do Select. Com um único certificado (ou já
+  // resolvido pela conexão existente) não há escolha a fazer.
+  const certForm = useForm<{ certRef: string }>({
+    mode: "onSubmit",
+    defaultValues: { certRef: "" },
+  });
+
   // Ao conectar o tribunal, INICIA a busca dos autos dos processos já na base
   // (uma vez). O BE aplica a regra tem-processo→busca / não-tem→nada.
   const jaBuscouAutos = useRef(false);
@@ -274,7 +295,6 @@ export function ConexaoWizard({
     usable,
     semCert,
     erroCerts,
-    certRef,
     setCertRef,
     selectedCertRef,
     precisaCert,
@@ -326,26 +346,27 @@ export function ConexaoWizard({
           <div className="px-[22px] py-5">
             {passo === "certificado" ? (
               <div className="flex flex-col gap-4">
-                <div>
-                  <label
-                    htmlFor={
-                      usable.length > 1 ? "connection-certificate" : undefined
-                    }
-                    className="text-fg3 mb-1.5 block text-[11.5px]"
-                  >
-                    Certificado
-                  </label>
-                  {semCert ? (
+                {semCert ? (
+                  <div>
+                    <label className="text-fg3 mb-1.5 block text-[11.5px]">
+                      Certificado
+                    </label>
                     <p className="border-line bg-bg text-fg3 rounded-[9px] border border-dashed px-[13px] py-3 text-[12.5px]">
                       Nenhum certificado válido cadastrado.{" "}
                       <button
+                        type="button"
                         className="text-primary underline"
                         onClick={certWizard.abrir}
                       >
                         Adicionar certificado A1
                       </button>
                     </p>
-                  ) : usable.length === 1 ? (
+                  </div>
+                ) : usable.length === 1 ? (
+                  <div>
+                    <label className="text-fg3 mb-1.5 block text-[11.5px]">
+                      Certificado
+                    </label>
                     <div className="border-line bg-bg rounded-lg border p-3 text-[12.5px]">
                       <p className="font-medium">{usable[0].subject_cn}</p>
                       <p className="text-fg3 mt-1">
@@ -353,34 +374,56 @@ export function ConexaoWizard({
                         certificado serve os sistemas do tribunal.
                       </p>
                     </div>
-                  ) : (
-                    <Select
-                      value={certRef}
-                      onValueChange={(v) => setCertRef(v ?? "")}
-                      disabled={iniciando}
-                    >
-                      <SelectTrigger
-                        id="connection-certificate"
-                        className="w-full"
-                      >
-                        <SelectValue placeholder="Selecione o certificado">
-                          {usable.find((c) => c.id === selectedCertRef)
-                            ?.subject_cn ?? "Selecione o certificado"}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {usable.map((cert) => (
-                            <SelectItem key={cert.id} value={cert.id}>
-                              {cert.subject_cn}
-                              {cert.oab ? ` · ${cert.oab}` : ""}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <Field data-invalid={!!certForm.formState.errors.certRef}>
+                    <FieldLabel htmlFor="connection-certificate">
+                      Certificado
+                    </FieldLabel>
+                    <Controller
+                      name="certRef"
+                      control={certForm.control}
+                      rules={{
+                        validate: (v) =>
+                          !precisaCert ||
+                          v !== "" ||
+                          "Selecione o certificado para conectar.",
+                      }}
+                      render={({ field }) => (
+                        <Select
+                          value={field.value || ""}
+                          onValueChange={(v) => {
+                            field.onChange(v ?? "");
+                            setCertRef(v ?? "");
+                          }}
+                          disabled={iniciando}
+                        >
+                          <SelectTrigger
+                            id="connection-certificate"
+                            className="w-full"
+                            aria-invalid={!!certForm.formState.errors.certRef}
+                          >
+                            <SelectValue placeholder="Selecione o certificado">
+                              {usable.find((c) => c.id === selectedCertRef)
+                                ?.subject_cn ?? "Selecione o certificado"}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {usable.map((cert) => (
+                                <SelectItem key={cert.id} value={cert.id}>
+                                  {cert.subject_cn}
+                                  {cert.oab ? ` · ${cert.oab}` : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    <FieldError errors={[certForm.formState.errors.certRef]} />
+                  </Field>
+                )}
                 <div className="border-line bg-bg rounded-lg border p-3 text-[12.5px]">
                   <p className="text-fg3">
                     Vamos conectar:{" "}
@@ -462,8 +505,11 @@ export function ConexaoWizard({
                 </button>
                 {passo === "certificado" && (
                   <button
-                    disabled={(precisaCert && !selectedCertRef) || iniciando}
-                    onClick={() => void wizard.conectar()}
+                    type="button"
+                    disabled={semCert || iniciando}
+                    onClick={certForm.handleSubmit(() => {
+                      void wizard.conectar();
+                    })}
                     className="bg-primary text-primary-foreground inline-flex items-center gap-1.5 rounded-[9px] px-3.5 py-2 text-[12.5px] font-medium disabled:opacity-50 pointer-coarse:min-h-11"
                   >
                     {iniciando && (

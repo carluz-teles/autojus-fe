@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Check,
-  ChevronRight,
-  Clock,
-  Inbox,
-  Loader2,
-  PenLine,
-  Sparkles,
-} from "lucide-react";
+import { ChevronRight, Clock, Inbox, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 import { InfiniteListFooter } from "@/components/shell/infinite-list-footer";
@@ -26,13 +18,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ProvidenciaFulfillment } from "@/features/action-items/components/providencia-fulfillment";
 import { hasActionableFulfillment } from "@/features/action-items/lib/fulfillment";
 import { WORK_TYPES } from "@/features/action-items/lib/piece-labels";
-import { useResolverIntimacao } from "@/features/intimacoes/hooks/use-intimacoes";
 import { Responsavel } from "@/features/organization/components/responsavel";
 import { cn } from "@/lib/utils";
 
 import { useListagemIntimacoes } from "../../hooks/use-listagem-intimacoes";
 import type { linhaIntimacao } from "../../lib/listagem";
-import type { RecommendedProvidencia } from "../../types";
 import { FilterTabs } from "../shared/filter-tabs";
 import { UrgenciaFilter } from "../shared/urgencia-filter";
 import { RevisaoOrigem } from "./revisao-origem";
@@ -332,62 +322,6 @@ function PrazoBadge({ prazo }: { prazo: Linha["prazo"] }) {
   );
 }
 
-// TriageActions — barra de ação DIRETA do mockup (a providência nasce comprometida, sem o
-// passo de curadoria SUGGESTED). Gera peça → /pecas/nova (mesmo href do WorkActions);
-// Concluir/Criar já concluída → POST /v1/action-items/:id/actions {accept_completed};
-// Dispensar → {dismiss}. O onSuccess do useWorkMutation invalida `intimacoes`, então a
-// linha some/atualiza sozinha.
-function TriageActions({
-  rec,
-  r,
-  m,
-}: {
-  rec: RecommendedProvidencia;
-  r: Linha;
-  m: Lista;
-}) {
-  const resolver = useResolverIntimacao();
-  const busy = resolver.isPending;
-  // auto=1 → navigate-first: cai direto no loader de geração (fluxo novo), sem a
-  // tela antiga de seleção de teses. Mesmo contrato do "Gerar peça" do detalhe.
-  // (providencia=<action_item_id> é só encanamento do fluxo de peça.)
-  const pieceHref = `/pecas/nova?providencia=${rec.id}&intimacao=${r.id}&auto=1&retorno=${encodeURIComponent(m.href(r.id))}`;
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {rec.gera_peca ? (
-        <Button
-          size="sm"
-          nativeButton={false}
-          render={<Link href={pieceHref} onClick={m.remember} />}
-        >
-          <PenLine data-icon="inline-start" />
-          Gerar peça
-        </Button>
-      ) : null}
-      <Button
-        variant={rec.gera_peca ? "outline" : "default"}
-        size="sm"
-        disabled={busy}
-        onClick={() => {
-          if (!busy) resolver.mutate(r.id);
-        }}
-      >
-        {busy ? (
-          <Loader2 data-icon="inline-start" className="animate-spin" />
-        ) : (
-          <Check data-icon="inline-start" />
-        )}
-        Dar ciência
-      </Button>
-      {resolver.isError ? (
-        <span role="alert" className="text-destructive text-xs">
-          Não foi possível dar ciência. Tente novamente.
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 function LinhaIntimacao({
   row: r,
   m,
@@ -484,7 +418,15 @@ function LinhaIntimacao({
             {hasActionableFulfillment(rec.fulfillment) ? (
               <ProvidenciaFulfillment fulfillment={rec.fulfillment} />
             ) : null}
-            <TriageActions rec={rec} r={r} m={m} />
+            <Link
+              href={m.href(r.id)}
+              onClick={m.remember}
+              aria-label={`Abrir intimação de ${r.publicado}, processo ${r.cnj}`}
+              className="text-primary focus-visible:ring-ring inline-flex items-center gap-1 self-start rounded text-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2"
+            >
+              Abrir intimação
+              <ChevronRight className="size-3" aria-hidden />
+            </Link>
           </>
         ) : (
           <Link

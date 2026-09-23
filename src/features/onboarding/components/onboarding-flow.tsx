@@ -1,12 +1,31 @@
 "use client";
 
-import { Building2, Check, Info, Sparkles, User, X } from "lucide-react";
+import {
+  Building2,
+  Check,
+  ChevronDown,
+  FileStack,
+  Info,
+  Landmark,
+  ScrollText,
+  ShieldCheck,
+  Sparkles,
+  User,
+  X,
+} from "lucide-react";
+import { useState } from "react";
+import { Controller } from "react-hook-form";
 
 import { CnpjInput } from "@/components/ui/cnpj-input";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { IconAction } from "@/components/ui/icon-action";
+import { Input } from "@/components/ui/input";
 import { OabInput } from "@/components/ui/oab-input";
+import { useSlidingIndicator } from "@/components/ui/use-sliding-indicator";
+import { ConfigTribunais } from "@/features/prazos/components/config/config-tribunais";
 import { OabTermRow } from "@/features/shared/components/oab-term-row";
 import { formatOabTermo } from "@/features/shared/lib/diario";
+import { cn } from "@/lib/utils";
 
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
 import { OnboardingImageUpload } from "./image-upload";
@@ -44,25 +63,52 @@ export function OnboardingFlow() {
         </span>
         <span className="font-display text-[16px]">Atjus</span>
         {f.step !== "done" ? (
-          <div className="ml-3.5 flex items-center gap-1.5">
-            {f.dots.map((on, i) => (
-              <span
-                key={i}
-                className="h-1.5 rounded-full transition-all duration-300"
-                style={
-                  on
-                    ? { width: 28, backgroundImage: BRAND_GRADIENT }
-                    : { width: 18, backgroundColor: "var(--line)" }
-                }
-              />
+          <ol
+            className="ml-3.5 flex items-center gap-2.5 sm:gap-3"
+            aria-label="Progresso do cadastro"
+          >
+            {f.steps.map((s) => (
+              <li
+                key={s.key}
+                className="flex items-center gap-1.5"
+                aria-current={s.current ? "step" : undefined}
+              >
+                <span
+                  className="h-1.5 rounded-full transition-all duration-300"
+                  style={
+                    s.done || s.current
+                      ? {
+                          width: s.current ? 26 : 18,
+                          backgroundImage: BRAND_GRADIENT,
+                        }
+                      : { width: 14, backgroundColor: "var(--line)" }
+                  }
+                />
+                <span
+                  className={cn(
+                    "hidden text-[10.5px] leading-none tracking-[0.01em] transition-colors sm:inline",
+                    s.current
+                      ? "text-foreground font-medium"
+                      : s.done
+                        ? "text-fg3"
+                        : "text-fg3/55",
+                  )}
+                >
+                  {s.label}
+                </span>
+              </li>
             ))}
-          </div>
+          </ol>
         ) : null}
       </div>
 
       {/* corpo centralizado */}
       <div className="grid min-h-0 flex-1 place-items-center overflow-y-auto p-[30px]">
-        <div className="surface-panel relative w-[520px] max-w-full overflow-hidden p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.12)] sm:p-7">
+        <div
+          className={`surface-panel relative w-full max-w-full overflow-hidden p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.12)] sm:p-7 ${
+            f.step === "autos" ? "sm:w-[720px]" : "sm:w-[520px]"
+          }`}
+        >
           {/* fio de luz no topo do card (primário→latão) */}
           <span
             aria-hidden
@@ -76,6 +122,7 @@ export function OnboardingFlow() {
             {f.step === "user" ? <UserStep f={f} /> : null}
             {f.step === "org" ? <OrgStep f={f} /> : null}
             {f.step === "oab" ? <OabStep f={f} /> : null}
+            {f.step === "autos" ? <AutosStep f={f} /> : null}
             {f.step === "team" ? <TeamStep f={f} /> : null}
             {f.step === "done" ? <Done f={f} /> : null}
           </div>
@@ -94,38 +141,6 @@ function Label({ htmlFor, children }: { htmlFor?: string; children: string }) {
       {children}
       <span className="text-destructive"> *</span>
     </label>
-  );
-}
-
-function Campo({
-  id,
-  label,
-  value,
-  onChange,
-  placeholder,
-  onEnter,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder: string;
-  onEnter?: () => void;
-}) {
-  return (
-    <div>
-      <Label htmlFor={id}>{label}</Label>
-      <input
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && onEnter) onEnter();
-        }}
-        placeholder={placeholder}
-        className="border-line bg-panel text-foreground placeholder:text-fg3 focus:border-primary w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
-      />
-    </div>
   );
 }
 
@@ -200,20 +215,33 @@ function Segmented<T extends string>({
   options: { k: T; label: string; icon?: React.ReactNode }[];
   onChange: (v: T) => void;
 }) {
+  const { containerRef, rect } = useSlidingIndicator(value);
   return (
-    <div className="border-line bg-bg flex gap-1 rounded-[10px] border p-1">
+    <div
+      ref={containerRef}
+      className="border-line bg-bg relative flex gap-1 rounded-[10px] border p-1"
+    >
+      {/* pílula deslizante (indicador ativo) — mesma mecânica das abas */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute top-1 bottom-1 rounded-[7px] shadow-sm transition-all duration-200 ease-out"
+        style={{
+          left: rect.left,
+          width: rect.width,
+          opacity: rect.ready ? 1 : 0,
+          backgroundImage: BRAND_GRADIENT,
+        }}
+      />
       {options.map((op) => {
         const on = op.k === value;
         return (
           <button
             key={op.k}
+            type="button"
             onClick={() => onChange(op.k)}
-            className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-[7px] text-[13px] font-medium shadow-none transition-all duration-200 data-[on=true]:shadow-sm"
-            data-on={on}
-            style={{
-              backgroundImage: on ? BRAND_GRADIENT : "none",
-              color: on ? "var(--primary-foreground)" : "var(--fg2)",
-            }}
+            data-slide-active={on}
+            className="relative z-10 flex min-h-10 flex-1 items-center justify-center gap-2 rounded-[7px] text-[13px] font-medium transition-colors duration-200"
+            style={{ color: on ? "var(--primary-foreground)" : "var(--fg2)" }}
           >
             {op.icon}
             {op.label}
@@ -226,8 +254,21 @@ function Segmented<T extends string>({
 
 // ── Passo 1: Usuário ──────────────────────────────────────────────────────────
 function UserStep({ f }: { f: F }) {
-  const iniciais =
-    `${f.firstName[0] ?? ""}${f.lastName[0] ?? ""}`.toUpperCase() || "?";
+  const {
+    register,
+    watch,
+    formState: { errors },
+  } = f.userForm;
+  const [first, last] = watch(["firstName", "lastName"]);
+  const iniciais = `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
+
+  const onEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      f.continuarUser();
+    }
+  };
+
   return (
     <>
       <div className="font-display mb-1 text-[21px] font-medium">
@@ -247,37 +288,54 @@ function UserStep({ f }: { f: F }) {
       />
 
       <div className="grid grid-cols-2 gap-3">
-        <Campo
-          id="onb-first"
-          label="Nome"
-          value={f.firstName}
-          onChange={f.setFirstName}
-          placeholder="Renata"
-          onEnter={f.continuarUser}
-        />
-        <Campo
-          id="onb-last"
-          label="Sobrenome"
-          value={f.lastName}
-          onChange={f.setLastName}
-          placeholder="Marcondes"
-          onEnter={f.continuarUser}
-        />
+        <Field data-invalid={!!errors.firstName}>
+          <FieldLabel htmlFor="onb-first">
+            Nome<span className="text-destructive"> *</span>
+          </FieldLabel>
+          <Input
+            id="onb-first"
+            placeholder="Renata"
+            aria-invalid={!!errors.firstName}
+            onKeyDown={onEnter}
+            {...register("firstName")}
+          />
+          <FieldError errors={[errors.firstName]} />
+        </Field>
+        <Field data-invalid={!!errors.lastName}>
+          <FieldLabel htmlFor="onb-last">
+            Sobrenome<span className="text-destructive"> *</span>
+          </FieldLabel>
+          <Input
+            id="onb-last"
+            placeholder="Marcondes"
+            aria-invalid={!!errors.lastName}
+            onKeyDown={onEnter}
+            {...register("lastName")}
+          />
+          <FieldError errors={[errors.lastName]} />
+        </Field>
       </div>
 
       <ErroLinha erro={f.erro} />
-      <Footer
-        cta="Continuar"
-        onCta={f.continuarUser}
-        disabled={!f.firstName.trim() || !f.lastName.trim()}
-      />
+      <Footer cta="Continuar" onCta={f.continuarUser} />
     </>
   );
 }
 
 // ── Passo 2: Organização ──────────────────────────────────────────────────────
 function OrgStep({ f }: { f: F }) {
-  const iniciais = (f.razaoSocial.trim()[0] ?? "E").toUpperCase();
+  const {
+    control,
+    register,
+    watch,
+    formState: { errors },
+  } = f.orgForm;
+  const iniciais = (
+    (watch("razaoSocial") ?? "").trim()[0] ?? "E"
+  ).toUpperCase();
+  const CNPJ_CLASS =
+    "border-line bg-panel text-foreground placeholder:text-fg3 focus:border-primary aria-invalid:border-destructive w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none";
+
   return (
     <>
       <div className="font-display mb-1 text-[21px] font-medium">
@@ -314,31 +372,7 @@ function OrgStep({ f }: { f: F }) {
         </div>
       ) : (
         <>
-          <div className="mb-4">
-            <Label htmlFor="onb-cnpj">CNPJ</Label>
-            <CnpjInput
-              id="onb-cnpj"
-              value={f.cnpj}
-              onChange={f.setCnpj}
-              onBlur={f.onCnpjBlur}
-              className="border-line bg-panel text-foreground placeholder:text-fg3 focus:border-primary w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
-            />
-            <p className="text-fg3 mt-1 text-[11px]">
-              {f.cnpjLoading
-                ? "Consultando a Receita…"
-                : "Buscamos a razão social automaticamente."}
-            </p>
-          </div>
-          <div className="mb-4">
-            <Campo
-              id="onb-razao"
-              label="Razão social"
-              value={f.razaoSocial}
-              onChange={f.setRazaoSocial}
-              placeholder="Prolheti & Marcondes Advogados"
-            />
-          </div>
-          <div className="mb-1">
+          <div className="mb-5">
             <span className="text-fg3 mb-2 block text-center text-[11.5px]">
               Logo do escritório
             </span>
@@ -346,10 +380,50 @@ function OrgStep({ f }: { f: F }) {
               url={f.logoPreview}
               initials={iniciais}
               label="Adicionar logo"
-              hint="Opcional — usada no papel timbrado"
+              hint="Usada no papel timbrado"
               onFile={f.stageLogo}
             />
           </div>
+          <Field data-invalid={!!errors.cnpj} className="mb-4">
+            <FieldLabel htmlFor="onb-cnpj">
+              CNPJ<span className="text-destructive"> *</span>
+            </FieldLabel>
+            <Controller
+              name="cnpj"
+              control={control}
+              render={({ field }) => (
+                <CnpjInput
+                  id="onb-cnpj"
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={() => {
+                    field.onBlur();
+                    f.onCnpjBlur();
+                  }}
+                  aria-invalid={!!errors.cnpj}
+                  className={CNPJ_CLASS}
+                />
+              )}
+            />
+            <p className="text-fg3 mt-1 text-[11px]">
+              {f.cnpjLoading
+                ? "Consultando a Receita…"
+                : "Buscamos a razão social automaticamente."}
+            </p>
+            <FieldError errors={[errors.cnpj]} />
+          </Field>
+          <Field data-invalid={!!errors.razaoSocial} className="mb-1">
+            <FieldLabel htmlFor="onb-razao">
+              Razão social<span className="text-destructive"> *</span>
+            </FieldLabel>
+            <Input
+              id="onb-razao"
+              placeholder="Prolheti & Marcondes Advogados"
+              aria-invalid={!!errors.razaoSocial}
+              {...register("razaoSocial")}
+            />
+            <FieldError errors={[errors.razaoSocial]} />
+          </Field>
         </>
       )}
 
@@ -367,6 +441,10 @@ function OrgStep({ f }: { f: F }) {
 
 // ── Passo 3: OABs ─────────────────────────────────────────────────────────────
 function OabStep({ f }: { f: F }) {
+  const {
+    control,
+    formState: { errors },
+  } = f.oabForm;
   return (
     <>
       <div className="font-display mb-1 text-[21px] font-medium">
@@ -377,28 +455,40 @@ function OabStep({ f }: { f: F }) {
         segundo plano assim que você concluir.
       </p>
 
-      <div className="mb-3.5">
-        <Label>OAB monitorada</Label>
+      <Field data-invalid={!!errors.oab} className="mb-3.5">
+        <FieldLabel htmlFor="onb-oab">OAB monitorada</FieldLabel>
         <div className="flex gap-2">
-          <label className="min-w-0 flex-1">
-            <span className="sr-only">OAB monitorada</span>
-            <OabInput
-              value={f.oab}
-              onChange={f.setOab}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") f.addOab();
-              }}
-              className="border-line bg-panel text-foreground placeholder:text-fg3 focus:border-primary w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+          <div className="min-w-0 flex-1">
+            <Controller
+              name="oab"
+              control={control}
+              render={({ field }) => (
+                <OabInput
+                  id="onb-oab"
+                  value={field.value}
+                  onChange={field.onChange}
+                  aria-invalid={!!errors.oab}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      f.addOab();
+                    }
+                  }}
+                  className="border-line bg-panel text-foreground placeholder:text-fg3 focus:border-primary aria-invalid:border-destructive w-full rounded-[9px] border px-[13px] py-2.5 text-[13.5px] outline-none"
+                />
+              )}
             />
-          </label>
+          </div>
           <button
+            type="button"
             onClick={f.addOab}
             className="border-primary text-primary hover:bg-selected min-h-11 flex-none rounded-[9px] border bg-transparent px-[15px] py-2.5 text-[13px] font-medium"
           >
             Adicionar
           </button>
         </div>
-      </div>
+        <FieldError errors={[errors.oab]} />
+      </Field>
 
       {f.oabs.length === 0 ? (
         <div className="border-line text-fg3 rounded-[10px] border border-dashed px-[13px] py-3 text-[12px]">
@@ -438,20 +528,149 @@ function OabStep({ f }: { f: F }) {
       <ErroLinha erro={f.erro} />
       <Footer
         onBack={f.voltarOrg}
-        cta={f.solo ? "Ativar captura e concluir" : "Continuar"}
-        icon={
-          f.solo ? <Sparkles className="size-[15px]" strokeWidth={1.8} /> : null
-        }
+        cta="Continuar"
         onCta={f.continuarOab}
         disabled={!f.podeConcluir}
-        busy={f.saving}
-        busyLabel="Preparando sua conta…"
       />
     </>
   );
 }
 
-// ── Passo 4: Time (só escritório, pulável) ────────────────────────────────────
+// ── Passo 4: Acesso ao tribunal (INDUÇÃO — nudge, nunca bloqueio) ──────────────
+// Persuade a conectar o tribunal AGORA: com os autos, os prazos e as peças
+// trabalham com o processo INTEIRO; sem eles, ficam superficiais. Reusa o fluxo de
+// conexão real (ConfigTribunais). "Adiar" fica visível, mas claramente secundário.
+function AutosStep({ f }: { f: F }) {
+  const [expandido, setExpandido] = useState(false);
+
+  const beneficios = [
+    {
+      icon: <ScrollText className="size-4" strokeWidth={1.9} />,
+      titulo: "Prazos com base no processo inteiro",
+      texto:
+        "A contagem enxerga o que realmente aconteceu nos autos — não só a publicação.",
+    },
+    {
+      icon: <FileStack className="size-4" strokeWidth={1.9} />,
+      titulo: "Peças mais completas",
+      texto:
+        "Com os autos em mãos, cada peça sai fundamentada no que está no processo.",
+    },
+    {
+      icon: <ShieldCheck className="size-4" strokeWidth={1.9} />,
+      titulo: "Um acesso, tudo destravado",
+      texto:
+        "Um certificado + 2FA conecta o tribunal uma vez — os autos passam a chegar sozinhos.",
+    },
+  ];
+
+  return (
+    <>
+      <div className="mb-1 flex items-center gap-2">
+        <span
+          className="text-primary-foreground grid size-7 place-items-center rounded-lg shadow-sm"
+          style={{ backgroundImage: BRAND_GRADIENT }}
+        >
+          <Landmark className="size-4" strokeWidth={1.9} aria-hidden />
+        </span>
+        <div className="font-display text-[21px] font-medium">
+          Conecte o acesso aos autos
+        </div>
+      </div>
+      <p className="text-fg3 mb-4 text-[12.5px] leading-[1.5]">
+        As publicações já chegam pela OAB. Conectar o tribunal traz os{" "}
+        <strong className="text-foreground font-medium">autos completos</strong>{" "}
+        — e é aí que o Atjus faz a diferença de verdade.
+      </p>
+
+      <div className="mb-4 flex flex-col gap-2">
+        {beneficios.map((b) => (
+          <div
+            key={b.titulo}
+            className="border-line bg-bg flex items-start gap-3 rounded-[11px] border px-3.5 py-3"
+          >
+            <span className="text-primary bg-selected mt-px grid size-8 flex-none place-items-center rounded-lg">
+              {b.icon}
+            </span>
+            <div className="min-w-0">
+              <p className="text-[13px] font-medium">{b.titulo}</p>
+              <p className="text-fg3 text-[12px] leading-[1.5]">{b.texto}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* CTA primária: revela o fluxo real de conexão (ConfigTribunais). É o caminho
+          fácil e atraente. */}
+      {expandido ? (
+        <div className="reveal border-line bg-bg mb-2 max-h-[46vh] overflow-y-auto rounded-[12px] border p-3.5">
+          <ConfigTribunais />
+        </div>
+      ) : (
+        <button
+          onClick={() => setExpandido(true)}
+          className="border-primary/40 hover:bg-selected group mb-2 flex w-full items-center gap-3 rounded-[12px] border px-4 py-3.5 text-left transition-colors"
+          style={{
+            backgroundImage:
+              "radial-gradient(120% 120% at 0% 0%, color-mix(in oklch, var(--primary) 8%, transparent), transparent 60%)",
+          }}
+        >
+          <span
+            className="text-primary-foreground grid size-9 flex-none place-items-center rounded-xl shadow-sm"
+            style={{ backgroundImage: BRAND_GRADIENT }}
+          >
+            <ShieldCheck className="size-4" strokeWidth={1.9} aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-medium">
+              Configurar acesso ao tribunal agora
+            </span>
+            <span className="text-fg3 block text-[12px]">
+              Certificado A1 + 2FA — leva um minuto e vale pra todos os
+              tribunais.
+            </span>
+          </span>
+          <ChevronDown
+            className="text-fg3 group-hover:text-primary size-4 flex-none"
+            aria-hidden
+          />
+        </button>
+      )}
+
+      <div className="border-line bg-bg mt-2 flex items-start gap-2.5 rounded-[10px] border px-3.5 py-3">
+        <Info
+          className="text-primary mt-px size-4 flex-none"
+          strokeWidth={1.9}
+        />
+        <p className="text-fg3 text-[12px] leading-[1.5]">
+          Pode configurar depois em Configurações › Fontes de dados — mas quanto
+          antes conectar, mais completo o Atjus fica desde o primeiro processo.
+        </p>
+      </div>
+
+      <ErroLinha erro={f.erro} />
+      <Footer
+        onBack={f.voltarOabDeAutos}
+        cta={f.solo ? "Concluir" : "Continuar"}
+        icon={
+          f.solo ? <Sparkles className="size-[15px]" strokeWidth={1.8} /> : null
+        }
+        onCta={f.continuarAutos}
+        busy={f.saving}
+        busyLabel="Preparando sua conta…"
+      />
+      <button
+        onClick={f.continuarAutos}
+        disabled={f.saving}
+        className="text-fg3 hover:text-foreground mx-auto mt-3 block text-[12px]"
+      >
+        Adiar — configurar depois
+      </button>
+    </>
+  );
+}
+
+// ── Passo 5: Time (só escritório, pulável) ────────────────────────────────────
 function TeamStep({ f }: { f: F }) {
   return (
     <>
@@ -533,7 +752,7 @@ function TeamStep({ f }: { f: F }) {
         disabled={f.saving}
         className="text-fg3 hover:text-foreground mx-auto mt-3 block text-[12px]"
       >
-        Pular por agora
+        Adiar — configurar depois
       </button>
     </>
   );

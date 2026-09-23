@@ -469,7 +469,7 @@ function Composer({
         Enviar mensagem <Send data-icon="inline-end" aria-hidden />
       </Button>
       <p className="text-muted-foreground text-[11px] leading-relaxed">
-        A IA auxilia. A revisão e a decisão final são suas.
+        O rascunho é um apoio. A revisão e a decisão final são suas.
       </p>
     </form>
   );

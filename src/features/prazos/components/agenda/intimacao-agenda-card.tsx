@@ -6,13 +6,14 @@
 // e Dar ciência (resolve a intimação). O action_item é só encanamento do "Gerar
 // peça" (via recommended_providencia.id) — nunca aparece como "providência".
 
-import { ArrowRight, Check, Loader2, PenLine } from "lucide-react";
+import { ArrowRight, Check, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { useResolverIntimacao } from "@/features/intimacoes/hooks/use-intimacoes";
 import { linhaIntimacao } from "@/features/intimacoes/lib/listagem";
 import type { IntimacaoView } from "@/features/intimacoes/types";
+import { GerarPecaButton } from "@/features/pecas-v2/components/pregen/gerar-peca-button";
 
 function prazoCor(daysLeft: number | null | undefined): string {
   if (daysLeft == null) return "var(--fg3)";
@@ -34,9 +35,6 @@ export function IntimacaoAgendaCard({
   const cor = prazoCor(intimacao.prazo?.days_left);
 
   const detalhe = `/intimacoes/${intimacao.id}`;
-  const pieceHref = rec
-    ? `/pecas/nova?providencia=${rec.id}&intimacao=${intimacao.id}&auto=1&retorno=${encodeURIComponent(detalhe)}`
-    : "";
 
   return (
     <div className="surface-panel grid grid-cols-1 gap-4 p-4 sm:grid-cols-[1fr_auto] sm:p-5">
@@ -73,14 +71,14 @@ export function IntimacaoAgendaCard({
         </div>
         <div className="flex flex-wrap gap-2 sm:justify-end">
           {rec?.gera_peca ? (
-            <Button
-              size="sm"
-              nativeButton={false}
-              render={<Link href={pieceHref} />}
-            >
-              <PenLine data-icon="inline-start" />
-              Gerar peça
-            </Button>
+            <GerarPecaButton
+              intimacaoId={intimacao.id}
+              processoId={intimacao.court_record_id}
+              actionItemId={rec.id}
+              retorno={detalhe}
+              degree={intimacao.degree}
+              pecaLabel={rec.title ?? row.ato}
+            />
           ) : null}
           <Button
             variant={rec?.gera_peca ? "outline" : "default"}

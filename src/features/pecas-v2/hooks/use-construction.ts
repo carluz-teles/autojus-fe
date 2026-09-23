@@ -23,6 +23,7 @@ import {
   clearInstructions,
   peekInstructions,
 } from "../lib/instructions-storage";
+import { preconditionFromCode } from "../lib/peca-precondition";
 import type { SagaState, Thesis } from "../types";
 import { useDraft } from "./use-draft";
 import { thesesKey, useGenerateDraft, useThesesController } from "./use-theses";
@@ -371,7 +372,15 @@ export function useConstruction(id: string) {
     gerarMinuta,
     instructions,
     setInstructions: setInstructionsEdit,
-    generationError: generate.error?.message,
+    // Pré-condições conhecidas (tipo do ato / trabalho não confirmado) ganham
+    // frase clara e acionável; nunca a mensagem crua do BE nem "Tente novamente".
+    generationError: (() => {
+      const e = generate.error as
+        { message?: string; code?: string } | undefined;
+      if (!e) return undefined;
+      const pre = preconditionFromCode(e.code);
+      return pre ? `${pre.title} ${pre.description}` : e.message;
+    })(),
     regenerateWithTheses,
     contentEdited: !!draftQuery.data?.contentEdited,
     isGenerating: generate.isPending,

@@ -9,18 +9,15 @@ import {
   ExternalLink,
   LoaderCircle,
   MoreHorizontal,
-  Sparkles,
   TriangleAlert,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { DetailCard as Card } from "@/components/shell/detail-card";
 import { PageFrame, ShellBackLink } from "@/components/shell/page-frame";
 import { SectionTitle } from "@/components/shell/section-title";
 import { TeorContent } from "@/components/teor-content";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -38,20 +35,17 @@ import { SkeletonDetail } from "@/components/ui/skeletons";
 import { useFilaNavigation } from "@/features/intimacoes/hooks/use-fila-navigation";
 import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
 import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
-import { GerarPecaModal } from "@/features/pecas-v2/components/pregen/gerar-peca-modal";
-import { setInstructions } from "@/features/pecas-v2/lib/instructions-storage";
+import { GerarPecaButton } from "@/features/pecas-v2/components/pregen/gerar-peca-button";
 import { cn, formatarData } from "@/lib/utils";
 
 import { useDisposicao } from "../../hooks/use-disposicao";
 import { useIntimacaoDetalhe } from "../../hooks/use-intimacao-detalhe";
 import {
   bloqueiaProvidencias,
-  precisaConfirmarPrazo,
   tipoIncompativelComPrazo,
 } from "../../lib/confirmacao";
 import { dataEscolhidaNaApuracao } from "../../lib/detalhe-apresentacao";
 import { AutosSection } from "./autos-section";
-import { ConfirmacaoPrazo } from "./confirmacao-prazo";
 import { DisposicaoSection } from "./disposicao-section";
 import { ExplicacaoPrazo } from "./explicacao-prazo";
 
@@ -71,10 +65,6 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
   const det = useIntimacaoDetalhe(id);
   const fila = useFilaNavigation(id);
   const m = det.model;
-  const reviewBlocked = bloqueiaProvidencias(
-    det.prazoDetalhe,
-    det.intimacao?.estado ?? "",
-  );
 
   const shellHeader = (
     <>
@@ -179,11 +169,17 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
                 <AcoesPrimarias det={det} />
               </div>
             </div>
-            {/* TÍTULO = o ATO que aconteceu nesta publicação (não o título do processo — esse é
-              o herói do cockpit; aqui a intimação é a unidade de TRABALHO). */}
+            {/* TÍTULO = a identidade do PROCESSO (m.titulo = BuildCaseTitle do BE, fonte única) —
+              o MESMO título usado em toda lista/superfície, pra a intimação ter título CONSISTENTE
+              onde quer que apareça. O ATO que aconteceu (m.ato) vira subtítulo secundário abaixo. */}
             <h2 className="font-display max-w-4xl text-2xl leading-[1.1] font-medium tracking-tight text-balance break-words sm:text-[2rem]">
-              {m.ato}
+              {m.titulo}
             </h2>
+            {m.ato ? (
+              <p className="text-muted-foreground max-w-4xl text-sm leading-snug">
+                {m.ato}
+              </p>
+            ) : null}
             {/* Breadcrumb pro PROCESSO: identidade MÍNIMA pra situar (CNJ + partes) — a ficha
               completa (classe/assunto/órgão/valor/sigilo) vive no cockpit, um clique adiante. */}
             <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-sm">
@@ -225,30 +221,6 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
             </div>
           </section>
 
-          {reviewBlocked && (
-            <Alert variant="destructive" className="p-4">
-              <TriangleAlert />
-              <AlertTitle>
-                Confirmação obrigatória antes de gerar a peça
-              </AlertTitle>
-              <AlertDescription className="flex flex-col items-start gap-3">
-                <p>
-                  O tipo ou o prazo desta intimação ainda precisa de revisão.
-                  Gerar a peça e dar ciência ficam bloqueados até resolver essa
-                  pendência.
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  render={<a href="#prazo-decisao" />}
-                  nativeButton={false}
-                >
-                  Revisar tipo e prazo
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-
           <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[min-content_1fr] lg:gap-5 xl:grid-cols-[minmax(0,1fr)_410px]">
             <div className="min-w-0 lg:col-start-1 lg:row-start-1">
               <Disposicao det={det} />
@@ -266,18 +238,6 @@ export function IntimacaoDetalhe({ id }: { id: string }) {
               </a>
               {det.memoria?.divergencia?.pendente ? (
                 <ApuracaoPrazo key={id} det={det} />
-              ) : null}
-              {det.prazoDetalhe &&
-              precisaConfirmarPrazo(
-                det.prazoDetalhe,
-                det.intimacao?.estado ?? "",
-              ) ? (
-                <ConfirmacaoPrazo
-                  key={`${det.prazoDetalhe.id}:${det.prazoDetalhe.confirmed_at ?? "pending"}`}
-                  id={id}
-                  prazo={det.prazoDetalhe}
-                  estado={det.intimacao?.estado ?? ""}
-                />
               ) : null}
               <PainelPrazo det={det} />
             </aside>
@@ -753,50 +713,30 @@ function Disposicao({ det }: { det: Detalhe }) {
 // funciona (sem item materializado, resolve a intimação). São bloqueadas apenas
 // quando o tipo/prazo ainda precisa de revisão (mesmo bloqueio do Alert do topo).
 function AcoesPrimarias({ det }: { det: Detalhe }) {
-  const router = useRouter();
   const m = det.model!;
-  const {
-    disposicao,
-    onDarCiencia,
-    dandoCiencia,
-    cienciaErro,
-    modalOpen,
-    pendingActionItemId,
-    openGerarModal,
-    closeGerarModal,
-    buildGerarUrl,
-    pecaLabel,
-  } = useDisposicao({
-    intimationId: m.id,
-    providencias: m.providencias,
-    retorno: `/intimacoes/${m.id}`,
-  });
+  const { disposicao, onDarCiencia, dandoCiencia, cienciaErro } = useDisposicao(
+    {
+      intimationId: m.id,
+      providencias: m.providencias,
+      retorno: `/intimacoes/${m.id}`,
+    },
+  );
 
-  const bloqueado =
-    bloqueiaProvidencias(det.prazoDetalhe, det.intimacao?.estado ?? "") ||
-    det.memoriaPending ||
-    det.memoriaErro;
+  // Enquanto o prazo/memória carrega, seguramos as ações (evita agir sobre estado
+  // incompleto). O gate cobre o pre-flight da peça inline (dentro do botão único).
+  const carregando = det.memoriaPending || det.memoriaErro;
+
+  // "Dar ciência" mantém o bloqueio de revisão (a intimação vira ciência) — o gate
+  // da peça é assunto do GerarPecaButton.
+  const cienciaBloqueada =
+    carregando ||
+    bloqueiaProvidencias(det.prazoDetalhe, det.intimacao?.estado ?? "");
 
   // Peça-alvo do botão "Gerar peça": a 1ª que gera peça; se só houver ciência, usa
   // o próprio item de ciência (o BE deriva o tipo). "" quando nada há → botão off.
   const pecaAlvo = disposicao.pecas[0] ?? null;
   const alvoId =
     pecaAlvo?.actionItemId ?? disposicao.ciencia?.actionItemId ?? "";
-
-  function handleGenerate(instructions: string) {
-    const url = buildGerarUrl(pendingActionItemId);
-    if (instructions) setInstructions(pendingActionItemId, instructions);
-    router.push(url);
-  }
-
-  function onGerarPeca() {
-    if (!alvoId) return;
-    if (pecaAlvo?.jaIniciada) {
-      router.push(buildGerarUrl(alvoId));
-    } else {
-      openGerarModal(alvoId);
-    }
-  }
 
   // Intimação em estado terminal (resolvida/ignorada) — a unidade de trabalho é a
   // própria intimação, então nada mais a gerar/concluir: só o menu (⋮ Reabrir).
@@ -806,14 +746,20 @@ function AcoesPrimarias({ det }: { det: Detalhe }) {
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
-      <Button size="sm" onClick={onGerarPeca} disabled={bloqueado || !alvoId}>
-        <Sparkles data-icon="inline-start" />
-        {pecaAlvo?.jaIniciada ? "Abrir peça" : "Gerar peça"}
-      </Button>
+      <GerarPecaButton
+        intimacaoId={m.id}
+        processoId={m.courtRecordId}
+        actionItemId={alvoId}
+        retorno={`/intimacoes/${m.id}`}
+        degree={det.intimacao?.degree}
+        jaIniciada={pecaAlvo?.jaIniciada}
+        pecaLabel={pecaAlvo?.label ?? disposicao.pecas[0]?.label}
+        disabled={carregando || !alvoId}
+      />
       <Button
         size="sm"
         variant="outline"
-        disabled={bloqueado || dandoCiencia}
+        disabled={cienciaBloqueada || dandoCiencia}
         onClick={onDarCiencia}
       >
         {dandoCiencia ? (
@@ -829,14 +775,6 @@ function AcoesPrimarias({ det }: { det: Detalhe }) {
           Não foi possível dar ciência. Tente novamente.
         </p>
       ) : null}
-      <GerarPecaModal
-        open={modalOpen}
-        onOpenChange={(v) => {
-          if (!v) closeGerarModal();
-        }}
-        onGenerate={handleGenerate}
-        pecaLabel={pecaLabel}
-      />
     </div>
   );
 }

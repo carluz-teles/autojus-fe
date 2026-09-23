@@ -1,5 +1,6 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUp,
@@ -17,12 +18,19 @@ import {
   Trash2,
 } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { IconAction } from "@/components/ui/icon-action";
 import { Input } from "@/components/ui/input";
 import {
@@ -142,6 +150,65 @@ function ChoiceField({
   );
 }
 
+// Sub-form isolado do código MFA (e-SAJ) — RHF + Field/FieldError. Regra única
+// (6 dígitos) declarada via zod; o erro aparece em vermelho abaixo do campo.
+const mfaSchema = z.object({
+  mfa: z
+    .string()
+    .regex(/^\d{6}$/, "Informe o código de 6 dígitos recebido por e-mail."),
+});
+type MfaForm = z.infer<typeof mfaSchema>;
+
+function MfaField({
+  disabled,
+  onValidate,
+}: {
+  disabled: boolean;
+  onValidate: (code: string) => void;
+}) {
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<MfaForm>({
+    resolver: zodResolver(mfaSchema),
+    mode: "onSubmit",
+    defaultValues: { mfa: "" },
+  });
+
+  const submit = handleSubmit(({ mfa }) => {
+    if (disabled) return;
+    onValidate(mfa);
+  });
+
+  return (
+    <Field data-invalid={!!errors.mfa}>
+      <FieldLabel htmlFor="filing-mfa">Código recebido por e-mail</FieldLabel>
+      <Controller
+        name="mfa"
+        control={control}
+        render={({ field }) => (
+          <Input
+            id="filing-mfa"
+            inputMode="numeric"
+            maxLength={6}
+            disabled={disabled}
+            aria-invalid={!!errors.mfa}
+            value={field.value}
+            onBlur={field.onBlur}
+            ref={field.ref}
+            onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))}
+          />
+        )}
+      />
+      <FieldError errors={[errors.mfa]} />
+      <Button type="button" disabled={disabled} onClick={submit}>
+        Validar código
+      </Button>
+    </Field>
+  );
+}
+
 export function PreparationWorkspace({
   draftId,
   cnj,
@@ -189,7 +256,6 @@ export function PreparationWorkspace({
   const [preview, setPreview] = useState<{ url: string; name: string } | null>(
     null,
   );
-  const [mfa, setMfa] = useState("");
   const [files, setFiles] = useState<{ file: File; type: string }[]>([]);
   const [fileError, setFileError] = useState("");
   const upload = useRef<HTMLInputElement>(null);
@@ -233,7 +299,6 @@ export function PreparationWorkspace({
     },
     onSuccess: (result) => {
       setContext(result);
-      setMfa("");
       if (result.mfa_required) return;
       if (!process && result.processes.length === 1) {
         const id = result.processes[0].id;
@@ -586,25 +651,10 @@ export function PreparationWorkspace({
               )}
             </FieldGroup>
             {context?.mfa_required && (
-              <Field>
-                <FieldLabel htmlFor="filing-mfa">
-                  Código recebido por e-mail
-                </FieldLabel>
-                <Input
-                  id="filing-mfa"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={mfa}
-                  disabled={busy}
-                  onChange={(e) => setMfa(e.target.value.replace(/\D/g, ""))}
-                />
-                <Button
-                  disabled={busy || mfa.length !== 6}
-                  onClick={() => connect.mutate({ mfa_code: mfa })}
-                >
-                  Validar código
-                </Button>
-              </Field>
+              <MfaField
+                disabled={busy}
+                onValidate={(code) => connect.mutate({ mfa_code: code })}
+              />
             )}
             {documentChoices.length > 0 && (
               <ChoiceField

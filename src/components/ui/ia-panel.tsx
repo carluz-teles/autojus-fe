@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
  * `children` (normalmente <IAField>s).
  */
 export function IAPanel({
-  title = "Análise da IA",
+  title = "Análise",
   children,
   placeholder,
   className,
