@@ -10,7 +10,6 @@
 // O componente chama só este hook (JSX + binding).
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
 import { toast } from "sonner";
 
 import { useSyncAutos } from "@/features/configuracoes/hooks/use-sync-autos";
@@ -29,6 +28,7 @@ export type AutosPath =
   | "unavailable"; // integração indisponível — só "Gerar mesmo assim"
 
 export interface UsePecaGateParams {
+  open: boolean;
   intimacaoId: string;
   processoId: string;
   /** Grau do processo (G1|JE|…) — recorte da cobertura da busca de autos. */
@@ -38,19 +38,19 @@ export interface UsePecaGateParams {
 }
 
 export function usePecaGate({
+  open,
   intimacaoId,
   processoId,
   degree,
   tipoConfirmado,
 }: UsePecaGateParams) {
   const api = useApi();
-  const [aberto, setAberto] = useState(false);
 
   // Status dos autos — só busca com o gate aberto (não paga a chamada à toa).
   const status = useQuery({
     queryKey: ["autos-status", processoId],
     queryFn: () => getAutosStatus(api, processoId),
-    enabled: aberto && !!processoId,
+    enabled: open && !!processoId,
     staleTime: 15_000,
   });
 
@@ -81,15 +81,11 @@ export function usePecaGate({
           : "fetch";
 
   return {
-    aberto,
-    abrir: () => setAberto(true),
-    fechar: () => setAberto(false),
-
     // Check 1 — tipo do ato
     precisaTipo: !tipoConfirmado,
 
     // Check 2 — autos
-    statusPendente: status.isPending && status.fetchStatus !== "idle",
+    statusPendente: open && !!processoId && status.isPending,
     statusErro: status.isError,
     recarregarStatus: () => void status.refetch(),
     hasAutos,

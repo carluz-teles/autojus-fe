@@ -11,10 +11,12 @@ export default async function NovaPecaPage({
   searchParams: Promise<{
     intimacao?: string;
     providencia?: string;
+    verificar_providencia?: string;
     auto?: string;
   }>;
 }) {
-  const { intimacao, providencia, auto } = await searchParams;
+  const { intimacao, providencia, verificar_providencia, auto } =
+    await searchParams;
   // auto=1 → auto-partida: construção direto (tela "Construindo a peça…"),
   // pulando a escolha de teses.
   const autoStart = auto === "1" || auto === "true";
@@ -31,6 +33,7 @@ export default async function NovaPecaPage({
     <ConstructionEntry
       key={intimacao}
       intimationId={intimacao}
+      existingActionItemId={verificar_providencia}
       auto={autoStart}
     />
   );

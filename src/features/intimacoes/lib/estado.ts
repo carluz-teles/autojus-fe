@@ -9,7 +9,8 @@ import type { IntimacaoView } from "../types";
 // Uma intimação está CONCLUÍDA por um de dois desfechos — Ciência (deu-se ciência) ou
 // Protocolada (a peça gerada dela foi protocolada) — ou está aberta (pendente / peça em
 // andamento) ou foi ignorada. Precedência: o desfecho mais avançado vence.
-export type IntimacaoEstadoTone = "pending" | "progress" | "done" | "muted";
+export type IntimacaoEstadoTone =
+  "pending" | "progress" | "done" | "muted" | "expired";
 
 export interface IntimacaoEstado {
   label: string;
@@ -25,6 +26,7 @@ const TOKEN: Record<IntimacaoEstadoTone, string> = {
   progress: "var(--blue)",
   done: "var(--green)",
   muted: "var(--fg3)",
+  expired: "var(--destructive)",
 };
 
 function make(
@@ -55,6 +57,9 @@ export function estadoIntimacao(i: {
   if (i.user_status === "RESOLVED")
     return make("Concluída · Ciência", "done", true);
   if (i.user_status === "IGNORED") return make("Ignorada", "muted", true);
+  // Prazo venceu sem tratamento e sem peça (BE: work_stage=VENCIDA) — desfecho encerrado,
+  // mas NUNCA um sucesso: tom próprio (expired/destructive), nunca "done" (verde).
+  if (i.work_stage === "VENCIDA") return make("Prazo vencido", "expired", true);
   // Aberta com trabalho andando — a peça foi gerada e está sendo produzida/revisada.
   if (i.work_stage === "PARTNER_REVIEW")
     return make("Em revisão", "progress", false);

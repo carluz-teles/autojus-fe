@@ -26,9 +26,20 @@ function sourceMeta(date: string, page: number) {
 export function ProvidenciaFulfillment({
   fulfillment,
   defaultOpen = false,
+  showObligationQuote = true,
 }: {
   fulfillment?: ProvidenciaFulfillment | null;
   defaultOpen?: boolean;
+  /**
+   * false = o CALLER já exibe `obligation_quote` separadamente (ex.:
+   * DisposicaoSection/ItemTrabalho, independente deste gate de
+   * `possible_fulfillment` — GAP 2 de docs/obrigacao-first-architecture.md
+   * v3), então este componente omite o bloco pra não duplicar a mesma
+   * citação quando as duas condições coincidem. Default `true` — extensão
+   * COMPATÍVEL: qualquer caller existente/futuro que não passe esta prop
+   * mantém o comportamento de sempre (mostra o quote aqui).
+   */
+  showObligationQuote?: boolean;
 }) {
   const [document, setDocument] = useState<OpenDocument | null>(null);
   if (!hasActionableFulfillment(fulfillment)) return null;
@@ -54,7 +65,7 @@ export function ProvidenciaFulfillment({
             {fulfillment.reason ? (
               <p className="whitespace-pre-wrap">{fulfillment.reason}</p>
             ) : null}
-            {fulfillment.obligation_quote ? (
+            {showObligationQuote && fulfillment.obligation_quote ? (
               <blockquote className="border-l-2 pl-3 whitespace-pre-wrap">
                 <span className="text-muted-foreground block text-xs">
                   Obrigação analisada

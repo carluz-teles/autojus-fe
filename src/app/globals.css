@@ -533,6 +533,19 @@
 }
 
 /* Respeita quem pediu menos movimento. */
+/* Controles flutuantes auxiliares não devem cobrir as ações da prévia. */
+body:has([data-slot="workspace-preview"]) [data-slot="onboarding-widget"],
+body:has([data-slot="workspace-preview"]) [data-slot="query-devtools"] {
+  display: none;
+}
+
+/* Em telas estreitas a prévia substitui a lista; filtros retornam ao fechá-la. */
+@media (width < 64rem) {
+  body:has([data-slot="workspace-preview"]) [data-slot="workspace-toolbar"] {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reveal,
   .reveal-stagger > *,

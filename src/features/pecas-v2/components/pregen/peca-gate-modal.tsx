@@ -62,7 +62,13 @@ export function PecaGateModal({
   onConfigurarTribunal,
 }: PecaGateModalProps) {
   const titleId = useId();
-  const g = usePecaGate({ intimacaoId, processoId, degree, tipoConfirmado });
+  const g = usePecaGate({
+    open,
+    intimacaoId,
+    processoId,
+    degree,
+    tipoConfirmado,
+  });
 
   function proceed() {
     onProceed();

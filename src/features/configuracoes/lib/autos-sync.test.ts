@@ -53,6 +53,152 @@ it("sincroniza somente conexões ativas e disponíveis, uma por tribunal", () =>
   ).toEqual([connection]);
 });
 
+// A2 (docs/qa-remediation-evidence/fe-operations-architecture.md): o catálogo —
+// não um filtro `system!=='EPROC'` hardcoded — é a única autoridade sobre qual
+// portal sincroniza autos. Confirmado no catálogo REAL do BE
+// (internal/court/catalog.go:43-46): TJSP/ESAJ tem `available=true`,
+// `connection_mode=PERSISTENT`, `capabilities=[SYNC_AUTOS, PREPARE_FILING]`.
+it("sincroniza e-SAJ quando o catálogo anuncia SYNC_AUTOS (dois portais conectados → dois acervos)", () => {
+  const catalog = [
+    { court: "TJSP", system: "EPROC", available: true },
+    {
+      court: "TJSP",
+      system: "ESAJ",
+      available: true,
+      connection_mode: "PERSISTENT",
+      capabilities: ["SYNC_AUTOS", "PREPARE_FILING"],
+    },
+  ] as CourtCatalogEntry[];
+  const eproc = {
+    id: "1",
+    court: "TJSP",
+    system: "EPROC",
+    status: "CONNECTED",
+  } as CourtConnectionView;
+  const esaj = { ...eproc, id: "2", system: "ESAJ" };
+  expect(autosSyncTargets(catalog, [eproc, esaj], {})).toEqual([eproc, esaj]);
+});
+
+it("NÃO sincroniza um portal conectado sem a capability SYNC_AUTOS no catálogo (sem fanout cego)", () => {
+  const catalog = [
+    {
+      court: "TJSP",
+      system: "ESAJ",
+      available: true,
+      connection_mode: "PERSISTENT",
+      capabilities: ["PREPARE_FILING"], // sem SYNC_AUTOS
+    },
+  ] as CourtCatalogEntry[];
+  const esaj = {
+    id: "1",
+    court: "TJSP",
+    system: "ESAJ",
+    status: "CONNECTED",
+  } as CourtConnectionView;
+  expect(autosSyncTargets(catalog, [esaj], {})).toEqual([]);
+});
+
+it("NÃO sincroniza um portal PER_OPERATION mesmo disponível e com SYNC_AUTOS (não é conexão persistente)", () => {
+  const catalog = [
+    {
+      court: "TJSP",
+      system: "ESAJ",
+      available: true,
+      connection_mode: "PER_OPERATION",
+      capabilities: ["SYNC_AUTOS"],
+    },
+  ] as CourtCatalogEntry[];
+  const esaj = {
+    id: "1",
+    court: "TJSP",
+    system: "ESAJ",
+    status: "CONNECTED",
+  } as CourtConnectionView;
+  expect(autosSyncTargets(catalog, [esaj], {})).toEqual([]);
+});
+
+it("dedup por court:system continua valendo entre portais distintos (não é mais fixo em EPROC)", () => {
+  const catalog = [
+    {
+      court: "TJSP",
+      system: "ESAJ",
+      available: true,
+      connection_mode: "PERSISTENT",
+      capabilities: ["SYNC_AUTOS"],
+    },
+  ] as CourtCatalogEntry[];
+  const esaj = {
+    id: "1",
+    court: "TJSP",
+    system: "ESAJ",
+    status: "CONNECTED",
+  } as CourtConnectionView;
+  expect(autosSyncTargets(catalog, [esaj, { ...esaj, id: "2" }], {})).toEqual([
+    esaj,
+  ]);
+});
+
+// A1 gêmeo FE (mesmo achado do BE): degree=UNKNOWN é o grau de DESCOBERTA (DJEN
+// nunca revela grau), não uma prova de portal incompatível — elegível SÓ quando o
+// court/system alvo já é suportado/conectado (a mesma checagem de catálogo
+// abaixo, nunca um bypass). G2/SUPERIOR continuam de fora (fora do achado A1).
+it("A1: degree=UNKNOWN elegível quando o court/system é suportado e conectado", () => {
+  const catalog = [
+    { court: "TJSP", system: "EPROC", available: true },
+  ] as CourtCatalogEntry[];
+  const connection = {
+    id: "1",
+    court: "TJSP",
+    system: "EPROC",
+    status: "CONNECTED",
+  } as CourtConnectionView;
+  expect(
+    autosSyncTargets(catalog, [connection], {
+      court: "TJSP",
+      courtRecordId: "record",
+      degree: "UNKNOWN",
+    }),
+  ).toEqual([connection]);
+});
+
+it("A1: degree=UNKNOWN NÃO ganha suporte inventado — court/system não suportado continua vazio", () => {
+  const catalog = [
+    { court: "TJRS", system: "EPROC", available: false },
+  ] as CourtCatalogEntry[];
+  const connection = {
+    id: "1",
+    court: "TJRS",
+    system: "EPROC",
+    status: "CONNECTED",
+  } as CourtConnectionView;
+  expect(
+    autosSyncTargets(catalog, [connection], {
+      court: "TJRS",
+      courtRecordId: "record",
+      degree: "UNKNOWN",
+    }),
+  ).toEqual([]);
+});
+
+it("A1: G2/SUPERIOR continuam bloqueados no gate de degree (não fazem parte do achado)", () => {
+  const catalog = [
+    { court: "TJSP", system: "EPROC", available: true },
+  ] as CourtCatalogEntry[];
+  const connection = {
+    id: "1",
+    court: "TJSP",
+    system: "EPROC",
+    status: "CONNECTED",
+  } as CourtConnectionView;
+  expect(
+    autosSyncTargets(catalog, [connection], {
+      court: "TJSP",
+      courtRecordId: "record",
+      degree: "SUPERIOR",
+    }),
+  ).toEqual([]);
+});
+
 it("keeps terminal failures visible after reload without requiring a mutation result", () => {
   const status = summarizeAutosSync([
     {

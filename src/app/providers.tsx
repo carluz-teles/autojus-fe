@@ -41,7 +41,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <NavigationWatchdog />
       {children}
       <Toaster richColors position="top-right" closeButton />
-      <ReactQueryDevtools initialIsOpen={false} />
+      <div data-slot="query-devtools">
+        <ReactQueryDevtools initialIsOpen={false} />
+      </div>
     </QueryClientProvider>
   );
 }

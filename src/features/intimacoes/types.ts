@@ -76,16 +76,30 @@ export type IntimacaoAcionabilidade = "ato" | "ciencia" | "a_classificar" | "";
 /** Lane de ciclo de vida derivada no BE (aba de topo da Triagem-pipeline). */
 export type IntimacaoLifecycle = "a_triar" | "em_andamento" | "concluido";
 
-/** Disposição — a PARTIÇÃO DISJUNTA de "A triar" (docs/erd-intimacao-triagem.md §4),
- *  derivada no BE (deriveDisposicao). Cada intimação de a_triar cai em EXATAMENTE UM
- *  bucket: exceção é seu próprio segmento (disjunto de trabalho), então "Pra trabalhar"
- *  não mistura mais exceção/ciência. Substitui o antigo eixo acionabilidade-segment. */
+/** Disposição — a PARTIÇÃO DISJUNTA da intimação (docs/erd-intimacao-triagem.md §4,
+ *  docs/navigation-architecture.md §4), derivada no BE (deriveDisposicao). É TRANSVERSAL
+ *  a qualquer `lifecycle`/status (a_triar/em_andamento/concluido) — não mais restrita a
+ *  "A triar": dirige as abas Todas/Trabalho/Ciência/Exceções sob QUALQUER status ativo.
+ *  Cada intimação cai em EXATAMENTE UM bucket: exceção é seu próprio segmento (disjunto
+ *  de trabalho), então "Pra trabalhar" não mistura mais exceção/ciência. Substitui o
+ *  antigo eixo acionabilidade-segment. */
 export type IntimacaoDisposicao =
   "analisando" | "trabalho" | "excecao" | "ciencia" | "sem_prazo";
 
-/** Motivo (de maior peso) de a intimação ser exceção; "" quando não é exceção. */
+/** Motivo (de maior peso) de a intimação ser exceção; "" quando não é exceção.
+ *  `divergente` = divergência de PRAZO (publicação × cálculo); `trabalho_divergente` =
+ *  divergência de OBRIGAÇÃO (a classificação da intimação × o trabalho identificado —
+ *  docs/navigation-architecture.md §2, conflito prazo×obrigação); `trabalho_nao_identificado`
+ *  = AUSÊNCIA (não conflito): a análise atual já materializou mas não produziu obrigação
+ *  nem ciência elegível — teor residuou (obrigacao-first-architecture.md §E). Três motivos
+ *  distintos, não confundir; espelha `ExcecaoMotivoTrabalhoNaoIdentificado` (BE read.go). */
 export type IntimacaoExcecaoMotivo =
-  "provisorio" | "ia_inferido" | "divergente" | "";
+  | "provisorio"
+  | "ia_inferido"
+  | "divergente"
+  | "trabalho_divergente"
+  | "trabalho_nao_identificado"
+  | "";
 
 export interface IntimacaoView {
   id: string;
@@ -180,6 +194,21 @@ export interface IntimacaoView {
   is_excecao: boolean;
   /** Motivo (de maior peso) da exceção; "" quando is_excecao=false. */
   excecao_motivo: IntimacaoExcecaoMotivo;
+  /**
+   * Estado de concordância prazo×obrigação (action_item), derivado no BE a partir dos
+   * mesmos flags de `disposicao`/exceção (docs/navigation-architecture.md §5 — contadores
+   * auditáveis): concordante (prazo e obrigação concordam) | divergente (os 2 conflitos que
+   * caem em disposicao='excecao') | mera_ciencia (subconjunto de concordante: ciencia+só
+   * ciência) | sem_analise (ainda não materializou action_item — indeterminado, NUNCA conta
+   * como concordância) | indeterminado (fallback). Aditivo/opcional enquanto o contrato do
+   * BE não estiver 100% do rollout; ausente = não renderizar o estado (não inventar).
+   */
+  agreement_state?:
+    | "concordante"
+    | "divergente"
+    | "mera_ciencia"
+    | "sem_analise"
+    | "indeterminado";
 }
 
 // RecommendedProvidencia é o subset enxuto da 1ª providência que a LISTA carrega (o conjunto
@@ -328,7 +357,8 @@ type IntimacaoWorkStage =
   | "CONFIRMED"
   | "DRAFTING"
   | "PARTNER_REVIEW"
-  | "FILED";
+  | "FILED"
+  | "VENCIDA";
 
 export interface IntimacaoDetalheView extends IntimacaoView {
   /** Teor COMPLETO da publicação (não truncado como content_preview). */
@@ -420,6 +450,26 @@ export interface TriagemBucketCounts {
   ciencia: number;
   /** Sem prazo — não datável (motor não soube); dentro de a_triar. */
   sem_prazo: number;
+  /**
+   * Matriz disposição × lifecycle (docs/navigation-architecture.md §4) — ADITIVA ao
+   * lado dos 8 campos legados acima (que só cobrem disposição dentro de a_triar).
+   * Cada lane expõe as MESMAS 6 células (total + as 5 disposições). Opcional: o BE
+   * está introduzindo este campo em paralelo (rollout a89a4e); ausente enquanto o
+   * rollout não completa — o FE NUNCA infere estas células a partir dos campos
+   * legados/página quando ausente (mostra loading/sem contagem, ver
+   * use-triagem-pipeline.ts).
+   */
+  by_lifecycle?: Record<
+    "a_triar" | "em_andamento" | "concluido",
+    {
+      total: number;
+      analisando: number;
+      trabalho: number;
+      excecao: number;
+      ciencia: number;
+      sem_prazo: number;
+    }
+  >;
 }
 
 /** Origem do prazo — closed set espelhado do BE (?origem=<v>). */

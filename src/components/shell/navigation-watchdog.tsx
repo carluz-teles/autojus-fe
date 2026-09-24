@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 
+import { isPanelHandled } from "@/features/intimacoes/lib/painel-click";
+
 // Bug conhecido do Next.js 16 App Router (reproduzido ao vivo nesta sessão e
 // confirmado via relatos externos — ver vercel/next.js discussions #57565 e
 // o fórum oficial sobre "_rsc request" travado): o clique num <Link> dispara
@@ -51,6 +53,10 @@ export function NavigationWatchdog() {
 
       const anchor = isInternalNavigableLink(event.target as Element);
       if (!anchor) return;
+      // Clique tratado in-place por um handler que muda SÓ a query (?painel=):
+      // o pathname legitimamente não muda, então NÃO é falha do router — não
+      // force full-nav (senão o painel abre e a página recarrega em seguida).
+      if (isPanelHandled(event)) return;
       if (!event.defaultPrevented) return; // Next não interceptou — navegação nativa cuida
 
       const href = anchor.getAttribute("href")!;

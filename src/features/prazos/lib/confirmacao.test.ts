@@ -6,6 +6,7 @@ import type { PrazoDetalheView } from "../types";
 import {
   bloqueiaProvidencias,
   confirmacaoSchema,
+  prazoAtivoParaCorrecao,
   prazoVisivel,
   precisaConfirmarPrazo,
   tipoIncompativelComPrazo,
@@ -105,4 +106,21 @@ describe("confirmação de prazo (v3: gate morto)", () => {
       );
     }
   });
+
+  // Whitelist canônica reusada por dois CTAs independentes (divergência
+  // prazo×obrigação e exceção de classificação, caso 018f8dd1) — uma só
+  // fonte, não `status !== "NO_DEADLINE"` (que deixaria passar terminais que
+  // o BE rejeita com 409).
+  it.each(["OPEN", "PENDING"] as const)(
+    "prazoAtivoParaCorrecao(%s) → true",
+    (status) => {
+      expect(prazoAtivoParaCorrecao(status)).toBe(true);
+    },
+  );
+  it.each(["MISSED", "MET", "CANCELLED", "NO_DEADLINE"] as const)(
+    "prazoAtivoParaCorrecao(%s) → false",
+    (status) => {
+      expect(prazoAtivoParaCorrecao(status)).toBe(false);
+    },
+  );
 });

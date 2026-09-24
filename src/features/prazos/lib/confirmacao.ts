@@ -82,4 +82,19 @@ export function precisaConfirmarPrazo(
   return false;
 }
 
+/** Status em que os writes de prazo (confirmar tipo/dias ou marcar sem prazo)
+ *  são válidos no BE (guard comum dos endpoints: `status IN (PENDING,OPEN,…)`).
+ *  Fonte única do whitelist — usada para gatear tanto o CTA de divergência
+ *  (`disposicao-section.tsx`) quanto o de exceção de classificação
+ *  (`PainelPrazo`), nunca reimplementada em cada lugar (Regra nº1).
+ *  NO_DEADLINE fica de fora de propósito: os writes lá são idempotentes no
+ *  BE, mas a UI não precisa do CTA quando já não há prazo ativo a corrigir.
+ *  Terminais (MISSED/MET/CANCELLED) ficam de fora porque o BE responde 409
+ *  (fora do guard). */
+export function prazoAtivoParaCorrecao(
+  status: PrazoDetalheView["status"],
+): boolean {
+  return status === "OPEN" || status === "PENDING";
+}
+
 export { prazoVisivel } from "@/features/intimacoes/lib/prazo-visivel";
