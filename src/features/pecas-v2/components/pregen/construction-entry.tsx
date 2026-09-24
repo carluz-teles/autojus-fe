@@ -7,7 +7,10 @@ import { useEffect, useRef } from "react";
 import { PageFrame, ShellBackLink } from "@/components/shell/page-frame";
 import { Button } from "@/components/ui/button";
 import { useActionItemDetalhe } from "@/features/action-items/hooks/use-action-items";
-import { iniciarActionItem } from "@/features/action-items/services/action-items.service";
+import {
+  getActionItem,
+  iniciarActionItem,
+} from "@/features/action-items/services/action-items.service";
 import { useApi } from "@/lib/api/use-api";
 
 import {
@@ -24,16 +27,17 @@ import { createDraft } from "../../services/pecas-v2.service";
 // rodava aqui ("Construindo a peça…") e só depois navegava, criando DUAS telas de
 // loading. Agora esta tela é uma transição curtíssima (só o createDraft).
 //
-// O prompt opcional (GerarPecaModal, gravado por actionItemId) é re-chaveado por
-// draftId antes de navegar — a tela da peça (use-construction) lê por draftId,
-// sem carregar o actionItemId na URL. BLOCKER-3: a limpeza do prompt só ocorre
-// após o generate 202 (na tela da peça), então sobrevive a retry.
+// O prompt opcional (GerarPecaModal, gravado por actionItemId ou intimationId)
+// é re-chaveado por draftId antes de navegar. A tela da peça lê por draftId,
+// inclusive após refresh; só limpa o prompt quando a peça fica pronta.
 export function ConstructionEntry({
   actionItemId = "",
+  existingActionItemId = "",
   intimationId = "",
   auto = false,
 }: {
   actionItemId?: string;
+  existingActionItemId?: string;
   intimationId?: string;
   auto?: boolean;
 }) {
@@ -52,7 +56,16 @@ export function ConstructionEntry({
       let draftId: string;
       if (!actionItemId) {
         if (!intimationId) throw new Error("Selecione a intimação de origem.");
-        draftId = (await createDraft(api, { intimationId })).id;
+        const existingItem = existingActionItemId
+          ? await getActionItem(api, existingActionItemId)
+          : null;
+        if (existingItem && existingItem.intimation_id !== intimationId)
+          throw new Error("A providência não pertence a esta intimação.");
+        // Um item sem gera_peca pode ter draft antigo. Reabra-o se existir;
+        // caso contrário, crie pela intimação sem alterar o perfil do item.
+        draftId = existingItem?.draft_id
+          ? existingItem.draft_id
+          : (await createDraft(api, { intimationId })).id;
       } else {
         const item = work.data;
         if (!item) throw new Error("Não foi possível iniciar a peça.");

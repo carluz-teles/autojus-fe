@@ -1,13 +1,9 @@
 import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
-import { ORIGEM_DESCRICAO, ORIGEM_LABEL } from "@/features/triagem/lib/origem";
 import { formatarData } from "@/lib/utils";
 
-import type {
-  IntimacaoGroup,
-  IntimacaoView,
-  RecommendedProvidencia,
-} from "../types";
+import type { IntimacaoGroup, IntimacaoView } from "../types";
 import { estadoIntimacao } from "./estado";
+import { tituloIntimacao } from "./labels";
 import { tipoAtoLabel } from "./tipo-ato";
 
 export const SITUACAO_LABEL = {
@@ -22,68 +18,9 @@ export const ETAPA_LABEL = {
   DRAFTING: "Em elaboração",
   PARTNER_REVIEW: "Revisão do sócio",
   FILED: "Protocolada",
+  VENCIDA: "Prazo vencido",
 };
 const cnjKey = (cnj: string) => cnj.replace(/\D/g, "");
-
-function revisaoDaLinha(i: IntimacaoView) {
-  const p = i.prazo;
-  if (
-    i.user_status !== "PENDING" ||
-    ["MET", "CANCELLED", "RESOLVED_ON_CONCLUSION"].includes(p?.status ?? "")
-  )
-    return { label: "", pending: false };
-  if (i.estado === "a_classificar")
-    return {
-      label: "Definir tipo e prazo",
-      pending: true,
-      description:
-        "O sistema não conseguiu classificar este item. Revise a publicação para definir o tipo de ato e se existe prazo.",
-    };
-  if (p?.selo === "a_apurar" || (!p?.confirmed && i.estado === "ia"))
-    return {
-      label: i.estado === "ia" ? "Revisar tipo e prazo" : "Revisar prazo",
-      pending: true,
-      description:
-        i.estado === "ia"
-          ? "A confirmar: o advogado precisa revisar o tipo de ato sugerido e o prazo, corrigindo o que for necessário antes de confirmar. Essa confirmação é interna ao app; não dá ciência nem protocola no tribunal."
-          : "O prazo precisa de revisão do advogado antes da confirmação, por exemplo por divergência entre a publicação e o cálculo. Essa confirmação é interna ao app; não dá ciência nem protocola no tribunal.",
-    };
-  if (p?.confirmed)
-    return {
-      label:
-        p.status === "NO_DEADLINE"
-          ? "Ausência de prazo revisada"
-          : "Prazo revisado",
-      pending: false,
-    };
-  return { label: "", pending: false };
-}
-
-// lifecycleDaLinha deriva o estado da linha para o card da Triagem:
-//  • "recommended" — há uma providência determinística (mostra a Ação recomendada inline);
-//  • "none"        — nada a sinalizar (resolvida/ignorada, sem prazo, ou pendente de confirmação,
-//                    caso já coberto por revisaoDaLinha → "Revisar tipo e prazo").
-// NÃO existe mais estado "analisando": o trabalho necessário é derivado DETERMINISTICAMENTE na
-// ingestão (não há mais análise async pós-chegada), então a linha nunca fica esperando um spinner.
-export type LinhaLifecycle =
-  | { state: "recommended"; rec: RecommendedProvidencia; count: number }
-  | { state: "none" };
-
-export function lifecycleDaLinha(i: IntimacaoView): LinhaLifecycle {
-  const p = i.prazo;
-  // A "Ação recomendada" (com Gerar peça/Concluir) só faz sentido num prazo ABERTO e real —
-  // espelha o lane `ready`. VENCIDO (histórico, assume-se feito) e SEM PRAZO (mera ciência) NÃO
-  // recebem ação recomendada. Aberto = PENDING/OPEN e não vencido (days_left >= 0).
-  const abertoReal =
-    !!p && ["PENDING", "OPEN"].includes(p.status) && p.days_left >= 0;
-  if (i.recommended_providencia && abertoReal)
-    return {
-      state: "recommended",
-      rec: i.recommended_providencia,
-      count: i.suggested_count,
-    };
-  return { state: "none" };
-}
 
 function vencimentoDaLinha(i: IntimacaoView) {
   const p = i.prazo;
@@ -120,14 +57,10 @@ export function linhaIntimacao(i: IntimacaoView) {
   return {
     id: i.id,
     cnj: formatarCNJ(i.cnj_number),
-    title: i.title.replace(/\s*·\s*$/, ""),
+    title: tituloIntimacao(i.title, i.cnj_number),
     partes: [i.autor, i.reu].filter(Boolean).join(" · "),
     tribunal: [i.court, i.degree].filter(Boolean).join(" · "),
     ato: i.prazo?.tipo_ato ? tipoAtoLabel(i.prazo.tipo_ato) : "Tipo a definir",
-    origem: ORIGEM_LABEL[i.estado] ?? "",
-    origemDescricao: ORIGEM_DESCRICAO[i.estado],
-    revisao: revisaoDaLinha(i),
-    lifecycle: lifecycleDaLinha(i),
     // estado (desfecho) — chip único: Pendente/Em elaboração/Em revisão/Concluída·Ciência/
     // Concluída·Protocolada/Ignorada. A linha só mostra quando NÃO é "Pendente" (a barra de
     // prazo já cobre a intimação aberta comum); ver estadoIntimacao.
@@ -141,7 +74,18 @@ export function linhaIntimacao(i: IntimacaoView) {
     etapa: ["DRAFTING", "PARTNER_REVIEW", "FILED"].includes(i.work_stage)
       ? ETAPA_LABEL[i.work_stage]
       : "",
-    publicado: i.published_at ? formatarData(i.published_at) : "Não informada",
+    // H2 (docs history-design.md): published_at é a âncora cronológica; quando o
+    // DJEN não informa a data de publicação em si, cai no instante em que a
+    // captura ficou disponível (made_available_at) — nunca "Não informada" se
+    // qualquer um dos dois existir. made_available_at NÃO É a publicação: o
+    // rótulo (`publicadoRotulo`) muda conforme a fonte real, pra nunca afirmar
+    // "Publicada" quando o dado é só "ficou disponível pra nós".
+    publicado: i.published_at
+      ? formatarData(i.published_at)
+      : i.made_available_at
+        ? formatarData(i.made_available_at)
+        : "Não informada",
+    publicadoRotulo: i.published_at ? "Publicada" : "Disponibilizada",
     preview: i.content_preview,
   };
 }
@@ -164,10 +108,6 @@ export function gruposIntimacoes(
     const urgent = children
       .filter((i) => vencimentoDaLinha(i).activeDate)
       .sort((a, b) => a.prazo!.end_date.localeCompare(b.prazo!.end_date))[0];
-    const pending = children.filter((i) => revisaoDaLinha(i).pending);
-    const missing = pending.filter((i) => i.estado === "a_classificar").length;
-    const confirm = pending.filter((i) => i.estado === "ia").length;
-    const revisar = pending.length - missing - confirm;
     const responsible = new Set(children.map((i) => i.assignee_user_id ?? ""));
     return {
       ...g,
@@ -176,14 +116,6 @@ export function gruposIntimacoes(
       partes: first ? linhaIntimacao(first).partes : "",
       items: children.map(linhaIntimacao),
       urgente: urgent ? vencimentoDaLinha(urgent) : null,
-      pending: pending.length,
-      pendencias: [
-        missing ? `${missing} a classificar` : "",
-        confirm ? `${confirm} para revisar tipo e prazo` : "",
-        revisar ? `${revisar} para revisar prazo` : "",
-      ]
-        .filter(Boolean)
-        .join(" · "),
       responsavelId: responsible.size === 1 ? first?.assignee_user_id : null,
       responsaveisDiferentes: responsible.size > 1,
       responsavel:

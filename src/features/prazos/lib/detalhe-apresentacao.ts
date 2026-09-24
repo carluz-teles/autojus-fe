@@ -1,5 +1,5 @@
 import type { PrazoDetalheView } from "../types";
-import { tipoIncompativelComPrazo } from "./confirmacao";
+import { tipoIncompativelComPrazo, tipoIndeterminado } from "./confirmacao";
 
 export function formatarCNJ(value: string): string {
   const digits = value.replace(/\D/g, "");
@@ -78,6 +78,18 @@ export function situacaoRevisao(p: PrazoDetalheView | null, estado: string) {
     return { label: "Sem prazo identificado", pendente: false };
   if (p.origem === "declarado")
     return { label: "Prazo declarado aceito", pendente: false };
+  // EXCEÇÃO DE CLASSIFICAÇÃO: o piso supletivo (CPC 218§3) assumiu uma data
+  // defensável (`selo='a_apurar'`) porque o tipo do ato não foi identificado
+  // — não é "revisão" genérica nem ausência de item (que não é desacordo),
+  // é uma causa concreta e nomeável. O rótulo genérico "Revisão pendente" cede
+  // pra essa causa específica sempre que ela se aplica; `pendente` continua
+  // `true` (nunca `false` cosmético) — a intimação permanece em exceção até o
+  // tipo ser de fato definido (ou marcado como sem prazo), não até o rótulo
+  // mudar. Não confundir com a divergência prazo×obrigação (caso 0b81 — item
+  // de ciência real + acionabilidade='ato'): aqui não há item nenhum, o eixo é
+  // outro (tipificação), resolvido pelo mesmo control `DefinirTipoAto`.
+  if (p.selo === "a_apurar" && tipoIndeterminado(p, estado))
+    return { label: "Tipo do ato não identificado", pendente: true };
   return {
     label: p.confirmacao_exigida
       ? "Revisão pendente"

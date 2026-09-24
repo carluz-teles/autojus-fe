@@ -1,26 +1,22 @@
 "use client";
 
 // BulkBar (sticky) da Triagem-pipeline — barra de ações em lote sobre a seleção
-// manual. Extraída do mockup; agora só as ações que têm mutação REAL ficam ativas.
-// "Adiar" fica desabilitado (sem endpoint) — ver TODO na view.
+// manual. Extraída do mockup; só as ações que têm mutação REAL ficam ativas.
 
-import { Check, CheckCheck, Clock, UserRound, X } from "lucide-react";
+import { CheckCheck, UserRound, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
-export type BulkKind = "ciencia" | "confirmar" | "responsavel" | "adiar";
+export type BulkKind = "ciencia" | "responsavel";
 
 export function BulkBar({
   count,
   onBulk,
   onClear,
-  adiarDisponivel = false,
 }: {
   count: number;
   onBulk: (kind: BulkKind) => void;
   onClear: () => void;
-  /** false = sem endpoint real; o botão fica desabilitado ("em breve"). */
-  adiarDisponivel?: boolean;
 }) {
   return (
     <div className="sticky top-2 z-30">
@@ -33,10 +29,6 @@ export function BulkBar({
           <CheckCheck data-icon="inline-start" />
           Dar ciência
         </Button>
-        <Button size="sm" variant="outline" onClick={() => onBulk("confirmar")}>
-          <Check data-icon="inline-start" />
-          Confirmar prazos
-        </Button>
         <Button
           size="sm"
           variant="outline"
@@ -44,16 +36,6 @@ export function BulkBar({
         >
           <UserRound data-icon="inline-start" />
           Atribuir a mim
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={!adiarDisponivel}
-          title={adiarDisponivel ? undefined : "em breve"}
-          onClick={() => adiarDisponivel && onBulk("adiar")}
-        >
-          <Clock data-icon="inline-start" />
-          Adiar
         </Button>
         <Button size="sm" variant="ghost" className="ml-auto" onClick={onClear}>
           <X data-icon="inline-start" />

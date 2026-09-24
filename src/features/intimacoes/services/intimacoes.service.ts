@@ -53,8 +53,6 @@ export interface ListIntimacoesParams {
    * mostrar o total real). Omitido quando vazio (= "Todos").
    */
   origem?: string;
-  /** Recorte operacional da triagem; vazio mantém a listagem completa. */
-  triage_lane?: "attention" | "ready" | "science" | "historical";
   /**
    * Filtro server-side do chip "Não confirmadas" (toggle de triagem) — restringe a
    * prazos sugeridos ainda não confirmados (deadline.status = 'PENDING'). Combina com
@@ -67,6 +65,15 @@ export interface ListIntimacoesParams {
    * `buckets` (limitação conhecida do BE).
    */
   assignee?: string;
+  /**
+   * Filtro server-side de escopo de responsável (mesa de trabalho — docs/revamp-
+   * mesa-trabalho-intimacoes.md §8): "mine" (minhas), "unassigned" (sem
+   * responsável) ou "mine_or_unassigned" (união das duas). Mutuamente exclusivo
+   * com `assignee` — o BE rejeita os dois juntos com 400. Aplica-se ao MESMO
+   * predicado da lista, das contagens (`page.total_count`), dos buckets e das
+   * origem_facets — não é um filtro parcial.
+   */
+  assignee_scope?: "mine" | "unassigned" | "mine_or_unassigned";
   // ── Dimensões da pipeline de Triagem (docs/erd-triagem-pipeline.md §9 U0 follow-up) ──
   /** ?lifecycle — lane de ciclo de vida derivada (a_triar|em_andamento|concluido);
    *  "" = todas. Filtra a lista server-side pra retornar SÓ aquela lane. */
@@ -94,9 +101,9 @@ export async function listIntimacoes(
     due_to,
     work_stage,
     origem,
-    triage_lane,
     nao_confirmado,
     assignee,
+    assignee_scope,
     lifecycle,
     disposicao,
   }: ListIntimacoesParams = {},
@@ -118,7 +125,6 @@ export async function listIntimacoes(
       due_from,
       due_to,
       origem,
-      triage_lane,
       lifecycle,
       disposicao,
       // Array vira CSV pro BE (que hoje aceita 1 valor mas está sendo
@@ -130,6 +136,7 @@ export async function listIntimacoes(
         : work_stage,
       nao_confirmado,
       assignee,
+      assignee_scope,
     },
   });
 }
@@ -149,9 +156,11 @@ export interface PipelineCountsParams {
   due_from?: string;
   due_to?: string;
   origem?: string;
-  triage_lane?: "attention" | "ready" | "science" | "historical";
   nao_confirmado?: boolean;
   assignee?: string;
+  /** Mesmo contrato de ListIntimacoesParams.assignee_scope — mutuamente exclusivo
+   *  com `assignee` (o BE rejeita os dois juntos com 400). */
+  assignee_scope?: "mine" | "unassigned" | "mine_or_unassigned";
   cnj?: string;
 }
 
@@ -166,9 +175,9 @@ export async function getPipelineCounts(
     due_from,
     due_to,
     origem,
-    triage_lane,
     nao_confirmado,
     assignee,
+    assignee_scope,
     cnj,
   }: PipelineCountsParams = {},
   signal?: AbortSignal,
@@ -184,9 +193,9 @@ export async function getPipelineCounts(
       due_from,
       due_to,
       origem,
-      triage_lane,
       nao_confirmado,
       assignee,
+      assignee_scope,
       cnj,
     },
   });
@@ -232,29 +241,25 @@ export async function resolveIntimacao(
   });
 }
 
+/** Resultado de um lote disparado por-id (sem endpoint em lote no BE): quais ids
+ *  sucederam e quais falharam — erro parcial é recuperável (docs/revamp-mesa-
+ *  trabalho-intimacoes.md AC7): o chamador reseleciona só os que falharam. */
+export interface BatchIdsResult {
+  succeeded: string[];
+  failed: string[];
+}
+
 export async function resolveIntimacoesBatch(
   fetcher: ApiFetcher,
   ids: string[],
-): Promise<number> {
-  await Promise.all(ids.map((id) => resolveIntimacao(fetcher, id)));
-  return ids.length;
-}
-
-/**
- * Confirma os prazos da faixa CONFIÁVEL (low-risk) em lote — POST /v1/prazos/confirm-batch.
- * Sem `intimationIds` (ou vazio) confirma TODOS os confiáveis (`all: true`). Com uma lista,
- * confirma só os prazos confiáveis dessas intimações (o BE filtra a faixa low-risk mesmo com
- * ids — exceções nunca entram). O contador `affected` reflete só os efetivamente confirmados.
- */
-export async function confirmTrustedDeadlinesBatch(
-  fetcher: ApiFetcher,
-  intimationIds?: string[],
-): Promise<{ affected: number }> {
-  const all = !intimationIds || intimationIds.length === 0;
-  return fetcher<{ affected: number }>("/v1/prazos/confirm-batch", {
-    method: "POST",
-    body: { all, intimation_ids: all ? [] : intimationIds },
-  });
+): Promise<BatchIdsResult> {
+  const results = await Promise.allSettled(
+    ids.map((id) => resolveIntimacao(fetcher, id)),
+  );
+  return {
+    succeeded: ids.filter((_, i) => results[i].status === "fulfilled"),
+    failed: ids.filter((_, i) => results[i].status === "rejected"),
+  };
 }
 
 /** Ignora a intimação — POST /v1/intimacoes/:id/ignore → intimação atualizada. */

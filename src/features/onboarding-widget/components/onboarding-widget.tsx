@@ -64,6 +64,7 @@ export function OnboardingWidget() {
 
   return (
     <div
+      data-slot="onboarding-widget"
       className={cn(
         "fixed right-4 bottom-4 left-4 z-40 sm:left-auto sm:w-[380px]",
         "transition-opacity duration-200 motion-reduce:transition-none",

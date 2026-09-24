@@ -4,6 +4,8 @@
 // esse código para o rótulo que o card AUTOS exibe. Código desconhecido cai no
 // fallback (title-case do próprio código), nunca fica vazio.
 
+import { formatarData } from "@/lib/utils";
+
 const TIPO_AUTOS_LABEL: Record<string, string> = {
   // petições / manifestações
   PET: "Petição",
@@ -131,5 +133,46 @@ export function visualDoAuto(codigo: string): AutoVisual {
     categoria,
     origem: ORIGEM_POR_CATEGORIA[categoria],
     cor: COR_POR_CATEGORIA[categoria],
+  };
+}
+
+/**
+ * Identificação legível de um auto pra lista "Autos do processo" (A4,
+ * docs/qa-remediation-evidence/fe-operations-architecture.md). `nome` é derivado
+ * do tipo (`rotuloTipoAuto`); a `meta` desambigua autos do MESMO tipo (ex.: 3
+ * "Petição") pela DATA.
+ *
+ * Data: prefere a data JURÍDICA do ato (`court_event_date`, agora projetada no
+ * DocumentView pelo BE — `viewFromListRow`/`viewFromGetRow` em
+ * internal/document/mapper.go). Quando ausente/null (UPLOAD humano, ou doc COURT
+ * capturado antes da coluna existir), cai para `created_at` (data de CAPTURA, já
+ * no DTO — nunca inventada) VISIVELMENTE ROTULADA como "Capturado em …", nunca
+ * apresentada como a data do ato. Assim dois PDFs capturados na mesma leva ficam
+ * distinguíveis pela data do ato real quando ela existe, e o fallback é honesto
+ * quando não existe.
+ */
+export function identificarAuto(doc: {
+  document_type: string;
+  title: string;
+  created_at: string;
+  court_event_date?: string | null;
+  pages?: number;
+  origin: "COURT" | "UPLOAD";
+}): { nome: string; meta: string } {
+  const dataSegmento = doc.court_event_date
+    ? formatarData(doc.court_event_date)
+    : doc.created_at
+      ? `Capturado em ${formatarData(doc.created_at)}`
+      : "";
+  return {
+    nome: rotuloTipoAuto(doc.document_type),
+    meta: [
+      dataSegmento,
+      doc.title,
+      doc.pages ? `${doc.pages} pág.` : "",
+      doc.origin === "UPLOAD" ? "Anexo do escritório" : "Autos",
+    ]
+      .filter(Boolean)
+      .join(" · "),
   };
 }

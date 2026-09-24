@@ -6,6 +6,8 @@
 //   iniciar → PecaGateModal (pre-flight: aviso de autos) → GerarPecaModal (orientação
 //   opcional) → navega /pecas/nova?...&auto=1 (as instructions viajam por
 //   sessionStorage, não pela URL). Peça já iniciada → abre direto ("Abrir peça").
+//   Uma peça opcional usa só a intimação; se houver item anterior, ele serve
+//   apenas para consultar se já existe draft vinculado antes da criação.
 //
 // Antes existiam 3 comportamentos divergentes (detalhe: gate+modal; triagem: só modal;
 // agenda: link direto). Aqui há UMA fonte:
@@ -34,8 +36,10 @@ export interface PecaTarget {
   intimacaoId: string;
   /** Processo (court_record) — usado pelo gate p/ checar autos. */
   processoId: string;
-  /** action_item recomendado (a peça-alvo) — dispara a geração. */
-  actionItemId: string;
+  /** Providência formal; omitida para peça opcional nascida só da intimação. */
+  actionItemId?: string;
+  /** Só consulta um draft já vinculado; criação opcional usa a intimação. */
+  existingActionItemId?: string;
   /** Para onde a construção volta ao concluir/cancelar. */
   retorno: string;
   /** Grau do processo (recorte da busca de autos no gate). */
@@ -46,8 +50,18 @@ export interface PecaTarget {
   jaIniciada?: boolean;
 }
 
-function urlDaPeca(t: PecaTarget): string {
-  return `/pecas/nova?providencia=${t.actionItemId}&intimacao=${t.intimacaoId}&auto=1&retorno=${encodeURIComponent(t.retorno)}`;
+/** Exportada só para teste comportamental (a garantia central do fluxo
+ *  canônico é `auto=1` SEMPRE presente — é o que faz a tela de construção
+ *  pular direto para o loader de 4 fases, sem wizard de teses). */
+export function urlDaPeca(t: PecaTarget): string {
+  const providencia = t.actionItemId
+    ? `providencia=${encodeURIComponent(t.actionItemId)}&`
+    : "";
+  const existente =
+    !t.actionItemId && t.existingActionItemId
+      ? `verificar_providencia=${encodeURIComponent(t.existingActionItemId)}&`
+      : "";
+  return `/pecas/nova?${providencia}${existente}intimacao=${encodeURIComponent(t.intimacaoId)}&auto=1&retorno=${encodeURIComponent(t.retorno)}`;
 }
 
 /**
@@ -62,7 +76,7 @@ export function usePecaGeracao() {
   const [modalOpen, setModalOpen] = useState(false);
 
   function iniciar(t: PecaTarget) {
-    if (!t.actionItemId) return;
+    if (!t.intimacaoId) return;
     if (t.jaIniciada) {
       router.push(urlDaPeca(t));
       return;
@@ -80,7 +94,8 @@ export function usePecaGeracao() {
   // Confirmou (com ou sem instruções) → grava as instruções (se houver) e navega.
   function onGenerate(instructions: string) {
     if (!target) return;
-    if (instructions) setInstructions(target.actionItemId, instructions);
+    if (instructions)
+      setInstructions(target.actionItemId || target.intimacaoId, instructions);
     setModalOpen(false);
     router.push(urlDaPeca(target));
   }
@@ -138,7 +153,7 @@ export function GerarPecaButton({
         variant={variant}
         size={size}
         className={className}
-        disabled={disabled || !target.actionItemId}
+        disabled={disabled || !target.intimacaoId}
         onClick={() => iniciar(target)}
       >
         <Sparkles data-icon="inline-start" />

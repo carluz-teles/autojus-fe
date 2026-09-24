@@ -12,11 +12,13 @@ import {
   estadoIntimacao,
   type IntimacaoEstado,
 } from "../../intimacoes/lib/estado";
+import { tituloIntimacao } from "../../intimacoes/lib/labels";
 import { tipoAtoLabel } from "../../intimacoes/lib/tipo-ato";
 import type {
   IntimacaoCategoriaCoarse,
   IntimacaoDisposicao,
   IntimacaoExcecaoMotivo,
+  IntimacaoLifecycle,
   IntimacaoView,
   RecommendedProvidencia,
 } from "../../intimacoes/types";
@@ -34,17 +36,27 @@ export const CATEGORIA_COARSE_LABEL: Record<IntimacaoCategoriaCoarse, string> =
   };
 
 /** Motivo da exceção → texto humano (tooltip do marcador ⚠). "" nunca deveria
- *  chegar aqui (só chamamos quando is_excecao), mas cai num fallback seguro. */
+ *  chegar aqui (só chamamos quando is_excecao), mas cai num fallback seguro.
+ *  `divergente` (prazo), `trabalho_divergente` (obrigação, conflito) e
+ *  `trabalho_nao_identificado` (obrigação, AUSÊNCIA — análise materializada sem
+ *  trabalho/ciência elegível) são motivos DISTINTOS — ver comentário de
+ *  IntimacaoExcecaoMotivo (types.ts) — cada um com o próprio rótulo, sem conflitar. */
 export const EXCECAO_MOTIVO_LABEL: Record<IntimacaoExcecaoMotivo, string> = {
   provisorio: "Prazo provisório (piso supletivo) — confirme a contagem.",
   ia_inferido: "Tipo de ato inferido — revise antes de confirmar.",
   divergente: "Divergência entre a publicação e o cálculo do prazo.",
+  trabalho_divergente:
+    "Divergência entre a classificação da intimação e o trabalho identificado.",
+  trabalho_nao_identificado:
+    "A análise não identificou o trabalho a realizar. Revise o teor da intimação.",
   "": "Precisa de revisão.",
 };
 
-/** Segmento da linha = a DISPOSIÇÃO disjunta do BE (docs/erd-intimacao-triagem §4).
- *  Exceção é seu próprio segmento (disjunto de "trabalhar"), então "Pra trabalhar" não
- *  mistura mais exceção/ciência. Deriva 1:1 de IntimacaoView.disposicao (fonte única do BE). */
+/** Segmento da linha = a DISPOSIÇÃO disjunta do BE (docs/erd-intimacao-triagem §4) —
+ *  TRANSVERSAL a qualquer lifecycle/status (não mais restrita a "A triar"; ver
+ *  IntimacaoDisposicao em types.ts). Exceção é seu próprio segmento (disjunto de
+ *  "trabalhar"), então "Pra trabalhar" não mistura mais exceção/ciência. Deriva 1:1
+ *  de IntimacaoView.disposicao (fonte única do BE). */
 export type PipelineSegment =
   "trabalhar" | "excecao" | "ciencia" | "sem-prazo" | "analisando";
 
@@ -96,10 +108,16 @@ export interface PipelinePrazo {
   provisorio: boolean;
 }
 
-/** Props de uma linha densa da fila "A triar" — o único contrato que os
- *  componentes de apresentação consomem (nada de IntimacaoView solto no JSX). */
+/** Props de uma linha densa da Mesa de Trabalho — o único contrato que os componentes
+ *  de apresentação consomem (nada de IntimacaoView solto no JSX). Não é mais exclusivo
+ *  da fila "A triar": sob status "Abertas"/"Todas" a lista é MISTA (`lifecycle` abaixo
+ *  decide RowTriar × RowReadonly por item, ver triagem-view.tsx). */
 export interface PipelineRow {
   id: string;
+  /** Lane de ciclo de vida DESTA linha (a_triar|em_andamento|concluido) — dirige a
+   *  escolha de linha (RowTriar × RowReadonly) em vistas MISTAS (status "Abertas"/
+   *  "Todas" combinam lifecycles numa só lista; a escolha é por item, não por aba). */
+  lifecycle: IntimacaoLifecycle;
   /** Deep-link ao processo/intimação. */
   courtRecordId: string;
   categoriaLabel: string;
@@ -163,10 +181,11 @@ export function pipelineRow(i: IntimacaoView): PipelineRow {
   }
   return {
     id: i.id,
+    lifecycle: i.lifecycle,
     courtRecordId: i.court_record_id,
     categoria: chipCategoria,
     categoriaLabel: chipLabel,
-    title: i.title.replace(/\s*·\s*$/, ""),
+    title: tituloIntimacao(i.title),
     meta: [formatarCNJ(i.cnj_number), i.court, grau]
       .filter(Boolean)
       .join(" · "),

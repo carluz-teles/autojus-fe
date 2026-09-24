@@ -40,13 +40,44 @@ describe("listagem", () => {
       linhaIntimacao(item({ estado: "sem_prazo", prazo: null })).prazo.data,
     ).toBe("Sem prazo");
   });
+  // H2 (docs history-design.md): published_at é a âncora cronológica do histórico;
+  // quando o DJEN não a informa, cai no instante em que a captura ficou disponível
+  // — mas isso NÃO é a publicação, então o rótulo muda pra "Disponibilizada".
+  it("publicação cai em made_available_at quando published_at está vazio (H2), com rótulo distinto", () => {
+    const row = linhaIntimacao(
+      item({ published_at: "", made_available_at: "2026-09-10T12:00:00Z" }),
+    );
+    expect(row.publicado).toBe("10/09/2026");
+    expect(row.publicadoRotulo).toBe("Disponibilizada");
+  });
+  it("rotula 'Publicada' quando published_at existe", () => {
+    expect(linhaIntimacao(item()).publicadoRotulo).toBe("Publicada");
+  });
+  it("publicado fica 'Não informada' só quando os dois estão vazios", () => {
+    expect(
+      linhaIntimacao(item({ published_at: "", made_available_at: "" }))
+        .publicado,
+    ).toBe("Não informada");
+  });
+  // H1 (docs history-design.md): título sem CNJ duplicado — deriva do CNJ desta
+  // própria intimação (mesmo helper canônico usado por Mesa/detalhe, agora com o
+  // 2º argumento opcional).
+  it("título do histórico remove o sufixo CNJ cru que o BE anexa (H1)", () => {
+    expect(
+      linhaIntimacao(
+        item({
+          title: "Réu Fulano · 40127327120268260506",
+          cnj_number: "40127327120268260506",
+        }),
+      ).title,
+    ).toBe("Réu Fulano");
+  });
   it("não colore como atraso ativo uma intimação resolvida", () => {
     const i = item({ user_status: "RESOLVED" });
     i.prazo!.days_left = -8;
     expect(linhaIntimacao(i).prazo.alert).toBe(false);
-    expect(linhaIntimacao(i).revisao.pending).toBe(false);
   });
-  it("resume apenas os filhos filtrados, preservando pendências e responsáveis diferentes", () => {
+  it("resume apenas os filhos filtrados, preservando responsáveis diferentes", () => {
     const a = item();
     const b = item({
       id: "b",
@@ -60,26 +91,7 @@ describe("listagem", () => {
     );
     expect(g.items).toHaveLength(2);
     expect(g.total_count).toBe(5);
-    expect(g.pending).toBe(2);
-    expect(g.pendencias).toBe("1 a classificar · 1 para revisar prazo");
     expect(g.responsavel).toBe("Responsáveis diferentes");
     expect(g.urgente?.data).toBe("15/09/2026");
-  });
-  it("separa a origem inferida da ação de revisão", () => {
-    const row = linhaIntimacao(item({ estado: "ia" }));
-    expect(row.origem).toBe("Inferido");
-    expect(row.origemDescricao).toContain("não uma confirmação do advogado");
-    expect(row.revisao.label).toBe("Revisar tipo e prazo");
-    expect(row.revisao.pending).toBe(true);
-    expect(row.revisao.description).toContain("não dá ciência nem protocola");
-    expect(linhaIntimacao(item()).revisao.label).toBe("Revisar prazo");
-  });
-  it("preserva a origem inferida após confirmação sem pedir nova revisão", () => {
-    const i = item({ estado: "ia" });
-    i.prazo!.confirmed = true;
-    i.prazo!.selo = "confiavel";
-    const row = linhaIntimacao(i);
-    expect(row.origem).toBe("Inferido");
-    expect(row.revisao).toEqual({ label: "Prazo revisado", pending: false });
   });
 });

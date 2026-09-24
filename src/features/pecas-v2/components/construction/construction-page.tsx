@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -40,12 +40,10 @@ import { useConstruction } from "../../hooks/use-construction";
 import { useContentSave } from "../../hooks/use-content-save";
 import { draftKeys } from "../../hooks/use-draft";
 import { useThesisBatch } from "../../hooks/use-thesis-batch";
-import { shouldForceAutoLoader } from "../../lib/auto-flow";
+import { derivarTelaConstrucao } from "../../lib/auto-flow";
 import { draftToPecaContexto } from "../../lib/peca-contexto";
 import type { Draft } from "../../types";
 import { ContextRail } from "../pregen/context-rail";
-import { PreparationCanvas } from "../pregen/preparation-canvas";
-import { PreparationSources } from "../pregen/preparation-sources";
 import { TesesRail } from "../pregen/teses-rail";
 import { TopBar } from "../pregen/top-bar";
 import type { RichEditorHandle } from "../rich-editor/rich-editor";
@@ -66,7 +64,6 @@ export function ConstructionPage({ id }: { id: string }) {
   const thesisBatch = useThesisBatch(h.theses.theses);
   const fetcher = useApi();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const qc = useQueryClient();
   const save = useContentSave(id, draft);
   const editor = useRef<RichEditorHandle | null>(null);
@@ -242,32 +239,56 @@ export function ConstructionPage({ id }: { id: string }) {
         </div>
       </PageFrame>
     );
-  const ready =
-    h.stage === "pronta" || (h.stage === "falha" && !!draft.contentHtml);
-  // NAVEGAR-PRIMEIRO: o fluxo auto (auto=1) agora dispara a sequência (teses →
-  // conferência → generate) AQUI, na tela da peça — não mais em /pecas/nova. O
-  // loader de 4 fases aparece direto:
-  //   • h.autoPending → janela antes/durante o disparo (teses chegando); OU
-  //   • shouldForceAutoLoader → geração em curso (isGenerating) ou saga EXTRACTING.
-  // Se a auto-partida FALHA (assessment_unavailable, timeout, erro), o hook zera
-  // autoPending (autoFailed) e isGenerating; o draft fica CREATED sem loader →
-  // cai no pregen recuperável (fix-3), cujo "Gerar minuta" re-roda o ciclo
-  // reaproveitando as instructions do sessionStorage. Sucesso (EXTRACTING) segue
-  // o caminho normal `gerando`.
-  const isFreshAutoPregen =
-    h.autoPending ||
-    shouldForceAutoLoader({
-      stage: h.stage,
-      isAutoFlow: searchParams.get("auto") === "1",
-      hasContent: !!draft.contentHtml,
-      isGenerating: h.isGenerating,
-      sagaState: draft.sagaState,
-    });
+  // Fluxo ÚNICO (usuário/root: o wizard intermediário de teses foi ABOLIDO —
+  // inclusive como "recuperação manual"): qual tela mostrar é função só do
+  // ESTADO REAL do rascunho, nunca de como o usuário chegou aqui (nenhuma
+  // dependência de `?auto=1` na URL) — cobre igualmente reabrir um rascunho
+  // existente (lista de Peças do processo, sem o param), retorno da fila,
+  // refresh, e falha detectada por polling pós-202/SSE. Ver `lib/auto-flow.ts`.
+  const tela = derivarTelaConstrucao({
+    hasOrigin: h.hasOrigin,
+    hasTeor: h.hasTeor,
+    stage: h.stage,
+    hasContent: !!draft.contentHtml,
+    autoFailed: h.autoFailed,
+  });
+  const ready = tela === "pronta";
+  const isFreshAutoPregen = tela === "carregando";
 
-  // Falha do fluxo auto (assessment/generate): estado de erro LIMPO na linguagem do
-  // fluxo novo + "Tentar de novo" (re-roda a geração com as mesmas teses/instructions).
-  // NÃO cai mais no pregen antigo de escolher tese — que só existe pra curadoria manual.
-  if (h.autoFailed) {
+  if (tela === "sem-teor")
+    return (
+      <PageFrame
+        header={
+          <ShellBackLink
+            href={`/intimacoes/${draft.intimation.id}`}
+            label="Intimação"
+          />
+        }
+      >
+        <div className="flex flex-col items-start gap-4 p-6">
+          <h1 className="font-display text-2xl">
+            O teor da intimação ainda não está disponível
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            A minuta é construída a partir do teor da intimação de origem —
+            confira se ele já chegou antes de gerar.
+          </p>
+          <Button
+            variant="outline"
+            nativeButton={false}
+            render={<Link href={`/intimacoes/${draft.intimation.id}`} />}
+          >
+            Abrir intimação de origem
+          </Button>
+        </div>
+      </PageFrame>
+    );
+
+  // Falha da geração (desta sessão OU detectada por polling): estado de erro
+  // LIMPO + "Tentar de novo" (re-roda a geração com as mesmas teses/
+  // instructions, MESMO draftId — não duplica peça). NUNCA cai num wizard de
+  // escolher tese manualmente — abolido, inclusive como recuperação.
+  if (tela === "falha") {
     return (
       <div className="bg-background flex min-h-0 flex-1 flex-col">
         <TopBar
@@ -294,91 +315,6 @@ export function ConstructionPage({ id }: { id: string }) {
             Tentar de novo
           </Button>
         </div>
-      </div>
-    );
-  }
-
-  if (
-    !isFreshAutoPregen &&
-    (h.stage === "pregen" || (h.stage === "falha" && !draft.contentHtml))
-  ) {
-    const docs = draftToPecaContexto(draft).autos;
-    return (
-      <div className="bg-background flex min-h-0 flex-1 flex-col">
-        <TopBar
-          title={draft.title}
-          cnjShort={draft.process.cnj}
-          state="Preparação"
-          onBack={h.voltar}
-        />
-        <PreparationCanvas
-          title={draft.title}
-          cnj={draft.process.cnj}
-          instructions={h.instructions}
-          onInstructionsChange={h.setInstructions}
-          selectedCount={h.theses.selectedCount}
-          onGenerate={h.gerarMinuta}
-          busy={h.isGenerating}
-          disabled={
-            !h.hasTeor ||
-            h.theses.isLoading ||
-            h.theses.isRegenerating ||
-            !!h.theses.isTogglingId ||
-            h.theses.isError
-          }
-          error={
-            h.generationError ||
-            (!h.hasTeor
-              ? "O teor da intimação ainda não está disponível. Confira a origem antes de gerar."
-              : h.stage === "falha"
-                ? "A geração falhou. Revise as orientações e tente novamente."
-                : undefined)
-          }
-          sources={
-            <PreparationSources
-              documents={docs}
-              publishedAt={draft.intimation.publishedAt}
-              hasIntimation={h.hasTeor}
-              onOpenIntimation={() => setTeorOpen(true)}
-              onOpenDocument={h.verAuto}
-              actions={
-                <SourceActions
-                  courtRecordId={draft.process.courtRecordId}
-                  draftId={id}
-                />
-              }
-            />
-          }
-          theses={
-            <TesesRail
-              theses={h.theses.theses}
-              selectedCount={h.theses.selectedCount}
-              isLoading={h.theses.isLoading}
-              isError={h.theses.isError}
-              onToggle={h.theses.toggle}
-              onFonte={source}
-              teorSourceId={draft.intimation.id}
-              isRegenerating={h.theses.isRegenerating}
-              disabled={
-                !!h.theses.isTogglingId ||
-                h.isGenerating ||
-                draft.status !== "DRAFT"
-              }
-              pregen
-              onRegenerate={h.theses.regenerate}
-              streaming={h.theses.streaming}
-            />
-          }
-        />
-        <TeorDrawer
-          open={teorOpen && h.hasTeor}
-          onClose={() => setTeorOpen(false)}
-          titulo="Intimação de origem"
-          tipo="Teor"
-          meta={draft.intimation.publishedAt || "Não informada"}
-          conteudo={draft.intimation.teor}
-        />
-        <PdfDrawer doc={h.autoDrawer} onClose={h.fecharAuto} />
       </div>
     );
   }
@@ -602,12 +538,16 @@ export function ConstructionPage({ id }: { id: string }) {
                 className={cn(
                   "bg-card min-h-0 w-full shrink-0 overflow-x-hidden overflow-y-auto rounded-xl border xl:w-80 xl:motion-safe:transition-[width] xl:motion-safe:duration-300 xl:motion-safe:ease-in-out 2xl:w-88",
                   contextCollapsed && "xl:w-12 2xl:w-12",
-                  generationActive
+                  // Também escondido durante a janela de loading pré-disparo
+                  // (isFreshAutoPregen): o rail embute um TesesRail em modo
+                  // `pregen` (seleção manual) — não pode ficar visível/
+                  // interativo enquanto o loader único está rodando.
+                  generationActive || isFreshAutoPregen
                     ? "hidden"
                     : panel === "context"
                       ? "block"
                       : "hidden",
-                  !generationActive && "xl:block",
+                  !generationActive && !isFreshAutoPregen && "xl:block",
                 )}
               >
                 <div
@@ -735,45 +675,6 @@ export function ConstructionPage({ id }: { id: string }) {
                       Minuta pronta para sua revisão.
                     </p>
                   )}
-                {h.stage === "pregen" && (
-                  <div className="mx-auto flex min-h-full max-w-2xl flex-col items-start justify-center gap-4 p-6 sm:p-8">
-                    <h1 className="font-display text-2xl">
-                      Construção da peça
-                    </h1>
-                    <p className="text-muted-foreground text-sm">
-                      {h.hasTeor
-                        ? "Revise as teses e as fontes do processo. A minuta será gerada aqui e ficará disponível para edição."
-                        : "O teor da intimação ainda não está disponível. Abra a intimação de origem para conferir os dados antes de gerar a minuta."}
-                    </p>
-                    {!h.hasTeor && (
-                      <Button
-                        variant="outline"
-                        nativeButton={false}
-                        render={
-                          <Link href={`/intimacoes/${draft.intimation.id}`} />
-                        }
-                      >
-                        Abrir intimação de origem
-                      </Button>
-                    )}
-                    <p className="text-sm">
-                      {h.theses.selectedCount} fundamentos selecionados
-                    </p>
-                    <Button
-                      onClick={h.gerarMinuta}
-                      disabled={
-                        !h.hasTeor ||
-                        h.isGenerating ||
-                        h.theses.isRegenerating ||
-                        h.theses.isLoading ||
-                        !!h.theses.isTogglingId ||
-                        h.theses.isError
-                      }
-                    >
-                      Gerar minuta
-                    </Button>
-                  </div>
-                )}
                 {(generationActive || isFreshAutoPregen) && (
                   <GerandoCenter
                     key={`${id}:${draft.updatedAt}`}

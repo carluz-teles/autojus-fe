@@ -19,6 +19,7 @@ import { detalheNaFila } from "@/features/intimacoes/lib/fila-navigation";
 import { htmlToText } from "@/lib/html/html-to-text";
 import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
+import { decidirAcaoAuto, decidirAcaoRetry } from "../lib/auto-flow";
 import {
   clearInstructions,
   peekInstructions,
@@ -79,10 +80,19 @@ export function useConstruction(id: string) {
     theses.theses.length === 0 && !theses.isLoading && !theses.isError;
   const streamEnabled = hasOrigin && hasTeor && noPersisted && !streamFellBack;
 
+  // "Settled" = o stream (ou o fallback síncrono) já CONCLUIU pelo menos uma
+  // tentativa real de obter teses — distinto de "ainda vazio porque a 1ª
+  // renderização aconteceu antes do SSE conectar" (status inicial "idle").
+  // Sem essa distinção, uma lista vazia genuína (sem fundamento algum
+  // encontrado) nunca seria diferenciada de "ainda carregando" — travando o
+  // loader de auto-partida pra sempre (achado real do root).
+  const settledRef = useRef(false);
+
   const onStreamDone = useCallback(
     (authoritative: Thesis[]) => {
       // A lista autoritativa traz ids reais + state inicial persistido — o
       // controller (useTheses query) passa a servir dela.
+      settledRef.current = true;
       qc.setQueryData(thesesKey(id), authoritative);
     },
     [qc, id],
@@ -91,7 +101,9 @@ export function useConstruction(id: string) {
   const onStreamError = useCallback((hadThesis: boolean) => {
     // Falha pré-1ª-tese → degrada pro POST síncrono (desliga o stream). Falha
     // mid-stream → mantém os cards; o erro inline vem do state do stream e o
-    // usuário reusa o regenerate.
+    // usuário reusa o regenerate. Em ambos os casos o stream por si só NÃO
+    // "settled" ainda — quem conclui é o POST síncrono (fallback) ou o próprio
+    // erro (`theses.isError`, já tratado à parte na decisão de auto-disparo).
     if (!hadThesis) setStreamFellBack(true);
   }, []);
 
@@ -107,11 +119,27 @@ export function useConstruction(id: string) {
   // chega — então não re-dispara. Espelha o `fellBack && generate.isIdle` da
   // partida sem um setState extra dentro do efeito.
   const regenerate = theses.regenerate;
-  const shouldFallback =
-    streamFellBack && noPersisted && !theses.isRegenerating;
   useEffect(() => {
-    if (shouldFallback) regenerate();
-  }, [shouldFallback, regenerate]);
+    if (
+      streamFellBack &&
+      noPersisted &&
+      !theses.isRegenerating &&
+      !settledRef.current
+    )
+      regenerate();
+  }, [streamFellBack, noPersisted, theses.isRegenerating, regenerate]);
+
+  // Marca "settled" quando o POST síncrono (fallback OU "Atualizar
+  // fundamentos" manual) CONCLUI (pending→não-pending) — sucesso ou erro
+  // (erro já é pego por `theses.isError` na decisão; aqui só fecha a janela
+  // de "ainda tentando" pro caso de sucesso com lista vazia).
+  const wasRegenerating = useRef(theses.isRegenerating);
+  useEffect(() => {
+    if (wasRegenerating.current && !theses.isRegenerating) {
+      settledRef.current = true;
+    }
+    wasRegenerating.current = theses.isRegenerating;
+  }, [theses.isRegenerating]);
 
   // Auto (documento dos autos) aberto no drawer: o viewer embute o PDF original
   // (busca os bytes por conta própria via /documentos/:id/raw). Guardamos só a
@@ -250,48 +278,55 @@ export function useConstruction(id: string) {
     (saga === "EXTRACTING" || (saga === "CREATED" && firedGenerate));
 
   // ── NAVEGAR-PRIMEIRO: auto-partida NA TELA DA PEÇA ─────────────────────────
-  // Chegou via "Gerar peça" (auto=1) num rascunho fresco: assim que as teses
-  // (draft-scoped, via stream) estão prontas, dispara a geração com TODAS elas +
-  // o prompt opcional (sessionStorage por draftId). O loader de 4 fases aparece
-  // desde o início (sem a antiga tela intermediária "Construindo a peça…").
-  // Falha → autoFailed → estado de erro limpo + "Tentar de novo" (retryAuto), na
-  // linguagem do fluxo novo — sem cair no pregen antigo de escolher tese.
-  const autoParam = params.get("auto") === "1";
+  // Qualquer rascunho ainda sem conteúdo (stage 'pregen') dispara a partida
+  // sozinho, assim que as teses (draft-scoped, via stream) estão prontas: TODAS
+  // elas + o prompt opcional (sessionStorage por draftId). O loader de 4 fases
+  // aparece desde o início. Falha → autoFailed → estado de erro limpo + "Tentar
+  // de novo" (retryAuto). NUNCA gated por `?auto=1` na URL — abolido: qualquer
+  // entrada (reabrir peça da lista/processo sem o param, refresh, retorno da
+  // fila) precisa do MESMO comportamento, nunca cair no wizard antigo de
+  // escolher tese manualmente (ver `lib/auto-flow.ts`).
+  //
+  // A DECISÃO (o que fazer dado o estado atual) é pura — `decidirAcaoAuto`,
+  // testável sem montar o hook/efeitos reais. O efeito abaixo é só um
+  // dispatcher fino sobre ela.
   const [autoFailed, setAutoFailed] = useState(false);
   const autoFired = useRef(false);
+  const retryInFlight = useRef(false);
+  const [retrying, setRetrying] = useState(false);
   // Janela em que o loader deve aparecer antes/durante o disparo automático
   // (evita um flash do pregen enquanto as teses ainda chegam).
   const autoPending =
-    autoParam &&
-    saga === "CREATED" &&
-    !hasContent &&
-    !autoFailed &&
-    !theses.isError;
+    ((saga === "CREATED" && !autoFailed && !theses.isError) || retrying) &&
+    !hasContent;
   useEffect(() => {
-    if (!autoParam || autoFired.current || autoFailed) return;
-    if (saga !== "CREATED" || hasContent || firedGenerate) return;
-    if (!hasOrigin || !hasTeor) return;
-    if (theses.isError) {
+    if (autoFired.current || autoFailed || retryInFlight.current) return;
+    const acao = decidirAcaoAuto({
+      hasOrigin,
+      hasTeor,
+      saga,
+      hasContent,
+      firedGenerate,
+      theses,
+      settled: settledRef.current,
+    });
+    if (acao.tipo === "esperar") return;
+    if (acao.tipo === "falhar") {
       setAutoFailed(true);
       return;
     }
-    if (theses.isLoading || theses.isRegenerating || theses.isTogglingId)
-      return;
-    if (theses.theses.length === 0) return; // aguarda as teses (stream) assentarem
     autoFired.current = true;
-    const allIds = theses.theses.map((t) => t.id);
     const instr = peekInstructions(id).trim();
     setFiredGenerate(true);
     setFiredAssessment(false);
     generate.mutate(
       {
-        thesisIds: allIds,
+        thesisIds: acao.thesisIds,
         instructions: instr,
         expectedCurrentVersionId: draftQuery.data?.currentVersionId ?? null,
         onAssessmentStarted: () => setFiredAssessment(true),
       },
       {
-        onSuccess: () => clearInstructions(id), // BLOCKER-3: limpa só no 202
         onError: () => {
           setFiredGenerate(false);
           setFiredAssessment(false);
@@ -300,31 +335,70 @@ export function useConstruction(id: string) {
       },
     );
   }, [
-    autoParam,
     autoFailed,
     saga,
     hasContent,
     firedGenerate,
     hasOrigin,
     hasTeor,
-    theses.isError,
-    theses.isLoading,
-    theses.isRegenerating,
-    theses.isTogglingId,
-    theses.theses,
+    theses,
     generate,
     id,
     draftQuery.data?.currentVersionId,
   ]);
 
-  // Retry do fluxo auto após falha (assessment_unavailable, timeout, erro): rearma
-  // o gatilho (autoFired=false) e limpa autoFailed → o efeito acima re-dispara a
-  // geração com as mesmas teses + instructions. É o "Tentar de novo" do estado de
-  // erro (substitui a queda no pregen antigo).
-  const retryAuto = useCallback(() => {
-    autoFired.current = false;
+  // O 202 apenas enfileira o worker. Guarde a orientação para um retry após
+  // falha assíncrona; só a peça realmente pronta encerra essa tentativa.
+  useEffect(() => {
+    if ((saga === "DRAFTED" || saga === "REVIEWED") && hasContent)
+      clearInstructions(id);
+  }, [saga, hasContent, id]);
+
+  // Falha assíncrona detectada por POLLING (não pela mutation desta sessão) —
+  // ex.: SSE caiu depois do 202 e o worker marcou saga_state=FAILED no BE, mas
+  // esta aba nunca chamou `generate` (ex.: reabriu um rascunho já em FAILED).
+  // Sem isto, `autoFailed` (só setado no onError da PRÓPRIA mutation) ficaria
+  // `false` e a tela cairia no ramo "sem conteúdo" — hoje "carregando" (nunca
+  // mais o wizard), mas um loader sobre um saga que não vai avançar sozinho.
+  // Reage ao `saga==='FAILED'` real, não a um evento local.
+  const autoFailedReal =
+    (autoFailed || saga === "FAILED") && !hasContent && !retrying;
+
+  // Retry explícito: teses com erro/vazias são aguardadas antes da mutation de
+  // geração. O mesmo draft e a orientação sobrevivem ao 202 e ao refresh.
+  const retryAuto = async () => {
+    if (retryInFlight.current || generate.isPending || hasContent) return;
+    retryInFlight.current = true;
+    setRetrying(true);
     setAutoFailed(false);
-  }, []);
+    try {
+      const acao = decidirAcaoRetry({ theses });
+      const thesisIds =
+        acao.tipo === "regerar-teses"
+          ? (await theses.regenerateAsync()).map((t) => t.id)
+          : theses.theses.map((t) => t.id);
+      if (thesisIds.length === 0)
+        throw new Error("Nenhum fundamento foi encontrado. Tente novamente.");
+      // O saga pode continuar FAILED até o POST /generate completar: a sequência
+      // do retry é explícita e não depende do efeito reservado ao draft CREATED.
+      autoFired.current = true;
+      setFiredGenerate(true);
+      setFiredAssessment(false);
+      await generate.mutateAsync({
+        thesisIds,
+        instructions: (peekInstructions(id) || instructions).trim(),
+        expectedCurrentVersionId: draftQuery.data?.currentVersionId ?? null,
+        onAssessmentStarted: () => setFiredAssessment(true),
+      });
+    } catch {
+      setFiredGenerate(false);
+      setFiredAssessment(false);
+      setAutoFailed(true);
+    } finally {
+      retryInFlight.current = false;
+      setRetrying(false);
+    }
+  };
 
   // Fonte das teses a exibir: enquanto o stream está ativo (ou parou no meio com
   // cards já mostrados), usa a lista incremental do stream; senão a lista
@@ -386,11 +460,12 @@ export function useConstruction(id: string) {
     isGenerating: generate.isPending,
     // Conferência (assessment) em curso — sinal real da fase 2 do loader.
     assessmentActive: firedAssessment && saga !== "EXTRACTING",
-    // Janela da auto-partida (auto=1, rascunho fresco): mostra o loader direto,
-    // antes mesmo do generate disparar (enquanto as teses chegam).
+    // Janela da auto-partida (rascunho fresco, sem conteúdo): mostra o loader
+    // direto, antes mesmo do generate disparar (enquanto as teses chegam).
     autoPending,
-    // Falha do fluxo auto (assessment/generate) → estado de erro + "Tentar de novo".
-    autoFailed: autoParam && autoFailed,
+    // Falha da geração (desta sessão OU detectada por polling) → estado de
+    // erro + "Tentar de novo". Nunca gated por parâmetro de URL.
+    autoFailed: autoFailedReal,
     retryAuto,
     hasOrigin,
     hasTeor,

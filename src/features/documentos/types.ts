@@ -35,8 +35,15 @@ export interface DocumentView {
   status: DocumentStatus;
   has_text_layer: boolean;
   checksum?: string;
-  /** RFC3339. */
+  /** RFC3339 — data de CAPTURA do documento (ingestão), não a data do ato. */
   created_at: string;
+  /**
+   * RFC3339 — data JURÍDICA do ato (document.court_event_date). Ausente/null quando
+   * desconhecida (UPLOAD humano, ou doc COURT capturado antes da coluna existir). É a
+   * data pela qual os autos são identificados; quando ausente, a UI cai para `created_at`
+   * rotulada como data de captura, nunca apresentada como data do ato.
+   */
+  court_event_date?: string | null;
 }
 
 // ── Upload presigned (3 passos) ──

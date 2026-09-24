@@ -1,147 +1,442 @@
 "use client";
 
-// Hook de integração da Triagem-pipeline (Fase U-FE + U0 follow-up). É a ÚNICA cola
-// entre o read model real (useIntimacoes — infinite query por cursor) e a UI. Não
-// inventa fetch: reusa useIntimacoes/usePipelineCounts; não duplica mutação: reusa os
-// hooks de use-intimacoes.ts. Agora o particionamento é SERVER-SIDE:
-//   • a lista pede só a lane ativa (?lifecycle=) + o segmento de "A triar" (?segmento=/
-//     ?is_excecao=), então os rows já vêm certos — sem .filter() client-side por lane;
-//   • os badges de aba/segmento leem do GET /v1/intimacoes/pipeline-counts (full backlog),
-//     não do comprimento da página. Os filtros COMPARTILHADOS (busca/urgência/responsável)
-//     vão pros dois (lista e counts), pra concordarem.
+// Hook de integração da Triagem-pipeline (Fase U-FE + revamp-mesa-trabalho-intimacoes:
+// UMA dimensão de abas). É a ÚNICA cola entre o read model real (useIntimacoes —
+// infinite query por cursor) e a UI. Não inventa fetch: reusa useIntimacoes/
+// usePipelineCounts; não duplica mutação: reusa os hooks de use-intimacoes.ts.
+//
+// EIXOS (docs/navigation-architecture.md §4 — CONTRATO ROOT):
+//   • Abas primárias (disposição, `?disposicao=`): Todas · Trabalho · Ciência ·
+//     Exceções. Independentes do lifecycle — o BE filtra `disposicao` para
+//     QUALQUER lifecycle (read.sql:296-310), não só a_triar.
+//   • Status (secundário, `?status=`, NativeSelect): Abertas (DEFAULT, união
+//     a_triar+em_andamento) · A decidir · Em andamento · Encerradas · Todas.
+//   • Refinar (`?refine=`, só dentro de "Todas"): Analisando · Sem prazo — os
+//     antigos segmentos transientes/residuais, agora um filtro secundário em vez
+//     de 2ª barra de abas.
+//
+// CONTRATO BE (mesma entrega, a89a4e): `?lifecycle=abertas` é aceito pelo servidor
+// como união a_triar+em_andamento numa query só — UMA lista, UM cursor, sort e
+// paginação de servidor preservados (nunca concat client-side de duas páginas, que
+// quebraria a paginação global). `TriagemBucketCounts.by_lifecycle` é a matriz
+// disposição×lifecycle que alimenta os badges das 4 abas sob QUALQUER status.
+// Enquanto a matriz não chegar (rollout em andamento), os badges de disposição
+// ficam em loading/sem número — nunca inferidos dos 8 campos legados (que só
+// cobrem a_triar) nem consultados via fan-out de queries dedicadas.
 
-import { TriangleAlert } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import type { FilterTab } from "@/features/intimacoes/components/shared/filter-tabs";
+import { useCaptures } from "@/features/captures/hooks/use-captures";
 import { useMe } from "@/features/onboarding/hooks/use-me";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { nomeExibicao } from "@/features/organization/lib/labels";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 
+import { useFiltrosDaFila } from "../../intimacoes/hooks/use-fila-navigation";
 import {
   useAssignIntimacaoResponsavelBatch,
-  useConfirmarPrazosConfiaveisEmLote,
   useDarCienciaEmLote,
   useIgnorarIntimacao,
   useIntimacoes,
   usePipelineCounts,
   useResolverIntimacao,
 } from "../../intimacoes/hooks/use-intimacoes";
+import { usePainelDetalhe } from "../../intimacoes/hooks/use-painel-detalhe";
+import { resumoLote } from "../../intimacoes/lib/batch-result";
 import { rotuloIntervalo } from "../../intimacoes/lib/intervalo-vencimento";
+import { vizinhosNaLista } from "../../intimacoes/lib/navegacao-sequencial";
+import {
+  construirUrgencyTabs,
+  rotuloUrgencia,
+} from "../../intimacoes/lib/urgencia-tabs";
 import type { IntimacaoView } from "../../intimacoes/types";
+import { resolverAssigneeScope } from "../lib/assignee-scope";
 import { type PipelineRow, pipelineRow } from "../lib/pipeline";
+import { useCapturaBoundedRefetch } from "./use-captura-bounded-refetch";
 
-export type PipelineLifecycle = "a_triar" | "em_andamento" | "concluido";
-/** Segmento interno de "A triar" — "all" (todos) + a PARTIÇÃO DISJUNTA (docs §4). */
-export type PipelineSegTab =
-  "all" | "trabalhar" | "excecoes" | "ciencia" | "sem-prazo" | "analisando";
+/** Status (eixo secundário, lifecycle) — NativeSelect. "abertas" é o DEFAULT (união
+ *  a_triar+em_andamento); "todas" ignora lifecycle por completo. */
+export type PipelineStatus =
+  "abertas" | "a_decidir" | "em_andamento" | "encerradas" | "todas";
 
-/** Atalhos de urgência do UrgenciaFilter — valores de wire ?urgencia= do BE
- *  (closed set espelhado de URGENCIA_TABS). */
-const URGENCIA_OPTIONS: { key: string; label: string }[] = [
-  { key: "atraso", label: "Em atraso" },
-  { key: "hoje", label: "Hoje" },
-  { key: "proximos_dois_dias", label: "Próximos 2 dias" },
-  { key: "semana", label: "Esta semana" },
-  { key: "este_mes", label: "Este mês" },
-  { key: "sem_data_definida", label: "Sem data" },
+/** Aba primária (eixo disposição) — "" = Todas. */
+export type PipelineDispTab = "" | "trabalho" | "ciencia" | "excecao";
+
+/** Refinamento secundário, só ativo dentro de "Todas" (disposição=""). */
+export type PipelineRefine = "" | "analisando" | "sem_prazo";
+
+const STATUSES: PipelineStatus[] = [
+  "abertas",
+  "a_decidir",
+  "em_andamento",
+  "encerradas",
+  "todas",
 ];
+// `url.get()` devolve "" tanto pra chave ausente quanto (hipoteticamente)
+// presente-e-vazia — por isso os conjuntos abaixo NÃO incluem "": incluí-la
+// faria uma chave AUSENTE passar no `.includes()` e nunca cair no fallback
+// legado. O gate de precedência (resolveDispTabERefine) usa estes dois — só
+// uma chave nova EXPLICITAMENTE preenchida (não-vazia) prevalece sobre o legado.
+const NON_EMPTY_DISP_TABS: PipelineDispTab[] = [
+  "trabalho",
+  "ciencia",
+  "excecao",
+];
+const NON_EMPTY_REFINES: PipelineRefine[] = ["analisando", "sem_prazo"];
 
-/** Mapa segmento (aba) → o filtro server-side ?disposicao (partição disjunta). */
-function segmentoParaFiltro(segment: PipelineSegTab): { disposicao?: string } {
-  switch (segment) {
-    case "trabalhar":
-      return { disposicao: "trabalho" };
-    case "excecoes":
-      return { disposicao: "excecao" };
-    case "ciencia":
-      return { disposicao: "ciencia" };
-    case "sem-prazo":
-      return { disposicao: "sem_prazo" };
-    case "analisando":
-      return { disposicao: "analisando" };
-    case "all":
+/** Status (wire) → lifecycle enviado ao BE. "abertas" e "todas" são valores de
+ *  wire que o SERVIDOR resolve (união/ausência de filtro) — nunca combinados
+ *  client-side. */
+export const STATUS_LIFECYCLE_WIRE: Record<PipelineStatus, string> = {
+  abertas: "abertas",
+  a_decidir: "a_triar",
+  em_andamento: "em_andamento",
+  encerradas: "concluido",
+  todas: "",
+};
+
+type TriagemLane = "a_triar" | "em_andamento" | "concluido";
+type TriagemLaneCell = {
+  total: number;
+  analisando: number;
+  trabalho: number;
+  excecao: number;
+  ciencia: number;
+  sem_prazo: number;
+};
+type TriagemMatrix = Record<TriagemLane, TriagemLaneCell>;
+
+/** Status → quais lanes da matriz `by_lifecycle` somar para o badge daquele
+ *  status ("abertas" soma a_triar+em_andamento; "todas" soma as 3). */
+export const LANES_DO_STATUS: Record<PipelineStatus, TriagemLane[]> = {
+  abertas: ["a_triar", "em_andamento"],
+  a_decidir: ["a_triar"],
+  em_andamento: ["em_andamento"],
+  encerradas: ["concluido"],
+  todas: ["a_triar", "em_andamento", "concluido"],
+};
+
+/** Soma a célula (disposição, ou "total" p/ a aba "Todas") da matriz sobre as
+ *  lanes do status — fonte ÚNICA dos badges de disposição/refinar sob qualquer
+ *  status. `matrix` ausente (rollout do BE ainda não chegou) → undefined
+ *  (loading/sem número); NUNCA inferido dos campos legados nem da página. */
+export function somaMatrizPorStatus(
+  matrix: TriagemMatrix | undefined,
+  status: PipelineStatus,
+  campo: keyof TriagemLaneCell,
+): number | undefined {
+  if (!matrix) return undefined;
+  return LANES_DO_STATUS[status].reduce(
+    (acc, lane) => acc + matrix[lane][campo],
+    0,
+  );
+}
+
+/** Legado ?tab= (lifecycle-como-aba) → ?status= novo. Compat de deep-link. */
+export function statusFromLegacyTab(tab: string): PipelineStatus | null {
+  switch (tab) {
+    case "a_triar":
+      return "a_decidir";
+    case "em_andamento":
+      return "em_andamento";
+    case "concluido":
+      return "encerradas";
     default:
-      return {};
+      return null;
   }
+}
+
+/** Legado ?segmento= (partição disjunta como filtro dentro de a_triar) →
+ *  {dispTab, refine} novos. Só fazia sentido com tab=a_triar (status=a_decidir). */
+export function dispRefineFromLegacySegmento(
+  segmento: string,
+): { dispTab: PipelineDispTab; refine: PipelineRefine } | null {
+  switch (segmento) {
+    case "all":
+      return { dispTab: "", refine: "" };
+    case "trabalhar":
+      return { dispTab: "trabalho", refine: "" };
+    case "excecoes":
+      return { dispTab: "excecao", refine: "" };
+    case "ciencia":
+      return { dispTab: "ciencia", refine: "" };
+    case "sem-prazo":
+      return { dispTab: "", refine: "sem_prazo" };
+    case "analisando":
+      return { dispTab: "", refine: "analisando" };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Resolve {dispTab, refine} com a precedência correta entre chaves novas
+ * (`?disposicao=`/`?refine=`) e o legado (`?tab=`+`?segmento=`):
+ *   1. `disposicao` EXPLICITAMENTE preenchida (não-vazia) prevalece sempre.
+ *   2. senão, `refine` explicitamente preenchida prevalece.
+ *   3. senão, cai no legado — MAS só se `segmento` fazia sentido na URL antiga:
+ *      o dropdown "Fila" só existia dentro de `tab=a_triar` (old default = "" =
+ *      a_triar); se `tab` antigo apontava pra `em_andamento`/`concluido`, o
+ *      `segmento` era IGNORADO pela lista mesmo que persistisse na URL (old
+ *      `useTriagemPipeline`: `disposicao: tab === "a_triar" ? ... : undefined`)
+ *      — não ressuscitar esse filtro stale fora do escopo em que ele valia.
+ *   4. senão, "Todas" sem refinamento (default).
+ * Pura e testável sem harness de URLSearchParams/React.
+ */
+export function resolveDispTabERefine(params: {
+  dispFromUrl: string;
+  refineFromUrl: string;
+  legacyTab: string;
+  legacySegmento: string;
+}): { dispTab: PipelineDispTab; refine: PipelineRefine } {
+  const { dispFromUrl, refineFromUrl, legacyTab, legacySegmento } = params;
+  if (NON_EMPTY_DISP_TABS.includes(dispFromUrl as PipelineDispTab)) {
+    return { dispTab: dispFromUrl as PipelineDispTab, refine: "" };
+  }
+  if (NON_EMPTY_REFINES.includes(refineFromUrl as PipelineRefine)) {
+    return { dispTab: "", refine: refineFromUrl as PipelineRefine };
+  }
+  const segmentoValiaNaUrlAntiga = legacyTab === "" || legacyTab === "a_triar";
+  if (segmentoValiaNaUrlAntiga && legacySegmento) {
+    const legacy = dispRefineFromLegacySegmento(legacySegmento);
+    if (legacy) return legacy;
+  }
+  return { dispTab: "", refine: "" };
+}
+
+/**
+ * S2 — sinal REAL de captura em andamento (mesmo campo que já dirige o poll
+ * bounded de `useCaptures`, nunca um estado inventado). Pura e testável sem
+ * harness de React Query: activation (alguma run "Em andamento") e terminal
+ * (nenhuma) são o mesmo predicado, então ligar/desligar é sempre coerente —
+ * não há um caminho de "ligado" sem nenhuma run ativa nem vice-versa.
+ */
+export function capturaEmAndamento(
+  runs: { display_status: string }[] | undefined,
+): boolean {
+  return (runs ?? []).some((r) => r.display_status === "Em andamento");
 }
 
 export function useTriagemPipeline() {
   const me = useMe();
   const members = useOrgMembersDirectory();
-
-  // Estado local da UI (client-side; sem URL params neste 1º incremento).
-  const [tab, setTab] = useState<PipelineLifecycle>("a_triar");
-  // Default "all": surface o VOLUME de trabalho (QA), não o subconjunto menor (Exceções).
-  const [segment, setSegment] = useState<PipelineSegTab>("all");
-  const [venc, setVenc] = useState<string>(""); // "" = Todas (valor de wire ?urgencia=)
-  const [dueFrom, setDueFrom] = useState<string>("");
-  const [dueTo, setDueTo] = useState<string>("");
-  // Faceta do popover "Filtrar" — Responsável (única suportada server-side).
-  const [respFilter, setRespFilter] = useState<string>(""); // ""|me|unassigned|<userId>
-  const [query, setQuery] = useState("");
-  const [density, setDensity] = useState<"confortavel" | "compacto">(
-    "confortavel",
-  );
+  const painel = usePainelDetalhe();
+  // URL-backed (mesmo helper do histórico de Intimações — useFiltrosDaFila):
+  // sobrevive a reload/back/forward/reload e é compartilhável. "Abrir na Mesa"
+  // (modo consulta do detalhe) já leva a ?tab=<lifecycle>&painel=<id>, e agora
+  // o restante dos filtros (segmento/busca/urgência/responsável/densidade)
+  // também persiste, em vez de reiniciar no default a cada navegação.
+  const url = useFiltrosDaFila();
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  // Qualquer mudança de FILTRO (não de exibição) reinicia cursor (automático —
+  // o queryKey muda) e seleção (docs: "reset cursor/selection com mudança de
+  // filtro"). `density` é display puro e não passa por aqui.
+  function change(values: Record<string, string | null>) {
+    url.set(values);
+    setSelected(new Set());
+  }
+
+  // ── Status (lifecycle) — com compat do legado ?tab= ─────────────────────────
+  const statusFromUrl = url.get("status");
+  const legacyTab = url.get("tab");
+  const status: PipelineStatus = STATUSES.includes(
+    statusFromUrl as PipelineStatus,
+  )
+    ? (statusFromUrl as PipelineStatus)
+    : (statusFromLegacyTab(legacyTab) ?? "abertas");
+  function setStatus(next: PipelineStatus) {
+    change({
+      status: next === "abertas" ? null : next,
+      tab: null, // grava só a chave nova; a leitura acima cobre o link antigo já salvo
+      // Sai de Encerradas → o sub-recorte "Prazo vencido" não se aplica mais.
+      ...(next !== "encerradas" ? { vencidas: null } : {}),
+    });
+  }
+
+  // ── Disposição (tabs primárias) + Refinar — com compat do legado ?segmento= ──
+  const dispFromUrl = url.get("disposicao");
+  const refineFromUrl = url.get("refine");
+  const legacySegmento = url.get("segmento");
+  const { dispTab, refine } = resolveDispTabERefine({
+    dispFromUrl,
+    refineFromUrl,
+    legacyTab,
+    legacySegmento,
+  });
+  function setDispTab(next: PipelineDispTab) {
+    change({
+      disposicao: next === "" ? null : next,
+      refine: null, // uma aba real (Trabalho/Ciência/Exceções) limpa o refinamento
+      segmento: null,
+    });
+  }
+  function setRefine(next: PipelineRefine) {
+    change({ refine: next === "" ? null : next, segmento: null });
+  }
+  // Wire real enviado ao BE: a aba OU o refinamento (dentro de "Todas") — nunca os dois.
+  const wireDisposicao = dispTab || refine || undefined;
+
+  // Recorte "Prazo vencido" — escopo PRÓPRIO dentro de Encerradas (docs/revamp-mesa-
+  // trabalho-intimacoes.md §4): nunca infla os contadores de outro status. O RECORTE
+  // em si é sempre um filtro real do servidor (workStage), nunca um .filter() sobre a
+  // página já carregada. Limpa a aba de disposição (o atalho não é restrito por ela).
+  const soVencidas = url.get("vencidas") === "1";
+
+  const venc = url.get("urgencia"); // "" = Todas (valor de wire ?urgencia=)
+  const dueFrom = url.get("due_from");
+  const dueTo = url.get("due_to");
+  function limparUrgencia() {
+    change({ urgencia: null, due_from: null, due_to: null });
+  }
+  function setIntervalo(from: string, to: string) {
+    change({ urgencia: null, due_from: from || null, due_to: to || null });
+  }
+
+  // "Minha visão" — eixo de responsável (docs/revamp-mesa-trabalho-intimacoes.md §8).
+  const respFilter = url.get("visao") || "minha_visao";
+  function setVisao(next: string) {
+    change({ visao: next === "minha_visao" ? null : next });
+  }
+
+  const query = url.get("q");
+  function setQuery(next: string) {
+    change({ q: next || null });
+  }
+
+  // Densidade é exibição pura — persiste na URL (reload/back preservam), mas
+  // NÃO reinicia seleção/cursor (não filtra dados).
+  const density: "confortavel" | "compacto" =
+    url.get("densidade") === "compacto" ? "compacto" : "confortavel";
+  function setDensity(next: "confortavel" | "compacto") {
+    url.set({ densidade: next === "confortavel" ? null : next });
+  }
+
+  function consultarVencidas() {
+    // Escopo próprio: nunca restrito pela aba de disposição ativa (§4 do contrato).
+    change({
+      status: "encerradas",
+      vencidas: "1",
+      disposicao: null,
+      refine: null,
+      segmento: null,
+    });
+  }
+  function limparVencidas() {
+    change({ vencidas: null });
+  }
+
   const meId = me.data?.user_id ?? null;
+  // Input segue a URL a cada tecla (sensação instantânea); só a REQUISIÇÃO
+  // debounça — mesma fonte do histórico de Intimações (useDebounce).
   const debouncedQuery = useDebounce(query, 400);
 
   // Filtros COMPARTILHADOS (busca/urgência/responsável) — vão pra lista E pros counts,
-  // pra os badges concordarem com o que a lista mostra. "me" resolve pro id interno.
-  const assignee =
-    respFilter === "me" ? (meId ?? undefined) : respFilter || undefined;
-  const sharedFilters = {
+  // pra os badges concordarem com o que a lista mostra.
+  const { assignee, assigneeScope } = resolverAssigneeScope(respFilter);
+  const sharedForServer = {
     search: debouncedQuery || undefined,
     urgencia: dueFrom || dueTo ? undefined : venc || undefined,
     dueFrom: dueFrom || undefined,
     dueTo: dueTo || undefined,
     assignee,
-  };
-  // "unassigned" não é um id — o BE não tem filtro nativo. Mantemos como client-side
-  // (filtra a lista carregada); os counts então não o refletem (documentado abaixo).
-  const assigneeUnassigned = respFilter === "unassigned";
-  const sharedForServer = {
-    ...sharedFilters,
-    assignee: assigneeUnassigned ? undefined : sharedFilters.assignee,
+    assigneeScope,
   };
 
-  const segFiltro = segmentoParaFiltro(segment);
+  // S2 (docs/qa-remediation-evidence/fe-operations-architecture.md): sinal REAL
+  // de captura em andamento — reusa `useCaptures` (já existe, já poll bounded
+  // sozinho enquanto alguma run está "Em andamento"; mesma queryKey/cache
+  // compartilhada com a tela Capturas, sem 2ª rede). Enquanto uma captura real
+  // está rodando, lista E badges da Mesa reabrem via refetch bounded; ao
+  // concluir, `importActive` cai e o refetch desliga sozinho (auto-off real,
+  // sem subsistema novo, sem polling permanente).
+  const capturas = useCaptures();
+  const importActive = capturaEmAndamento(capturas.data?.runs);
+  const IMPORT_REFETCH_MS = 4_000;
+  // Teto de duração do poll bounded (stall guard) — se uma captura ficar
+  // "Em andamento" por mais que isto, o refetch desliga mesmo assim (nunca
+  // um polling permanente por um run travado). 10min: alto o bastante pra
+  // não cortar uma captura real em andamento, baixo o bastante pra nunca
+  // ficar pra sempre.
+  const IMPORT_MAX_POLL_MS = 10 * 60 * 1000;
+  // Refetch FINAL único na transição running→terminal (ver
+  // use-captura-bounded-refetch.ts) — indireção por ref porque `list`/
+  // `pipeline` ainda não existem neste ponto do corpo da função; o ref é
+  // atualizado logo abaixo, sempre ANTES do efeito que o consome disparar
+  // (efeitos só rodam após o commit do render inteiro).
+  const refetchNaTransicaoRef = useRef<() => void>(() => {});
+  const { pollIntervalMs } = useCapturaBoundedRefetch(
+    importActive,
+    IMPORT_REFETCH_MS,
+    IMPORT_MAX_POLL_MS,
+    () => refetchNaTransicaoRef.current(),
+  );
 
-  // Lista real da LANE ativa: ?lifecycle=<tab> + (dentro de a_triar) ?disposicao=<segmento>.
-  // O BE já devolve o conjunto certo (partição disjunta) — sem partição client-side. Por prazo.
+  // Lista real do STATUS ativo (uma lane só, sort e paginação de SERVIDOR
+  // preservados) — "abertas" e "todas" são valores de wire que o BE resolve
+  // (união/sem filtro), nunca uma composição client-side de duas páginas.
   const list = useIntimacoes({
     ...sharedForServer,
-    lifecycle: tab,
-    disposicao: tab === "a_triar" ? segFiltro.disposicao : undefined,
+    lifecycle: STATUS_LIFECYCLE_WIRE[status],
+    disposicao: wireDisposicao,
+    workStage: status === "encerradas" && soVencidas ? "VENCIDA" : undefined,
     sort: "deadline",
     limit: 50,
     prefetchNextPage: true,
+    refetchIntervalMs: pollIntervalMs,
   });
 
-  // Counts full-backlog — só os filtros compartilhados (NÃO lifecycle/segmento).
-  const pipeline = usePipelineCounts({
-    search: sharedForServer.search,
-    urgencia: sharedForServer.urgencia,
-    due_from: sharedForServer.dueFrom,
-    due_to: sharedForServer.dueTo,
-    assignee: sharedForServer.assignee,
+  // Counts full-backlog — só os filtros compartilhados (NÃO lifecycle/disposição).
+  const pipeline = usePipelineCounts(
+    {
+      search: sharedForServer.search,
+      urgencia: sharedForServer.urgencia,
+      due_from: sharedForServer.dueFrom,
+      due_to: sharedForServer.dueTo,
+      assignee: sharedForServer.assignee,
+      assignee_scope: sharedForServer.assigneeScope,
+    },
+    true,
+    pollIntervalMs,
+  );
+
+  // Sempre a versão mais recente de list/pipeline — a transição running→terminal
+  // pode disparar em QUALQUER render; nunca uma referência velha (stale closure).
+  // Escrita de ref só é permitida FORA do render (react-hooks/refs) — daí o efeito.
+  useEffect(() => {
+    refetchNaTransicaoRef.current = () => {
+      void list.refetch();
+      void pipeline.refetch();
+    };
   });
-  const counts = {
-    a_triar: pipeline.counts.a_triar,
-    em_andamento: pipeline.counts.em_andamento,
-    concluido: pipeline.counts.concluido,
+
+  // "Prazo vencido" — contagem de ESCOPO PRÓPRIO (não soma em counts.*), requisição
+  // real dedicada (lifecycle=concluido + work_stage=VENCIDA), não .filter().length.
+  const vencidaCount = useIntimacoes({
+    ...sharedForServer,
+    lifecycle: "concluido",
+    workStage: "VENCIDA",
+    limit: 1,
+  });
+
+  // ── Badges (Todas/Trabalho/Ciência/Exceções + Refinar) — SEMPRE da matriz
+  // `by_lifecycle` (aditiva, mesma entrega BE). Ausente = loading/sem número em
+  // TODOS os status: nunca inferido dos 8 campos legados nem consultado via
+  // fan-out de queries dedicadas (o rollout da matriz é a fonte única aqui). ──
+  const matrix = pipeline.counts.by_lifecycle;
+
+  const tabCounts: Record<PipelineDispTab, number | undefined> = {
+    "": somaMatrizPorStatus(matrix, status, "total"),
+    trabalho: somaMatrizPorStatus(matrix, status, "trabalho"),
+    ciencia: somaMatrizPorStatus(matrix, status, "ciencia"),
+    excecao: somaMatrizPorStatus(matrix, status, "excecao"),
   };
-  const segCounts = {
-    all: pipeline.counts.a_triar,
-    trabalhar: pipeline.counts.trabalho,
-    excecoes: pipeline.counts.excecao,
-    ciencia: pipeline.counts.ciencia,
-    "sem-prazo": pipeline.counts.sem_prazo,
-    analisando: pipeline.counts.analisando,
+
+  // "Refinar" (Analisando/Sem prazo) — mesma matriz, mesmas lanes do status ativo.
+  const refineCounts = {
+    analisando: somaMatrizPorStatus(matrix, status, "analisando") ?? 0,
+    sem_prazo: somaMatrizPorStatus(matrix, status, "sem_prazo") ?? 0,
   };
 
   const memberOptions = useMemo(
@@ -165,55 +460,68 @@ export function useTriagemPipeline() {
     }));
   }, [list.intimacoes, memberOptions]);
 
-  // "Sem responsável" (unassigned) fica como recorte client-side sobre a lane já
-  // filtrada pelo servidor (o BE não tem esse filtro nativo).
-  const rows = useMemo(() => {
-    const mapped = enriched.map(pipelineRow);
-    return assigneeUnassigned
-      ? mapped.filter((r) => r.responsavelId === null)
-      : mapped;
-  }, [enriched, assigneeUnassigned]);
+  const rows = useMemo(() => enriched.map(pipelineRow), [enriched]);
 
-  // A lista JÁ vem filtrada pela lane/segmento no servidor — o que está carregado é
+  // A lista JÁ vem filtrada pela lane/disposição no servidor — o que está carregado é
   // exatamente o recorte a exibir.
   const filtered = rows;
+  // Elegibilidade de triagem (checkbox/bulk/RowTriar) é POR ITEM em views mistas
+  // (Abertas/Todas combinam lifecycles): só a_triar é mutável/selecionável.
+  const triagemEligibleIds = useMemo(
+    () => filtered.filter((r) => r.lifecycle === "a_triar").map((r) => r.id),
+    [filtered],
+  );
+
+  // Navegação sequencial do painel contextual — sobre a MESMA lane/recorte visível
+  // (docs/revamp-mesa-trabalho-intimacoes.md §4), não uma fila separada.
+  const { anterior: painelAnterior, proxima: painelProxima } = vizinhosNaLista(
+    filtered,
+    painel.id,
+  );
 
   // ── Mutações reais ──────────────────────────────────────────────────────────
   const resolver = useResolverIntimacao();
   const ignorar = useIgnorarIntimacao();
-  const confirmBatch = useConfirmarPrazosConfiaveisEmLote();
   const cienciaBatch = useDarCienciaEmLote();
   const assignBatch = useAssignIntimacaoResponsavelBatch();
+
+  // Fluxo sequencial (docs §4): após sucesso de uma ação elegível sobre o item
+  // ABERTO no painel, segue ao próximo (ou fecha, se não houver) — sem retornar
+  // ao início da lista nem perder o recorte/posição.
+  function avancarSePainelAberto(ids: string[]) {
+    if (!painel.id || !ids.includes(painel.id)) return;
+    if (painelProxima) painel.abrir(painelProxima.id);
+    else painel.fechar();
+  }
+
+  // Sinal do PRÓPRIO painel (Dar ciência/Resolver/Ignorar disparados de dentro
+  // do detalhe, não da linha) — mesmo avanço, para o item atualmente aberto.
+  // Nunca chamado por "Gerar peça" (preserva sua navegação para o editor).
+  function avancarPainelAtual() {
+    if (!painel.id) return;
+    avancarSePainelAberto([painel.id]);
+  }
 
   async function darCiencia(ids: string[]) {
     if (ids.length === 0) return;
     try {
-      const n = await cienciaBatch.mutateAsync(ids);
-      toast.success(
-        `Ciência registrada em ${n.toLocaleString("pt-BR")} ${n === 1 ? "item" : "itens"}.`,
-      );
-      deselecionar(ids);
+      const result = await cienciaBatch.mutateAsync(ids);
+      // Fan-out por id (sem endpoint em lote no BE) — erro parcial é recuperável:
+      // só o que teve sucesso sai da seleção; o que falhou PERMANECE selecionado
+      // (nunca removido) para nova tentativa.
+      const { mensagens } = resumoLote(result, {
+        singular: "item",
+        plural: "itens",
+      });
+      for (const m of mensagens) {
+        if (m.tom === "success")
+          toast.success(`Ciência registrada em ${m.texto}`);
+        else toast.error(m.texto);
+      }
+      deselecionar(result.succeeded);
+      avancarSePainelAberto(result.succeeded);
     } catch {
       toast.error("Não foi possível registrar a ciência.");
-    }
-  }
-
-  async function confirmar(ids: string[]) {
-    if (ids.length === 0) return;
-    try {
-      const { affected } = await confirmBatch.mutateAsync(ids);
-      // O BE só confirma a faixa confiável (exceções/vencidos ficam de fora): affected=0 NÃO
-      // é sucesso — avisa em vez de um "0 prazos confirmados" verde enganoso (QA D3).
-      if (affected === 0) {
-        toast.info("Nenhum prazo confiável para confirmar neste recorte.");
-      } else {
-        toast.success(
-          `${affected.toLocaleString("pt-BR")} ${affected === 1 ? "prazo confirmado" : "prazos confirmados"}.`,
-        );
-      }
-      deselecionar(ids);
-    } catch {
-      toast.error("Não foi possível confirmar os prazos.");
     }
   }
 
@@ -222,6 +530,7 @@ export function useTriagemPipeline() {
       await ignorar.mutateAsync(id);
       toast.success("Intimação descartada.");
       deselecionar([id]);
+      avancarSePainelAberto([id]);
     } catch {
       toast.error("Não foi possível descartar a intimação.");
     }
@@ -232,6 +541,7 @@ export function useTriagemPipeline() {
       await resolver.mutateAsync(id);
       toast.success("Ciência registrada.");
       deselecionar([id]);
+      avancarSePainelAberto([id]);
     } catch {
       toast.error("Não foi possível registrar a ciência.");
     }
@@ -240,21 +550,35 @@ export function useTriagemPipeline() {
   async function atribuir(ids: string[], memberId: string | null) {
     if (ids.length === 0) return;
     try {
-      await assignBatch.mutateAsync({ ids, assigneeUserId: memberId });
+      const result = await assignBatch.mutateAsync({
+        ids,
+        assigneeUserId: memberId,
+      });
       const nome = memberId
         ? (memberOptions.find((m) => m.id === memberId)?.nome ?? "responsável")
         : null;
-      toast.success(nome ? `Responsável: ${nome}.` : "Responsável removido.");
+      const rotulo = nome ? `Responsável: ${nome}` : "Responsável removido";
+      // Fan-out por id — erro parcial é recuperável: o item que falhou permanece
+      // selecionado (nunca removido da seleção) para nova tentativa. Atribuir não
+      // retira o item da vista, então a seleção em si não muda no sucesso —
+      // preserva o encadeamento de ações (ex.: atribuir e então dar ciência).
+      if (result.succeeded.length > 0) toast.success(`${rotulo}.`);
+      if (result.failed.length > 0) {
+        const n = result.failed.length;
+        toast.error(
+          `${n.toLocaleString("pt-BR")} ${n === 1 ? "item" : "itens"} — falha ao definir responsável; ${n === 1 ? "permanece selecionado" : "permanecem selecionados"} para nova tentativa.`,
+        );
+      }
     } catch {
       toast.error("Não foi possível definir o responsável.");
     }
   }
 
-  // ── Seleção (Gmail-style) ────────────────────────────────────────────────────
-  const visibleIds = filtered.map((r) => r.id);
+  // ── Seleção (Gmail-style) — restrita aos itens ELEGÍVEIS (a_triar) em views mistas ──
   const allVisibleSelected =
-    visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
-  const selectedIds = visibleIds.filter((id) => selected.has(id));
+    triagemEligibleIds.length > 0 &&
+    triagemEligibleIds.every((id) => selected.has(id));
+  const selectedIds = triagemEligibleIds.filter((id) => selected.has(id));
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -268,10 +592,10 @@ export function useTriagemPipeline() {
     setSelected((prev) => {
       if (allVisibleSelected) {
         const n = new Set(prev);
-        visibleIds.forEach((id) => n.delete(id));
+        triagemEligibleIds.forEach((id) => n.delete(id));
         return n;
       }
-      return new Set([...prev, ...visibleIds]);
+      return new Set([...prev, ...triagemEligibleIds]);
     });
   }
   function deselecionar(ids: string[]) {
@@ -288,131 +612,118 @@ export function useTriagemPipeline() {
     return map;
   }, [rows]);
 
-  // ── Faceta do popover "Filtrar" (ListToolbar) ───────────────────────────────
-  // Só "Responsável" — é o único filtro compartilhado que o BE (lista E counts)
-  // suporta. Mesma forma que o useListagemIntimacoes monta m.filters/m.active/m.clear.
-  const respOptions = [
-    { value: "me", label: "Minhas" },
+  // ── "Minha visão" (docs §8) — controle DEDICADO no toolbar, fora do popover
+  // "Filtrar" (que na Mesa não sobra nenhuma outra faceta). Default: minha_visao
+  // (mine_or_unassigned). "todos" = Todo o escritório (conforme permissões) — um
+  // sentinela NÃO-vazio (string vazia colidiria com "ausente" no useUrlFilters).
+  const visaoOptions = [
+    { value: "minha_visao", label: "Minha visão" },
+    { value: "mine", label: "Minhas" },
     { value: "unassigned", label: "Sem responsável" },
+    { value: "todos", label: "Todo o escritório" },
     ...memberOptions.map((m) => ({ value: m.id, label: m.nome })),
   ];
-  const filters = [
-    {
-      key: "assignee",
-      label: "Responsável",
-      value: respFilter,
-      options: respOptions,
-      onChange: setRespFilter,
-    },
+  // NativeSelect de status — Abertas (default) primeiro, depois o detalhamento.
+  const statusOptions: { value: PipelineStatus; label: string }[] = [
+    { value: "abertas", label: "Abertas" },
+    { value: "a_decidir", label: "A decidir" },
+    { value: "em_andamento", label: "Em andamento" },
+    { value: "encerradas", label: "Encerradas" },
+    { value: "todas", label: "Todas" },
   ];
-  const active = filters
-    .filter((f) => f.value)
-    .map((f) => ({
-      key: f.key,
-      label: `${f.label}: ${f.options.find((o) => o.value === f.value)?.label ?? f.value}`,
-      remove: () => f.onChange(""),
-    }));
-  if (venc || dueFrom || dueTo)
-    active.push({
-      key: "urgencia",
-      label: `Vencimento: ${
-        dueFrom || dueTo
-          ? rotuloIntervalo(dueFrom, dueTo)
-          : (URGENCIA_OPTIONS.find((o) => o.key === venc)?.label ?? venc)
-      }`,
-      remove: () => limparUrgencia(),
-    });
-
-  function limparUrgencia() {
-    setVenc("");
-    setDueFrom("");
-    setDueTo("");
-  }
-  function clear() {
-    setRespFilter("");
-    limparUrgencia();
-  }
-  function setIntervalo(from: string, to: string) {
-    setVenc("");
-    setDueFrom(from);
-    setDueTo(to);
-  }
-
-  // Tabs de urgência do UrgenciaFilter (FilterTab[], como as tabs de Intimações).
-  const urgencyTabs: FilterTab[] = [
-    {
-      key: "",
-      label: "Todas",
-      ativo: !venc && !dueFrom && !dueTo,
-      onClick: () => limparUrgencia(),
-    },
-    ...URGENCIA_OPTIONS.map((o) => ({
-      key: o.key,
-      label: o.label,
-      ativo: venc === o.key,
-      onClick: () => {
-        setDueFrom("");
-        setDueTo("");
-        setVenc(o.key);
-      },
-    })),
-  ];
-
-  // Tabs de segmento (FilterTabs do DS) = a PARTIÇÃO DISJUNTA de "A triar". "Tudo" é o
-  // landing (volume); "Pra trabalhar" EXCLUI exceções (o bug do overlap morreu). "Analisando"
-  // só aparece quando há item transiente (motor ainda classificando), pra não poluir.
-  const segmentTabs: FilterTab[] = [
-    {
-      key: "all",
-      label: "Tudo",
-      count: segCounts.all,
-      ativo: segment === "all",
-      onClick: () => setSegment("all"),
-    },
-    {
-      key: "trabalhar",
-      label: "Pra trabalhar",
-      count: segCounts.trabalhar,
-      ativo: segment === "trabalhar",
-      onClick: () => setSegment("trabalhar"),
-    },
-    {
-      key: "excecoes",
-      label: "Exceções",
-      count: segCounts.excecoes,
-      ativo: segment === "excecoes",
-      onClick: () => setSegment("excecoes"),
-      icon: TriangleAlert,
-      emphasis: true,
-    },
-    {
-      key: "ciencia",
-      label: "Ciências",
-      count: segCounts.ciencia,
-      ativo: segment === "ciencia",
-      onClick: () => setSegment("ciencia"),
-    },
-    {
-      key: "sem-prazo",
-      label: "Sem prazo",
-      count: segCounts["sem-prazo"],
-      ativo: segment === "sem-prazo",
-      onClick: () => setSegment("sem-prazo"),
-    },
-    ...(segCounts.analisando > 0 || segment === "analisando"
+  // "Refinar" — só ofertado quando há volume (item transiente/residual existe) ou já
+  // está ativo (não desaparece debaixo do usuário ao navegar).
+  const refineOptions: {
+    value: PipelineRefine;
+    label: string;
+    count: number;
+  }[] = [
+    { value: "", label: "Tudo", count: 0 },
+    ...(refineCounts.analisando > 0 || refine === "analisando"
       ? [
           {
-            key: "analisando",
+            value: "analisando" as PipelineRefine,
             label: "Analisando",
-            count: segCounts.analisando,
-            ativo: segment === "analisando",
-            onClick: () => setSegment("analisando"),
+            count: refineCounts.analisando,
+          },
+        ]
+      : []),
+    ...(refineCounts.sem_prazo > 0 || refine === "sem_prazo"
+      ? [
+          {
+            value: "sem_prazo" as PipelineRefine,
+            label: "Sem prazo",
+            count: refineCounts.sem_prazo,
           },
         ]
       : []),
   ];
+  // Filtrar popover: nenhuma faceta própria na Mesa (responsável virou "Minha visão").
+  const filters: {
+    key: string;
+    label: string;
+    value: string;
+    options: { value: string; label: string }[];
+    onChange: (value: string) => void;
+  }[] = [];
+  const activeFilters: { key: string; label: string; remove: () => void }[] =
+    [];
+  if (venc || dueFrom || dueTo)
+    activeFilters.push({
+      key: "urgencia",
+      label: `Vencimento: ${
+        dueFrom || dueTo
+          ? rotuloIntervalo(dueFrom, dueTo)
+          : rotuloUrgencia(venc)
+      }`,
+      remove: () => limparUrgencia(),
+    });
+  if (refine)
+    activeFilters.push({
+      key: "refine",
+      label: `Refinar: ${refine === "analisando" ? "Analisando" : "Sem prazo"}`,
+      remove: () => setRefine(""),
+    });
+
+  // "Limpar todos os filtros" (ListToolbar.onClear) — zera os filtros da toolbar,
+  // preserva a aba de disposição e o status ativos (não são "filtro" no popover, são
+  // navegação). O recorte "Prazo vencido" NÃO entra aqui: escopo próprio (só em
+  // Encerradas) com clear dedicado ("Ver todas as encerradas").
+  function clear() {
+    change({
+      refine: null,
+      visao: null,
+      urgencia: null,
+      due_from: null,
+      due_to: null,
+    });
+  }
+
+  // Tabs de urgência do UrgenciaFilter — MESMA fonte canônica do histórico de
+  // Intimações (construirUrgencyTabs): rótulos honestos dos buckets disjuntos +
+  // contagens REAIS do servidor (list.buckets / totalWithoutUrgency, não a página).
+  const urgencyTabs = construirUrgencyTabs({
+    buckets: list.buckets,
+    totalWithoutUrgency: list.totalWithoutUrgency,
+    urgency: venc || "",
+    temIntervalo: !!(dueFrom || dueTo),
+    incluirSemData: false,
+    onSelecionar: (value) =>
+      value
+        ? change({ urgencia: value, due_from: null, due_to: null })
+        : limparUrgencia(),
+  });
 
   return {
+    // painel contextual (docs/revamp-mesa-trabalho-intimacoes.md §4)
+    painelId: painel.id,
+    abrirPainel: painel.abrir,
+    fecharPainel: painel.fechar,
+    painelTemAnterior: !!painelAnterior,
+    painelTemProxima: !!painelProxima,
+    painelAnterior: () => painelAnterior && painel.abrir(painelAnterior.id),
+    painelProxima: () => painelProxima && painel.abrir(painelProxima.id),
+    painelOnAcaoConcluida: avancarPainelAtual,
     // fetch state
     isPending: list.isPending,
     isFetching: list.isFetching,
@@ -427,36 +738,48 @@ export function useTriagemPipeline() {
     // members
     members: memberOptions,
     meId,
-    // tabs / filtros (padrão ListToolbar/FilterTabs)
-    tab,
-    setTab,
-    segment,
-    segmentTabs,
+    // status (lifecycle, NativeSelect) + abas de disposição + refinar
+    status,
+    setStatus,
+    statusOptions,
+    dispTab,
+    setDispTab,
+    refine,
+    setRefine,
+    refineOptions,
+    tabCounts,
+    countsPending: pipeline.isPending,
     query,
     setQuery,
     density,
     setDensity,
-    counts,
-    segCounts,
-    countsPending: pipeline.isPending,
+    // "Prazo vencido" — escopo próprio (fora de counts/tabCounts), com consulta dedicada.
+    vencidaCount: vencidaCount.totalCount,
+    vencidaCountPending: vencidaCount.isPending,
+    soVencidas,
+    consultarVencidas,
+    limparVencidas,
     // toolbar padrão
     filters,
-    active,
+    active: activeFilters,
     clear,
+    // "Minha visão" — controle dedicado (docs §8)
+    visao: respFilter,
+    setVisao,
+    visaoOptions,
     urgencyTabs,
     urgency: venc,
     dueFrom,
     dueTo,
     setIntervalo,
-    // dados da lane ATIVA (o BE já devolve só ela) — a_triar usa triarFiltered;
-    // em_andamento/concluido usam laneRows (mesma fonte, tab diferente).
-    triarFiltered: filtered,
+    // linhas do recorte ativo — MISTAS quando status=abertas/todas (RowTriar/RowReadonly
+    // escolhidos por item, ver triagem-view.tsx: PipelineRow.lifecycle).
     laneRows: filtered,
-    // seleção
+    triagemEligibleIds,
+    // seleção (só sobre itens elegíveis — a_triar)
     selected,
     selectedIds,
     allVisibleSelected,
-    visibleIds,
     toggleSelect,
     toggleSelectAllVisible,
     clearSelection: () => setSelected(new Set()),
@@ -464,15 +787,11 @@ export function useTriagemPipeline() {
     // mutações
     darCiencia,
     darCienciaUnica,
-    confirmar,
     descartar,
     atribuir,
-    // flags "sem endpoint real" (ver TODO na view)
-    adiarDisponivel: false,
     mutating:
       resolver.isPending ||
       ignorar.isPending ||
-      confirmBatch.isPending ||
       cienciaBatch.isPending ||
       assignBatch.isPending,
   };

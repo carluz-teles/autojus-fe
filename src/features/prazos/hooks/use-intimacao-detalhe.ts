@@ -14,7 +14,7 @@ import {
   useResolverIntimacao,
 } from "@/features/intimacoes/hooks/use-intimacoes";
 import { estadoIntimacao } from "@/features/intimacoes/lib/estado";
-import { TYPE_LABEL } from "@/features/intimacoes/lib/labels";
+import { tituloIntimacao, TYPE_LABEL } from "@/features/intimacoes/lib/labels";
 import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
 import type {
   IntimacaoDetalheView,
@@ -292,7 +292,7 @@ function useModel(i: IntimacaoDetalheView | undefined) {
       cnj: formatarCNJ(i.cnj_number),
       courtRecordId: i.court_record_id,
       // Identidade estável antes e depois da análise.
-      titulo: i.title,
+      titulo: tituloIntimacao(i.title),
       autor: i.autor,
       reu: i.reu,
       fonte: i.source,
@@ -368,7 +368,17 @@ function useModel(i: IntimacaoDetalheView | undefined) {
 
 // Hook público do detalhe da intimação (unidade de trabalho). Compõe os hooks
 // reais da feature intimacoes e expõe uma VM limpa + handlers para a UI ligar.
-export function useIntimacaoDetalhe(id: string) {
+export function useIntimacaoDetalhe(
+  id: string,
+  opts?: {
+    /** Chamado quando "Marcar como resolvida" ou "Ignorar" COMPLETA/remove a
+     *  intimação da fila ativa — sinaliza ao painel contextual (Mesa) que pode
+     *  avançar ao próximo item (docs/revamp-mesa-trabalho-intimacoes.md §4).
+     *  Nunca em erro, nunca em "Reabrir" (desfaz um desfecho, não completa
+     *  nada) nem em "Gerar peça" (navega para o editor). */
+    onAcaoConcluida?: () => void;
+  },
+) {
   const queryClient = useQueryClient();
   const query = useIntimacaoDetalheQuery(id);
   const i = query.data;
@@ -464,13 +474,19 @@ export function useIntimacaoDetalhe(id: string) {
 
   const onResolver = () =>
     resolver.mutate(id, {
-      onSuccess: () => toast.success("Intimação resolvida."),
+      onSuccess: () => {
+        toast.success("Intimação resolvida.");
+        opts?.onAcaoConcluida?.();
+      },
       onError: () => toast.error("Não foi possível resolver. Tente novamente."),
     });
 
   const onIgnorar = () =>
     ignorar.mutate(id, {
-      onSuccess: () => toast.success("Intimação ignorada."),
+      onSuccess: () => {
+        toast.success("Intimação ignorada.");
+        opts?.onAcaoConcluida?.();
+      },
       onError: () => toast.error("Não foi possível ignorar. Tente novamente."),
     });
 

@@ -5,43 +5,12 @@
 // recebem props derivadas e renderizam. Reusam os tokens do design system
 // (font-display serif, font-mono, --gold/--green/--blue, Badge/Checkbox do DS).
 
-import { Clock, TriangleAlert, UserRound } from "lucide-react";
+import { Clock, TriangleAlert } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-import type {
-  IntimacaoEstado,
-  IntimacaoEstadoTone,
-} from "../../../intimacoes/lib/estado";
 import type { IntimacaoCategoriaCoarse } from "../../../intimacoes/types";
 import type { PipelinePrazo } from "../../lib/pipeline";
-
-export function iniciais(name: string): string {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase();
-}
-
-/** Avatar compacto do responsável (20px) ou traço tracejado "sem responsável". */
-export function RespAvatar({ nome }: { nome: string | null }) {
-  return (
-    <span className="shrink-0" aria-hidden title={nome ?? "Sem responsável"}>
-      {nome ? (
-        <span className="bg-primary/12 text-primary grid size-5 place-items-center rounded-full text-[0.55rem] font-semibold">
-          {iniciais(nome)}
-        </span>
-      ) : (
-        <span className="border-line text-fg3 grid size-5 place-items-center rounded-full border border-dashed">
-          <UserRound className="size-3" />
-        </span>
-      )}
-    </span>
-  );
-}
 
 /** Chip grosso da categoria coarse — pequeno, neutro/outline. */
 export function CategoriaChip({
@@ -61,46 +30,84 @@ export function CategoriaChip({
   );
 }
 
-/** Pill compacta de prazo — data curta + relativo; cor por urgência; hint
- *  provisório (*) e dual date interno. */
-export function PrazoBadge({ prazo }: { prazo: PipelinePrazo }) {
+/**
+ * Prazo em DESTAQUE — a âncora visual da linha da Mesa (redesign da linha, docs
+ * §4; ui-ux-pro-max §5 visual-hierarchy + §6 number-tabular). Bloco tonalizado
+ * por urgência: data fatal grande e tabular no topo, relativo + prazo interno
+ * embaixo. Recebe PipelinePrazo, fonte única de datas e tom da linha.
+ */
+export function PrazoDestaque({
+  prazo,
+  dense = false,
+}: {
+  prazo: PipelinePrazo;
+  /** Compacto: pílula de UMA linha (mesma info, menos altura), para a densidade
+   *  "compacto" da lista. Padrão: bloco de duas linhas com a data em destaque. */
+  dense?: boolean;
+}) {
   if (prazo.tone === "sem-prazo") {
     return (
-      <span className="text-fg3 inline-flex shrink-0 items-center gap-1 text-[11px]">
-        <Clock className="size-3" aria-hidden />
-        sem prazo
+      <span className="text-fg3 inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-dashed px-2 py-1 text-[12px]">
+        <Clock className="size-3.5" aria-hidden />
+        Sem prazo
       </span>
     );
   }
   const cls =
     prazo.tone === "vencido"
-      ? "border-destructive/30 bg-destructive/10 text-destructive"
+      ? "border-destructive/30 bg-destructive/8 text-destructive"
       : prazo.tone === "urgente"
         ? "border-gold/35 bg-gold/10 text-gold-foreground"
-        : "border-border bg-transparent text-muted-foreground";
+        : "border-border bg-card text-foreground/80";
   const internoTitle = prazo.internoCurto
     ? ` · interno ${prazo.internoCurto}`
     : "";
+  const title = prazo.fatalLongo
+    ? `vence ${prazo.fatalLongo}${internoTitle}${prazo.provisorio ? " (provisório)" : ""}`
+    : undefined;
+
+  if (dense) {
+    return (
+      <span
+        className={cn(
+          "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border px-2 py-1 text-[11.5px] font-medium tabular-nums",
+          cls,
+        )}
+        title={title}
+      >
+        <Clock className="size-3.5 shrink-0" aria-hidden />
+        <span className="font-semibold">
+          {prazo.fatalCurto}
+          {prazo.provisorio ? "*" : ""}
+        </span>
+        <span className="opacity-80">· {prazo.relativo}</span>
+        {prazo.internoCurto ? (
+          <span className="opacity-60">· int. {prazo.internoCurto}</span>
+        ) : null}
+      </span>
+    );
+  }
+
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-px text-[11px] font-medium tabular-nums",
+        "inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border px-2.5 py-1",
         cls,
       )}
-      title={
-        prazo.fatalLongo
-          ? `vence ${prazo.fatalLongo}${internoTitle}${prazo.provisorio ? " (provisório)" : ""}`
-          : undefined
-      }
+      title={title}
     >
-      <Clock className="size-3" aria-hidden />
-      {prazo.fatalCurto} · {prazo.relativo}
-      {prazo.provisorio ? "*" : ""}
-      {prazo.internoCurto ? (
-        <span className="text-fg3 ml-0.5 font-normal">
-          int. {prazo.internoCurto}
+      <Clock className="size-4 shrink-0" aria-hidden />
+      {/* conteúdo centrado dentro do chip (pedido do usuário) */}
+      <span className="flex flex-col items-center text-center leading-none">
+        <span className="text-[14px] font-semibold tabular-nums">
+          {prazo.fatalCurto}
+          {prazo.provisorio ? "*" : ""}
         </span>
-      ) : null}
+        <span className="mt-0.5 text-[10.5px] font-medium tabular-nums opacity-80">
+          {prazo.relativo}
+          {prazo.internoCurto ? ` · int. ${prazo.internoCurto}` : ""}
+        </span>
+      </span>
     </span>
   );
 }
@@ -117,29 +124,3 @@ export function ExcecaoDot({ motivo }: { motivo?: string }) {
     </span>
   );
 }
-
-const ESTADO_COR: Record<IntimacaoEstadoTone, string> = {
-  pending: "var(--gold)",
-  progress: "var(--blue)",
-  done: "var(--green)",
-  muted: "var(--fg3)",
-};
-
-/** Chip de estado (desfecho) — reusa a fonte única estadoIntimacao (estado.ts). */
-export function EstadoChip({ estado }: { estado: IntimacaoEstado }) {
-  return (
-    <span
-      className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium"
-      style={{ color: estado.cor, backgroundColor: estado.fundo }}
-    >
-      <span
-        className="size-1.5 rounded-full"
-        style={{ backgroundColor: estado.cor }}
-        aria-hidden
-      />
-      {estado.label}
-    </span>
-  );
-}
-
-export { ESTADO_COR };

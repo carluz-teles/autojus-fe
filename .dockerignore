@@ -5,5 +5,23 @@ out
 e2e
 playwright.config.ts
 .env*
+**/.env*
 !.env.example
 npm-debug.log*
+
+# Local scratch, alternate checkouts, and private development state
+/tmp
+/.claude
+/.codex
+/.agents
+/.worktrees
+
+# Private certificates, key material and local database dumps at any depth
+**/*.pfx
+**/*.p12
+**/*.pem
+**/*.key
+**/*.dump
+**/*.bak
+**/*.backup
+**/*.sql.gz

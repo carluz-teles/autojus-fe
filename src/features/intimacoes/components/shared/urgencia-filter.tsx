@@ -23,7 +23,13 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-import { dataDoFiltro } from "../../lib/intervalo-vencimento";
+import {
+  brParaISO,
+  dataDoFiltro,
+  intervaloMesAtual,
+  isoParaBR,
+  mascararDataBR,
+} from "../../lib/intervalo-vencimento";
 import type { FilterTab } from "./filter-tabs";
 
 export function UrgenciaFilter({
@@ -114,6 +120,25 @@ export function UrgenciaFilter({
             ))}
           </ToggleGroup>
           <div className="flex min-w-0 flex-1 flex-col gap-3">
+            {/* Atalho "Este mês" = mês-CALENDÁRIO (1º→último dia), aplicado como
+                intervalo real via onRange. Distinto do bucket disjunto "Após 7 dias,
+                neste mês" nas tabs; por ser intervalo, não carrega contagem. */}
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground text-xs">Atalho</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7"
+                onClick={() => {
+                  const mes = intervaloMesAtual(new Date());
+                  onRange(mes.from, mes.to);
+                  setOpen(false);
+                }}
+              >
+                Este mês
+              </Button>
+            </div>
             <Calendar
               mode="range"
               locale={ptBR}
@@ -132,27 +157,24 @@ export function UrgenciaFilter({
             <div className="grid grid-cols-2 gap-2">
               <Field>
                 <FieldLabel htmlFor="urgencia-de">De</FieldLabel>
-                <Input
+                <CampoDataBR
                   id="urgencia-de"
-                  type="date"
                   value={draftFrom}
-                  onChange={(e) => {
+                  onChangeISO={(iso) => {
                     setValue("editing", true);
-                    setValue("from", e.target.value);
+                    setValue("from", iso);
                   }}
                 />
               </Field>
               <Field data-invalid={!!inicio && !!fim && !valid}>
                 <FieldLabel htmlFor="urgencia-ate">Até</FieldLabel>
-                <Input
+                <CampoDataBR
                   id="urgencia-ate"
-                  type="date"
                   value={draftTo}
-                  min={draftFrom || undefined}
-                  aria-invalid={!!inicio && !!fim && !valid}
-                  onChange={(e) => {
+                  invalid={!!inicio && !!fim && !valid}
+                  onChangeISO={(iso) => {
                     setValue("editing", true);
-                    setValue("to", e.target.value);
+                    setValue("to", iso);
                   }}
                 />
               </Field>
@@ -182,5 +204,50 @@ export function UrgenciaFilter({
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+// Campo de data com entrada manual no padrão BR (dd/mm/aaaa) sobre o MESMO <Input>
+// do app — exibição brasileira, wire ISO (yyyy-MM-dd). NÃO é um DateInput separado
+// nem um datepicker: é só a extensão dos campos De/Até deste filtro compartilhado.
+// Mantém um buffer local de digitação sincronizado ao valor ISO externo (ex.: uma
+// seleção pelo calendário) sem atropelar uma digitação parcial em andamento.
+function CampoDataBR({
+  id,
+  value,
+  invalid,
+  onChangeISO,
+}: {
+  id: string;
+  /** Valor ISO ("" | yyyy-MM-dd). */
+  value: string;
+  invalid?: boolean;
+  /** ISO válido, ou "" enquanto a data está incompleta/inválida. */
+  onChangeISO: (iso: string) => void;
+}) {
+  const [texto, setTexto] = useState(() => isoParaBR(value));
+  // Sincroniza a exibição quando o ISO externo muda (ex.: seleção pelo calendário)
+  // sem atropelar uma digitação parcial — padrão React de ajustar estado durante o
+  // render (sem effect): só reseta o buffer quando o novo ISO diverge do digitado.
+  const [ultimoISO, setUltimoISO] = useState(value);
+  if (value !== ultimoISO) {
+    setUltimoISO(value);
+    if (brParaISO(texto) !== value) setTexto(isoParaBR(value));
+  }
+  return (
+    <Input
+      id={id}
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      placeholder="dd/mm/aaaa"
+      value={texto}
+      aria-invalid={invalid}
+      onChange={(e) => {
+        const mascarado = mascararDataBR(e.target.value);
+        setTexto(mascarado);
+        onChangeISO(brParaISO(mascarado));
+      }}
+    />
   );
 }

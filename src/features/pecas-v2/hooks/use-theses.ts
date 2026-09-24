@@ -156,6 +156,7 @@ export interface ThesesController {
   toggle: (thesis: Thesis) => void;
   /** (Re)gera as teses de forma síncrona (botão "Atualizar" + fallback do stream). */
   regenerate: () => void;
+  regenerateAsync: () => Promise<Thesis[]>;
   isRegenerating: boolean;
   isTogglingId: string | null;
 }
@@ -181,6 +182,7 @@ export function useThesesController(id: string): ThesesController {
     regenerate: () => {
       if (!regen.isPending) regen.mutate();
     },
+    regenerateAsync: () => regen.mutateAsync(),
     isRegenerating: regen.isPending,
     isTogglingId: patch.isPending ? (patch.variables?.thesisId ?? null) : null,
   };

@@ -1,15 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import { toast } from "sonner";
 
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { nomeExibicao } from "@/features/organization/lib/labels";
-import {
-  abasVisiveis,
-  ORIGEM_DESCRICAO,
-  ORIGEM_LABEL,
-} from "@/features/triagem/lib/origem";
+import { ORIGEM_LABEL } from "@/features/triagem/lib/origem";
 
 import {
   filtroDeIntervalo,
@@ -23,88 +18,53 @@ import {
   linhaIntimacao,
   SITUACAO_LABEL,
 } from "../lib/listagem";
-import { URGENCIA_TABS } from "../lib/urgencia-tabs";
+import { construirUrgencyTabs } from "../lib/urgencia-tabs";
 import { useFilaNavigation, useFiltrosDaFila } from "./use-fila-navigation";
-import {
-  useConfirmarPrazosConfiaveisEmLote,
-  useDarCienciaEmLote,
-  useIntimacoes,
-} from "./use-intimacoes";
+import { useIntimacoes } from "./use-intimacoes";
 
-export const TRIAGEM_STAGES = ["RECEIVED", "AWAITING_CONFIRMATION"];
-
-type TriageLane = "attention" | "ready" | "science" | "historical";
-
-const TRIAGE_LANES: Array<{ value: TriageLane; label: string }> = [
-  { value: "attention", label: "Precisa de análise" },
-  { value: "ready", label: "Pronto para confirmar" },
-  { value: "science", label: "Para ciência" },
-  { value: "historical", label: "Histórico importado" },
-];
-
-export function useListagemIntimacoes(triagem: boolean) {
+/**
+ * Histórico de intimações (`/intimacoes`) — consulta/auditoria READ-ONLY de
+ * TODAS as intimações que passaram pelo sistema (todos os status, escritório
+ * inteiro por default — nenhum `assignee`/escopo é injetado aqui; só o que o
+ * usuário filtrar explicitamente). Busca, filtros, agrupamento por processo,
+ * ordenação e paginação infinita são a fonte única (docs/history-design.md);
+ * a EXECUÇÃO (seleção/lote/mutação) vive só na Mesa de Trabalho.
+ *
+ * Sem painel/prévia: título e linha navegam pro detalhe cheio (`/intimacoes/
+ * [id]`, via `fila.href`/`fila.lembrar` — preserva anterior/próxima e
+ * `?retorno=` pro voltar). Não há mais wiring de painel contextual aqui: um
+ * `?painel=` legado que sobreviva num link salvo fica simplesmente inerte
+ * (nenhum código lê essa chave nesta tela) — não reabre preview nem entra em
+ * loop de URL.
+ */
+export function useListagemIntimacoes() {
   const url = useFiltrosDaFila();
   const fila = useFilaNavigation();
   const members = useOrgMembersDirectory();
-  const grouped =
-    (url.get("visao") || (triagem ? "processos" : "intimacoes")) ===
-    "processos";
+  const grouped = (url.get("visao") || "intimacoes") === "processos";
   const search = url.get("q");
   const origem = url.get("origem");
-  const lane = (url.get("fila") || "attention") as TriageLane;
   const dueFrom = url.get("due_from");
   const dueTo = url.get("due_to");
   const urgency =
     url.get("urgencia") === "esta_semana" ? "semana" : url.get("urgencia");
-  const sort = (url.get("sort") || (triagem ? "deadline" : "recent")) as
-    "recent" | "deadline";
-  const status = triagem ? "PENDING" : url.get("situacao");
+  const sort = (url.get("sort") || "recent") as "recent" | "deadline";
+  const status = url.get("situacao");
   const query = useIntimacoes({
     search,
     groupBy: grouped ? "cnj" : undefined,
     sort,
     cnj: url.get("cnj") || undefined,
     origem: origem || undefined,
-    triageLane: triagem ? lane : undefined,
     urgencia: urgency || undefined,
     dueFrom,
     dueTo,
     court: url.get("court"),
     assignee: url.get("assignee"),
     user_status: status,
-    workStage: triagem ? TRIAGEM_STAGES : url.get("work_stage"),
+    workStage: url.get("work_stage"),
     limit: 20,
     prefetchNextPage: true,
-  });
-  const confirmBatch = useConfirmarPrazosConfiaveisEmLote();
-  const scienceBatch = useDarCienciaEmLote();
-  const laneCountBase = {
-    search,
-    court: url.get("court"),
-    assignee: url.get("assignee"),
-    user_status: "PENDING",
-    workStage: TRIAGEM_STAGES,
-    limit: 1,
-  } as const;
-  const attentionCount = useIntimacoes({
-    ...laneCountBase,
-    triageLane: "attention",
-    enabled: triagem,
-  });
-  const readyCount = useIntimacoes({
-    ...laneCountBase,
-    triageLane: "ready",
-    enabled: triagem,
-  });
-  const scienceCount = useIntimacoes({
-    ...laneCountBase,
-    triageLane: "science",
-    enabled: triagem,
-  });
-  const historicalCount = useIntimacoes({
-    ...laneCountBase,
-    triageLane: "historical",
-    enabled: triagem,
   });
   const change = (values: Record<string, string | null>) =>
     url.set({ ...values, abertos: null });
@@ -125,81 +85,31 @@ export function useListagemIntimacoes(triagem: boolean) {
     () => gruposIntimacoes(intimacoes, query.groups),
     [intimacoes, query.groups],
   );
-  const origemTabs = abasVisiveis(query.origemFacets).map((tab) => ({
-    key: tab.value ?? "",
-    label: tab.label,
-    description: tab.value ? ORIGEM_DESCRICAO[tab.value] : undefined,
-    count: tab.count,
-    ativo: (tab.value ?? "") === origem,
-    onClick: () => change({ origem: tab.value, ...limparUrgencia }),
-  }));
-  const laneCounts: Record<TriageLane, number> = {
-    attention: attentionCount.totalCount,
-    ready: readyCount.totalCount,
-    science: scienceCount.totalCount,
-    historical: historicalCount.totalCount,
-  };
-  const laneTabs = TRIAGE_LANES.map((tab) => ({
-    key: tab.value,
-    label: tab.label,
-    count: laneCounts[tab.value],
-    ativo: lane === tab.value,
-    onClick: () =>
-      change({
-        fila: tab.value === "attention" ? null : tab.value,
-        origem: null,
-        ...limparUrgencia,
-      }),
-  }));
-  const urgencyTabs = [
-    {
-      key: "",
-      label: "Todas",
-      count: query.totalWithoutUrgency,
-      ativo: !urgency && !dueFrom && !dueTo,
-      onClick: () => change(limparUrgencia),
-    },
-    ...URGENCIA_TABS.map((tab) => ({
-      key: tab.value,
-      label:
-        tab.value === "semana"
-          ? "Em 3–7 dias"
-          : tab.value === "este_mes"
-            ? "Após 7 dias, neste mês"
-            : tab.label,
-      count: query.buckets[tab.bucketKey],
-      ativo: urgency === tab.value,
-      onClick: () => change(filtroDeUrgencia(tab.value)),
-    })),
-    {
-      key: "mais_adiante",
-      label: "Após este mês",
-      count: query.buckets.mais_adiante,
-      ativo: urgency === "mais_adiante",
-      onClick: () => change(filtroDeUrgencia("mais_adiante")),
-    },
-  ];
+  const urgencyTabs = construirUrgencyTabs({
+    buckets: query.buckets,
+    totalWithoutUrgency: query.totalWithoutUrgency,
+    urgency: urgency || "",
+    temIntervalo: !!(dueFrom || dueTo),
+    onSelecionar: (value) =>
+      value ? change(filtroDeUrgencia(value)) : change(limparUrgencia),
+  });
   const filters = [
-    ...(!triagem
-      ? [
-          {
-            key: "situacao",
-            label: "Situação da intimação",
-            options: Object.entries(SITUACAO_LABEL).map(([value, label]) => ({
-              value,
-              label,
-            })),
-          },
-          {
-            key: "work_stage",
-            label: "Etapa do trabalho",
-            options: Object.entries(ETAPA_LABEL).map(([value, label]) => ({
-              value,
-              label,
-            })),
-          },
-        ]
-      : []),
+    {
+      key: "situacao",
+      label: "Situação da intimação",
+      options: Object.entries(SITUACAO_LABEL).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    },
+    {
+      key: "work_stage",
+      label: "Etapa do trabalho",
+      options: Object.entries(ETAPA_LABEL).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    },
     {
       key: "origem",
       label: "Origem do prazo",
@@ -258,7 +168,6 @@ export function useListagemIntimacoes(triagem: boolean) {
     url.set({ abertos: [...next].join(",") });
   };
   return {
-    triagem,
     grouped,
     search,
     sort,
@@ -268,57 +177,6 @@ export function useListagemIntimacoes(triagem: boolean) {
     toggleGroup,
     filters,
     active,
-    origemTabs,
-    laneTabs,
-    lane,
-    bulkAction:
-      triagem && lane === "ready" && query.totalCount > 0 && active.length === 0
-        ? {
-            label: `Confirmar ${query.totalCount.toLocaleString("pt-BR")} prazos confiáveis`,
-            pending: confirmBatch.isPending,
-            run: async () => {
-              if (
-                !window.confirm(
-                  `Confirmar os ${query.totalCount.toLocaleString("pt-BR")} prazos confiáveis? Esta ação ficará registrada em seu nome.`,
-                )
-              )
-                return;
-              try {
-                const result = await confirmBatch.mutateAsync(undefined);
-                toast.success(
-                  `${result.affected.toLocaleString("pt-BR")} prazos confirmados`,
-                );
-              } catch {
-                toast.error("Não foi possível confirmar os prazos em lote.");
-              }
-            },
-          }
-        : triagem && lane === "science" && intimacoes.length > 0
-          ? {
-              label: `Dar ciência em ${intimacoes.length.toLocaleString("pt-BR")} itens exibidos`,
-              pending: scienceBatch.isPending,
-              run: async () => {
-                if (
-                  !window.confirm(
-                    `Dar ciência nos ${intimacoes.length.toLocaleString("pt-BR")} itens exibidos?`,
-                  )
-                )
-                  return;
-                try {
-                  const affected = await scienceBatch.mutateAsync(
-                    intimacoes.map((item) => item.id),
-                  );
-                  toast.success(
-                    `Ciência registrada em ${affected.toLocaleString("pt-BR")} itens`,
-                  );
-                } catch {
-                  toast.error(
-                    "Não foi possível registrar as ciências em lote.",
-                  );
-                }
-              },
-            }
-          : null,
     urgencyTabs,
     urgency,
     dueFrom,
@@ -344,7 +202,6 @@ export function useListagemIntimacoes(triagem: boolean) {
       change({
         q: null,
         origem: null,
-        fila: null,
         ...limparUrgencia,
         court: null,
         assignee: null,

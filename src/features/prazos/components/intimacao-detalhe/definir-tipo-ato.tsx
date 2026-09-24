@@ -34,12 +34,24 @@ export function DefinirTipoAto({
   ctaLabel = "Definir tipo e prazo",
   /** Compacto = sem o control de contagem (usado no gate). */
   compact = false,
+  /** false = esconde os campos tipo/dias/contagem e o submit — só o botão
+   *  "sem prazo" fica visível. Usa quando o caller já sabe que definir um
+   *  novo tipo/prazo NÃO corrige o que precisa ser corrigido (ex.: divergência
+   *  prazo×obrigação onde o item já identificado é ciência real — reclassificar
+   *  o tipo do ato não resolve essa divergência específica). */
+  showDefinirForm = true,
+  /** Rótulo do botão "sem prazo" — default preserva o texto genérico usado no
+   *  gate de peça; callers com um sentido mais específico (ex.: "Corrigir
+   *  classificação para ciência") podem sobrescrever. */
+  semPrazoLabel = "Não há prazo",
 }: {
   intimacaoId: string;
   prazo: PrazoDetalheView | null;
   onConfirmado?: () => void;
   ctaLabel?: string;
   compact?: boolean;
+  showDefinirForm?: boolean;
+  semPrazoLabel?: string;
 }) {
   const c = useDefinirTipo({ intimacaoId, prazo, onConfirmado });
   const {
@@ -49,138 +61,149 @@ export function DefinirTipoAto({
 
   return (
     <form onSubmit={c.onConfirmar} noValidate className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field data-invalid={!!errors.tipo_ato}>
-          <FieldLabel htmlFor="definir-tipo-ato">Tipo do ato</FieldLabel>
-          <Controller
-            name="tipo_ato"
-            control={control}
-            render={({ field }) => (
-              <Select
-                value={field.value || ""}
-                onValueChange={(v) => field.onChange(v ?? "")}
-              >
-                <SelectTrigger
-                  id="definir-tipo-ato"
-                  className="w-full"
-                  aria-invalid={!!errors.tipo_ato}
-                >
-                  <SelectValue placeholder="Selecione o tipo">
-                    {field.value
-                      ? (TIPO_ATO_LABEL[field.value] ?? "Selecione o tipo")
-                      : "Selecione o tipo"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {c.options.map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            )}
-          />
-          <FieldError errors={[errors.tipo_ato]} />
-        </Field>
+      {showDefinirForm ? (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field data-invalid={!!errors.tipo_ato}>
+              <FieldLabel htmlFor="definir-tipo-ato">Tipo do ato</FieldLabel>
+              <Controller
+                name="tipo_ato"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value || ""}
+                    onValueChange={(v) => field.onChange(v ?? "")}
+                  >
+                    <SelectTrigger
+                      id="definir-tipo-ato"
+                      className="w-full"
+                      aria-invalid={!!errors.tipo_ato}
+                    >
+                      <SelectValue placeholder="Selecione o tipo">
+                        {field.value
+                          ? (TIPO_ATO_LABEL[field.value] ?? "Selecione o tipo")
+                          : "Selecione o tipo"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {c.options.map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <FieldError errors={[errors.tipo_ato]} />
+            </Field>
 
-        <Field data-invalid={!!errors.days}>
-          <FieldLabel htmlFor="definir-tipo-dias">Prazo em dias</FieldLabel>
-          <Input
-            id="definir-tipo-dias"
-            type="number"
-            min={1}
-            step={1}
-            inputMode="numeric"
-            placeholder="Informe os dias"
-            aria-invalid={!!errors.days}
-            {...c.form.register("days", { valueAsNumber: true })}
-          />
-          <FieldError errors={[errors.days]} />
-        </Field>
-      </div>
+            <Field data-invalid={!!errors.days}>
+              <FieldLabel htmlFor="definir-tipo-dias">Prazo em dias</FieldLabel>
+              <Input
+                id="definir-tipo-dias"
+                type="number"
+                min={1}
+                step={1}
+                inputMode="numeric"
+                placeholder="Informe os dias"
+                aria-invalid={!!errors.days}
+                {...c.form.register("days", { valueAsNumber: true })}
+              />
+              <FieldError errors={[errors.days]} />
+            </Field>
+          </div>
 
-      {compact ? null : (
-        <Field data-invalid={!!errors.counting}>
-          <FieldLabel htmlFor="definir-tipo-contagem">Contagem</FieldLabel>
-          <Controller
-            name="counting"
-            control={control}
-            render={({ field }) => (
-              <Select
-                value={field.value}
-                onValueChange={(v) =>
-                  field.onChange((v as "BUSINESS" | "CALENDAR") ?? "BUSINESS")
-                }
-              >
-                <SelectTrigger
-                  id="definir-tipo-contagem"
-                  className="w-full sm:w-56"
-                  aria-invalid={!!errors.counting}
-                >
-                  <SelectValue>
-                    {field.value === "CALENDAR"
-                      ? "Dias corridos"
-                      : "Dias úteis"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="BUSINESS">Dias úteis</SelectItem>
-                    <SelectItem value="CALENDAR">Dias corridos</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            )}
-          />
-          <FieldError errors={[errors.counting]} />
-        </Field>
-      )}
+          {compact ? null : (
+            <Field data-invalid={!!errors.counting}>
+              <FieldLabel htmlFor="definir-tipo-contagem">Contagem</FieldLabel>
+              <Controller
+                name="counting"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(v) =>
+                      field.onChange(
+                        (v as "BUSINESS" | "CALENDAR") ?? "BUSINESS",
+                      )
+                    }
+                  >
+                    <SelectTrigger
+                      id="definir-tipo-contagem"
+                      className="w-full sm:w-56"
+                      aria-invalid={!!errors.counting}
+                    >
+                      <SelectValue>
+                        {field.value === "CALENDAR"
+                          ? "Dias corridos"
+                          : "Dias úteis"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="BUSINESS">Dias úteis</SelectItem>
+                        <SelectItem value="CALENDAR">Dias corridos</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <FieldError errors={[errors.counting]} />
+            </Field>
+          )}
 
-      <div
-        role="status"
-        aria-live="polite"
-        className="text-muted-foreground text-sm"
-      >
-        {c.previewPendente
-          ? "Calculando vencimento…"
-          : c.previewErro
-            ? "Não foi possível calcular o vencimento."
-            : c.preview
-              ? `Vencimento previsto: ${formatarData(c.preview.end_date)} · ${c.preview.weekday}.`
-              : "Escolha o tipo e informe os dias para ver o vencimento."}
-        {c.previewErro ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="mt-1 block"
-            onClick={c.onRetryPreview}
+          <div
+            role="status"
+            aria-live="polite"
+            className="text-muted-foreground text-sm"
           >
-            Recalcular
-          </Button>
-        ) : null}
-      </div>
+            {c.previewPendente
+              ? "Calculando vencimento…"
+              : c.previewErro
+                ? "Não foi possível calcular o vencimento."
+                : c.preview
+                  ? `Vencimento previsto: ${formatarData(c.preview.end_date)} · ${c.preview.weekday}.`
+                  : "Escolha o tipo e informe os dias para ver o vencimento."}
+            {c.previewErro ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="mt-1 block"
+                onClick={c.onRetryPreview}
+              >
+                Recalcular
+              </Button>
+            ) : null}
+          </div>
+        </>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" disabled={!c.podeConfirmar}>
-          {c.emVoo ? (
-            <LoaderCircle data-icon="inline-start" className="animate-spin" />
-          ) : (
-            <Check data-icon="inline-start" />
-          )}
-          {c.emVoo ? "Salvando…" : ctaLabel}
-        </Button>
+        {showDefinirForm ? (
+          <Button type="submit" disabled={!c.podeConfirmar}>
+            {c.emVoo ? (
+              <LoaderCircle data-icon="inline-start" className="animate-spin" />
+            ) : (
+              <Check data-icon="inline-start" />
+            )}
+            {c.emVoo ? "Salvando…" : ctaLabel}
+          </Button>
+        ) : null}
         {c.podeSemPrazo ? (
           <Button
             type="button"
-            variant="ghost"
+            variant={showDefinirForm ? "ghost" : "default"}
             disabled={c.emVoo}
             onClick={c.onSemPrazo}
           >
-            Não há prazo
+            {!showDefinirForm && c.emVoo ? (
+              <LoaderCircle data-icon="inline-start" className="animate-spin" />
+            ) : null}
+            {!showDefinirForm && c.emVoo ? "Salvando…" : semPrazoLabel}
           </Button>
         ) : null}
       </div>
