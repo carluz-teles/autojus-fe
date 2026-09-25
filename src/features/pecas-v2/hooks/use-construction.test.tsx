@@ -11,12 +11,21 @@ const mocks = vi.hoisted(() => ({
   contentHtml: "",
   theses: [] as { id: string }[],
   thesesError: true,
+  regenerate: vi.fn(),
   regenerateAsync: vi.fn(),
   mutate: vi.fn(),
   mutateAsync: vi.fn(),
+  generateError: null as Error | null,
   setQueryData: vi.fn(),
-  streamOptions: null as null | { onDone: (theses: { id: string }[]) => void },
+  streamOptions: null as null | {
+    enabled: boolean;
+    onDone: (theses: { id: string }[]) => void;
+    onError: (hadThesis: boolean, message?: string, code?: string) => void;
+  },
+  streamCode: undefined as string | undefined,
   draftId: "",
+  assessmentStatus: "ready" as "ready" | "loading" | "error",
+  assessmentRequest: null as null | { status: string },
 }));
 
 vi.mock("next/navigation", () => ({
@@ -30,6 +39,12 @@ vi.mock("@/lib/telemetry/use-ai-experience", () => ({
   useAIExperience: vi.fn(),
 }));
 vi.mock("./use-draft", () => ({
+  useAssessment: () => ({
+    data: { request: mocks.assessmentRequest },
+    isSuccess: mocks.assessmentStatus === "ready",
+    isFetching: mocks.assessmentStatus === "loading",
+    isError: mocks.assessmentStatus === "error",
+  }),
   useDraft: () => ({
     data: {
       intimation: { id: "int-1", teor: "Intimação com teor." },
@@ -52,7 +67,7 @@ vi.mock("./use-theses", () => ({
     isError: mocks.thesesError,
     isRegenerating: false,
     isTogglingId: null,
-    regenerate: vi.fn(),
+    regenerate: mocks.regenerate,
     regenerateAsync: mocks.regenerateAsync,
   }),
   useGenerateDraft: (id: string) => {
@@ -61,14 +76,20 @@ vi.mock("./use-theses", () => ({
       isPending: false,
       mutate: mocks.mutate,
       mutateAsync: mocks.mutateAsync,
-      error: null,
+      error: mocks.generateError,
     };
   },
 }));
 vi.mock("./use-theses-stream", () => ({
+  THESIS_EVIDENCE_INVALID_CODE: "thesis_evidence_invalid",
   useThesesStream: (_key: string, options: typeof mocks.streamOptions) => {
     mocks.streamOptions = options;
-    return { status: "idle", theses: [], count: 0 };
+    return {
+      status: mocks.streamCode ? "error" : "idle",
+      theses: [],
+      count: 0,
+      errorCode: mocks.streamCode,
+    };
   },
 }));
 
@@ -91,9 +112,14 @@ describe("useConstruction — dispatch real da geração", () => {
     mocks.contentHtml = "";
     mocks.theses = [];
     mocks.thesesError = true;
+    mocks.streamCode = undefined;
+    mocks.regenerate.mockReset();
+    mocks.assessmentStatus = "ready";
+    mocks.assessmentRequest = null;
     mocks.regenerateAsync.mockReset();
     mocks.mutate.mockReset();
     mocks.mutateAsync.mockReset().mockResolvedValue({ updated_at: "now" });
+    mocks.generateError = null;
     mocks.setQueryData.mockReset();
     container = document.createElement("div");
     document.body.append(container);
@@ -195,5 +221,149 @@ describe("useConstruction — dispatch real da geração", () => {
     });
     expect(latest.autoFailed).toBe(true);
     expect(mocks.mutate).not.toHaveBeenCalled();
+  });
+
+  it("coded evidence error stops automatic fallback and generation until explicit retry", async () => {
+    mocks.saga = "CREATED";
+    mocks.thesesError = false;
+    await act(async () => root.render(createElement(Probe)));
+    await act(async () => {
+      mocks.streamCode = "thesis_evidence_invalid";
+      mocks.streamOptions!.onError(
+        false,
+        "Uma sugestão citou trecho ausente das fontes consultadas.",
+        mocks.streamCode,
+      );
+      root.render(createElement(Probe));
+    });
+    expect(mocks.regenerate).not.toHaveBeenCalled();
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    expect(latest.autoFailed).toBe(true);
+    expect(latest.generationError).toMatch(/fontes consultadas/i);
+
+    mocks.regenerateAsync.mockResolvedValue([{ id: "valid-1" }]);
+    await act(async () => latest.retryAuto());
+    expect(mocks.regenerateAsync).toHaveBeenCalledTimes(1);
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a later generation failure after valid explicit thesis recovery without restarting automatic work", async () => {
+    mocks.saga = "CREATED";
+    mocks.thesesError = false;
+    await act(async () => root.render(createElement(Probe)));
+    await act(async () => {
+      mocks.streamCode = "thesis_evidence_invalid";
+      mocks.streamOptions!.onError(false, "Invalid evidence", mocks.streamCode);
+      root.render(createElement(Probe));
+    });
+    expect(latest.generationError).toMatch(/fontes consultadas/i);
+    expect(mocks.streamOptions!.enabled).toBe(false);
+    expect(mocks.regenerate).not.toHaveBeenCalled();
+    expect(mocks.mutate).not.toHaveBeenCalled();
+
+    mocks.regenerateAsync.mockResolvedValue([{ id: "valid-1" }]);
+    mocks.mutateAsync.mockRejectedValue(
+      new Error("Falha na conferência atual"),
+    );
+    await act(async () => latest.retryAuto());
+    await act(async () => {
+      mocks.generateError = new Error("Falha na conferência atual");
+      root.render(createElement(Probe));
+    });
+    expect(latest.generationError).toBe("Falha na conferência atual");
+    expect(latest.autoFailed).toBe(true);
+    expect(mocks.streamOptions!.enabled).toBe(false);
+    expect(mocks.regenerate).not.toHaveBeenCalled();
+    expect(mocks.regenerateAsync).toHaveBeenCalledTimes(1);
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("uncoded transport failure keeps the existing synchronous fallback", async () => {
+    mocks.saga = "CREATED";
+    mocks.thesesError = false;
+    await act(async () => root.render(createElement(Probe)));
+    await act(async () => mocks.streamOptions!.onError(false));
+    expect(mocks.regenerate).toHaveBeenCalledTimes(1);
+    expect(mocks.mutate).not.toHaveBeenCalled();
+  });
+
+  it("coded stream error cannot replace persisted cards or selection", async () => {
+    mocks.saga = "DRAFTED";
+    mocks.contentHtml = "<p>Peça existente</p>";
+    mocks.thesesError = false;
+    mocks.theses = [{ id: "persisted-1" }];
+    await act(async () => root.render(createElement(Probe)));
+    await act(async () => {
+      mocks.streamCode = "thesis_evidence_invalid";
+      mocks.streamOptions!.onError(false, "Erro", mocks.streamCode);
+      root.render(createElement(Probe));
+    });
+    expect(latest.theses.theses).toEqual([{ id: "persisted-1" }]);
+    expect(latest.theses.selectedIds).toEqual(["persisted-1"]);
+    expect(mocks.setQueryData).not.toHaveBeenCalled();
+    expect(mocks.regenerate).not.toHaveBeenCalled();
+  });
+
+  it("remount de CREATED vazio com assessment FAILED mostra retry sem auto-mutation", async () => {
+    mocks.saga = "CREATED";
+    mocks.thesesError = false;
+    mocks.theses = [{ id: "tese-2" }];
+    mocks.assessmentRequest = { status: "failed" };
+    await act(async () => root.render(createElement(Probe)));
+    expect(latest.autoFailed).toBe(true);
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    await act(async () => root.render(createElement(Probe)));
+    expect(latest.autoFailed).toBe(true);
+    expect(mocks.mutate).not.toHaveBeenCalled();
+  });
+
+  it.each(["loading", "error"] as const)(
+    "assessment read %s blocks automatic paid work",
+    async (status) => {
+      mocks.saga = "CREATED";
+      mocks.thesesError = false;
+      mocks.theses = [{ id: "tese-2" }];
+      mocks.assessmentStatus = status;
+      if (status === "loading") mocks.assessmentRequest = { status: "failed" }; // stale cache
+      await act(async () => root.render(createElement(Probe)));
+      expect(mocks.mutate).not.toHaveBeenCalled();
+      expect(latest.autoFailed).toBe(status === "error");
+    },
+  );
+
+  it("failed assessment retries once explicitly with the same draft and input", async () => {
+    mocks.saga = "CREATED";
+    mocks.thesesError = false;
+    mocks.theses = [{ id: "tese-2" }];
+    mocks.assessmentRequest = { status: "failed" };
+    setInstructions("draft-1", "Orientação opcional");
+    await act(async () => root.render(createElement(Probe)));
+    await act(async () => {
+      void latest.retryAuto();
+      void latest.retryAuto();
+    });
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    expect(mocks.draftId).toBe("draft-1");
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(mocks.mutateAsync.mock.calls[0][0]).toMatchObject({
+      thesisIds: ["tese-2"],
+      instructions: "Orientação opcional",
+    });
+  });
+
+  it("active assessment is reused by the existing auto lifecycle; completed content does not restart", async () => {
+    mocks.saga = "CREATED";
+    mocks.thesesError = false;
+    mocks.theses = [{ id: "tese-2" }];
+    mocks.assessmentRequest = { status: "running" };
+    await act(async () => root.render(createElement(Probe)));
+    expect(mocks.mutate).toHaveBeenCalledTimes(1);
+    mocks.saga = "DRAFTED";
+    mocks.contentHtml = "<p>Minuta pronta</p>";
+    await act(async () => root.render(createElement(Probe)));
+    expect(mocks.mutate).toHaveBeenCalledTimes(1);
   });
 });

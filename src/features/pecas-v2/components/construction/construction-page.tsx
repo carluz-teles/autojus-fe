@@ -65,7 +65,6 @@ export function ConstructionPage({ id }: { id: string }) {
   const fetcher = useApi();
   const router = useRouter();
   const qc = useQueryClient();
-  const save = useContentSave(id, draft);
   const editor = useRef<RichEditorHandle | null>(null);
   const [panel, setPanel] = useState<"context" | "assistant" | null>(null);
   const [contextCollapsed, setContextCollapsed] = useState(false);
@@ -73,27 +72,24 @@ export function ConstructionPage({ id }: { id: string }) {
   const [contextTab, setContextTab] = useState("");
   const [teorOpen, setTeorOpen] = useState(false);
   const [completionOpen, setCompletionOpen] = useState(false);
+  const [completionPending, setCompletionPending] = useState(false);
+  const completionRef = useRef(false);
   const [versions, setVersions] = useState<Version[] | null>(null);
   const [preview, setPreview] = useState<Version | null>(null);
   const [pdf, setPdf] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [liveHTML, setLiveHTML] = useState<string | null>(null);
+  const [hydrationKey, setHydrationKey] = useState(0);
   const [checked, setChecked] = useState(false);
+  const save = useContentSave(id, draft, (html) => {
+    editor.current?.setHtml(html);
+    setLiveHTML(html);
+    setHydrationKey((key) => key + 1);
+    setChecked(false);
+  });
   const generationActive =
     h.isGenerating || h.regenerating || h.stage === "gerando";
   const applyingRef = useRef(false);
-  const wasGenerating = useRef(generationActive);
-  useEffect(() => {
-    if (
-      wasGenerating.current &&
-      !generationActive &&
-      draft?.contentRevision &&
-      !save.queue.dirty
-    ) {
-      save.queue.acknowledge(draft.contentRevision);
-    }
-    wasGenerating.current = generationActive;
-  }, [generationActive, draft?.contentRevision, save.queue]);
   const guard = async (action: () => void | Promise<void>) => {
     try {
       await save.flush();
@@ -324,6 +320,31 @@ export function ConstructionPage({ id }: { id: string }) {
         [],
     ),
   );
+  const concludeElaboracao = async () => {
+    if (
+      completionRef.current ||
+      !checked ||
+      pending.length > 0 ||
+      busy ||
+      draft.sentToSigningAt
+    )
+      return;
+    completionRef.current = true;
+    setCompletionPending(true);
+    try {
+      await guard(async () => {
+        await fetcher(`/v1/pecas/${id}/enviar-para-assinatura`, {
+          method: "POST",
+        });
+        await refresh();
+        setCompletionOpen(false);
+        toast.success("Elaboração concluída. A peça aguarda assinatura.");
+      });
+    } finally {
+      completionRef.current = false;
+      setCompletionPending(false);
+    }
+  };
   const state =
     h.stage === "falha"
       ? "Falha na geração"
@@ -412,7 +433,9 @@ export function ConstructionPage({ id }: { id: string }) {
                     <Button
                       size="xs"
                       variant="outline"
-                      disabled={busy || !!draft.sentToSigningAt}
+                      disabled={
+                        busy || completionPending || !!draft.sentToSigningAt
+                      }
                       onClick={() => {
                         setChecked(false);
                         setCompletionOpen(true);
@@ -628,6 +651,7 @@ export function ConstructionPage({ id }: { id: string }) {
                         selectedCount={h.theses.selectedCount}
                         isLoading={h.theses.isLoading}
                         isError={h.theses.isError}
+                        errorMessage={h.theses.errorMessage}
                         onToggle={(t) =>
                           h.stage === "pregen"
                             ? h.theses.toggle(t)
@@ -688,7 +712,9 @@ export function ConstructionPage({ id }: { id: string }) {
                 )}
                 {ready && !generationActive && (
                   <EditorCenter
+                    key={`${id}:${hydrationKey}`}
                     draft={draft}
+                    initialHtml={liveHTML ?? undefined}
                     editorRef={editor}
                     regenerating={busy}
                     actions={
@@ -922,7 +948,12 @@ export function ConstructionPage({ id }: { id: string }) {
                 </div>
               )}
             </PopoverContent>
-            <Sheet open={completionOpen} onOpenChange={setCompletionOpen}>
+            <Sheet
+              open={completionOpen}
+              onOpenChange={(open) => {
+                if (!completionRef.current) setCompletionOpen(open);
+              }}
+            >
               <SheetContent
                 title="Concluir elaboração"
                 description="Confira fatos, pedidos e documentos antes de concluir a elaboração."
@@ -950,6 +981,7 @@ export function ConstructionPage({ id }: { id: string }) {
                     <Checkbox
                       id="completion-confirm"
                       checked={checked}
+                      disabled={completionPending}
                       onCheckedChange={(v) => setChecked(!!v)}
                     />
                     <Label htmlFor="completion-confirm" className="leading-5">
@@ -962,25 +994,12 @@ export function ConstructionPage({ id }: { id: string }) {
                       !checked ||
                       pending.length > 0 ||
                       busy ||
+                      completionPending ||
                       !!draft.sentToSigningAt
                     }
-                    onClick={() =>
-                      void guard(async () => {
-                        await fetcher(
-                          `/v1/pecas/${id}/enviar-para-assinatura`,
-                          {
-                            method: "POST",
-                          },
-                        );
-                        await refresh();
-                        setCompletionOpen(false);
-                        toast.success(
-                          "Elaboração concluída. A peça aguarda assinatura.",
-                        );
-                      })
-                    }
+                    onClick={() => void concludeElaboracao()}
                   >
-                    Concluir elaboração
+                    {completionPending ? "Concluindo…" : "Concluir elaboração"}
                   </Button>
                   <p className="text-muted-foreground text-xs">
                     A assinatura e o protocolo são etapas posteriores.

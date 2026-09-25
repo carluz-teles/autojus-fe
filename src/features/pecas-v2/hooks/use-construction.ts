@@ -26,9 +26,15 @@ import {
 } from "../lib/instructions-storage";
 import { preconditionFromCode } from "../lib/peca-precondition";
 import type { SagaState, Thesis } from "../types";
-import { useDraft } from "./use-draft";
+import { useAssessment, useDraft } from "./use-draft";
 import { thesesKey, useGenerateDraft, useThesesController } from "./use-theses";
-import { useThesesStream } from "./use-theses-stream";
+import {
+  THESIS_EVIDENCE_INVALID_CODE,
+  useThesesStream,
+} from "./use-theses-stream";
+
+const THESIS_EVIDENCE_MESSAGE =
+  "Uma sugestão citou trecho ausente das fontes consultadas. Os fundamentos anteriores foram preservados; revise os autos e tente novamente.";
 
 /** Estágio do CENTRO da tela — a barra e o rail não mudam entre estágios. */
 export type CenterStage = "pregen" | "gerando" | "pronta" | "falha";
@@ -76,9 +82,13 @@ export function useConstruction(id: string) {
   // "Tentar novamente" (o próprio regenerate). Na `done`, semeia o cache draft-
   // scoped com a lista autoritativa pra o controller assumir os ids reais.
   const [streamFellBack, setStreamFellBack] = useState(false);
+  const [streamInvalid, setStreamInvalid] = useState(false);
+  const [streamErrorRecovered, setStreamErrorRecovered] = useState(false);
+  const [autoFailed, setAutoFailed] = useState(false);
   const noPersisted =
     theses.theses.length === 0 && !theses.isLoading && !theses.isError;
-  const streamEnabled = hasOrigin && hasTeor && noPersisted && !streamFellBack;
+  const streamEnabled =
+    hasOrigin && hasTeor && noPersisted && !streamFellBack && !streamInvalid;
 
   // "Settled" = o stream (ou o fallback síncrono) já CONCLUIU pelo menos uma
   // tentativa real de obter teses — distinto de "ainda vazio porque a 1ª
@@ -98,14 +108,23 @@ export function useConstruction(id: string) {
     [qc, id],
   );
 
-  const onStreamError = useCallback((hadThesis: boolean) => {
-    // Falha pré-1ª-tese → degrada pro POST síncrono (desliga o stream). Falha
-    // mid-stream → mantém os cards; o erro inline vem do state do stream e o
-    // usuário reusa o regenerate. Em ambos os casos o stream por si só NÃO
-    // "settled" ainda — quem conclui é o POST síncrono (fallback) ou o próprio
-    // erro (`theses.isError`, já tratado à parte na decisão de auto-disparo).
-    if (!hadThesis) setStreamFellBack(true);
-  }, []);
+  const onStreamError = useCallback(
+    (hadThesis: boolean, _message?: string, code?: string) => {
+      if (code === THESIS_EVIDENCE_INVALID_CODE) {
+        settledRef.current = true;
+        setStreamInvalid(true);
+        setAutoFailed(true);
+        return;
+      }
+      // Falha pré-1ª-tese → degrada pro POST síncrono (desliga o stream). Falha
+      // mid-stream → mantém os cards; o erro inline vem do state do stream e o
+      // usuário reusa o regenerate. Em ambos os casos o stream por si só NÃO
+      // "settled" ainda — quem conclui é o POST síncrono (fallback) ou o próprio
+      // erro (`theses.isError`, já tratado à parte na decisão de auto-disparo).
+      if (!hadThesis) setStreamFellBack(true);
+    },
+    [],
+  );
 
   const stream = useThesesStream(`pecas/${id}`, {
     enabled: streamEnabled,
@@ -270,6 +289,15 @@ export function useConstruction(id: string) {
 
   const hasContent =
     !!draftQuery.data?.contentHtml && draftQuery.data.contentHtml.trim() !== "";
+  const assessmentRequired =
+    saga === "CREATED" && !hasContent && hasOrigin && hasTeor;
+  const assessment = useAssessment(id, assessmentRequired);
+  const assessmentFailed =
+    assessmentRequired &&
+    !assessment.isFetching &&
+    (assessment.data?.request?.status === "failed" ||
+      assessment.data?.request?.status === "superseded");
+  const assessmentReadError = assessmentRequired && assessment.isError;
   const stage = deriveStage(saga, firedGenerate, hasContent);
   // Regeração em curso: a peça já tinha folha e o saga voltou a EXTRACTING/CREATED.
   // O centro fica em "pronta" e a folha streama o novo conteúdo.
@@ -290,17 +318,28 @@ export function useConstruction(id: string) {
   // A DECISÃO (o que fazer dado o estado atual) é pura — `decidirAcaoAuto`,
   // testável sem montar o hook/efeitos reais. O efeito abaixo é só um
   // dispatcher fino sobre ela.
-  const [autoFailed, setAutoFailed] = useState(false);
   const autoFired = useRef(false);
   const retryInFlight = useRef(false);
   const [retrying, setRetrying] = useState(false);
   // Janela em que o loader deve aparecer antes/durante o disparo automático
   // (evita um flash do pregen enquanto as teses ainda chegam).
   const autoPending =
-    ((saga === "CREATED" && !autoFailed && !theses.isError) || retrying) &&
+    ((saga === "CREATED" &&
+      !autoFailed &&
+      !assessmentFailed &&
+      !assessmentReadError &&
+      !theses.isError) ||
+      retrying) &&
     !hasContent;
   useEffect(() => {
-    if (autoFired.current || autoFailed || retryInFlight.current) return;
+    if (
+      autoFired.current ||
+      autoFailed ||
+      retryInFlight.current ||
+      (assessmentRequired &&
+        (!assessment.isSuccess || assessment.isFetching || assessmentFailed))
+    )
+      return;
     const acao = decidirAcaoAuto({
       hasOrigin,
       hasTeor,
@@ -336,6 +375,10 @@ export function useConstruction(id: string) {
     );
   }, [
     autoFailed,
+    assessmentRequired,
+    assessment.isSuccess,
+    assessment.isFetching,
+    assessmentFailed,
     saga,
     hasContent,
     firedGenerate,
@@ -362,12 +405,23 @@ export function useConstruction(id: string) {
   // mais o wizard), mas um loader sobre um saga que não vai avançar sozinho.
   // Reage ao `saga==='FAILED'` real, não a um evento local.
   const autoFailedReal =
-    (autoFailed || saga === "FAILED") && !hasContent && !retrying;
+    (autoFailed ||
+      saga === "FAILED" ||
+      assessmentFailed ||
+      assessmentReadError) &&
+    !hasContent &&
+    !retrying;
 
   // Retry explícito: teses com erro/vazias são aguardadas antes da mutation de
   // geração. O mesmo draft e a orientação sobrevivem ao 202 e ao refresh.
   const retryAuto = async () => {
-    if (retryInFlight.current || generate.isPending || hasContent) return;
+    if (
+      retryInFlight.current ||
+      generate.isPending ||
+      hasContent ||
+      (assessmentRequired && assessment.isFetching)
+    )
+      return;
     retryInFlight.current = true;
     setRetrying(true);
     setAutoFailed(false);
@@ -379,6 +433,9 @@ export function useConstruction(id: string) {
           : theses.theses.map((t) => t.id);
       if (thesisIds.length === 0)
         throw new Error("Nenhum fundamento foi encontrado. Tente novamente.");
+      // The stream stays terminal, but valid authoritative theses recovered by
+      // this explicit action must not mask a later assessment/generation error.
+      setStreamErrorRecovered(true);
       // O saga pode continuar FAILED até o POST /generate completar: a sequência
       // do retry é explícita e não depende do efeito reservado ao draft CREATED.
       autoFired.current = true;
@@ -430,6 +487,11 @@ export function useConstruction(id: string) {
           : undefined,
       }
     : { ...theses, streaming: undefined };
+  const thesisErrorMessage =
+    (streamInvalid && !streamErrorRecovered) ||
+    theses.errorCode === THESIS_EVIDENCE_INVALID_CODE
+      ? THESIS_EVIDENCE_MESSAGE
+      : undefined;
 
   return {
     draft: draftQuery.data,
@@ -437,7 +499,7 @@ export function useConstruction(id: string) {
     isLoading: draftQuery.isLoading,
     isError: draftQuery.isError,
     stage,
-    theses: thesesView,
+    theses: { ...thesesView, errorMessage: thesisErrorMessage },
     highlightedDocId,
     focusSource,
     verAuto,
@@ -449,9 +511,13 @@ export function useConstruction(id: string) {
     // Pré-condições conhecidas (tipo do ato / trabalho não confirmado) ganham
     // frase clara e acionável; nunca a mensagem crua do BE nem "Tente novamente".
     generationError: (() => {
+      if (thesisErrorMessage) return thesisErrorMessage;
       const e = generate.error as
         { message?: string; code?: string } | undefined;
-      if (!e) return undefined;
+      if (!e)
+        return assessmentReadError
+          ? "Não foi possível verificar a conferência das fontes. Tente novamente."
+          : undefined;
       const pre = preconditionFromCode(e.code);
       return pre ? `${pre.title} ${pre.description}` : e.message;
     })(),

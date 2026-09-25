@@ -422,6 +422,7 @@ function PipelineList({
       {m.selectedIds.length > 0 && (
         <BulkBar
           count={m.selectedIds.length}
+          pending={m.mutating}
           onBulk={onBulk}
           onClear={m.clearSelection}
         />
