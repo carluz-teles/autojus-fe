@@ -1,6 +1,34 @@
 import { describe, expect, it } from "vitest";
 
-import { tituloIntimacao } from "./labels";
+import { atoPublicacaoLabel, tituloIntimacao } from "./labels";
+
+describe("atoPublicacaoLabel", () => {
+  it("prefers the trimmed classified act over the deadline action", () => {
+    expect(
+      atoPublicacaoLabel(
+        " Especificação de Provas ",
+        "manifestacao",
+        "INTIMACAO",
+      ),
+    ).toBe("Especificação de Provas");
+  });
+
+  it("uses the deadline action for absent or whitespace AI metadata", () => {
+    for (const aiAct of [undefined, null, "", "  "]) {
+      expect(atoPublicacaoLabel(aiAct, "manifestacao", "INTIMACAO")).toBe(
+        "Manifestação",
+      );
+    }
+  });
+
+  it("uses the generic publication type without a deadline", () => {
+    expect(atoPublicacaoLabel(null, null, "CITACAO")).toBe("Citação");
+    expect(atoPublicacaoLabel("", "", "COMUNICACAO")).toBe("Comunicação");
+    expect(
+      atoPublicacaoLabel(undefined, undefined, "UNKNOWN" as "INTIMACAO"),
+    ).toBe("Intimação");
+  });
+});
 
 // tituloIntimacao(title, cnjNumber?) — o 2º argumento é OPCIONAL e aditivo
 // (docs/history-design.md H1): remove o sufixo " · <CNJ desta intimação>" que o

@@ -14,8 +14,11 @@ import {
   useResolverIntimacao,
 } from "@/features/intimacoes/hooks/use-intimacoes";
 import { estadoIntimacao } from "@/features/intimacoes/lib/estado";
-import { tituloIntimacao, TYPE_LABEL } from "@/features/intimacoes/lib/labels";
-import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
+import {
+  atoPublicacaoLabel,
+  tituloIntimacao,
+  TYPE_LABEL,
+} from "@/features/intimacoes/lib/labels";
 import type {
   IntimacaoDetalheView,
   IntimacaoUserStatus,
@@ -311,10 +314,7 @@ function useModel(i: IntimacaoDetalheView | undefined) {
       // ato classificado, ex.: "Sentença") > rótulo do tipo_ato do prazo (ex.: "Apelação",
       // disponível já na ingestão determinística) > tipo genérico ("Intimação"). Substitui o
       // título do PROCESSO no header (a intimação é a unidade de trabalho, não o processo).
-      ato:
-        i.ai_act?.trim() ||
-        (i.prazo?.tipo_ato ? tipoAtoLabel(i.prazo.tipo_ato) : "") ||
-        TYPE_LABEL[i.type],
+      ato: atoPublicacaoLabel(i.ai_act, i.prazo?.tipo_ato, i.type),
       orgao: i.judging_body || i.court,
       publicadoEm: i.published_at ? formatarData(i.published_at) : "—",
 

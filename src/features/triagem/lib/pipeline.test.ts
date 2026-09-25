@@ -49,6 +49,22 @@ function item(overrides: Partial<IntimacaoView> = {}): IntimacaoView {
 // docs/navigation-architecture.md §4) escolhem RowTriar × RowReadonly POR ITEM;
 // o sinal precisa sobreviver à tradução IntimacaoView → PipelineRow.
 describe("pipelineRow — lifecycle por item (base da renderização mista)", () => {
+  it("shows the publication act without changing the piece fallback action", () => {
+    const row = pipelineRow(
+      item({
+        ai_act: "Especificação de Provas",
+        prazo: {
+          tipo_ato: "manifestacao",
+          status: "OPEN",
+          days_left: 5,
+          end_date: "2026-09-29",
+          prazo_interno: null,
+        } as IntimacaoView["prazo"],
+      }),
+    );
+    expect(row.atoPublicacao).toBe("Especificação de Provas");
+    expect(row.ato).toBe("Manifestação");
+  });
   it("propaga lifecycle=a_triar (linha mutável/elegível pra bulk)", () => {
     expect(pipelineRow(item({ lifecycle: "a_triar" })).lifecycle).toBe(
       "a_triar",

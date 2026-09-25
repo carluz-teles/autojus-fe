@@ -154,6 +154,8 @@ export interface IntimacaoView {
    * Espelha IntimacaoView.ai_analyzed_at do BE.
    */
   ai_analyzed_at: string | null;
+  /** Ato da publicação classificado pela IA; opcional durante a atualização da API. */
+  ai_act?: string;
   /** Id interno do responsável pela intimação (0057, ex-conductor/reviewer);
    *  null = não atribuído. Espelha o BE. */
   assignee_user_id: string | null;

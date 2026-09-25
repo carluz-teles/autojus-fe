@@ -1,10 +1,10 @@
 import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
+import { grauProcessoLabel } from "@/features/processos/lib/apresentacao";
 import { formatarData } from "@/lib/utils";
 
 import type { IntimacaoGroup, IntimacaoView } from "../types";
 import { estadoIntimacao } from "./estado";
-import { tituloIntimacao } from "./labels";
-import { tipoAtoLabel } from "./tipo-ato";
+import { atoPublicacaoLabel, tituloIntimacao } from "./labels";
 
 export const SITUACAO_LABEL = {
   PENDING: "Pendente",
@@ -59,8 +59,10 @@ export function linhaIntimacao(i: IntimacaoView) {
     cnj: formatarCNJ(i.cnj_number),
     title: tituloIntimacao(i.title, i.cnj_number),
     partes: [i.autor, i.reu].filter(Boolean).join(" · "),
-    tribunal: [i.court, i.degree].filter(Boolean).join(" · "),
-    ato: i.prazo?.tipo_ato ? tipoAtoLabel(i.prazo.tipo_ato) : "Tipo a definir",
+    tribunal: [i.court, grauProcessoLabel(i.degree)]
+      .filter(Boolean)
+      .join(" · "),
+    ato: atoPublicacaoLabel(i.ai_act, i.prazo?.tipo_ato, i.type),
     // estado (desfecho) — chip único: Pendente/Em elaboração/Em revisão/Concluída·Ciência/
     // Concluída·Protocolada/Ignorada. A linha só mostra quando NÃO é "Pendente" (a barra de
     // prazo já cobre a intimação aberta comum); ver estadoIntimacao.

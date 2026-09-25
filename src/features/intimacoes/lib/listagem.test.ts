@@ -26,6 +26,18 @@ const item = (extra: Partial<IntimacaoView> = {}) =>
     ...extra,
   }) as IntimacaoView;
 describe("listagem", () => {
+  it("shows the publication act independently of process identity and deadline action", () => {
+    const row = linhaIntimacao(
+      item({
+        title: "Réu Fulano · 40127327120268260506",
+        ai_act: "Especificação de Provas",
+        degree: "UNKNOWN",
+      }),
+    );
+    expect(row.title).toBe("Réu Fulano");
+    expect(row.ato).toBe("Especificação de Provas");
+    expect(row.tribunal).toBe("TJSP · Grau não informado");
+  });
   it("mostra publicação explícita e distingue prazo a definir de ausência de prazo", () => {
     expect(linhaIntimacao(item()).publicado).toBe("08/09/2026");
     expect(
