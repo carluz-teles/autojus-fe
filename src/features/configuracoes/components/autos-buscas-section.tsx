@@ -7,8 +7,9 @@ import { SkeletonRows } from "@/components/ui/skeletons";
 
 import { useAutosHistory } from "../hooks/use-autos-history";
 
-// "Buscas de autos" na aba Fontes de dados › Histórico. Cada linha = um lote
+// "Buscas de autos" na aba Fontes de dados › Histórico. Cada linha = uma SESSÃO
 // (sync_run do court): quantos PROCESSOS foram sincronizados no tribunal e quando.
+// Uma sessão fica RUNNING enquanto drena o backlog; OK ou FAILED ao fechar.
 // `records` é processos, não documentos (esses aparecem por-processo no cockpit).
 function fmtDataHora(iso: string): string {
   try {
@@ -45,8 +46,13 @@ export function AutosBuscasSection() {
       ) : (
         <div className="surface-panel divide-line2 reveal-stagger divide-y overflow-hidden">
           {q.data.map((r) => {
+            const running = r.status === "RUNNING";
             const ok = r.status === "OK";
-            const cor = ok ? "var(--primary)" : "var(--destructive)";
+            const cor = running
+              ? "var(--accent)"
+              : ok
+                ? "var(--primary)"
+                : "var(--destructive)";
             return (
               <div key={r.id} className="flex items-center gap-3 px-4 py-3">
                 <span
@@ -64,11 +70,28 @@ export function AutosBuscasSection() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-medium">
-                    {r.records} {r.records === 1 ? "processo" : "processos"}
-                    <span className="text-fg3 font-normal">
-                      {" "}
-                      · {fmtDataHora(r.finished_at)}
-                    </span>
+                    {running ? (
+                      // Show "início <date>" while the session is still draining.
+                      <span>
+                        {r.records > 0
+                          ? `${r.records} ${r.records === 1 ? "processo" : "processos"}`
+                          : "Em andamento"}
+                        <span className="text-fg3 font-normal">
+                          {" "}
+                          · início {fmtDataHora(r.started_at)}
+                        </span>
+                      </span>
+                    ) : (
+                      // Closed: show the date range.
+                      <span>
+                        {r.records} {r.records === 1 ? "processo" : "processos"}
+                        <span className="text-fg3 font-normal">
+                          {" "}
+                          · {fmtDataHora(r.started_at)}
+                          {r.finished_at ? ` – ${fmtDataHora(r.finished_at)}` : ""}
+                        </span>
+                      </span>
+                    )}
                   </p>
                   {r.retried > 0 ? (
                     <p className="text-fg3 text-[11.5px]">
@@ -76,9 +99,13 @@ export function AutosBuscasSection() {
                     </p>
                   ) : null}
                 </div>
-                <Badge variant={ok ? "success" : "warning"}>
-                  {ok ? "Concluída" : "Falhou"}
-                </Badge>
+                {running ? (
+                  <Badge variant="secondary">Em andamento</Badge>
+                ) : (
+                  <Badge variant={ok ? "success" : "warning"}>
+                    {ok ? "Concluída" : "Falhou"}
+                  </Badge>
+                )}
               </div>
             );
           })}
