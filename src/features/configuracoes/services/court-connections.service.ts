@@ -86,6 +86,14 @@ export async function connectCourtConnection(
   });
 }
 
+/** Unlinks one connection. Imported records and the certificate remain on the server. */
+export async function deleteCourtConnection(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<void> {
+  await fetcher<void>(`${ENDPOINT}/${id}`, { method: "DELETE" });
+}
+
 export interface SubmitMfaSeedInput {
   /** Imagem do QR (o "print" do segundo fator). Vence o `secret` quando ambos vêm. */
   qr?: File;

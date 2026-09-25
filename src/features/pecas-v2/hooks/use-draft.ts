@@ -29,7 +29,41 @@ export function useAssessment(id: string, enabled: boolean) {
   });
 }
 
-export function useDraft(id: string) {
+export interface AcceptedGeneration {
+  at: number;
+  updatedAt?: string;
+  previousUpdatedAt?: string;
+}
+
+const NO_TIMESTAMP_GRACE_MS = 5_000;
+
+export function isStaleAcceptedSnapshot(
+  draft: Draft | undefined,
+  accepted: AcceptedGeneration | null,
+): boolean {
+  if (
+    !accepted ||
+    (draft?.sagaState !== "FAILED" &&
+      draft?.sagaState !== "DRAFTED" &&
+      draft?.sagaState !== "REVIEWED")
+  )
+    return false;
+  if (accepted.updatedAt && draft.updatedAt) {
+    const acceptedAt = Date.parse(accepted.updatedAt);
+    const draftAt = Date.parse(draft.updatedAt);
+    if (Number.isFinite(acceptedAt) && Number.isFinite(draftAt))
+      return draftAt < acceptedAt;
+  }
+  if (accepted.previousUpdatedAt && draft.updatedAt)
+    return draft.updatedAt === accepted.previousUpdatedAt;
+  // A 202 without usable timestamps needs a short reconciliation window.
+  return Date.now() - accepted.at < NO_TIMESTAMP_GRACE_MS;
+}
+
+export function useDraft(
+  id: string,
+  accepted: AcceptedGeneration | null = null,
+) {
   const fetcher = useApi();
   const qc = useQueryClient();
   const detailKey = draftKeys.detail(id);
@@ -58,15 +92,16 @@ export function useDraft(id: string) {
       }
       return incoming;
     },
-    // Enquanto a geração está em curso (saga CREATED/EXTRACTING), o worker
-    // já persistiu content_html no fim; polling curto garante que o FE veja
-    // a transição pra EXTRACTING (ativando o SSE) e depois DRAFTED (parando).
+    // A 202 can arrive before GET reflects the new attempt. Keep observing
+    // CREATED and terminal snapshots from the preceding attempt.
     refetchIntervalInBackground: true,
     refetchInterval: (query) => {
       const draft = query.state.data as Draft | undefined;
       if (!draft || draft.status !== "DRAFT" || draft.supersededAt)
         return false;
       if (draft.sagaState === "EXTRACTING") return 1000;
+      if (accepted && draft.sagaState === "CREATED") return 1000;
+      if (isStaleAcceptedSnapshot(draft, accepted)) return 1000;
       if (draft.sagaState !== "DRAFTED" || !draft.currentVersionId)
         return false;
       const reason = draft.qualityAuthorization?.reasonCode;

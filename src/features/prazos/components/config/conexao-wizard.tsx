@@ -233,12 +233,24 @@ function SistemaProgresso({
           </p>
           <button
             type="button"
+            disabled={wizard.ocupado}
             onClick={() => wizard.reconectar(sistema.system)}
             className="text-primary self-start text-[12px] underline"
           >
             Tentar novamente
           </button>
         </div>
+      )}
+
+      {sistema.fase === "pendente" && wizard.passo === "conectar" && (
+        <button
+          type="button"
+          disabled={wizard.ocupado}
+          onClick={() => wizard.reconectar(sistema.system)}
+          className="text-primary mt-2 self-start text-[12px] underline disabled:opacity-50"
+        >
+          Tentar novamente
+        </button>
       )}
 
       {sistema.fase === "requer_2fa" && (

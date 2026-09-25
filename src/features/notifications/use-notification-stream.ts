@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { toast } from "sonner";
 
+import { COURT_CONNECTIONS_QUERY_KEY } from "@/features/configuracoes/hooks/use-court-connections";
+
 import { notificationKeys } from "./notification-keys";
 import { notificationHref } from "./notification-presentation";
 import type { NotificationView } from "./types";
@@ -85,6 +87,14 @@ export function useNotificationStream() {
             : undefined,
         });
         void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+        if (
+          n.type === "court_connection_established" ||
+          n.type === "court_connection_failed"
+        ) {
+          void queryClient.invalidateQueries({
+            queryKey: COURT_CONNECTIONS_QUERY_KEY,
+          });
+        }
       },
       onerror: () => {
         // Não relança: retorno vazio mantém o retry com backoff padrão (o servidor caiu,

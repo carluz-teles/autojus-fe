@@ -8,6 +8,7 @@ import {
   connectCourtConnection,
   createCourtConnection,
   type CreateCourtConnectionInput,
+  deleteCourtConnection,
   listCourtCatalog,
   listCourtConnections,
   submitMfaCode,
@@ -19,7 +20,8 @@ import type {
   MfaSeedResult,
 } from "../types/court-connection";
 
-const QUERY_KEY = ["court-connections"] as const;
+export const COURT_CONNECTIONS_QUERY_KEY = ["court-connections"] as const;
+const QUERY_KEY = COURT_CONNECTIONS_QUERY_KEY;
 
 /**
  * Lista as conexões com tribunais. Repolla enquanto alguma estiver AUTHENTICATING
@@ -55,6 +57,20 @@ export function useConnectCourtConnection() {
   return useMutation<CourtConnectionView, Error, string>({
     mutationFn: (id) => connectCourtConnection(fetcher, id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+  });
+}
+
+export function useDeleteCourtConnection() {
+  const fetcher = useApi();
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: (id) => deleteCourtConnection(fetcher, id),
+    onSuccess: (_result, id) => {
+      queryClient.setQueryData<CourtConnectionView[]>(QUERY_KEY, (current) =>
+        current?.filter((connection) => connection.id !== id),
+      );
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    },
   });
 }
 

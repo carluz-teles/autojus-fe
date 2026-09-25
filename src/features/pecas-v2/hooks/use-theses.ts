@@ -137,7 +137,13 @@ function useGenerateDraft(id: string) {
       );
       // Start polling/streaming immediately, including before the first refetch.
       qc.setQueryData(draftKeys.detail(id), (d: Draft | undefined) =>
-        d ? { ...d, sagaState: "EXTRACTING", updatedAt: result.updated_at } : d,
+        d
+          ? {
+              ...d,
+              sagaState: "EXTRACTING",
+              ...(result.updated_at ? { updatedAt: result.updated_at } : {}),
+            }
+          : d,
       );
       void qc.invalidateQueries({ queryKey: draftKeys.detail(id) });
       void qc.invalidateQueries({ queryKey: thesesKey(id) });

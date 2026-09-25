@@ -45,6 +45,16 @@ describe("notification destinations", () => {
       notificationHref({ payload: { href: "/primeira-importacao" } }),
     ).toBe("/configuracoes?tab=fontes");
   });
+  it("accepts only the exact court notification destination", () => {
+    expect(
+      notificationHref({ payload: { href: "/configuracoes?tab=fontes" } }),
+    ).toBe("/configuracoes?tab=fontes");
+    expect(
+      notificationHref({
+        payload: { href: "/configuracoes?tab=fontes&redirect=evil" },
+      }),
+    ).toBeNull();
+  });
   it.each([
     "https://example.com",
     "//example.com",
