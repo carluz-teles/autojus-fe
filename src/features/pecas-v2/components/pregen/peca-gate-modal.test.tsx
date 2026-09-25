@@ -57,6 +57,7 @@ const props: PecaGateModalProps = {
   tipoConfirmado: true,
   onProceed: vi.fn(),
   onConfigurarTribunal: vi.fn(),
+  onRevisarIntimacao: vi.fn(),
 };
 
 function response(overrides: Partial<AutosStatus> = {}): AutosStatus {
@@ -165,5 +166,65 @@ describe("PecaGateModal — consulta de autos ao abrir", () => {
     expect(container.textContent).not.toContain(
       "A importação automática de autos ainda não está disponível",
     );
+  });
+
+  it("reviews the formal item before autos and confirms it only on explicit click", async () => {
+    let confirmed = false;
+    mocks.fetch.mockImplementation(
+      async (path: string, options?: { method: string }) => {
+        if (path.endsWith("/confirmar")) {
+          confirmed = true;
+          return { data: {} };
+        }
+        if (path === "/v1/action-items/item-1")
+          return {
+            data: {
+              id: "item-1",
+              intimation_id: "int-1",
+              tipo: "manifestar",
+              piece_profile_key: "manifestacao",
+              gera_peca: true,
+              tipo_status: confirmed ? "confiavel" : "a_confirmar",
+              status: "SUGGESTED",
+              draft_id: null,
+            },
+          };
+        expect(options).toBeUndefined();
+        return response();
+      },
+    );
+    await act(async () => {
+      root.render(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(PecaGateModal, {
+            ...props,
+            open: true,
+            actionItemId: "item-1",
+          }),
+        ),
+      );
+    });
+    await settleQuery();
+    expect(container.textContent).toContain("Confirme o tipo de trabalho");
+    expect(container.textContent).toContain("Manifestar-se");
+    expect(container.textContent).toContain("Manifestação");
+    expect(container.textContent).not.toContain("Tudo pronto para a peça");
+    expect(mocks.fetch).not.toHaveBeenCalledWith(
+      "/v1/action-items/item-1/confirmar",
+      expect.anything(),
+    );
+    const confirm = [...container.querySelectorAll("button")].find((button) =>
+      button.textContent?.includes("Confirmar tipo e continuar"),
+    );
+    expect(confirm).toBeTruthy();
+    await act(async () => confirm!.click());
+    await settleQuery();
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      "/v1/action-items/item-1/confirmar",
+      { method: "POST" },
+    );
+    expect(container.textContent).toContain("Tudo pronto para a peça");
   });
 });

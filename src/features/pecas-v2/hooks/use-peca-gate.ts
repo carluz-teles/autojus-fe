@@ -2,7 +2,8 @@
 
 // Hook do PRE-FLIGHT da geração de peça. A análise da intimação é horizontal/
 // cosmética e NUNCA bloqueia a peça — o gate real roda AQUI, ao clicar "Gerar peça":
-//  · Check 1 (tipo do ato): quando o tipo ainda não foi confirmado, o gate exige
+//  · Primeiro, a sugestão de tipo da providência formal exige confirmação explícita.
+//  · Check 1 (tipo do ato da intimação): quando o tipo ainda não foi confirmado, o gate exige
 //    a confirmação inline (reusa o control de definir tipo) antes de seguir.
 //  · Check 2 (autos): consulta GET /processos/:id/autos-status. Sem autos é só um
 //    AVISO de qualidade (não bloqueia) — o gate oferece o caminho certo conforme o
@@ -19,6 +20,8 @@ import {
   getAutosStatus,
   priorizarAutos,
 } from "../../intimacoes/services/autos-status.service";
+import { generationBlockReason } from "../lib/generation-eligibility";
+import { useActionItemReview } from "./use-action-item-review";
 
 /** Caminho ACIONÁVEL oferecido quando o processo está sem autos carregados. */
 export type AutosPath =
@@ -35,6 +38,7 @@ export interface UsePecaGateParams {
   degree?: string;
   /** true quando o tipo do ato JÁ está confirmado (Check 1 satisfeito de saída). */
   tipoConfirmado: boolean;
+  actionItemId?: string;
 }
 
 export function usePecaGate({
@@ -43,8 +47,11 @@ export function usePecaGate({
   processoId,
   degree,
   tipoConfirmado,
+  actionItemId = "",
 }: UsePecaGateParams) {
   const api = useApi();
+  const review = useActionItemReview(actionItemId, open);
+  const item = review.detail.data;
 
   // Status dos autos — só busca com o gate aberto (não paga a chamada à toa).
   const status = useQuery({
@@ -81,6 +88,17 @@ export function usePecaGate({
           : "fetch";
 
   return {
+    reviewPending:
+      !!actionItemId && (review.detail.isPending || review.detail.isFetching),
+    reviewError: !!actionItemId && review.detail.isError,
+    retryReview: () => void review.detail.refetch(),
+    reviewItem:
+      item?.tipo_status === "a_confirmar" && !item.draft_id ? item : null,
+    reviewBlock:
+      actionItemId && item ? generationBlockReason(item, intimacaoId) : null,
+    confirmReview: () => void review.confirmOnce().catch(() => {}),
+    confirmPending: review.confirm.isPending,
+    confirmError: review.confirm.isError,
     // Check 1 — tipo do ato
     precisaTipo: !tipoConfirmado,
 

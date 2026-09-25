@@ -16,9 +16,9 @@
 //     o MESMO fluxo).
 //   · `GerarPecaButton` — o botão pronto (detalhe, agenda) = usePecaGeracao + <Button>.
 //
-// Check 1 do gate (confirmar tipo do ato) é no-op no motor v3 (o tipo é resolvido no
-// BE na geração) — por isso tipoConfirmado=true / prazo=null e o gate roda só o Check 2
-// (autos). Se a confirmação de tipo voltar, muda-se AQUI, num lugar só.
+// O gate confirma explicitamente o tipo do action item quando tipo_status exige;
+// isso é diferente de DefinirTipoAto, que trata o prazo/intimação. O antigo check
+// de prazo segue no-op no motor v3 (tipoConfirmado=true / prazo=null).
 
 import { Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -107,12 +107,16 @@ export function usePecaGeracao() {
         onOpenChange={setGateOpen}
         intimacaoId={target.intimacaoId}
         processoId={target.processoId}
+        actionItemId={target.actionItemId}
         degree={target.degree}
         prazo={null}
         tipoConfirmado
         pecaLabel={target.pecaLabel}
         onProceed={onGatePassou}
         onConfigurarTribunal={() => router.push("/configuracoes?tab=fontes")}
+        onRevisarIntimacao={() =>
+          router.push(`/intimacoes/${encodeURIComponent(target.intimacaoId)}`)
+        }
       />
       <GerarPecaModal
         open={modalOpen}
