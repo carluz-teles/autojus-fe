@@ -26,7 +26,12 @@ import {
 } from "../lib/instructions-storage";
 import { preconditionFromCode } from "../lib/peca-precondition";
 import type { SagaState, Thesis } from "../types";
-import { useAssessment, useDraft } from "./use-draft";
+import {
+  type AcceptedGeneration,
+  isStaleAcceptedSnapshot,
+  useAssessment,
+  useDraft,
+} from "./use-draft";
 import { thesesKey, useGenerateDraft, useThesesController } from "./use-theses";
 import {
   THESIS_EVIDENCE_INVALID_CODE,
@@ -67,7 +72,8 @@ function deriveStage(
 export function useConstruction(id: string) {
   const router = useRouter();
   const params = useSearchParams();
-  const draftQuery = useDraft(id);
+  const [accepted, setAccepted] = useState<AcceptedGeneration | null>(null);
+  const draftQuery = useDraft(id, accepted);
   const hasOrigin = !!draftQuery.data?.intimation.id;
   const hasTeor = !!htmlToText(draftQuery.data?.intimation.teor || "").trim();
   const theses = useThesesController(id);
@@ -177,11 +183,14 @@ export function useConstruction(id: string) {
   // Conferência (assessment) em andamento? Sinal real da fase 2 do loader — o
   // ciclo REST (request+poll+validate) roda antes do generate flipar EXTRACTING.
   const [firedAssessment, setFiredAssessment] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [instructionsEdit, setInstructionsEdit] = useState<string | null>(null);
   const instructions = instructionsEdit ?? draftQuery.data?.instructions ?? "";
 
   const saga = draftQuery.data?.sagaState;
-  const generated = saga === "DRAFTED" || saga === "REVIEWED";
+  const staleSnapshot = isStaleAcceptedSnapshot(draftQuery.data, accepted);
+  const generated =
+    (saga === "DRAFTED" || saga === "REVIEWED") && !staleSnapshot;
   useAIExperience(
     `/v1/pecas/${id}/generate`,
     generated,
@@ -190,7 +199,7 @@ export function useConstruction(id: string) {
   );
   useAIExperience(
     `/v1/pecas/${id}/generate`,
-    saga === "FAILED",
+    saga === "FAILED" && !staleSnapshot,
     "error",
     draftQuery.dataUpdatedAt,
   );
@@ -235,12 +244,17 @@ export function useConstruction(id: string) {
     setFiredGenerate(true);
     setFiredAssessment(false);
     try {
-      await generate.mutateAsync({
+      const result = await generate.mutateAsync({
         thesisIds,
         instructions: instructions.trim(),
         expectedCurrentVersionId: draftQuery.data?.currentVersionId ?? null,
         revision,
         onAssessmentStarted: () => setFiredAssessment(true),
+      });
+      setAccepted({
+        at: Date.now(),
+        updatedAt: result.updated_at,
+        previousUpdatedAt: draftQuery.data?.updatedAt,
       });
     } catch (error) {
       setFiredGenerate(false);
@@ -270,6 +284,12 @@ export function useConstruction(id: string) {
         onAssessmentStarted: () => setFiredAssessment(true),
       },
       {
+        onSuccess: (result) =>
+          setAccepted({
+            at: Date.now(),
+            updatedAt: result.updated_at,
+            previousUpdatedAt: draftQuery.data?.updatedAt,
+          }),
         onError: () => {
           setFiredGenerate(false);
           setFiredAssessment(false);
@@ -298,12 +318,19 @@ export function useConstruction(id: string) {
     (assessment.data?.request?.status === "failed" ||
       assessment.data?.request?.status === "superseded");
   const assessmentReadError = assessmentRequired && assessment.isError;
-  const stage = deriveStage(saga, firedGenerate, hasContent);
+  const staleFailure = saga === "FAILED" && (retrying || staleSnapshot);
+  const stage = deriveStage(
+    staleFailure || staleSnapshot ? "EXTRACTING" : saga,
+    firedGenerate,
+    hasContent,
+  );
   // Regeração em curso: a peça já tinha folha e o saga voltou a EXTRACTING/CREATED.
   // O centro fica em "pronta" e a folha streama o novo conteúdo.
   const regenerating =
     stage === "pronta" &&
-    (saga === "EXTRACTING" || (saga === "CREATED" && firedGenerate));
+    (saga === "EXTRACTING" ||
+      (saga === "CREATED" && firedGenerate) ||
+      staleSnapshot);
 
   // ── NAVEGAR-PRIMEIRO: auto-partida NA TELA DA PEÇA ─────────────────────────
   // Qualquer rascunho ainda sem conteúdo (stage 'pregen') dispara a partida
@@ -320,7 +347,6 @@ export function useConstruction(id: string) {
   // dispatcher fino sobre ela.
   const autoFired = useRef(false);
   const retryInFlight = useRef(false);
-  const [retrying, setRetrying] = useState(false);
   // Janela em que o loader deve aparecer antes/durante o disparo automático
   // (evita um flash do pregen enquanto as teses ainda chegam).
   const autoPending =
@@ -366,6 +392,14 @@ export function useConstruction(id: string) {
         onAssessmentStarted: () => setFiredAssessment(true),
       },
       {
+        onSuccess: (result) => {
+          setAccepted({
+            at: Date.now(),
+            updatedAt: result.updated_at,
+            previousUpdatedAt: draftQuery.data?.updatedAt,
+          });
+          setAutoFailed(false);
+        },
         onError: () => {
           setFiredGenerate(false);
           setFiredAssessment(false);
@@ -388,14 +422,19 @@ export function useConstruction(id: string) {
     generate,
     id,
     draftQuery.data?.currentVersionId,
+    draftQuery.data?.updatedAt,
   ]);
 
   // O 202 apenas enfileira o worker. Guarde a orientação para um retry após
   // falha assíncrona; só a peça realmente pronta encerra essa tentativa.
   useEffect(() => {
-    if ((saga === "DRAFTED" || saga === "REVIEWED") && hasContent)
+    if (
+      (saga === "DRAFTED" || saga === "REVIEWED") &&
+      hasContent &&
+      !staleSnapshot
+    )
       clearInstructions(id);
-  }, [saga, hasContent, id]);
+  }, [saga, hasContent, staleSnapshot, id]);
 
   // Falha assíncrona detectada por POLLING (não pela mutation desta sessão) —
   // ex.: SSE caiu depois do 202 e o worker marcou saga_state=FAILED no BE, mas
@@ -410,7 +449,9 @@ export function useConstruction(id: string) {
       assessmentFailed ||
       assessmentReadError) &&
     !hasContent &&
-    !retrying;
+    !retrying &&
+    !staleSnapshot &&
+    !generated;
 
   // Retry explícito: teses com erro/vazias são aguardadas antes da mutation de
   // geração. O mesmo draft e a orientação sobrevivem ao 202 e ao refresh.
@@ -441,12 +482,18 @@ export function useConstruction(id: string) {
       autoFired.current = true;
       setFiredGenerate(true);
       setFiredAssessment(false);
-      await generate.mutateAsync({
+      const result = await generate.mutateAsync({
         thesisIds,
         instructions: (peekInstructions(id) || instructions).trim(),
         expectedCurrentVersionId: draftQuery.data?.currentVersionId ?? null,
         onAssessmentStarted: () => setFiredAssessment(true),
       });
+      setAccepted({
+        at: Date.now(),
+        updatedAt: result.updated_at,
+        previousUpdatedAt: draftQuery.data?.updatedAt,
+      });
+      setAutoFailed(false);
     } catch {
       setFiredGenerate(false);
       setFiredAssessment(false);

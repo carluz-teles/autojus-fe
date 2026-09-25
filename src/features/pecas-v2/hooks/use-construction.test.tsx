@@ -9,6 +9,7 @@ import { useConstruction } from "./use-construction";
 const mocks = vi.hoisted(() => ({
   saga: "FAILED",
   contentHtml: "",
+  updatedAt: "2026-09-25T11:00:00Z",
   theses: [] as { id: string }[],
   thesesError: true,
   regenerate: vi.fn(),
@@ -38,7 +39,8 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/lib/telemetry/use-ai-experience", () => ({
   useAIExperience: vi.fn(),
 }));
-vi.mock("./use-draft", () => ({
+vi.mock("./use-draft", async (importOriginal) => ({
+  ...(await importOriginal()),
   useAssessment: () => ({
     data: { request: mocks.assessmentRequest },
     isSuccess: mocks.assessmentStatus === "ready",
@@ -50,6 +52,7 @@ vi.mock("./use-draft", () => ({
       intimation: { id: "int-1", teor: "Intimação com teor." },
       sagaState: mocks.saga,
       contentHtml: mocks.contentHtml,
+      updatedAt: mocks.updatedAt,
       instructions: "Instrução persistida",
       currentVersionId: null,
     },
@@ -110,6 +113,7 @@ describe("useConstruction — dispatch real da geração", () => {
     sessionStorage.clear();
     mocks.saga = "FAILED";
     mocks.contentHtml = "";
+    mocks.updatedAt = "2026-09-25T11:00:00Z";
     mocks.theses = [];
     mocks.thesesError = true;
     mocks.streamCode = undefined;
@@ -365,5 +369,67 @@ describe("useConstruction — dispatch real da geração", () => {
     mocks.contentHtml = "<p>Minuta pronta</p>";
     await act(async () => root.render(createElement(Probe)));
     expect(mocks.mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("GET DRAFTED antigo mantém regeração ativa e orientação até a nova versão", async () => {
+    mocks.saga = "DRAFTED";
+    mocks.contentHtml = "<p>Minuta anterior</p>";
+    mocks.mutateAsync.mockResolvedValue({
+      updated_at: "2026-09-25T12:00:00Z",
+    });
+    await act(async () => root.render(createElement(Probe)));
+    setInstructions("draft-1", "Manter orientação da tentativa");
+
+    await act(async () => latest.regenerateWithTheses(["t1"], "revision-1"));
+    expect(latest.stage).toBe("pronta");
+    expect(latest.regenerating).toBe(true);
+    expect(latest.draft?.contentHtml).toBe("<p>Minuta anterior</p>");
+    expect(sessionStorage.getItem("peca:instructions:draft-1")).toBe(
+      "Manter orientação da tentativa",
+    );
+
+    mocks.updatedAt = "2026-09-25T12:01:00Z";
+    mocks.contentHtml = "<p>Minuta nova</p>";
+    await act(async () => root.render(createElement(Probe)));
+    expect(latest.regenerating).toBe(false);
+    expect(latest.draft?.contentHtml).toBe("<p>Minuta nova</p>");
+    expect(sessionStorage.getItem("peca:instructions:draft-1")).toBeNull();
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("FAILED novo após 202 libera erro e preserva conteúdo anterior", async () => {
+    mocks.saga = "REVIEWED";
+    mocks.contentHtml = "<p>Minuta anterior</p>";
+    mocks.mutateAsync.mockResolvedValue({
+      updated_at: "2026-09-25T12:00:00Z",
+    });
+    await act(async () => root.render(createElement(Probe)));
+    await act(async () => latest.regenerateWithTheses(["t1"], "revision-1"));
+    expect(latest.regenerating).toBe(true);
+
+    mocks.saga = "FAILED";
+    mocks.updatedAt = "2026-09-25T12:01:00Z";
+    await act(async () => root.render(createElement(Probe)));
+    expect(latest.stage).toBe("falha");
+    expect(latest.regenerating).toBe(false);
+    expect(latest.draft?.contentHtml).toBe("<p>Minuta anterior</p>");
+  });
+
+  it("falha local anterior é limpa quando chega sucesso novo", async () => {
+    mocks.saga = "CREATED";
+    mocks.thesesError = false;
+    mocks.theses = [{ id: "tese-1" }];
+    await act(async () => root.render(createElement(Probe)));
+    expect(mocks.mutate).toHaveBeenCalledOnce();
+    await act(async () => mocks.mutate.mock.calls[0][1].onError());
+    expect(latest.autoFailed).toBe(true);
+
+    mocks.saga = "DRAFTED";
+    mocks.contentHtml = "<p>Minuta nova</p>";
+    mocks.updatedAt = "2026-09-25T12:01:00Z";
+    await act(async () => root.render(createElement(Probe)));
+    expect(latest.stage).toBe("pronta");
+    expect(latest.autoFailed).toBe(false);
+    expect(mocks.mutate).toHaveBeenCalledOnce();
   });
 });
