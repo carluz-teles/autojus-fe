@@ -233,12 +233,24 @@ function SistemaProgresso({
           </p>
           <button
             type="button"
+            disabled={wizard.ocupado}
             onClick={() => wizard.reconectar(sistema.system)}
             className="text-primary self-start text-[12px] underline"
           >
             Tentar novamente
           </button>
         </div>
+      )}
+
+      {sistema.fase === "pendente" && wizard.passo === "conectar" && (
+        <button
+          type="button"
+          disabled={wizard.ocupado}
+          onClick={() => wizard.reconectar(sistema.system)}
+          className="text-primary mt-2 self-start text-[12px] underline disabled:opacity-50"
+        >
+          Tentar novamente
+        </button>
       )}
 
       {sistema.fase === "requer_2fa" && (
@@ -458,7 +470,8 @@ export function ConexaoWizard({
                         className="mt-px size-4 flex-none"
                         style={{
                           color:
-                            autos.fase === "ok" && autos.queued > 0
+                            autos.fase === "ok" &&
+                            (autos.queued > 0 || autos.pending > 0)
                               ? "var(--green)"
                               : "var(--fg3)",
                         }}
@@ -470,8 +483,8 @@ export function ConexaoWizard({
                         ? `Verificando quais processos do ${court} já estão na sua base…`
                         : autos.fase === "erro"
                           ? "Conectado. Não foi possível iniciar a busca dos autos agora — use “Sincronizar autos” em Fontes de dados › Tribunais."
-                          : autos.queued > 0
-                            ? `Buscando os autos de ${autos.queued} ${autos.queued === 1 ? "processo" : "processos"} do ${court} que já estão na sua base. Eles chegam em segundo plano.`
+                          : autos.queued > 0 || autos.pending > 0
+                            ? `Buscando os autos de ${autos.queued || autos.pending} ${(autos.queued || autos.pending) === 1 ? "processo" : "processos"} do ${court} que já estão na sua base. Eles chegam em segundo plano.`
                             : `Conectado. Nenhum processo do ${court} na sua base ainda — os autos serão buscados automaticamente assim que chegarem.`}
                     </p>
                   </div>

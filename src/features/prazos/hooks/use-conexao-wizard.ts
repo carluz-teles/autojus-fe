@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCertificados } from "@/features/configuracoes/hooks/use-cert-upload";
 import {
@@ -91,7 +91,7 @@ function estadoInicial(
           ? "conectado"
           : status === "MFA_REQUIRED" || status === "MFA_ENROLLMENT_REQUIRED"
             ? "requer_2fa"
-            : "pendente"
+            : "erro"
         : "pendente",
       erro: null,
       qrFile: null,
@@ -135,6 +135,14 @@ export function useConexaoWizard({
   const [sistemas, setSistemas] = useState<SistemaEstado[]>(() =>
     estadoInicial(entries, connections),
   );
+  const active = useRef(true);
+  const busySystems = useRef(new Set<string>());
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
 
   // Se todo sistema já tem conexão registrada, não precisamos do certificado
   // para retomar (o connect/2FA reaproveita a conexão existente).
@@ -154,6 +162,7 @@ export function useConexaoWizard({
 
   const patch = useCallback(
     (system: string, valores: Partial<SistemaEstado>) => {
+      if (!active.current) return;
       setSistemas((prev) =>
         prev.map((s) => (s.system === system ? { ...s, ...valores } : s)),
       );
@@ -177,6 +186,8 @@ export function useConexaoWizard({
   /** Cria (se preciso) e conecta um sistema; devolve a fase resultante. */
   const conectarSistema = useCallback(
     async (sistema: SistemaEstado) => {
+      if (busySystems.current.has(sistema.system)) return;
+      busySystems.current.add(sistema.system);
       patch(sistema.system, { fase: "conectando", erro: null });
       try {
         let id = sistema.connectionId;
@@ -187,7 +198,9 @@ export function useConexaoWizard({
             certificateRef: selectedCertRef,
           });
           id = criada.id;
+          patch(sistema.system, { connectionId: id, status: criada.status });
         }
+        if (!active.current) return;
         const conn = await connectMut.mutateAsync(id);
         patch(sistema.system, {
           connectionId: id,
@@ -200,6 +213,8 @@ export function useConexaoWizard({
         });
       } catch (e) {
         patch(sistema.system, { fase: "erro", erro: mensagemErro(e) });
+      } finally {
+        busySystems.current.delete(sistema.system);
       }
     },
     [court, selectedCertRef, createMut, connectMut, patch],
@@ -286,26 +301,29 @@ export function useConexaoWizard({
   );
 
   // Busca de autos ao conectar. A REGRA (do BE, RequestAutosSync): se há processos
-  // deste tribunal na base, enfileira a busca (queued > 0); se não há, nada a buscar
-  // (queued = 0). O sync é court-scoped, então basta acionar uma conexão do tribunal.
+  // deste tribunal na base, enfileira a busca (queued > 0); também pode retornar
+  // queued=0 com pending>0 quando autos já estão enfileirados de uma busca anterior
+  // — ambos os sinais indicam que autos estão sendo buscados. O sync é court-scoped,
+  // então basta acionar uma conexão do tribunal.
   const [autos, setAutos] = useState<{
     fase: "idle" | "buscando" | "ok" | "erro";
     queued: number;
+    pending: number;
     erro: string | null;
-  }>({ fase: "idle", queued: 0, erro: null });
+  }>({ fase: "idle", queued: 0, pending: 0, erro: null });
 
   const buscarAutos = useCallback(async () => {
     const alvo = sistemas.find((s) => s.fase === "conectado" && s.connectionId);
     if (!alvo?.connectionId) {
-      setAutos({ fase: "ok", queued: 0, erro: null });
+      setAutos({ fase: "ok", queued: 0, pending: 0, erro: null });
       return;
     }
-    setAutos({ fase: "buscando", queued: 0, erro: null });
+    setAutos({ fase: "buscando", queued: 0, pending: 0, erro: null });
     try {
       const r = await syncCourtAutos(api, alvo.connectionId);
-      setAutos({ fase: "ok", queued: r.queued ?? 0, erro: null });
+      setAutos({ fase: "ok", queued: r.queued ?? 0, pending: r.pending ?? 0, erro: null });
     } catch (e) {
-      setAutos({ fase: "erro", queued: 0, erro: mensagemErro(e) });
+      setAutos({ fase: "erro", queued: 0, pending: 0, erro: mensagemErro(e) });
     }
   }, [sistemas, api]);
 
