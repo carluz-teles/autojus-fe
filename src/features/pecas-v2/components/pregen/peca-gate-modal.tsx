@@ -206,8 +206,8 @@ function TipoStep({
       </Dialog.Title>
       <Dialog.Description className="text-muted-foreground mb-4 text-[13px] leading-relaxed">
         Para gerar a peça{pecaLabel ? ` (${pecaLabel})` : ""} com precisão,
-        confirme o tipo do ato e o prazo desta intimação. Assim que confirmar, o
-        próximo passo aparece aqui.
+        confirme o tipo do ato desta intimação. O prazo pode exigir uma revisão
+        separada antes de continuar.
       </Dialog.Description>
       <div className="surface-inset p-4">
         <DefinirTipoAto

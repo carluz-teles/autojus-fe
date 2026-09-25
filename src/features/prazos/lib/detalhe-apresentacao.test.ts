@@ -6,10 +6,36 @@ import {
   documentoOrigemUrl,
   feriadosVigentes,
   formatarCNJ,
+  motivoRevisaoLabel,
+  origemRevisaoLabel,
   situacaoRevisao,
+  tipoRevisaoLabel,
 } from "./detalhe-apresentacao";
 
 describe("apresentação do detalhe", () => {
+  it("apresenta origem e tipo legíveis sem exibir enums crus", () => {
+    expect(origemRevisaoLabel("generic_fallback")).toBe(
+      "Base genérica provisória",
+    );
+    expect(origemRevisaoLabel("declared")).toBe("Informado na publicação");
+    expect(origemRevisaoLabel("manual")).toBe("Ajustado manualmente");
+    expect(origemRevisaoLabel("unexpected_origin")).toBe(
+      "Origem não informada",
+    );
+    expect(
+      tipoRevisaoLabel(
+        "impugnacao_cumprimento",
+        "Impugnação ao cumprimento de sentença",
+      ),
+    ).toBe("Impugnação ao cumprimento de sentença");
+    expect(tipoRevisaoLabel("impugnacao_cumprimento")).toBe("Tipo registrado");
+    expect(
+      motivoRevisaoLabel(
+        "generic_fallback",
+        "Base genérica ou provisória requer revisão.",
+      ),
+    ).toBe("Confira a contagem antes de confirmar.");
+  });
   it("não apresenta ciência com prazo ativo como classificação aceita", () => {
     const p = {
       status: "OPEN",
@@ -25,10 +51,12 @@ describe("apresentação do detalhe", () => {
       situacaoRevisao({ ...p, confirmed: true }, "declarado").pendente,
     ).toBe(false);
   });
-  it("preserva nomes só dos feriados que continuam no cálculo revisado", () => {
+  it("mostra apenas feriados do snapshot corrente, sem nomes da memória histórica", () => {
     const p = {
-      confirmed: true,
-      holidays_applied: ["2026-09-07T00:00:00Z", "2026-09-10"],
+      calculation_audit_status: "current",
+      current_calculation: {
+        holidays_applied: ["2026-09-07T00:00:00Z", "2026-09-10"],
+      },
       applied_holiday: [
         {
           data: "2026-09-07",
@@ -39,9 +67,12 @@ describe("apresentação do detalhe", () => {
       ],
     } as PrazoDetalheView;
     expect(feriadosVigentes(p).map((h) => h.nome)).toEqual([
-      "Independência do Brasil",
+      "Feriado ou suspensão",
       "Feriado ou suspensão",
     ]);
+    expect(
+      feriadosVigentes({ ...p, calculation_audit_status: "historical" }),
+    ).toEqual([]);
   });
   it("não confunde revisão humana com cumprimento nem oculta divergência", () => {
     const p = { confirmed: true, status: "OPEN" } as PrazoDetalheView;

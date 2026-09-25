@@ -47,6 +47,8 @@ export const CATEGORIA_COARSE_LABEL: Record<IntimacaoCategoriaCoarse, string> =
 export const EXCECAO_MOTIVO_LABEL: Record<IntimacaoExcecaoMotivo, string> = {
   provisorio: "Prazo provisório (piso supletivo) — confirme a contagem.",
   ia_inferido: "Tipo de ato inferido — revise antes de confirmar.",
+  tipo_pendente: "Tipo de ato ainda precisa ser classificado.",
+  prazo_pendente: "Prazo calculado ainda precisa de revisão.",
   divergente: "Divergência entre a publicação e o cálculo do prazo.",
   trabalho_divergente:
     "Divergência entre a classificação da intimação e o trabalho identificado.",

@@ -26,11 +26,11 @@ import type {
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { nomeExibicao } from "@/features/organization/lib/labels";
 import { FASE_STEPS } from "@/features/processos/lib/apresentacao";
+import { ApiError } from "@/lib/api/errors";
 import { formatarData } from "@/lib/utils";
 
 import { prazoVisivel } from "../lib/confirmacao";
 import {
-  dataEscolhidaNaApuracao,
   documentoOrigemUrl,
   feriadosVigentes,
   formatarCNJ,
@@ -41,6 +41,7 @@ import type {
   PrazoDetalheView,
   PrazoOrigem,
 } from "../types";
+import { usePrazoTipos } from "./_private/use-prazo-tipos";
 import { useApurarDivergenciaPrazo } from "./use-apurar-divergencia-prazo";
 import { usePrazo } from "./use-prazo";
 
@@ -176,58 +177,44 @@ export interface MemoriaCalculoVM {
 function buildMemoria(p: PrazoDetalheView | null): MemoriaCalculoVM | null {
   if (!p || p.status === "NO_DEADLINE") return null;
 
-  const calc = p.calc_memory ?? null;
+  const calc =
+    p.calculation_audit_status === "current" ? p.current_calculation : null;
   const holidays = feriadosVigentes(p);
-
-  const cadeia: MemoriaCadeiaItem[] = [];
-  if (calc) {
-    cadeia.push({
-      kicker: "TERMO INICIAL",
-      valor: formatarData(p.start_date),
-      sub: p.confirmed
-        ? "Início registrado para esta contagem"
-        : calc.termo_inicial_regra,
-    });
-    cadeia.push({
-      kicker: "PRAZO BASE",
-      valor: dataEscolhidaNaApuracao(p)
-        ? "Data definida na apuração"
-        : p.confirmed
-          ? `${p.days} dias`
-          : calc.prazo_base,
-      sub: dataEscolhidaNaApuracao(p)
-        ? "O vencimento foi escolhido diretamente na revisão."
-        : p.origem === "declarado"
-          ? "Duração informada no ato"
-          : p.confirmed
-            ? "Contagem revisada"
-            : calc.prazo_base_fonte,
-    });
-    cadeia.push({
-      kicker: "CONTAGEM",
-      valor: (p.confirmed ? p.counting === "BUSINESS" : calc.dias_uteis)
-        ? "Dias úteis"
-        : "Dias corridos",
-      sub: dataEscolhidaNaApuracao(p)
-        ? "Regime registrado antes da escolha do vencimento."
-        : `${holidays.length} feriado(s) ou suspensão(ões) na contagem.`,
-    });
-    cadeia.push(
-      (p.confirmed ? p.doubled : calc.dobra_motivo)
-        ? {
-            kicker: "DOBRA",
-            valor: "2x",
-            sub: p.confirmed
-              ? p.doubled_reason || "Confirmada na revisão"
-              : (calc.dobra_motivo ?? ""),
-          }
-        : {
-            kicker: "SEM DOBRA",
-            valor: "—",
-            sub: "Nenhuma prerrogativa de prazo em dobro registrada na Pasta.",
-          },
-    );
-  }
+  const cadeia: MemoriaCadeiaItem[] = calc
+    ? [
+        {
+          kicker: "TERMO INICIAL",
+          valor: calc.start_date
+            ? formatarData(calc.start_date)
+            : "Não informado",
+          sub: calc.anchor_event || "Marco não registrado",
+        },
+        {
+          kicker: "PRAZO BASE",
+          valor: `${calc.days} dias`,
+          sub:
+            calc.source === "declared"
+              ? "Duração informada na publicação"
+              : calc.source === "manual"
+                ? "Duração ajustada manualmente"
+                : calc.fallback_used
+                  ? "Base genérica provisória"
+                  : "Regra registrada",
+        },
+        {
+          kicker: "CONTAGEM",
+          valor: calc.counting === "BUSINESS" ? "Dias úteis" : "Dias corridos",
+          sub: `${holidays.length} feriado(s) ou suspensão(ões) nesta contagem.`,
+        },
+        {
+          kicker: calc.doubled ? "DOBRA" : "SEM DOBRA",
+          valor: calc.doubled ? "2x" : "—",
+          sub: calc.doubled
+            ? "Prazo em dobro registrado"
+            : "Sem prazo em dobro",
+        },
+      ]
+    : [];
 
   const cv = p.cross_validation ?? null;
   const divergencia = cv
@@ -247,7 +234,21 @@ function buildMemoria(p: PrazoDetalheView | null): MemoriaCalculoVM | null {
 
   return {
     prazoId: p.id,
-    origem: origemInfo(p.origem),
+    origem: calc
+      ? calc.source === "generic_fallback"
+        ? {
+            label: "Prazo provisório pela regra genérica",
+            cor: "var(--gold)",
+            fundo: "var(--hover)",
+          }
+        : calc.source === "manual"
+          ? {
+              label: "Prazo ajustado manualmente",
+              cor: "var(--fg2)",
+              fundo: "var(--hover)",
+            }
+          : origemInfo(calc.source === "declared" ? "declarado" : "calculado")
+      : null,
     temCalcMemory: !!calc,
     cadeia,
     notaInterna:
@@ -396,6 +397,7 @@ export function useIntimacaoDetalhe(
   // fetch duplicado. Desligada enquanto não houver prazo derivado da intimação.
   const prazoId = i?.prazo?.deadline_id ?? null;
   const prazoDetalhe = usePrazo(prazoId);
+  const tipoCatalogo = usePrazoTipos(id);
   const apurarDivergencia = useApurarDivergenciaPrazo();
   const revisao = situacaoRevisao(prazoDetalhe.prazo, i?.estado ?? "");
   const memoria = useMemo(
@@ -412,17 +414,45 @@ export function useIntimacaoDetalhe(
   const invalidateIntimacaoDetalhe = () =>
     queryClient.invalidateQueries({ queryKey: intimacoesKeys.detail(id) });
 
+  const apuracaoObsoleta =
+    apurarDivergencia.error instanceof ApiError &&
+    apurarDivergencia.error.status === 409 &&
+    apurarDivergencia.lastExpectedRevision ===
+      prazoDetalhe.prazo?.review_revision;
+  const onErroApuracao = (error: Error, fallback: string) => {
+    if (error instanceof ApiError && error.status === 409) {
+      void Promise.allSettled([
+        queryClient.invalidateQueries({
+          queryKey: ["prazos", "detail", prazoId],
+        }),
+        invalidateIntimacaoDetalhe(),
+      ]);
+      toast.error(
+        "O prazo mudou. Confira os dados atualizados antes de decidir.",
+      );
+      return;
+    }
+    toast.error(fallback);
+  };
+
   const onAceitarDeclarado = () => {
-    if (!prazoId) return;
+    if (!prazoId || !prazoDetalhe.prazo || apuracaoObsoleta) return;
     apurarDivergencia.apurar(
-      { prazoId, body: { decisao: "aceita_declarado" } },
+      {
+        prazoId,
+        body: {
+          decisao: "aceita_declarado",
+          expected_revision: prazoDetalhe.prazo.review_revision,
+        },
+      },
       {
         onSuccess: () => {
           invalidateIntimacaoDetalhe();
           toast.success("Divergência apurada — declarado aceito.");
         },
-        onError: () =>
-          toast.error(
+        onError: (error) =>
+          onErroApuracao(
+            error,
             "Não foi possível apurar a divergência. Tente novamente.",
           ),
       },
@@ -430,16 +460,23 @@ export function useIntimacaoDetalhe(
   };
 
   const onAceitarCalculado = () => {
-    if (!prazoId) return;
+    if (!prazoId || !prazoDetalhe.prazo || apuracaoObsoleta) return;
     apurarDivergencia.apurar(
-      { prazoId, body: { decisao: "aceita_calculado" } },
+      {
+        prazoId,
+        body: {
+          decisao: "aceita_calculado",
+          expected_revision: prazoDetalhe.prazo.review_revision,
+        },
+      },
       {
         onSuccess: () => {
           invalidateIntimacaoDetalhe();
           toast.success("Divergência apurada — calculado aceito.");
         },
-        onError: () =>
-          toast.error(
+        onError: (error) =>
+          onErroApuracao(
+            error,
             "Não foi possível apurar a divergência. Tente novamente.",
           ),
       },
@@ -449,19 +486,26 @@ export function useIntimacaoDetalhe(
   // Ajuste manual = escolher uma DATA FATAL específica (endDate, wire YYYY-MM-DD),
   // não mais uma quantidade de dias — o BE grava a data direto no prazo.
   const onAjusteManual = (endDate: string) => {
-    if (!prazoId) return;
+    if (!prazoId || !prazoDetalhe.prazo || apuracaoObsoleta) return;
     apurarDivergencia.apurar(
       {
         prazoId,
-        body: { decisao: "ajuste_manual", end_date: endDate },
+        body: {
+          decisao: "ajuste_manual",
+          end_date: endDate,
+          expected_revision: prazoDetalhe.prazo.review_revision,
+        },
       },
       {
         onSuccess: () => {
           invalidateIntimacaoDetalhe();
           toast.success("Ajuste manual registrado.");
         },
-        onError: () =>
-          toast.error("Não foi possível registrar o ajuste. Tente novamente."),
+        onError: (error) =>
+          onErroApuracao(
+            error,
+            "Não foi possível registrar o ajuste. Tente novamente.",
+          ),
       },
     );
   };
@@ -532,6 +576,10 @@ export function useIntimacaoDetalhe(
 
     // memória de cálculo ("por que essa data?")
     prazoDetalhe: prazoDetalhe.prazo,
+    prazoTipoLabel:
+      tipoCatalogo.data?.items.find(
+        (item) => item.key === prazoDetalhe.prazo?.tipo_ato,
+      )?.label ?? null,
     revisao,
     recarregar: () => query.refetch(),
     recarregarPrazo: () =>
@@ -548,7 +596,13 @@ export function useIntimacaoDetalhe(
     memoriaPending: !!prazoId && prazoDetalhe.isPending,
     memoriaErro: !!prazoId && prazoDetalhe.isError,
     memoriaEmVoo: apurarDivergencia.isPending,
-    apuracaoErro: !!apurarDivergencia.error,
+    apuracaoErro:
+      !!apurarDivergencia.error &&
+      !(
+        apurarDivergencia.error instanceof ApiError &&
+        apurarDivergencia.error.status === 409
+      ),
+    apuracaoObsoleta,
     onAceitarDeclarado,
     onAceitarCalculado,
     onAjusteManual,
