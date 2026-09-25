@@ -21,6 +21,9 @@ export function useAssessment(id: string, enabled: boolean) {
     queryKey: draftKeys.assessment(id),
     queryFn: () => svc.getAssessment(fetcher, id),
     enabled: !!id && enabled,
+    // The app defaults to 60s. A cached success must not skip the GET when
+    // the draft loads and changes this query from disabled to enabled.
+    staleTime: 0,
     refetchOnMount: "always",
   });
 }
