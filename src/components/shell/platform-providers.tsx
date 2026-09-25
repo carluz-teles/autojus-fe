@@ -13,6 +13,8 @@ export default function PlatformProviders({
   return (
     <ClerkProvider
       appearance={clerkAppearance}
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
       signInFallbackRedirectUrl={APP_HOME_PATH}
       signUpFallbackRedirectUrl={ONBOARDING_PATH}
     >
