@@ -484,6 +484,12 @@ export function useTriagemPipeline() {
   const ignorar = useIgnorarIntimacao();
   const cienciaBatch = useDarCienciaEmLote();
   const assignBatch = useAssignIntimacaoResponsavelBatch();
+  const bulkInFlight = useRef(false);
+  const mutating =
+    resolver.isPending ||
+    ignorar.isPending ||
+    cienciaBatch.isPending ||
+    assignBatch.isPending;
 
   // Fluxo sequencial (docs §4): após sucesso de uma ação elegível sobre o item
   // ABERTO no painel, segue ao próximo (ou fecha, se não houver) — sem retornar
@@ -503,7 +509,8 @@ export function useTriagemPipeline() {
   }
 
   async function darCiencia(ids: string[]) {
-    if (ids.length === 0) return;
+    if (ids.length === 0 || bulkInFlight.current || mutating) return;
+    bulkInFlight.current = true;
     try {
       const result = await cienciaBatch.mutateAsync(ids);
       // Fan-out por id (sem endpoint em lote no BE) — erro parcial é recuperável:
@@ -522,6 +529,8 @@ export function useTriagemPipeline() {
       avancarSePainelAberto(result.succeeded);
     } catch {
       toast.error("Não foi possível registrar a ciência.");
+    } finally {
+      bulkInFlight.current = false;
     }
   }
 
@@ -548,7 +557,8 @@ export function useTriagemPipeline() {
   }
 
   async function atribuir(ids: string[], memberId: string | null) {
-    if (ids.length === 0) return;
+    if (ids.length === 0 || bulkInFlight.current || mutating) return;
+    bulkInFlight.current = true;
     try {
       const result = await assignBatch.mutateAsync({
         ids,
@@ -571,6 +581,8 @@ export function useTriagemPipeline() {
       }
     } catch {
       toast.error("Não foi possível definir o responsável.");
+    } finally {
+      bulkInFlight.current = false;
     }
   }
 
@@ -789,10 +801,6 @@ export function useTriagemPipeline() {
     darCienciaUnica,
     descartar,
     atribuir,
-    mutating:
-      resolver.isPending ||
-      ignorar.isPending ||
-      cienciaBatch.isPending ||
-      assignBatch.isPending,
+    mutating,
   };
 }
