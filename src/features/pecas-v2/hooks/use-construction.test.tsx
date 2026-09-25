@@ -15,8 +15,10 @@ const mocks = vi.hoisted(() => ({
   regenerateAsync: vi.fn(),
   mutate: vi.fn(),
   mutateAsync: vi.fn(),
+  generateError: null as Error | null,
   setQueryData: vi.fn(),
   streamOptions: null as null | {
+    enabled: boolean;
     onDone: (theses: { id: string }[]) => void;
     onError: (hadThesis: boolean, message?: string, code?: string) => void;
   },
@@ -74,7 +76,7 @@ vi.mock("./use-theses", () => ({
       isPending: false,
       mutate: mocks.mutate,
       mutateAsync: mocks.mutateAsync,
-      error: null,
+      error: mocks.generateError,
     };
   },
 }));
@@ -117,6 +119,7 @@ describe("useConstruction — dispatch real da geração", () => {
     mocks.regenerateAsync.mockReset();
     mocks.mutate.mockReset();
     mocks.mutateAsync.mockReset().mockResolvedValue({ updated_at: "now" });
+    mocks.generateError = null;
     mocks.setQueryData.mockReset();
     container = document.createElement("div");
     document.body.append(container);
@@ -241,6 +244,38 @@ describe("useConstruction — dispatch real da geração", () => {
     mocks.regenerateAsync.mockResolvedValue([{ id: "valid-1" }]);
     await act(async () => latest.retryAuto());
     expect(mocks.regenerateAsync).toHaveBeenCalledTimes(1);
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a later generation failure after valid explicit thesis recovery without restarting automatic work", async () => {
+    mocks.saga = "CREATED";
+    mocks.thesesError = false;
+    await act(async () => root.render(createElement(Probe)));
+    await act(async () => {
+      mocks.streamCode = "thesis_evidence_invalid";
+      mocks.streamOptions!.onError(false, "Invalid evidence", mocks.streamCode);
+      root.render(createElement(Probe));
+    });
+    expect(latest.generationError).toMatch(/fontes consultadas/i);
+    expect(mocks.streamOptions!.enabled).toBe(false);
+    expect(mocks.regenerate).not.toHaveBeenCalled();
+    expect(mocks.mutate).not.toHaveBeenCalled();
+
+    mocks.regenerateAsync.mockResolvedValue([{ id: "valid-1" }]);
+    mocks.mutateAsync.mockRejectedValue(
+      new Error("Falha na conferência atual"),
+    );
+    await act(async () => latest.retryAuto());
+    await act(async () => {
+      mocks.generateError = new Error("Falha na conferência atual");
+      root.render(createElement(Probe));
+    });
+    expect(latest.generationError).toBe("Falha na conferência atual");
+    expect(latest.autoFailed).toBe(true);
+    expect(mocks.streamOptions!.enabled).toBe(false);
+    expect(mocks.regenerate).not.toHaveBeenCalled();
+    expect(mocks.regenerateAsync).toHaveBeenCalledTimes(1);
+    expect(mocks.mutate).not.toHaveBeenCalled();
     expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
   });
 

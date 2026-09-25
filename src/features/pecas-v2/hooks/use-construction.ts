@@ -83,6 +83,7 @@ export function useConstruction(id: string) {
   // scoped com a lista autoritativa pra o controller assumir os ids reais.
   const [streamFellBack, setStreamFellBack] = useState(false);
   const [streamInvalid, setStreamInvalid] = useState(false);
+  const [streamErrorRecovered, setStreamErrorRecovered] = useState(false);
   const [autoFailed, setAutoFailed] = useState(false);
   const noPersisted =
     theses.theses.length === 0 && !theses.isLoading && !theses.isError;
@@ -432,6 +433,9 @@ export function useConstruction(id: string) {
           : theses.theses.map((t) => t.id);
       if (thesisIds.length === 0)
         throw new Error("Nenhum fundamento foi encontrado. Tente novamente.");
+      // The stream stays terminal, but valid authoritative theses recovered by
+      // this explicit action must not mask a later assessment/generation error.
+      setStreamErrorRecovered(true);
       // O saga pode continuar FAILED até o POST /generate completar: a sequência
       // do retry é explícita e não depende do efeito reservado ao draft CREATED.
       autoFired.current = true;
@@ -484,7 +488,8 @@ export function useConstruction(id: string) {
       }
     : { ...theses, streaming: undefined };
   const thesisErrorMessage =
-    streamInvalid || theses.errorCode === THESIS_EVIDENCE_INVALID_CODE
+    (streamInvalid && !streamErrorRecovered) ||
+    theses.errorCode === THESIS_EVIDENCE_INVALID_CODE
       ? THESIS_EVIDENCE_MESSAGE
       : undefined;
 
