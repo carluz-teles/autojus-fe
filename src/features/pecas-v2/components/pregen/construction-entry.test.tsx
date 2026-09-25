@@ -4,6 +4,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import NovaPecaPage from "@/app/(app)/pecas/nova/page";
 import type { ActionItemView } from "@/features/action-items/types";
 
 import {
@@ -68,6 +69,18 @@ describe("ConstructionEntry — fresh detail and explicit type review", () => {
           createElement(ConstructionEntry, props),
         ),
       );
+    });
+    await settle();
+  }
+  async function renderRoute(query: {
+    providencia: string;
+    intimacao?: string;
+    auto?: string;
+  }) {
+    mocks.search = new URLSearchParams(query);
+    const page = await NovaPecaPage({ searchParams: Promise.resolve(query) });
+    await act(async () => {
+      root.render(createElement(QueryClientProvider, { client: qc }, page));
     });
     await settle();
   }
@@ -150,6 +163,55 @@ describe("ConstructionEntry — fresh detail and explicit type review", () => {
     expect(mocks.iniciarActionItem).not.toHaveBeenCalled();
     expect(mocks.createDraft).not.toHaveBeenCalled();
     expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("rota formal bloqueia associação divergente antes de iniciar ou criar", async () => {
+    mocks.getActionItem.mockResolvedValue(item({ intimation_id: "int-other" }));
+    await renderRoute({ providencia: "item-1", intimacao: "int-1", auto: "1" });
+    expect(container.textContent).toContain(
+      "A providência não pertence a esta intimação",
+    );
+    expect(mocks.confirmarActionItem).not.toHaveBeenCalled();
+    expect(mocks.iniciarActionItem).not.toHaveBeenCalled();
+    expect(mocks.createDraft).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("rota formal não reabre draft de outra intimação conhecida", async () => {
+    mocks.getActionItem.mockResolvedValue(
+      item({ intimation_id: "int-other", draft_id: "draft-existing" }),
+    );
+    await renderRoute({ providencia: "item-1", intimacao: "int-1", auto: "1" });
+    expect(container.textContent).toContain(
+      "A providência não pertence a esta intimação",
+    );
+    expect(mocks.confirmarActionItem).not.toHaveBeenCalled();
+    expect(mocks.iniciarActionItem).not.toHaveBeenCalled();
+    expect(mocks.createDraft).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("rota formal mantém geração para associação correspondente", async () => {
+    mocks.getActionItem.mockResolvedValue(item());
+    await renderRoute({ providencia: "item-1", intimacao: "int-1", auto: "1" });
+    expect(mocks.iniciarActionItem).toHaveBeenCalledTimes(1);
+    expect(mocks.createDraft).toHaveBeenCalledTimes(1);
+    expect(mocks.replace).toHaveBeenCalledWith(
+      "/pecas/draft-new?auto=1&retorno=%2Fintimacoes%2Fint-1",
+    );
+  });
+
+  it("rota formal sem intimação ainda reabre draft legado sem origem", async () => {
+    mocks.getActionItem.mockResolvedValue(
+      item({ intimation_id: "", draft_id: "draft-existing", status: "DONE" }),
+    );
+    await renderRoute({ providencia: "item-1", auto: "1" });
+    expect(mocks.confirmarActionItem).not.toHaveBeenCalled();
+    expect(mocks.iniciarActionItem).not.toHaveBeenCalled();
+    expect(mocks.createDraft).not.toHaveBeenCalled();
+    expect(mocks.replace).toHaveBeenCalledExactlyOnceWith(
+      "/pecas/draft-existing?auto=1&retorno=%2Ftriagem",
+    );
   });
 
   it("cria peça opcional pela intimação sem iniciar item anterior", async () => {
