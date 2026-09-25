@@ -147,8 +147,8 @@ export function useUpdateProcessoManual(processoId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: {
-      phase?: ProcessoPhase;
-      claim_value?: number;
+      phase?: ProcessoPhase | null;
+      claim_value?: number | null;
       label?: string;
     }) => updateProcessoManual(fetcher, processoId, body),
     onSuccess: (processo) => {

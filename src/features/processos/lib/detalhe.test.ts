@@ -2,10 +2,61 @@ import { describe, expect, it } from "vitest";
 
 import {
   intimacaoPendente,
+  montarEdicaoProcesso,
   parseValorCausa,
   prazoPendente,
   urgenciaPrazo,
 } from "./detalhe";
+
+describe("payload da edição manual", () => {
+  const current = {
+    label: "Título",
+    phase: "INSTRUCAO" as const,
+    claim_value: 123.45,
+  };
+  it("omite campos intactos", () => {
+    expect(
+      montarEdicaoProcesso(
+        { label: "Título", phase: "INSTRUCAO", valor: "123,45" },
+        current,
+      ),
+    ).toEqual({ changes: {} });
+  });
+  it("envia null para campos apagados sem mexer no título", () => {
+    expect(
+      montarEdicaoProcesso({ label: "Título", phase: "", valor: "" }, current),
+    ).toEqual({ changes: { phase: null, claim_value: null } });
+  });
+  it("preserva zero e alteração isolada", () => {
+    expect(
+      montarEdicaoProcesso(
+        { label: "Título", phase: "INSTRUCAO", valor: "0,00" },
+        current,
+      ),
+    ).toEqual({ changes: { claim_value: 0 } });
+  });
+  it("limpa título e valores juntos, preservando zero quando não alterado", () => {
+    expect(
+      montarEdicaoProcesso(
+        { label: "", phase: "", valor: "" },
+        { label: "Título", phase: "INSTRUCAO", claim_value: 0 },
+      ),
+    ).toEqual({ changes: { label: "", phase: null, claim_value: null } });
+  });
+  it("mantém campos já vazios omitidos", () => {
+    expect(
+      montarEdicaoProcesso(
+        { label: "", phase: "", valor: "" },
+        { label: null, phase: null, claim_value: null },
+      ),
+    ).toEqual({ changes: {} });
+  });
+  it("não envia payload quando o valor é inválido", () => {
+    expect(
+      montarEdicaoProcesso({ label: "Novo", phase: "", valor: "-1" }, current),
+    ).toEqual({ error: "Informe um valor válido, como 1.500,00." });
+  });
+});
 
 describe("pendências do processo", () => {
   it("separa intimações encerradas e canceladas das pendentes", () => {
