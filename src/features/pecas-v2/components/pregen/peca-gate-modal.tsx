@@ -1,8 +1,9 @@
 "use client";
 
 // PRE-FLIGHT da geração de peça — o gate REAL (a análise é cosmética e nunca bloqueia).
-// Dispara ao clicar "Gerar peça". Dois checks, em ordem:
-//   Check 1 — Tipo do ato: se não confirmado, EXIGE a confirmação inline (reusa o
+// Dispara ao clicar "Gerar peça". Primeiro confirma o tipo do action item quando
+// a sugestão da IA requer revisão; depois seguem os checks existentes:
+//   Check 1 — Tipo do ato da intimação: se não confirmado, EXIGE a confirmação inline (reusa o
 //     control DefinirTipoAto) antes de seguir. É o que limpa ACT_TYPE_NOT_DEFINED.
 //   Check 2 — Autos: consulta autos-status. Sem autos é AVISO de qualidade (não
 //     bloqueia). Oferece o caminho certo conforme o estado do tribunal/busca, e
@@ -31,11 +32,14 @@ import { DefinirTipoAto } from "@/features/prazos/components/intimacao-detalhe/d
 import type { PrazoDetalheView } from "@/features/prazos/types";
 import { cn } from "@/lib/utils";
 
+import { ActionItemReview } from "./action-item-review";
+
 export interface PecaGateModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   intimacaoId: string;
   processoId: string;
+  actionItemId?: string;
   degree?: string;
   /** Prazo atual — semeia o control de tipo (Check 1). */
   prazo: PrazoDetalheView | null;
@@ -47,6 +51,7 @@ export interface PecaGateModalProps {
   onProceed: () => void;
   /** Rota para configurar o tribunal (deep-link). */
   onConfigurarTribunal: () => void;
+  onRevisarIntimacao: () => void;
 }
 
 export function PecaGateModal({
@@ -54,18 +59,21 @@ export function PecaGateModal({
   onOpenChange,
   intimacaoId,
   processoId,
+  actionItemId,
   degree,
   prazo,
   tipoConfirmado,
   pecaLabel,
   onProceed,
   onConfigurarTribunal,
+  onRevisarIntimacao,
 }: PecaGateModalProps) {
   const titleId = useId();
   const g = usePecaGate({
     open,
     intimacaoId,
     processoId,
+    actionItemId,
     degree,
     tipoConfirmado,
   });
@@ -75,8 +83,12 @@ export function PecaGateModal({
     onOpenChange(false);
   }
 
+  function changeOpen(next: boolean) {
+    if (!g.confirmPending) onOpenChange(next);
+  }
+
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={open} onOpenChange={changeOpen}>
       <Dialog.Portal>
         <Dialog.Backdrop
           className={cn(
@@ -114,13 +126,43 @@ export function PecaGateModal({
               </div>
               <Dialog.Close
                 aria-label="Fechar"
+                disabled={g.confirmPending}
                 render={<Button variant="ghost" size="icon-sm" />}
               >
                 <X aria-hidden />
               </Dialog.Close>
             </div>
 
-            {g.precisaTipo ? (
+            {g.reviewPending ? (
+              <>
+                <Dialog.Title id={titleId}>
+                  Verificando a providência
+                </Dialog.Title>
+                <p role="status">Consultando o tipo de trabalho…</p>
+              </>
+            ) : g.reviewError ? (
+              <>
+                <Dialog.Title id={titleId}>
+                  Não foi possível verificar a providência
+                </Dialog.Title>
+                <Button onClick={g.retryReview}>Tentar novamente</Button>
+              </>
+            ) : g.reviewBlock ? (
+              <>
+                <Dialog.Title id={titleId}>Revise a providência</Dialog.Title>
+                <p role="alert">{g.reviewBlock}</p>
+                <Button onClick={onRevisarIntimacao}>Voltar à intimação</Button>
+              </>
+            ) : g.reviewItem ? (
+              <ActionItemReview
+                item={g.reviewItem}
+                pending={g.confirmPending}
+                error={g.confirmError}
+                onConfirm={g.confirmReview}
+                onCancel={() => onOpenChange(false)}
+                titleId={titleId}
+              />
+            ) : g.precisaTipo ? (
               <TipoStep
                 titleId={titleId}
                 pecaLabel={pecaLabel}
