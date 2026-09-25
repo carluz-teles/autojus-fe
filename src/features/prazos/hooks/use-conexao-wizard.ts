@@ -301,26 +301,29 @@ export function useConexaoWizard({
   );
 
   // Busca de autos ao conectar. A REGRA (do BE, RequestAutosSync): se há processos
-  // deste tribunal na base, enfileira a busca (queued > 0); se não há, nada a buscar
-  // (queued = 0). O sync é court-scoped, então basta acionar uma conexão do tribunal.
+  // deste tribunal na base, enfileira a busca (queued > 0); também pode retornar
+  // queued=0 com pending>0 quando autos já estão enfileirados de uma busca anterior
+  // — ambos os sinais indicam que autos estão sendo buscados. O sync é court-scoped,
+  // então basta acionar uma conexão do tribunal.
   const [autos, setAutos] = useState<{
     fase: "idle" | "buscando" | "ok" | "erro";
     queued: number;
+    pending: number;
     erro: string | null;
-  }>({ fase: "idle", queued: 0, erro: null });
+  }>({ fase: "idle", queued: 0, pending: 0, erro: null });
 
   const buscarAutos = useCallback(async () => {
     const alvo = sistemas.find((s) => s.fase === "conectado" && s.connectionId);
     if (!alvo?.connectionId) {
-      setAutos({ fase: "ok", queued: 0, erro: null });
+      setAutos({ fase: "ok", queued: 0, pending: 0, erro: null });
       return;
     }
-    setAutos({ fase: "buscando", queued: 0, erro: null });
+    setAutos({ fase: "buscando", queued: 0, pending: 0, erro: null });
     try {
       const r = await syncCourtAutos(api, alvo.connectionId);
-      setAutos({ fase: "ok", queued: r.queued ?? 0, erro: null });
+      setAutos({ fase: "ok", queued: r.queued ?? 0, pending: r.pending ?? 0, erro: null });
     } catch (e) {
-      setAutos({ fase: "erro", queued: 0, erro: mensagemErro(e) });
+      setAutos({ fase: "erro", queued: 0, pending: 0, erro: mensagemErro(e) });
     }
   }, [sistemas, api]);
 

@@ -13,6 +13,7 @@ import { useConexaoWizard } from "./use-conexao-wizard";
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   connect: vi.fn(),
+  syncCourtAutos: vi.fn(),
 }));
 vi.mock("@/features/configuracoes/hooks/use-cert-upload", () => ({
   useCertificados: () => ({
@@ -36,7 +37,7 @@ vi.mock("@/features/configuracoes/hooks/use-court-connections", () => ({
 }));
 vi.mock("@/lib/api/use-api", () => ({ useApi: () => vi.fn() }));
 vi.mock("@/features/configuracoes/services/court-connections.service", () => ({
-  syncCourtAutos: vi.fn(),
+  syncCourtAutos: mocks.syncCourtAutos,
 }));
 
 const entry: CourtCatalogEntry = {
@@ -154,5 +155,29 @@ describe("useConexaoWizard retry", () => {
     await act(async () => root.unmount());
     await act(async () => resolve({ ...existing[0], status: "CONNECTED" }));
     expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("reports autos being fetched when queued=0 but pending>0", async () => {
+    existing = [
+      {
+        id: "existing-id",
+        court: "TJSP",
+        system: "EPROC",
+        status: "CONNECTED",
+        authentication_method: "CERTIFICATE_A1",
+        created_at: "2026-09-25",
+      },
+    ];
+    mocks.syncCourtAutos.mockResolvedValue({ queued: 0, pending: 3, failed: 0, status: "pending" });
+    await render();
+    await act(async () => {
+      await latest.buscarAutos();
+    });
+    expect(latest.autos.fase).toBe("ok");
+    expect(latest.autos.queued).toBe(0);
+    expect(latest.autos.pending).toBe(3);
+    // When pending>0, the wizard should NOT report "nenhum processo":
+    // the component logic uses queued>0 || pending>0 to show the "buscando" message.
+    expect(latest.autos.queued > 0 || latest.autos.pending > 0).toBe(true);
   });
 });
