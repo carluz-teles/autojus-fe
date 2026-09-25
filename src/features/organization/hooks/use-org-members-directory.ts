@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
@@ -19,9 +20,11 @@ const ORG_MEMBERS_KEY = ["organization", "members"] as const;
 
 export function useOrgMembersDirectory() {
   const fetcher = useApi();
+  const { orgId } = useAuth();
 
   const query = useQuery({
-    queryKey: ORG_MEMBERS_KEY,
+    queryKey: [...ORG_MEMBERS_KEY, orgId],
+    enabled: !!orgId,
     queryFn: () => listOrgMembers(fetcher),
     staleTime: 5 * 60 * 1000,
   });
@@ -36,6 +39,9 @@ export function useOrgMembersDirectory() {
     members: query.data ?? [],
     isPending: query.isPending,
     error: query.error,
+    isSuccess: query.isSuccess,
+    dataUpdatedAt: query.dataUpdatedAt,
+    refetch: query.refetch,
     /** Rótulo do membro pelo id interno: nome, ou o e-mail (parte local) quando
      *  o nome está vazio — via `nomeExibicao`. null quando desconhecido/ausente. */
     nameFor: (id: string | undefined | null): string | null => {

@@ -25,3 +25,13 @@ export async function listOrgMembers(
   );
   return res.data;
 }
+
+/** Remove through the tenant-scoped BE endpoint; it enforces admin and self checks. */
+export async function removeOrgMember(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<void> {
+  await fetcher(`/v1/organization/members/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
