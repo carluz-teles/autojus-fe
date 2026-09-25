@@ -56,6 +56,18 @@ export async function iniciarActionItem(
   return res.data;
 }
 
+/** Confirma somente o tipo sugerido, sem iniciar o trabalho ou alterar prazo. */
+export async function confirmarActionItem(
+  fetcher: ApiFetcher,
+  id: string,
+): Promise<ActionItemView> {
+  const res = await fetcher<DataEnvelope<ActionItemView>>(
+    `${ENDPOINT}/${id}/confirmar`,
+    { method: "POST" },
+  );
+  return res.data;
+}
+
 /** Começa o trabalho / dá ciência (TODO→WORKING) — POST /v1/action-items/:id/comecar. */
 export async function comecarActionItem(
   fetcher: ApiFetcher,

@@ -25,6 +25,7 @@ export default async function NovaPecaPage({
       <ConstructionEntry
         key={providencia}
         actionItemId={providencia}
+        intimationId={intimacao}
         auto={autoStart}
       />
     );
