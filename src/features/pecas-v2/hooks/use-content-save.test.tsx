@@ -6,9 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Draft } from "../types";
 import { useContentSave } from "./use-content-save";
+import { draftKeys, useDraft } from "./use-draft";
 
-const mocks = vi.hoisted(() => ({ fetch: vi.fn() }));
+const mocks = vi.hoisted(() => ({ fetch: vi.fn(), getDraft: vi.fn() }));
 vi.mock("@/lib/api/use-api", () => ({ useApi: () => mocks.fetch }));
+vi.mock("../services/pecas-v2.service", async (original) => ({
+  ...(await original()),
+  getDraft: mocks.getDraft,
+}));
 
 function draft(version: string, revision: string, html: string, second = 0) {
   return {
@@ -47,6 +52,15 @@ function Probe({
   return null;
 }
 
+function ComposedProbe({ onHydrate }: { onHydrate: (html: string) => void }) {
+  const { data } = useDraft("draft-1");
+  const state = useContentSave("draft-1", data, onHydrate);
+  useEffect(() => {
+    latest = state;
+  });
+  return null;
+}
+
 describe("useContentSave server body/revision reconciliation", () => {
   let client: QueryClient;
   let root: Root;
@@ -67,6 +81,7 @@ describe("useContentSave server body/revision reconciliation", () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     sessionStorage.clear();
     mocks.fetch.mockReset();
+    mocks.getDraft.mockReset();
     hydrate = vi.fn();
     client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     host = document.createElement("div");
@@ -151,7 +166,8 @@ describe("useContentSave server body/revision reconciliation", () => {
     );
   });
 
-  it("does not replace newer typing when A acknowledges or a stale refetch arrives; B uses A revision", async () => {
+  it("does not replace newer typing when A acknowledges; B uses A revision", async () => {
+    client.setQueryData(draftKeys.detail("draft-1"), interim);
     await render(interim);
     const a = deferred<{ data: { revision: string } }>();
     const b = deferred<{ data: { revision: string } }>();
@@ -168,13 +184,91 @@ describe("useContentSave server body/revision reconciliation", () => {
       content_html: "<p>Edit B</p>",
       revision: "rA",
     });
-    await render(interim); // old GET that finishes after A
     expect(hydrate).toHaveBeenCalledTimes(1);
     expect(latest.queue.revision).toBe("rA");
     await act(async () => b.resolve({ data: { revision: "rB" } }));
     await act(async () => flushing);
-    await render(interim); // old GET that finishes after B
     expect(latest.queue.revision).toBe("rB");
     expect(hydrate).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a pre-ack GET and hydrates a fresh equal-time post-ack GET through the real query", async () => {
+    const oldRead = deferred<Draft>();
+    const stamp = interim.updatedAt;
+    const fresh = draft("v1", "rB", "<p>Server revision</p>");
+    fresh.updatedAt = stamp;
+    const final = draft("v2", "r2", "<p>Final</p>");
+    final.updatedAt = stamp;
+    client.setDefaultOptions({ queries: { retry: false, staleTime: 60_000 } });
+    client.setQueryData(draftKeys.detail("draft-1"), interim);
+    mocks.getDraft
+      .mockReturnValueOnce(oldRead.promise)
+      .mockResolvedValueOnce(fresh)
+      .mockResolvedValue(final);
+    mocks.fetch.mockResolvedValue({ data: { revision: "rA" } });
+    await act(async () =>
+      root.render(
+        <QueryClientProvider client={client}>
+          <ComposedProbe onHydrate={hydrate} />
+        </QueryClientProvider>,
+      ),
+    );
+    expect(latest.queue.revision).toBe("r1");
+    await act(async () => {
+      void client.invalidateQueries({ queryKey: draftKeys.detail("draft-1") });
+    });
+    expect(mocks.getDraft).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      latest.change("<p>Local save</p>");
+      await latest.flush();
+    });
+    expect(
+      client.getQueryData<Draft>(draftKeys.detail("draft-1")),
+    ).toMatchObject({
+      contentRevision: "rA",
+      contentHtml: "<p>Local save</p>",
+    });
+    await act(async () => oldRead.resolve(interim));
+    expect(
+      client.getQueryData<Draft>(draftKeys.detail("draft-1")),
+    ).toMatchObject({
+      contentRevision: "rA",
+      contentHtml: "<p>Local save</p>",
+    });
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: draftKeys.detail("draft-1") });
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(mocks.getDraft).toHaveBeenCalledTimes(2);
+    expect(
+      client.getQueryData<Draft>(draftKeys.detail("draft-1")),
+    ).toMatchObject({
+      contentRevision: "rB",
+      contentHtml: "<p>Server revision</p>",
+    });
+    expect(hydrate).toHaveBeenLastCalledWith("<p>Server revision</p>");
+    expect(latest.queue.revision).toBe("rB");
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: draftKeys.detail("draft-1") });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(hydrate).toHaveBeenLastCalledWith("<p>Final</p>");
+    expect(latest.queue.revision).toBe("r2");
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("hydrates a fresh final version at the same parsed millisecond after a local save ack", async () => {
+    const sameTimeFinal = draft("v2", "r2", "<p>Final</p>");
+    await render(interim);
+    mocks.fetch.mockResolvedValue({ data: { revision: "rA" } });
+    await act(async () => {
+      latest.change("<p>Edited</p>");
+      await latest.flush();
+    });
+    await render(sameTimeFinal);
+    expect(hydrate).toHaveBeenLastCalledWith("<p>Final</p>");
+    expect(latest.queue.revision).toBe("r2");
   });
 });

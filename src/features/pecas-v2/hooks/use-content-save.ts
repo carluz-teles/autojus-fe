@@ -29,8 +29,6 @@ export function useContentSave(
     version: string | null;
     revision: string;
     html: string;
-    updatedAt: string;
-    awaitingAckRead: boolean;
   } | null>(null);
   const onHydrateRef = useRef(onHydrate);
   useEffect(() => {
@@ -92,7 +90,6 @@ export function useContentSave(
         ...baseline.current,
         revision: saved.revision,
         html: saved.html,
-        awaitingAckRead: true,
       };
     if (
       !draft?.contentRevision ||
@@ -102,28 +99,18 @@ export function useContentSave(
       queue.state === "error"
     )
       return;
+    // Query cache is the freshness owner. A save ack can update it before
+    // this component receives the new prop; do not reapply that old render.
+    const current = qc.getQueryData<Draft>(draftKeys.detail(id));
+    if (current && current !== draft) return;
     const html =
       draft.contentHtml ??
       structuredToHtml({ preamble: draft.preamble, sections: draft.sections });
     const previous = baseline.current;
-    const oldTime = previous ? Date.parse(previous.updatedAt) : NaN;
-    const nextTime = Date.parse(draft.updatedAt);
     if (
       previous?.revision === draft.contentRevision &&
       previous.version === draft.currentVersionId &&
       previous.html === html
-    ) {
-      if (Number.isFinite(nextTime) && nextTime > oldTime) {
-        previous.updatedAt = draft.updatedAt;
-        previous.awaitingAckRead = false;
-      }
-      return;
-    }
-    if (
-      previous &&
-      Number.isFinite(oldTime) &&
-      Number.isFinite(nextTime) &&
-      (nextTime < oldTime || (previous.awaitingAckRead && nextTime <= oldTime))
     )
       return;
     queue.acknowledge(draft.contentRevision);
@@ -131,11 +118,9 @@ export function useContentSave(
       version: draft.currentVersionId,
       revision: draft.contentRevision,
       html,
-      updatedAt: draft.updatedAt,
-      awaitingAckRead: false,
     };
     onHydrateRef.current?.(html);
-  }, [draft, queue, state]);
+  }, [draft, id, qc, queue, state]);
   const flush = () => {
     if (timer.current) clearTimeout(timer.current);
     return queue.flush();

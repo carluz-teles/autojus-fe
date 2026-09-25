@@ -198,4 +198,70 @@ describe("draft quality follow-up polling", () => {
       contentHtml: "<p>Edited</p>",
     });
   });
+
+  it("accepts a distinct final version returned at the same parsed millisecond", async () => {
+    const stamp = "2026-09-25T04:00:00.123456Z";
+    const interim = version("v1", "blocked", stamp);
+    interim.contentRevision = "r1";
+    interim.contentHtml = "<p>Interim</p>";
+    const final = version("v2", "escalated", stamp);
+    final.contentRevision = "r2";
+    final.contentHtml = "<p>Final</p>";
+    mocks.getDraft.mockResolvedValueOnce(interim).mockResolvedValue(final);
+    await mount();
+    await tick(1000);
+    expect(mocks.getDraft).toHaveBeenCalledTimes(2);
+    expect(
+      client.getQueryData<Draft>(draftKeys.detail("draft-1")),
+    ).toMatchObject({
+      currentVersionId: "v2",
+      contentRevision: "r2",
+      contentHtml: "<p>Final</p>",
+    });
+    await tick(5000);
+    expect(mocks.getDraft).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps an acknowledged edit when a pre-save GET returns at the same parsed millisecond", async () => {
+    let settle!: (value: Draft) => void;
+    mocks.getDraft.mockImplementation(
+      () => new Promise((resolve) => (settle = resolve)),
+    );
+    await mount();
+    const saved = version("v1", "allowed", "2026-09-25T04:00:00.123456Z");
+    saved.contentRevision = "r2";
+    saved.contentHtml = "<p>Saved</p>";
+    client.setQueryData(draftKeys.detail("draft-1"), saved);
+    const old = version("v1", "allowed", saved.updatedAt);
+    old.contentRevision = "r1";
+    old.contentHtml = "<p>Old</p>";
+    await act(async () => settle(old));
+    expect(
+      client.getQueryData<Draft>(draftKeys.detail("draft-1")),
+    ).toMatchObject({
+      contentRevision: "r2",
+      contentHtml: "<p>Saved</p>",
+    });
+  });
+
+  it("accepts an equal-time authoritative GET started after an acknowledged edit", async () => {
+    const stamp = "2026-09-25T04:00:00.123456Z";
+    const saved = version("v1", "blocked", stamp);
+    saved.contentRevision = "rA";
+    saved.contentHtml = "<p>Saved</p>";
+    client.setQueryData(draftKeys.detail("draft-1"), saved);
+    const final = version("v2", "escalated", stamp);
+    final.contentRevision = "r2";
+    final.contentHtml = "<p>Final</p>";
+    mocks.getDraft.mockResolvedValue(final);
+    await mount();
+    expect(mocks.getDraft).toHaveBeenCalledTimes(1);
+    expect(
+      client.getQueryData<Draft>(draftKeys.detail("draft-1")),
+    ).toMatchObject({
+      currentVersionId: "v2",
+      contentRevision: "r2",
+      contentHtml: "<p>Final</p>",
+    });
+  });
 });

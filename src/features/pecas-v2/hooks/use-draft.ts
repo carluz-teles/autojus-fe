@@ -37,17 +37,20 @@ export function useDraft(id: string) {
   return useQuery({
     queryKey: detailKey,
     queryFn: async () => {
+      const atStart = qc.getQueryData<Draft>(detailKey);
       const incoming = await svc.getDraft(fetcher, id);
       const current = qc.getQueryData<Draft>(detailKey);
       if (current && current.id === incoming.id) {
         const currentAt = Date.parse(current.updatedAt);
         const incomingAt = Date.parse(incoming.updatedAt);
-        // A GET started before a newer generated version or local save ack
-        // cannot put its older body/revision back into the shared query.
+        // A response older than the cache, or a GET overtaken by a cache
+        // update (such as a local save ack), cannot replace its body/revision.
+        // Equal millisecond timestamps alone do not order two server versions.
         if (
-          Number.isFinite(currentAt) &&
-          Number.isFinite(incomingAt) &&
-          currentAt >= incomingAt &&
+          (current !== atStart ||
+            (Number.isFinite(currentAt) &&
+              Number.isFinite(incomingAt) &&
+              currentAt > incomingAt)) &&
           (current.currentVersionId !== incoming.currentVersionId ||
             current.contentRevision !== incoming.contentRevision)
         )
