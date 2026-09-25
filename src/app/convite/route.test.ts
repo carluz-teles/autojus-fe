@@ -13,7 +13,11 @@ describe("invitation callback", () => {
     const response = GET(
       new Request(`https://app.atjud.com.br/convite?${query}`),
     );
-    const location = new URL(response.headers.get("location")!);
+    const location = new URL(
+      response.headers.get("location")!,
+      "https://app.atjud.com.br",
+    );
+    expect(response.headers.get("location")).toMatch(/^\/sign-(up|in)\?/);
     expect(location.origin).toBe("https://app.atjud.com.br");
     expect(location.pathname).toBe(
       status === "sign_up" ? "/sign-up" : "/sign-in",
@@ -26,15 +30,24 @@ describe("invitation callback", () => {
     expect(response.headers.get("referrer-policy")).toBe("no-referrer");
   });
 
+  it("never redirects to the internal standalone container origin", () => {
+    const response = GET(
+      new Request(
+        "http://0.0.0.0:3000/convite?__clerk_status=sign_up&__clerk_ticket=synthetic",
+      ),
+    );
+    expect(response.headers.get("location")).toBe(
+      "/sign-up?__clerk_ticket=synthetic&__clerk_status=sign_up",
+    );
+  });
+
   it("returns an already accepted invitation to the protected app without leaking the ticket", () => {
     const response = GET(
       new Request(
         "https://app.atjud.com.br/convite?__clerk_status=complete&__clerk_ticket=secret",
       ),
     );
-    expect(response.headers.get("location")).toBe(
-      "https://app.atjud.com.br/notificacoes",
-    );
+    expect(response.headers.get("location")).toBe("/notificacoes");
   });
 
   it.each([

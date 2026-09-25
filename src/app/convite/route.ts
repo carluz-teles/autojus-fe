@@ -14,7 +14,7 @@ export function GET(request: Request) {
   if (status === "complete") {
     return new Response(null, {
       status: 303,
-      headers: { ...headers, Location: new URL(APP_HOME_PATH, url).href },
+      headers: { ...headers, Location: APP_HOME_PATH },
     });
   }
   if (!ticket || (status !== "sign_in" && status !== "sign_up")) {
@@ -33,8 +33,13 @@ export function GET(request: Request) {
   );
   destination.searchParams.set("__clerk_ticket", ticket);
   destination.searchParams.set("__clerk_status", status);
+  // Relative redirects preserve the public host behind Railway/reverse proxies.
+  // In standalone mode request.url can contain the internal container origin.
   return new Response(null, {
     status: 303,
-    headers: { ...headers, Location: destination.href },
+    headers: {
+      ...headers,
+      Location: destination.pathname + destination.search,
+    },
   });
 }
