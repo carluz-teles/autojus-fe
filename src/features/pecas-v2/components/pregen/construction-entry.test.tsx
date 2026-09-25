@@ -121,6 +121,37 @@ describe("ConstructionEntry — fresh detail and explicit type review", () => {
     );
   });
 
+  it("reabre draft antigo sem intimação de origem mesmo com trabalho encerrado", async () => {
+    mocks.getActionItem.mockResolvedValue(
+      item({ intimation_id: "", draft_id: "draft-existing", status: "DONE" }),
+    );
+    await render({ actionItemId: "item-1", auto: true });
+    expect(mocks.confirmarActionItem).not.toHaveBeenCalled();
+    expect(mocks.iniciarActionItem).not.toHaveBeenCalled();
+    expect(mocks.createDraft).not.toHaveBeenCalled();
+    expect(mocks.replace).toHaveBeenCalledExactlyOnceWith(
+      "/pecas/draft-existing?auto=1&retorno=%2Ftriagem",
+    );
+  });
+
+  it("não reabre draft vinculado a outra intimação conhecida", async () => {
+    mocks.getActionItem.mockResolvedValue(
+      item({
+        intimation_id: "int-other",
+        draft_id: "draft-existing",
+        status: "DONE",
+      }),
+    );
+    await render({ actionItemId: "item-1", intimationId: "int-1", auto: true });
+    expect(container.textContent).toContain(
+      "A providência não pertence a esta intimação",
+    );
+    expect(mocks.confirmarActionItem).not.toHaveBeenCalled();
+    expect(mocks.iniciarActionItem).not.toHaveBeenCalled();
+    expect(mocks.createDraft).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
   it("cria peça opcional pela intimação sem iniciar item anterior", async () => {
     setInstructions("int-1", "Incluir documento juntado");
     mocks.getActionItem.mockResolvedValue(item({ gera_peca: false }));

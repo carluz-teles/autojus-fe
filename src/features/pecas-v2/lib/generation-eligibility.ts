@@ -5,11 +5,15 @@ export function generationBlockReason(
   item: ActionItemView,
   expectedIntimationId?: string,
 ): string | null {
-  if (!item.intimation_id)
-    return "Esta providência não tem intimação de origem. Abra a intimação para continuar.";
-  if (expectedIntimationId && item.intimation_id !== expectedIntimationId)
+  if (
+    expectedIntimationId &&
+    item.intimation_id &&
+    item.intimation_id !== expectedIntimationId
+  )
     return "A providência não pertence a esta intimação. Volte à intimação de origem.";
   if (item.draft_id) return null;
+  if (!item.intimation_id)
+    return "Esta providência não tem intimação de origem. Abra a intimação para continuar.";
   if (item.origin_review_required)
     return "A origem desta providência precisa ser revisada na intimação antes de gerar a peça.";
   if (!item.gera_peca)
