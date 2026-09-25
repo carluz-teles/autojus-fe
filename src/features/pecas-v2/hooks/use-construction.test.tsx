@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
   setQueryData: vi.fn(),
   streamOptions: null as null | { onDone: (theses: { id: string }[]) => void },
   draftId: "",
+  assessmentStatus: "ready" as "ready" | "loading" | "error",
+  assessmentRequest: null as null | { status: string },
 }));
 
 vi.mock("next/navigation", () => ({
@@ -30,6 +32,12 @@ vi.mock("@/lib/telemetry/use-ai-experience", () => ({
   useAIExperience: vi.fn(),
 }));
 vi.mock("./use-draft", () => ({
+  useAssessment: () => ({
+    data: { request: mocks.assessmentRequest },
+    isSuccess: mocks.assessmentStatus === "ready",
+    isFetching: mocks.assessmentStatus === "loading",
+    isError: mocks.assessmentStatus === "error",
+  }),
   useDraft: () => ({
     data: {
       intimation: { id: "int-1", teor: "Intimação com teor." },
@@ -91,6 +99,8 @@ describe("useConstruction — dispatch real da geração", () => {
     mocks.contentHtml = "";
     mocks.theses = [];
     mocks.thesesError = true;
+    mocks.assessmentStatus = "ready";
+    mocks.assessmentRequest = null;
     mocks.regenerateAsync.mockReset();
     mocks.mutate.mockReset();
     mocks.mutateAsync.mockReset().mockResolvedValue({ updated_at: "now" });
@@ -195,5 +205,67 @@ describe("useConstruction — dispatch real da geração", () => {
     });
     expect(latest.autoFailed).toBe(true);
     expect(mocks.mutate).not.toHaveBeenCalled();
+  });
+
+  it("remount de CREATED vazio com assessment FAILED mostra retry sem auto-mutation", async () => {
+    mocks.saga = "CREATED";
+    mocks.thesesError = false;
+    mocks.theses = [{ id: "tese-2" }];
+    mocks.assessmentRequest = { status: "failed" };
+    await act(async () => root.render(createElement(Probe)));
+    expect(latest.autoFailed).toBe(true);
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    await act(async () => root.render(createElement(Probe)));
+    expect(latest.autoFailed).toBe(true);
+    expect(mocks.mutate).not.toHaveBeenCalled();
+  });
+
+  it.each(["loading", "error"] as const)(
+    "assessment read %s blocks automatic paid work",
+    async (status) => {
+      mocks.saga = "CREATED";
+      mocks.thesesError = false;
+      mocks.theses = [{ id: "tese-2" }];
+      mocks.assessmentStatus = status;
+      if (status === "loading") mocks.assessmentRequest = { status: "failed" }; // stale cache
+      await act(async () => root.render(createElement(Probe)));
+      expect(mocks.mutate).not.toHaveBeenCalled();
+      expect(latest.autoFailed).toBe(status === "error");
+    },
+  );
+
+  it("failed assessment retries once explicitly with the same draft and input", async () => {
+    mocks.saga = "CREATED";
+    mocks.thesesError = false;
+    mocks.theses = [{ id: "tese-2" }];
+    mocks.assessmentRequest = { status: "failed" };
+    setInstructions("draft-1", "Orientação opcional");
+    await act(async () => root.render(createElement(Probe)));
+    await act(async () => {
+      void latest.retryAuto();
+      void latest.retryAuto();
+    });
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    expect(mocks.draftId).toBe("draft-1");
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(mocks.mutateAsync.mock.calls[0][0]).toMatchObject({
+      thesisIds: ["tese-2"],
+      instructions: "Orientação opcional",
+    });
+  });
+
+  it("active assessment is reused by the existing auto lifecycle; completed content does not restart", async () => {
+    mocks.saga = "CREATED";
+    mocks.thesesError = false;
+    mocks.theses = [{ id: "tese-2" }];
+    mocks.assessmentRequest = { status: "running" };
+    await act(async () => root.render(createElement(Probe)));
+    expect(mocks.mutate).toHaveBeenCalledTimes(1);
+    mocks.saga = "DRAFTED";
+    mocks.contentHtml = "<p>Minuta pronta</p>";
+    await act(async () => root.render(createElement(Probe)));
+    expect(mocks.mutate).toHaveBeenCalledTimes(1);
   });
 });

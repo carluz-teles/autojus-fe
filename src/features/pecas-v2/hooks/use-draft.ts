@@ -10,8 +10,20 @@ import type { Draft } from "../types";
 export const draftKeys = {
   all: ["pecas-v2"] as const,
   detail: (id: string) => [...draftKeys.all, "detail", id] as const,
+  assessment: (id: string) => [...draftKeys.all, "assessment", id] as const,
   chat: (id: string) => [...draftKeys.all, "chat", id] as const,
 };
+
+/** Persisted assessment state must be read before an empty draft auto-starts. */
+export function useAssessment(id: string, enabled: boolean) {
+  const fetcher = useApi();
+  return useQuery({
+    queryKey: draftKeys.assessment(id),
+    queryFn: () => svc.getAssessment(fetcher, id),
+    enabled: !!id && enabled,
+    refetchOnMount: "always",
+  });
+}
 
 export function useDraft(id: string) {
   const fetcher = useApi();

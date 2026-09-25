@@ -26,7 +26,7 @@ import {
 } from "../lib/instructions-storage";
 import { preconditionFromCode } from "../lib/peca-precondition";
 import type { SagaState, Thesis } from "../types";
-import { useDraft } from "./use-draft";
+import { useAssessment, useDraft } from "./use-draft";
 import { thesesKey, useGenerateDraft, useThesesController } from "./use-theses";
 import { useThesesStream } from "./use-theses-stream";
 
@@ -270,6 +270,15 @@ export function useConstruction(id: string) {
 
   const hasContent =
     !!draftQuery.data?.contentHtml && draftQuery.data.contentHtml.trim() !== "";
+  const assessmentRequired =
+    saga === "CREATED" && !hasContent && hasOrigin && hasTeor;
+  const assessment = useAssessment(id, assessmentRequired);
+  const assessmentFailed =
+    assessmentRequired &&
+    !assessment.isFetching &&
+    (assessment.data?.request?.status === "failed" ||
+      assessment.data?.request?.status === "superseded");
+  const assessmentReadError = assessmentRequired && assessment.isError;
   const stage = deriveStage(saga, firedGenerate, hasContent);
   // Regeração em curso: a peça já tinha folha e o saga voltou a EXTRACTING/CREATED.
   // O centro fica em "pronta" e a folha streama o novo conteúdo.
@@ -297,10 +306,22 @@ export function useConstruction(id: string) {
   // Janela em que o loader deve aparecer antes/durante o disparo automático
   // (evita um flash do pregen enquanto as teses ainda chegam).
   const autoPending =
-    ((saga === "CREATED" && !autoFailed && !theses.isError) || retrying) &&
+    ((saga === "CREATED" &&
+      !autoFailed &&
+      !assessmentFailed &&
+      !assessmentReadError &&
+      !theses.isError) ||
+      retrying) &&
     !hasContent;
   useEffect(() => {
-    if (autoFired.current || autoFailed || retryInFlight.current) return;
+    if (
+      autoFired.current ||
+      autoFailed ||
+      retryInFlight.current ||
+      (assessmentRequired &&
+        (!assessment.isSuccess || assessment.isFetching || assessmentFailed))
+    )
+      return;
     const acao = decidirAcaoAuto({
       hasOrigin,
       hasTeor,
@@ -336,6 +357,10 @@ export function useConstruction(id: string) {
     );
   }, [
     autoFailed,
+    assessmentRequired,
+    assessment.isSuccess,
+    assessment.isFetching,
+    assessmentFailed,
     saga,
     hasContent,
     firedGenerate,
@@ -362,12 +387,23 @@ export function useConstruction(id: string) {
   // mais o wizard), mas um loader sobre um saga que não vai avançar sozinho.
   // Reage ao `saga==='FAILED'` real, não a um evento local.
   const autoFailedReal =
-    (autoFailed || saga === "FAILED") && !hasContent && !retrying;
+    (autoFailed ||
+      saga === "FAILED" ||
+      assessmentFailed ||
+      assessmentReadError) &&
+    !hasContent &&
+    !retrying;
 
   // Retry explícito: teses com erro/vazias são aguardadas antes da mutation de
   // geração. O mesmo draft e a orientação sobrevivem ao 202 e ao refresh.
   const retryAuto = async () => {
-    if (retryInFlight.current || generate.isPending || hasContent) return;
+    if (
+      retryInFlight.current ||
+      generate.isPending ||
+      hasContent ||
+      (assessmentRequired && assessment.isFetching)
+    )
+      return;
     retryInFlight.current = true;
     setRetrying(true);
     setAutoFailed(false);
@@ -451,7 +487,10 @@ export function useConstruction(id: string) {
     generationError: (() => {
       const e = generate.error as
         { message?: string; code?: string } | undefined;
-      if (!e) return undefined;
+      if (!e)
+        return assessmentReadError
+          ? "Não foi possível verificar a conferência das fontes. Tente novamente."
+          : undefined;
       const pre = preconditionFromCode(e.code);
       return pre ? `${pre.title} ${pre.description}` : e.message;
     })(),
