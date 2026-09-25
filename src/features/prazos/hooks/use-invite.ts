@@ -2,11 +2,19 @@
 
 import type { OrganizationCustomRoleKey } from "@clerk/shared/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCallback, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import { inviteMember } from "@/features/organization/actions/invite-member";
+import {
+  listTeamInvitations,
+  replaceExpiredTeamInvitation,
+  resendTeamInvitation,
+  revokeTeamInvitation,
+} from "@/features/organization/actions/team-invitations";
 import {
   roleLabel as clerkRoleLabel,
   useOrgMembers,
@@ -30,7 +38,7 @@ export type InviteForm = z.infer<typeof inviteSchema>;
 // Modal "Convidar membro" (port de Atjus - Convite.dc.html, persona admin):
 // chips de e-mail → papel → "pode protocolar" → mensagem → enviar. Ligado ao
 // Clerk REAL: cada e-mail é enviado no servidor com redirect para /convite;
-// os pendentes vêm de useOrganization().invitations (revogáveis). O Clerk envia o
+// o histórico de convites vem da listagem paginada do Clerk no servidor. O Clerk envia o
 // e-mail de aceite — não há "link compartilhável" próprio, então a tela de sucesso
 // confirma o envio sem fabricar link. "Pode protocolar" e "Mensagem" ficam na UI
 // (fidelidade ao design), mas ainda NÃO são enviados: o fluxo atual
@@ -70,16 +78,72 @@ const PAPEL_DEFS: {
   },
 ];
 
+export type InvitationStatus = "pending" | "accepted" | "expired" | "revoked";
+
 export interface InvitePendente {
   id: string;
   email: string;
   papel: string;
+  status: InvitationStatus | null;
   reenviar: () => void;
-  revogando: boolean;
+  revogar: () => void;
+  busy: "resend" | "revoke" | "replace" | null;
+  error: string | null;
 }
 
 export function useInvite() {
-  const { organization, invitations, isAdmin } = useOrgMembers();
+  const { organization, isAdmin } = useOrgMembers();
+  const qc = useQueryClient();
+  const [status, setStatus] = useState<InvitationStatus>("pending");
+  const orgId = organization?.id ?? null;
+  const [pageState, setPageState] = useState<{
+    orgId: string | null;
+    page: number;
+  }>({ orgId, page: 0 });
+  const page = pageState.orgId === orgId ? pageState.page : 0;
+  const busyRef = useRef(false);
+  const [busy, setBusy] = useState<{
+    id: string;
+    action: "resend" | "revoke" | "replace";
+  } | null>(null);
+  const [notice, setNotice] = useState<{
+    orgId: string;
+    message: string;
+  } | null>(null);
+  const [rowError, setRowError] = useState<{
+    id: string;
+    message: string;
+  } | null>(null);
+  const invitationQuery = useQuery({
+    queryKey: ["organization", "invitations", orgId, status, page],
+    queryFn: () => listTeamInvitations(orgId ?? "", status, page),
+    enabled: !!orgId,
+  });
+  const pageOutOfRange =
+    invitationQuery.isSuccess &&
+    page > 0 &&
+    page * 20 >= invitationQuery.data.totalCount;
+  useEffect(() => {
+    if (!pageOutOfRange || !orgId) return;
+    const lastPage = Math.max(
+      0,
+      Math.ceil(invitationQuery.data.totalCount / 20) - 1,
+    );
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setPageState({ orgId, page: lastPage });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pageOutOfRange, invitationQuery.data?.totalCount, orgId]);
+  const refreshInvitations = useCallback(
+    () =>
+      qc.invalidateQueries({
+        queryKey: ["organization", "invitations", orgId],
+      }),
+    [qc, orgId],
+  );
   const [aberto, setAberto] = useState(false);
   const [chips, setChips] = useState<string[]>([]);
   const [papel, setPapel] = useState<Papel>("Advogado");
@@ -87,7 +151,6 @@ export function useInvite() {
   const [enviado, setEnviado] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erroEnvio, setErroEnvio] = useState<string | null>(null);
-  const [revogandoId, setRevogandoId] = useState<string | null>(null);
   const [totalEnviados, setTotalEnviados] = useState(0);
 
   const form = useForm<InviteForm>({
@@ -156,7 +219,7 @@ export function useInvite() {
         inviteMember({ organizationId: organization.id, emailAddress, role }),
       ),
     );
-    void invitations?.revalidate?.();
+    void refreshInvitations();
     const falhou = res.filter((r) => r.status === "rejected").length;
     setEnviando(false);
     setTotalEnviados(todos.length - falhou);
@@ -174,21 +237,57 @@ export function useInvite() {
     setChips([]);
     reset({ email: "", msg: "" });
     setEnviado(true);
-  }, [organization, invitations, getValues, chips, papel, reset, setError]);
+  }, [
+    organization,
+    refreshInvitations,
+    getValues,
+    chips,
+    papel,
+    reset,
+    setError,
+  ]);
 
-  const revogar = useCallback(
-    async (
-      inv: NonNullable<NonNullable<typeof invitations>["data"]>[number],
-    ) => {
-      setRevogandoId(inv.id);
+  const runInvitationAction = useCallback(
+    async (id: string, action: "resend" | "revoke" | "replace") => {
+      if (!isAdmin || busyRef.current) return;
+      busyRef.current = true;
+      setBusy({ id, action });
+      setRowError(null);
+      setNotice(null);
       try {
-        await inv.revoke();
-        void invitations?.revalidate?.();
+        if (action === "revoke") {
+          await revokeTeamInvitation(id);
+          toast.success("Convite revogado.");
+        } else if (action === "resend") {
+          const result = await resendTeamInvitation(id);
+          if (!result.sent) {
+            const message =
+              "O convite anterior foi revogado, mas o novo envio falhou. Convide a pessoa novamente.";
+            setRowError({ id, message });
+            if (organization?.id)
+              setNotice({ orgId: organization.id, message });
+            toast.error(message);
+            return;
+          }
+          toast.success("Novo convite solicitado ao Clerk.");
+        } else {
+          await replaceExpiredTeamInvitation(id);
+          toast.success("Novo convite solicitado ao Clerk.");
+        }
+      } catch {
+        const message =
+          action === "revoke"
+            ? "Não foi possível revogar o convite. Tente novamente."
+            : "Não foi possível solicitar um novo convite. Tente novamente.";
+        setRowError({ id, message });
+        toast.error(message);
       } finally {
-        setRevogandoId(null);
+        await refreshInvitations();
+        busyRef.current = false;
+        setBusy(null);
       }
     },
-    [invitations],
+    [isAdmin, refreshInvitations, organization?.id],
   );
 
   const papeis = useMemo(
@@ -211,14 +310,24 @@ export function useInvite() {
 
   const pendentes = useMemo<InvitePendente[]>(
     () =>
-      (invitations?.data ?? []).map((inv) => ({
-        id: inv.id,
-        email: inv.emailAddress,
-        papel: clerkRoleLabel(inv.role),
-        reenviar: () => void revogar(inv),
-        revogando: revogandoId === inv.id,
-      })),
-    [invitations?.data, revogandoId, revogar],
+      (invitationQuery.data?.data ?? []).map((inv) => {
+        const effectiveStatus = inv.status;
+        return {
+          id: inv.id,
+          email: inv.email,
+          papel: clerkRoleLabel(inv.role),
+          status: effectiveStatus,
+          reenviar: () =>
+            void runInvitationAction(
+              inv.id,
+              effectiveStatus === "expired" ? "replace" : "resend",
+            ),
+          revogar: () => void runInvitationAction(inv.id, "revoke"),
+          busy: busy?.id === inv.id ? busy.action : null,
+          error: rowError?.id === inv.id ? rowError.message : null,
+        };
+      }),
+    [invitationQuery.data, busy, rowError, runInvitationAction],
   );
 
   const totalCompondo = chips.length + ((email ?? "").includes("@") ? 1 : 0);
@@ -251,5 +360,22 @@ export function useInvite() {
       "Eles recebem um e-mail com o link de aceite para criar a conta e entrar no escritório.",
     totalCompondo,
     pendentes,
+    invitationNotice:
+      notice && notice.orgId === organization?.id ? notice.message : null,
+    invitationStatus: status,
+    setInvitationStatus: (next: InvitationStatus) => {
+      setStatus(next);
+      setPageState({ orgId, page: 0 });
+      setRowError(null);
+      setNotice(null);
+    },
+    invitationPage: page,
+    invitationTotal: invitationQuery.data?.totalCount ?? 0,
+    invitationLoading:
+      invitationQuery.isPending || invitationQuery.isFetching || pageOutOfRange,
+    invitationError: invitationQuery.error,
+    nextInvitationPage: () => setPageState({ orgId, page: page + 1 }),
+    previousInvitationPage: () =>
+      setPageState({ orgId, page: Math.max(0, page - 1) }),
   };
 }
