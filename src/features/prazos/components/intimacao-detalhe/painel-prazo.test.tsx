@@ -3,24 +3,30 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { situacaoRevisao } from "../../lib/detalhe-apresentacao";
-import type { PrazoDetalheView } from "../../types";
+import type { DimensionReview, PrazoDetalheView } from "../../types";
+import { ConfirmacaoPrazo } from "./confirmacao-prazo";
+import { DefinirTipoAto } from "./definir-tipo-ato";
 import { PainelPrazo } from "./intimacao-detalhe";
 
-// PainelPrazo → (quando excecaoClassificacao) <DefinirTipoAto> → useDefinirTipo
-// → useApi → useAuth (Clerk). Mesmo mock escopado a este arquivo já usado em
-// disposicao-section.test.tsx — sem harness novo.
 vi.mock("@clerk/nextjs", () => ({
   useAuth: () => ({ getToken: async () => null }),
 }));
 
-// Caso real 018f8dd1: deadline OPEN, tipo_ato='indeterminado', selo='a_apurar'
-// (piso supletivo CPC 218§3), confirmacao_exigida=true, 0 action_items.
-function prazoFixture018f(
-  over: Partial<PrazoDetalheView> = {},
-): PrazoDetalheView {
+const pending: DimensionReview = {
+  status: "pending",
+  origin: "ia",
+  reason_codes: ["ai_inferred"],
+  reason: "Tipo sugerido automaticamente; confira a publicação.",
+  confirmed_by_id: null,
+  confirmed_by_name: null,
+  confirmed_at: null,
+  can_review: true,
+};
+
+function prazoFixture(over: Partial<PrazoDetalheView> = {}): PrazoDetalheView {
   return {
     id: "cea58159-0000-0000-0000-000000000000",
-    tipo_ato: "indeterminado",
+    tipo_ato: "impugnacao_cumprimento",
     end_date: "2026-09-23",
     days_left: 0,
     counting: "BUSINESS",
@@ -40,32 +46,48 @@ function prazoFixture018f(
     selo: "a_apurar",
     confirmacao_exigida: true,
     prazo_interno: "2026-09-23",
+    review_revision: 3,
+    review: {
+      tipo: pending,
+      prazo: {
+        ...pending,
+        origin: "generic_fallback",
+        reason_codes: ["generic_fallback"],
+        reason: "Base genérica provisória; confira o prazo.",
+      },
+    },
+    current_calculation: null,
+    calculation_audit_status: "unavailable",
+    tipo_ato_origem: "ia",
+    provisorio: true,
+    no_deadline_reason: null,
     ...over,
   };
 }
 
-function detFixture({
-  prazo,
-  estado = "manual",
-  excecaoMotivo = "",
-}: {
-  prazo: PrazoDetalheView | null;
-  estado?: string;
-  excecaoMotivo?: string;
-}) {
-  return {
+function renderPainel(
+  prazo: PrazoDetalheView,
+  modo: "execucao" | "consulta" = "execucao",
+  compacto = true,
+): string {
+  const qc = new QueryClient();
+  const det = {
     model: {
-      id: "018f8dd1-180e-49e3-8216-9ae409b8add5",
-      fatalData: prazo?.end_date ? "23/09/2026" : "",
+      id: prazo.intimation_id,
+      fatalData: prazo.end_date ? "23/09/2026" : "",
       prazoCor: "#0a5",
-      prazoNum: prazo?.days ?? 0,
+      prazoNum: prazo.days,
       prazoFrase: "dias úteis",
       responsavelId: null,
       responsavelNome: null,
     },
     prazoDetalhe: prazo,
-    revisao: situacaoRevisao(prazo, estado),
-    intimacao: { estado, excecao_motivo: excecaoMotivo },
+    prazoTipoLabel:
+      prazo.tipo_ato === "impugnacao_cumprimento"
+        ? "Impugnação ao cumprimento de sentença"
+        : null,
+    revisao: situacaoRevisao(prazo, "ia"),
+    intimacao: { estado: "ia", excecao_motivo: "provisorio" },
     memoria: null,
     memoriaPending: false,
     memoriaErro: false,
@@ -73,113 +95,138 @@ function detFixture({
     assignEmVoo: false,
     onAssign: () => {},
     recarregarPrazo: () => {},
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- fixture: só os campos que PainelPrazo lê
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- fixture only supplies fields read by PainelPrazo
   } as any as Parameters<typeof PainelPrazo>[0]["det"];
-}
-
-function renderPainel(
-  det: ReturnType<typeof detFixture>,
-  overrides: Partial<Omit<Parameters<typeof PainelPrazo>[0], "det">> = {},
-): string {
-  const qc = new QueryClient();
   return renderToStaticMarkup(
     <QueryClientProvider client={qc}>
-      <PainelPrazo det={det} compacto {...overrides} />
+      <PainelPrazo det={det} modo={modo} compacto={compacto} />
     </QueryClientProvider>,
   );
 }
 
-describe("PainelPrazo — exceção de classificação (caso 018f8dd1)", () => {
-  it("0 action items, modo execução → causa concreta + CTA 'Definir tipo do ato' visíveis (ação obrigatória, não só aviso), explicação factual (sem afirmar piso/provisório sem dado tipado)", () => {
-    const det = detFixture({ prazo: prazoFixture018f() });
-    const html = renderPainel(det, { modo: "execucao" });
-    expect(html).toContain("Tipo do ato não identificado");
-    expect(html).toContain(
-      "O sistema não identificou o tipo do ato. Revise a classificação e confira o prazo registrado.",
+describe("PainelPrazo — revisão por dimensão", () => {
+  it("coloca Não há prazo no diálogo Prazo e deixa o Tipo focado na classificação", () => {
+    const p = prazoFixture();
+    const qc = new QueryClient();
+    const tipo = renderToStaticMarkup(
+      <QueryClientProvider client={qc}>
+        <DefinirTipoAto intimacaoId={p.intimation_id} prazo={p} />
+      </QueryClientProvider>,
     );
-    expect(html).toContain("Definir tipo do ato");
-    // Ausência de action_items não é o motivo mostrado nem impede a ação —
-    // não há menção de "conflito"/"divergência" (isso é o caso 0b81, distinto).
-    expect(html).not.toContain("diverge do conteúdo identificado");
-    // Sem o dado tipado real (`excecao_motivo==='provisorio'`), não se afirma
-    // "piso legal CPC 218§3" — nem qualquer menção a "provisório" universal.
-    expect(html).not.toContain("provisório");
-    expect(html).not.toContain("CPC 218");
+    const prazo = renderToStaticMarkup(
+      <QueryClientProvider client={qc}>
+        <ConfirmacaoPrazo id={p.intimation_id} prazo={p} estado="ia" />
+      </QueryClientProvider>,
+    );
+    expect(tipo).not.toContain("Não há prazo");
+    expect(prazo).toContain("Não há prazo");
+    expect(prazo).toContain("corrige a classificação para ciência");
+    expect(prazo).not.toContain("impugnacao_cumprimento");
   });
-
-  it("com o dado tipado real (`excecao_motivo==='provisorio'`) → usa o rótulo CANÔNICO já existente (EXCECAO_MOTIVO_LABEL da Triagem, não um texto novo)", () => {
-    const det = detFixture({
-      prazo: prazoFixture018f(),
-      excecaoMotivo: "provisorio",
+  it("mostra tipo inferido preenchido e fallback provisório com ações independentes, mesmo sem action items", () => {
+    const html = renderPainel(prazoFixture());
+    expect(html).toContain("Conferência da intimação");
+    expect(html).toContain("Impugnação ao cumprimento de sentença");
+    expect(html).toContain("<span>A revisar</span>");
+    expect(html).toContain("Revisar tipo");
+    expect(html).toContain("Revisar prazo");
+    expect(html).toContain("Base genérica provisória");
+    expect(html).not.toContain("generic_fallback");
+  });
+  it("NO_DEADLINE aguardando classificação permite apenas definir tipo", () => {
+    const p = prazoFixture({
+      status: "NO_DEADLINE",
+      tipo_ato: "indeterminado",
+      no_deadline_reason: "CLASSIFICAR_MANUAL",
+      review: {
+        tipo: { ...pending, reason_codes: ["ambiguous_type"] },
+        prazo: { ...pending, can_review: false },
+      },
     });
-    const html = renderPainel(det, { modo: "execucao" });
-    expect(html).toContain(
-      "Prazo provisório (piso supletivo) — confirme a contagem.",
-    );
+    const html = renderPainel(p);
+    expect(html).toContain("Definir tipo");
+    expect(html).toContain("Prazo a definir");
+    expect(html).not.toContain("23/09/2026");
+    expect(html).not.toContain("Revisar prazo");
   });
-
-  it("modo consulta (readOnly) → causa continua visível, SEM CTA (sem mutação em consulta)", () => {
-    const det = detFixture({ prazo: prazoFixture018f() });
-    const html = renderPainel(det, { modo: "consulta" });
-    expect(html).toContain("Tipo do ato não identificado");
-    expect(html).toContain("O sistema não identificou o tipo do ato.");
-    expect(html).not.toContain("Definir tipo do ato");
-  });
-
-  // Regressão CRÍTICA: o caso 0b81 (divergência prazo×obrigação) também tem
-  // tipo_ato='indeterminado' — mas origem='declarado'/selo='confiavel'. SEM
-  // o gate `selo==='a_apurar'`, este bloco duplicaria "causa/CTA" ali TAMBÉM,
-  // fora do fluxo D1 (já resolvido por DisposicaoSection/"Revisar
-  // classificação"). Achado real do root, não hipotético.
-  it("0b81 (declarado/confiavel/indeterminado) → ZERO causa/CTA de exceção de classificação aqui; fluxo continua só em DisposicaoSection", () => {
-    const det = detFixture({
-      prazo: prazoFixture018f({
-        tipo_ato: "indeterminado",
-        selo: "confiavel",
-        confirmacao_exigida: false,
+  it("NO_DEADLINE por ciência não mostra data histórica residual", () => {
+    const html = renderPainel(
+      prazoFixture({
+        status: "NO_DEADLINE",
+        no_deadline_reason: "CIENCIA",
+        review: {
+          tipo: { ...pending, status: "confirmed", can_review: false },
+          prazo: { ...pending, status: "confirmed", can_review: false },
+        },
       }),
-    });
-    const html = renderPainel(det, { modo: "execucao" });
-    expect(html).not.toContain("Tipo do ato não identificado");
-    expect(html).not.toContain("O sistema não identificou o tipo do ato");
-    expect(html).not.toContain("Definir tipo do ato");
+    );
+    expect(html).toContain("Sem prazo");
+    expect(html).not.toContain("23/09/2026");
+    expect(html).not.toContain("Definir tipo");
   });
-
+  it("consulta informa as duas dimensões sem controles de mutação", () => {
+    const html = renderPainel(prazoFixture(), "consulta");
+    expect(html).toContain("<span>A revisar</span>");
+    expect(html).not.toContain("Revisar tipo");
+    expect(html).not.toContain("Revisar prazo");
+  });
   it.each(["MISSED", "MET", "CANCELLED"] as const)(
-    "status TERMINAL (%s) → SEM CTA mesmo em execução (whitelist OPEN/PENDING, BE 409ia fora dela)",
-    (statusTerminal) => {
-      const det = detFixture({
-        prazo: prazoFixture018f({ status: statusTerminal }),
-      });
-      const html = renderPainel(det, { modo: "execucao" });
-      expect(html).not.toContain("Definir tipo do ato");
+    "estado terminal %s não abre revisão",
+    (status) => {
+      const html = renderPainel(prazoFixture({ status }));
+      expect(html).not.toContain("Revisar tipo");
+      expect(html).not.toContain("Revisar prazo");
     },
   );
-
-  it("pós-Confirm (tipo válido, selo='confiavel', confirmed) → nem causa nem CTA, mesmo em execução", () => {
-    const det = detFixture({
-      prazo: prazoFixture018f({
-        tipo_ato: "apelacao",
-        selo: "confiavel",
-        confirmacao_exigida: false,
-        confirmed: true,
-        confirmed_by_name: "Dra. Fulana",
-        confirmed_at: "2026-09-23T10:00:00Z",
+  it("tipo confirmado não transforma prazo pendente em confirmado", () => {
+    const html = renderPainel(
+      prazoFixture({
+        review: {
+          tipo: {
+            ...pending,
+            status: "confirmed",
+            reason: "Confirmado por Ana",
+            confirmed_by_name: "Ana",
+            confirmed_at: "2026-09-23T10:00:00Z",
+          },
+          prazo: pending,
+        },
       }),
-    });
-    const html = renderPainel(det, { modo: "execucao" });
-    expect(html).not.toContain("Tipo do ato não identificado");
-    expect(html).not.toContain("Definir tipo do ato");
-    expect(html).not.toContain("Prazo provisório (piso legal CPC 218§3)");
+    );
+    expect(html).toContain("<span>Confirmado</span>");
+    expect(html).toContain("<span>A revisar</span>");
+    expect(html).toContain("Revisar prazo");
   });
-
-  it("renderizar a exceção não dispara mutação: diálogo fechado por padrão, botão que muta (dentro do form) não está no HTML inicial", () => {
-    const det = detFixture({ prazo: prazoFixture018f() });
-    const html = renderPainel(det, { modo: "execucao" });
-    // O trigger que ABRE o diálogo está presente (é só um <button>, sem
-    // side-effect); os campos do form/CTA de submit do diálogo (fechado por
-    // padrão) não aparecem no HTML inicial.
-    expect(html).toContain("Definir tipo do ato");
-    expect(html).not.toContain("Não há prazo");
+  it("divergência pendente encaminha à apuração, sem confirmação normal", () => {
+    const p = prazoFixture({
+      review: {
+        tipo: pending,
+        prazo: { ...pending, reason_codes: ["date_divergence"] },
+      },
+    });
+    const html = renderPainel(p);
+    expect(html).toContain("Use a apuração");
+    expect(html).toContain("Revisar prazo</button>");
+    const qc = new QueryClient();
+    const modal = renderToStaticMarkup(
+      <QueryClientProvider client={qc}>
+        <ConfirmacaoPrazo id={p.intimation_id} prazo={p} estado="divergente" />
+      </QueryClientProvider>,
+    );
+    expect(modal).toContain("Não há prazo");
+    expect(modal).not.toContain("Confirmar prazo");
+  });
+  it("revisão dispensada usa indicador neutro, sem check de confirmação", () => {
+    const html = renderPainel(
+      prazoFixture({
+        review: {
+          tipo: { ...pending, status: "not_required" },
+          prazo: { ...pending, status: "not_required" },
+        },
+      }),
+    );
+    expect(html).toContain("Revisão dispensada");
+    expect(html).toContain("lucide-minus");
+    expect(html).not.toContain("lucide-check");
   });
 });

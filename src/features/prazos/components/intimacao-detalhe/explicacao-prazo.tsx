@@ -1,41 +1,19 @@
 import { formatarData } from "@/lib/utils";
 
-import {
-  dataEscolhidaNaApuracao,
-  feriadosVigentes,
-} from "../../lib/detalhe-apresentacao";
+import { feriadosVigentes } from "../../lib/detalhe-apresentacao";
 import type { PrazoDetalheView } from "../../types";
 
-/** Presents recorded values only: no client-side deadline arithmetic or legal inference. */
+/** Explains only the verified current snapshot; birth memory is historical. */
 export function ExplicacaoPrazo({
   prazo: p,
-  estado,
 }: {
   prazo: PrazoDetalheView;
   estado: string;
 }) {
   if (p.status === "NO_DEADLINE") return null;
-  const calc = p.calc_memory;
-  const chosen = dataEscolhidaNaApuracao(p);
+  const calc =
+    p.calculation_audit_status === "current" ? p.current_calculation : null;
   const holidays = feriadosVigentes(p);
-  const rule = p.confirmed
-    ? p.legal_citation
-    : p.origem === "declarado"
-      ? "Publicação de origem"
-      : calc?.prazo_base_fonte || p.legal_citation || calc?.tabela_legal_ref;
-  const origin = chosen
-    ? "O vencimento foi escolhido diretamente na apuração. Não resulta de uma nova contagem."
-    : p.confirmed
-      ? "Tipo e contagem revisados pelo advogado."
-      : p.origem === "declarado"
-        ? "A duração do prazo foi extraída da publicação."
-        : p.origem === "ia"
-          ? "A regra de prazo foi aplicada a um tipo de ato inferido automaticamente."
-          : p.origem === "calculado"
-            ? "A duração vem da regra associada ao tipo de ato registrado."
-            : p.origem === "divergente"
-              ? "A duração informada na publicação diverge do cálculo por regra. Confira a apuração antes de confirmar."
-              : "A origem da duração não foi detalhada neste registro.";
   return (
     <section
       aria-label="Explicação do prazo"
@@ -43,25 +21,44 @@ export function ExplicacaoPrazo({
     >
       <div>
         <h3 className="text-sm font-medium">Por que essa data?</h3>
-        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-          {origin}
-        </p>
-        {!chosen ? (
-          <p className="text-muted-foreground mt-2 text-xs leading-relaxed">
-            {rule ? (
-              <>
-                <span className="text-foreground font-medium">
-                  Fonte da duração:{" "}
-                </span>
-                {rule}
-              </>
-            ) : (
-              "Fundamentação da duração não disponível neste registro."
-            )}
+        {!calc ? (
+          <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+            {p.calculation_audit_status === "historical"
+              ? "A memória disponível é histórica e não explica o vencimento atual. Confira a publicação e o prazo registrado."
+              : "A memória do cálculo atual não está disponível. Confira a publicação e o prazo registrado."}
           </p>
-        ) : null}
+        ) : (
+          <>
+            <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+              {calc.source === "declared"
+                ? "A duração foi informada na publicação."
+                : calc.source === "manual"
+                  ? "O vencimento foi ajustado por uma decisão humana."
+                  : calc.source === "generic_fallback"
+                    ? "A regra genérica produziu uma data provisória; revise o tipo e o prazo."
+                    : "A duração veio da regra associada ao tipo registrado."}
+              {calc.protected
+                ? " A data atual está protegida por uma decisão anterior."
+                : ""}
+            </p>
+            {calc.reason ? (
+              <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                {calc.reason}
+              </p>
+            ) : null}
+            <p className="text-muted-foreground mt-2 text-xs leading-relaxed">
+              <span className="text-foreground font-medium">
+                Fonte da duração:{" "}
+              </span>
+              {calc.legal_citation ||
+                (calc.source === "declared"
+                  ? "Publicação de origem"
+                  : "Referência não registrada")}
+            </p>
+          </>
+        )}
       </div>
-      {!chosen ? (
+      {calc ? (
         <>
           <ol
             aria-label="Etapas do cálculo registrado"
@@ -70,29 +67,26 @@ export function ExplicacaoPrazo({
             {[
               {
                 label: "Marco inicial",
-                value: p.start_date
-                  ? formatarData(p.start_date)
+                value: calc.start_date
+                  ? formatarData(calc.start_date)
                   : "Não informado",
-                detail: p.confirmed
-                  ? "Início registrado na revisão."
-                  : calc?.termo_inicial_regra ||
-                    "Regra de início não registrada.",
+                detail: calc.anchor_event || "Marco não registrado",
               },
               {
                 label: "Contagem",
-                value: p.days
-                  ? `${p.days} dias ${p.counting === "BUSINESS" ? "úteis" : "corridos"}`
-                  : "Duração não informada",
-                detail: p.doubled
+                value: `${calc.days} dias ${calc.counting === "BUSINESS" ? "úteis" : "corridos"}`,
+                detail: calc.doubled
                   ? "Prazo em dobro registrado."
                   : "Sem prazo em dobro.",
               },
               {
                 label: "Vencimento",
-                value: p.end_date ? formatarData(p.end_date) : "Não informado",
-                detail: p.confirmed
-                  ? "Data registrada após revisão."
-                  : "Data registrada, ainda sujeita à revisão quando exigida.",
+                value: calc.end_date
+                  ? formatarData(calc.end_date)
+                  : "Não informado",
+                detail: calc.protected
+                  ? "Data preservada na revisão do tipo."
+                  : "Data do cálculo atual.",
               },
             ].map((step, index) => (
               <li key={step.label} className="flex gap-3">
@@ -118,27 +112,13 @@ export function ExplicacaoPrazo({
           </ol>
           <p className="text-muted-foreground text-xs leading-relaxed">
             {holidays.length} feriado(s) ou suspensão(ões) registrado(s)
-            {p.manual_extra_days
-              ? ` · ${p.manual_extra_days} dia(s) adicional(is)`
+            {calc.manual_extra_days
+              ? ` · ${calc.manual_extra_days} dia(s) adicional(is)`
               : " · sem dias adicionais"}
             .
           </p>
         </>
       ) : null}
-      <div className="text-muted-foreground flex flex-col gap-1 text-xs leading-relaxed">
-        {!p.confirmed && estado === "ia" ? (
-          <p>
-            A justificativa específica da classificação do ato não foi
-            registrada. Confira o teor da intimação.
-          </p>
-        ) : null}
-        {!calc && !chosen ? (
-          <p>
-            Memória detalhada indisponível; exibindo apenas os dados
-            registrados.
-          </p>
-        ) : null}
-      </div>
     </section>
   );
 }

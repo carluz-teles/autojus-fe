@@ -1,17 +1,10 @@
 "use client";
 
-// Control "Definir tipo do ato" — DISCRETO e SEMPRE disponível: o usuário escolhe,
-// ele mesmo, o tipo do ato (e o prazo) da intimação. É o que limpa a pré-condição
-// ACT_TYPE_NOT_DEFINED do BE. Usado (a) inline no pre-flight da peça (Check 1) e
-// (b) como control autônomo no detalhe. Dropdown = shadcn Select (nunca <select>
-// nativo). Só JSX + binding; a lógica vive em useDefinirTipo.
-
 import { Check, LoaderCircle } from "lucide-react";
 import { Controller } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -20,7 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TIPO_ATO_LABEL } from "@/features/intimacoes/lib/tipo-ato";
 import { useDefinirTipo } from "@/features/prazos/hooks/use-definir-tipo";
 import { formatarData } from "@/lib/utils";
 
@@ -30,24 +22,15 @@ export function DefinirTipoAto({
   intimacaoId,
   prazo,
   onConfirmado,
-  /** Rótulo do CTA — o gate usa "Confirmar e continuar". */
-  ctaLabel = "Definir tipo e prazo",
-  /** Compacto = sem o control de contagem (usado no gate). */
-  compact = false,
-  /** false = esconde os campos tipo/dias/contagem e o submit — só o botão
-   *  "sem prazo" fica visível. Usa quando o caller já sabe que definir um
-   *  novo tipo/prazo NÃO corrige o que precisa ser corrigido (ex.: divergência
-   *  prazo×obrigação onde o item já identificado é ciência real — reclassificar
-   *  o tipo do ato não resolve essa divergência específica). */
+  onCancelar,
+  ctaLabel = "Confirmar tipo do ato",
   showDefinirForm = true,
-  /** Rótulo do botão "sem prazo" — default preserva o texto genérico usado no
-   *  gate de peça; callers com um sentido mais específico (ex.: "Corrigir
-   *  classificação para ciência") podem sobrescrever. */
   semPrazoLabel = "Não há prazo",
 }: {
   intimacaoId: string;
   prazo: PrazoDetalheView | null;
   onConfirmado?: () => void;
+  onCancelar?: () => void;
   ctaLabel?: string;
   compact?: boolean;
   showDefinirForm?: boolean;
@@ -58,121 +41,128 @@ export function DefinirTipoAto({
     control,
     formState: { errors },
   } = c.form;
-
   return (
     <form onSubmit={c.onConfirmar} noValidate className="flex flex-col gap-4">
       {showDefinirForm ? (
         <>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field data-invalid={!!errors.tipo_ato}>
-              <FieldLabel htmlFor="definir-tipo-ato">Tipo do ato</FieldLabel>
-              <Controller
-                name="tipo_ato"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    value={field.value || ""}
-                    onValueChange={(v) => field.onChange(v ?? "")}
-                  >
-                    <SelectTrigger
-                      id="definir-tipo-ato"
-                      className="w-full"
-                      aria-invalid={!!errors.tipo_ato}
-                    >
-                      <SelectValue placeholder="Selecione o tipo">
-                        {field.value
-                          ? (TIPO_ATO_LABEL[field.value] ?? "Selecione o tipo")
-                          : "Selecione o tipo"}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {c.options.map(([value, label]) => (
-                          <SelectItem key={value} value={value}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError errors={[errors.tipo_ato]} />
-            </Field>
-
-            <Field data-invalid={!!errors.days}>
-              <FieldLabel htmlFor="definir-tipo-dias">Prazo em dias</FieldLabel>
-              <Input
-                id="definir-tipo-dias"
-                type="number"
-                min={1}
-                step={1}
-                inputMode="numeric"
-                placeholder="Informe os dias"
-                aria-invalid={!!errors.days}
-                {...c.form.register("days", { valueAsNumber: true })}
-              />
-              <FieldError errors={[errors.days]} />
-            </Field>
-          </div>
-
-          {compact ? null : (
-            <Field data-invalid={!!errors.counting}>
-              <FieldLabel htmlFor="definir-tipo-contagem">Contagem</FieldLabel>
-              <Controller
-                name="counting"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={(v) =>
-                      field.onChange(
-                        (v as "BUSINESS" | "CALENDAR") ?? "BUSINESS",
-                      )
+          <Field data-invalid={!!errors.tipo_ato}>
+            <FieldLabel htmlFor="definir-tipo-ato">Tipo do ato</FieldLabel>
+            <Controller
+              name="tipo_ato"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  value={field.value || ""}
+                  onValueChange={(value) => field.onChange(value ?? "")}
+                >
+                  <SelectTrigger
+                    id="definir-tipo-ato"
+                    className="w-full"
+                    disabled={
+                      c.catalogPendente ||
+                      c.catalogErro ||
+                      c.options.length === 0
                     }
+                    aria-invalid={!!errors.tipo_ato}
                   >
-                    <SelectTrigger
-                      id="definir-tipo-contagem"
-                      className="w-full sm:w-56"
-                      aria-invalid={!!errors.counting}
-                    >
-                      <SelectValue>
-                        {field.value === "CALENDAR"
-                          ? "Dias corridos"
-                          : "Dias úteis"}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="BUSINESS">Dias úteis</SelectItem>
-                        <SelectItem value="CALENDAR">Dias corridos</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError errors={[errors.counting]} />
-            </Field>
-          )}
-
+                    <SelectValue placeholder="Selecione o tipo">
+                      {c.options.find((item) => item.key === field.value)
+                        ?.label ?? "Selecione o tipo"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {c.options.map((item) => (
+                        <SelectItem key={item.key} value={item.key}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <FieldError errors={[errors.tipo_ato]} />
+          </Field>
+          {c.catalogPendente ? (
+            <p role="status" className="text-muted-foreground text-xs">
+              Carregando tipos disponíveis…
+            </p>
+          ) : null}
+          {c.catalogErro ? (
+            <div role="alert" className="text-destructive text-xs">
+              Não foi possível carregar os tipos disponíveis.
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={c.onRetryCatalog}
+              >
+                Tentar novamente
+              </Button>
+            </div>
+          ) : null}
+          {!c.catalogPendente && !c.catalogErro && c.options.length === 0 ? (
+            <p role="note" className="text-muted-foreground text-xs">
+              Não há tipos disponíveis para as regras deste prazo. Confira a
+              classificação com a equipe antes de prosseguir.
+            </p>
+          ) : null}
           <div
             role="status"
             aria-live="polite"
-            className="text-muted-foreground text-sm"
+            className="surface-inset flex flex-col gap-2 p-3 text-sm"
           >
-            {c.previewPendente
-              ? "Calculando vencimento…"
-              : c.previewErro
-                ? "Não foi possível calcular o vencimento."
-                : c.preview
-                  ? `Vencimento previsto: ${formatarData(c.preview.end_date)} · ${c.preview.weekday}.`
-                  : "Escolha o tipo e informe os dias para ver o vencimento."}
+            <p className="text-muted-foreground text-xs font-medium">
+              Efeito no prazo
+            </p>
+            {c.previewPendente ? (
+              <p className="text-muted-foreground flex items-center gap-2">
+                <LoaderCircle
+                  className="size-4 animate-spin"
+                  aria-hidden="true"
+                />
+                Calculando…
+              </p>
+            ) : c.previewErro ? (
+              <p className="text-destructive">
+                Não foi possível calcular a sugestão.
+              </p>
+            ) : c.preview ? (
+              <>
+                <p className="text-foreground font-medium">
+                  {c.preview.calculation.end_date
+                    ? `Vencimento sugerido: ${formatarData(c.preview.calculation.end_date)}.`
+                    : "A regra exige revisão do termo inicial."}
+                </p>
+                {c.preview.calculation.fallback_used ? (
+                  <p className="text-muted-foreground text-xs leading-relaxed">
+                    Base genérica usada; confira a regra antes de revisar o
+                    prazo.
+                  </p>
+                ) : null}
+                {c.preview.preserved_deadline ? (
+                  <p className="text-muted-foreground text-xs leading-relaxed">
+                    O vencimento atual está protegido e será mantido. A sugestão
+                    não o substitui.
+                  </p>
+                ) : null}
+                {c.preview.impact_reason ? (
+                  <p className="text-muted-foreground text-xs leading-relaxed">
+                    {c.preview.impact_reason}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-muted-foreground">
+                Escolha um tipo para ver a sugestão de cálculo.
+              </p>
+            )}
             {c.previewErro ? (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="mt-1 block"
                 onClick={c.onRetryPreview}
               >
                 Recalcular
@@ -181,8 +171,28 @@ export function DefinirTipoAto({
           </div>
         </>
       ) : null}
-
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="border-border flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+        {onCancelar ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onCancelar}
+          >
+            Cancelar
+          </Button>
+        ) : null}
+        {!showDefinirForm && c.podeSemPrazo ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={c.emVoo}
+            onClick={c.onSemPrazo}
+          >
+            {semPrazoLabel}
+          </Button>
+        ) : null}
         {showDefinirForm ? (
           <Button type="submit" disabled={!c.podeConfirmar}>
             {c.emVoo ? (
@@ -193,22 +203,12 @@ export function DefinirTipoAto({
             {c.emVoo ? "Salvando…" : ctaLabel}
           </Button>
         ) : null}
-        {c.podeSemPrazo ? (
-          <Button
-            type="button"
-            variant={showDefinirForm ? "ghost" : "default"}
-            disabled={c.emVoo}
-            onClick={c.onSemPrazo}
-          >
-            {!showDefinirForm && c.emVoo ? (
-              <LoaderCircle data-icon="inline-start" className="animate-spin" />
-            ) : null}
-            {!showDefinirForm && c.emVoo ? "Salvando…" : semPrazoLabel}
-          </Button>
-        ) : null}
       </div>
-
-      {c.erro ? (
+      {c.staleError ? (
+        <p role="alert" className="text-destructive text-sm">
+          O prazo mudou. Confira os dados atualizados antes de tentar novamente.
+        </p>
+      ) : c.erro ? (
         <p role="alert" className="text-destructive text-sm">
           Não foi possível salvar. Tente novamente.
         </p>

@@ -149,3 +149,22 @@ describe("EXCECAO_MOTIVO_LABEL — trabalho_nao_identificado (ausência) não co
     );
   });
 });
+
+describe("EXCECAO_MOTIVO_LABEL — revisão independente", () => {
+  it.each([
+    ["tipo_pendente", "Tipo de ato ainda precisa ser classificado."],
+    ["prazo_pendente", "Prazo calculado ainda precisa de revisão."],
+  ] as const)(
+    "mostra o motivo %s sem atribuir inferência de IA",
+    (motivo, label) => {
+      const row = pipelineRow(
+        item({
+          disposicao: "excecao",
+          is_excecao: true,
+          excecao_motivo: motivo,
+        }),
+      );
+      expect(row.excecaoMotivo).toBe(label);
+    },
+  );
+});

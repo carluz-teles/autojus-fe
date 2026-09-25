@@ -30,15 +30,23 @@ export const confirmacaoSchema = z.object({
 
 export type ConfirmacaoForm = z.infer<typeof confirmacaoSchema>;
 
-// Subconjunto para o control "Definir tipo do ato" (tipo + dias + contagem).
-// Reusa exatamente as regras de tipo_ato/days do confirmacaoSchema — uma só fonte.
-export const definirTipoSchema = confirmacaoSchema.pick({
-  tipo_ato: true,
-  days: true,
-  counting: true,
+// A revisão nova escolhe somente o tipo; a elegibilidade vem do catálogo do BE.
+export const definirTipoSchema = z.object({
+  tipo_ato: z.string().min(1, "Escolha o tipo do ato."),
 });
 
 export type DefinirTipoForm = z.infer<typeof definirTipoSchema>;
+
+export const revisarPrazoSchema = z.object({
+  days: z.number({ error: "Informe o número de dias." }).int().min(1),
+  counting: z.enum(["BUSINESS", "CALENDAR"]),
+  anchor_event: z.enum(["DEADLINE_START", "PUBLISHED", "MADE_AVAILABLE"]),
+  doubled: z.boolean(),
+  manual_extra_days: z.number().int().min(0),
+  revisado: z.boolean().refine(Boolean, "Confirme a revisão do prazo."),
+});
+
+export type RevisarPrazoForm = z.infer<typeof revisarPrazoSchema>;
 
 /**
  * Tipo do ato ainda indeterminado — "" (nunca preenchido) ou "indeterminado"

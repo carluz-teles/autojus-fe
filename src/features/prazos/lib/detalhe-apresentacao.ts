@@ -1,5 +1,44 @@
+import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
+
 import type { PrazoDetalheView } from "../types";
 import { tipoIncompativelComPrazo, tipoIndeterminado } from "./confirmacao";
+
+const REVIEW_ORIGIN_LABEL: Record<string, string> = {
+  generic_fallback: "Base genérica provisória",
+  declared: "Informado na publicação",
+  declarado: "Informado na publicação",
+  manual: "Ajustado manualmente",
+  calculado: "Calculado pelas regras",
+  rule: "Calculado pelas regras",
+  deterministico: "Classificado pelo texto",
+  ia: "Sugerido pela análise",
+  divergente: "Fontes divergentes",
+  no_deadline: "Sem prazo identificado",
+};
+
+export function origemRevisaoLabel(origin: string | null): string {
+  return origin ? (REVIEW_ORIGIN_LABEL[origin] ?? "Origem não informada") : "";
+}
+
+export function motivoRevisaoLabel(
+  origin: string | null,
+  reason: string,
+): string {
+  if (origin === "generic_fallback" && /base genérica/i.test(reason)) {
+    return "Confira a contagem antes de confirmar.";
+  }
+  return reason;
+}
+
+export function tipoRevisaoLabel(
+  tipo: string | null | undefined,
+  catalogLabel?: string | null,
+): string {
+  if (!tipo || tipo === "indeterminado") return "A definir";
+  if (catalogLabel) return catalogLabel;
+  const label = tipoAtoLabel(tipo);
+  return label === "Prazo" ? "Tipo registrado" : label;
+}
 
 export function formatarCNJ(value: string): string {
   const digits = value.replace(/\D/g, "");
@@ -21,16 +60,13 @@ export function documentoOrigemUrl(value: string): string | null {
 }
 
 export function feriadosVigentes(p: PrazoDetalheView) {
-  const detalhes = p.applied_holiday ?? [];
-  if (!p.confirmed) return detalhes;
-  return (p.holidays_applied ?? []).map(
-    (data) =>
-      detalhes.find((h) => h.data.slice(0, 10) === data.slice(0, 10)) ?? {
-        data,
-        nome: "Feriado ou suspensão",
-        ambito: "",
-      },
-  );
+  if (p.calculation_audit_status !== "current" || !p.current_calculation)
+    return [];
+  return p.current_calculation.holidays_applied.map((data) => ({
+    data,
+    nome: "Feriado ou suspensão",
+    ambito: "",
+  }));
 }
 
 export function dataEscolhidaNaApuracao(p: PrazoDetalheView): boolean {
@@ -41,6 +77,14 @@ export function dataEscolhidaNaApuracao(p: PrazoDetalheView): boolean {
 
 export function situacaoRevisao(p: PrazoDetalheView | null, estado: string) {
   if (!p) return { label: "Prazo não disponível", pendente: false };
+  if (p.review) {
+    const pendente =
+      p.review.tipo.status === "pending" || p.review.prazo.status === "pending";
+    return {
+      label: pendente ? "Revisão pendente" : "Revisão em dia",
+      pendente,
+    };
+  }
   if (p.status === "CANCELLED")
     return { label: "Prazo cancelado", pendente: false };
   if (p.status === "MET") return { label: "Prazo cumprido", pendente: false };

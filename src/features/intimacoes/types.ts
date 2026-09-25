@@ -96,6 +96,8 @@ export type IntimacaoDisposicao =
 export type IntimacaoExcecaoMotivo =
   | "provisorio"
   | "ia_inferido"
+  | "tipo_pendente"
+  | "prazo_pendente"
   | "divergente"
   | "trabalho_divergente"
   | "trabalho_nao_identificado"

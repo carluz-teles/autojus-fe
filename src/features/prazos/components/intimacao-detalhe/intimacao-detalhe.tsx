@@ -7,11 +7,12 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CircleDashed,
   Copy,
   ExternalLink,
   LoaderCircle,
+  Minus,
   MoreHorizontal,
-  TriangleAlert,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -41,20 +42,23 @@ import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
 import { Responsavel } from "@/features/organization/components/responsavel";
 import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
 import { GerarPecaButton } from "@/features/pecas-v2/components/pregen/gerar-peca-button";
-import { EXCECAO_MOTIVO_LABEL } from "@/features/triagem/lib/pipeline";
 import { cn, formatarData } from "@/lib/utils";
 
 import { useDisposicao } from "../../hooks/use-disposicao";
 import { useIntimacaoDetalhe } from "../../hooks/use-intimacao-detalhe";
 import {
   bloqueiaProvidencias,
-  prazoAtivoParaCorrecao,
   tipoIncompativelComPrazo,
-  tipoIndeterminado,
 } from "../../lib/confirmacao";
-import { dataEscolhidaNaApuracao } from "../../lib/detalhe-apresentacao";
+import {
+  motivoRevisaoLabel,
+  origemRevisaoLabel,
+  tipoRevisaoLabel,
+} from "../../lib/detalhe-apresentacao";
 import { type ModoDetalhe, resolverModoDetalhe } from "../../lib/modo-detalhe";
+import type { DimensionReview } from "../../types";
 import { AutosSection } from "./autos-section";
+import { ConfirmacaoPrazo } from "./confirmacao-prazo";
 import { DefinirTipoAto } from "./definir-tipo-ato";
 import { DisposicaoSection } from "./disposicao-section";
 import { ExplicacaoPrazo } from "./explicacao-prazo";
@@ -655,29 +659,41 @@ export function PainelPrazo({
 }) {
   const m = det.model!;
   const p = det.prazoDetalhe;
-  const hasDate = !!m.fatalData;
+  const hasDate = !!m.fatalData && p?.status !== "NO_DEADLINE";
   const [definirTipoAberto, setDefinirTipoAberto] = useState(false);
+  const [revisarPrazoAberto, setRevisarPrazoAberto] = useState(false);
   const definirTipoTitleId = useId();
-  // EXCEÇÃO DE CLASSIFICAÇÃO (não a divergência prazo×obrigação do caso 0b81,
-  // que exige item de ciência real + acionabilidade='ato'; aqui não há item
-  // nenhum — ausência de action_items NÃO é desacordo). Causa concreta: o
-  // tipo do ato não foi identificado. `selo==='a_apurar'` é OBRIGATÓRIO no
-  // gate — sem ele este bloco duplicaria o CTA do caso 0b81 (que também tem
-  // `tipo_ato` indeterminado, mas `origem='declarado'`/`selo='confiavel'`;
-  // sem essa trava, "Prazo provisório"/"Definir tipo do ato" apareceriam ali
-  // TAMBÉM, fora do fluxo D1 já resolvido por `DisposicaoSection`/"Revisar
-  // classificação" — achado real, não hipotético, corrigido nesta rodada).
-  // Permanece exceção até o padrão real deixar de casar — nunca até o rótulo
-  // mudar por si (`det.revisao.pendente` continua `true`, ver
-  // `situacaoRevisao`, MESMO predicado). Resolve pelo MESMO control canônico
-  // `DefinirTipoAto` já usado no gate de peça e na divergência — sem form/
-  // componente paralelo.
-  const excecaoClassificacao =
-    !!p &&
-    p.selo === "a_apurar" &&
-    tipoIndeterminado(p, det.intimacao?.estado ?? "") &&
-    prazoAtivoParaCorrecao(p.status);
-  const podeDefinirTipoAto = excecaoClassificacao && modo === "execucao";
+  const revisarPrazoTitleId = useId();
+  const revisarTipo =
+    modo === "execucao" &&
+    !!p?.review?.tipo.can_review &&
+    (["OPEN", "PENDING"].includes(p.status) ||
+      (p.status === "NO_DEADLINE" &&
+        p.no_deadline_reason === "CLASSIFICAR_MANUAL"));
+  const confirmarPrazo =
+    modo === "execucao" &&
+    !!p?.review?.prazo.can_review &&
+    !p.review.prazo.reason_codes.includes("date_divergence") &&
+    ["OPEN", "PENDING"].includes(p.status);
+  const declararSemPrazo =
+    modo === "execucao" && !!p && ["OPEN", "PENDING"].includes(p.status);
+  const revisarPrazo = confirmarPrazo || declararSemPrazo;
+  const tipoValor = tipoRevisaoLabel(p?.tipo_ato, det.prazoTipoLabel);
+  const prazoValor =
+    p?.status === "NO_DEADLINE"
+      ? p.no_deadline_reason === "CLASSIFICAR_MANUAL"
+        ? "Prazo a definir"
+        : "Sem prazo"
+      : p?.end_date
+        ? [
+            p.days > 0
+              ? `${p.days} ${p.days === 1 ? "dia" : "dias"} ${p.counting === "BUSINESS" ? "úteis" : "corridos"}`
+              : null,
+            formatarData(p.end_date),
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : "Sem prazo";
   return (
     <>
       <Card>
@@ -720,10 +736,12 @@ export function PainelPrazo({
               className="font-display mt-1 text-3xl leading-tight font-semibold tracking-tight tabular-nums transition-colors duration-300"
               style={{ color: hasDate ? m.prazoCor : undefined }}
             >
-              {m.fatalData ||
-                (det.intimacao?.estado === "a_classificar"
+              {hasDate
+                ? m.fatalData
+                : p?.no_deadline_reason === "CLASSIFICAR_MANUAL" ||
+                    det.intimacao?.estado === "a_classificar"
                   ? "Prazo a definir"
-                  : "Sem prazo")}
+                  : "Sem prazo"}
             </p>
             {hasDate ? (
               <p className="text-muted-foreground mt-1 text-sm">
@@ -737,15 +755,15 @@ export function PainelPrazo({
             ) : null}
           </div>
           <div className="flex flex-wrap items-start justify-between gap-4">
-            {p && (!compacto || tipoIncompativelComPrazo(p)) ? (
+            {p && !p.review ? (
               <dl className="text-sm">
                 <Dado
                   label="Tipo do ato"
                   value={
                     tipoIncompativelComPrazo(p)
-                      ? `${tipoAtoLabel(p.tipo_ato!)} · incompatível com prazo ativo; revise o tipo`
+                      ? `${det.prazoTipoLabel ?? tipoAtoLabel(p.tipo_ato!)} · incompatível com prazo ativo; revise o tipo`
                       : p.tipo_ato
-                        ? tipoAtoLabel(p.tipo_ato)
+                        ? (det.prazoTipoLabel ?? tipoAtoLabel(p.tipo_ato))
                         : "A definir"
                   }
                 />
@@ -781,43 +799,91 @@ export function PainelPrazo({
                 Tentar novamente
               </Button>
             </div>
-          ) : (
-            <div className="border-border border-t pt-4">
-              <p className="flex items-center gap-2 text-sm font-medium">
-                {det.revisao.pendente ? (
-                  <TriangleAlert className="text-gold-foreground size-4" />
-                ) : (
-                  <Check className="text-primary size-4" />
-                )}
-                {det.revisao.label}
-              </p>
-              {p?.confirmed_at ? (
-                <p className="text-muted-foreground mt-1 text-xs">
-                  {p.confirmed_by_name ? `${p.confirmed_by_name} · ` : ""}
-                  {formatarData(p.confirmed_at)}
-                  {det.memoria?.divergencia?.decisaoLabel
-                    ? ` · ${det.memoria.divergencia.decisaoLabel}`
-                    : ""}
-                </p>
-              ) : null}
-              {excecaoClassificacao ? (
-                <div className="mt-2 flex flex-col items-start gap-2">
-                  <p className="text-muted-foreground text-xs leading-relaxed">
-                    {det.intimacao?.excecao_motivo === "provisorio"
-                      ? EXCECAO_MOTIVO_LABEL.provisorio
-                      : "O sistema não identificou o tipo do ato. Revise a classificação e confira o prazo registrado."}
-                  </p>
-                  {podeDefinirTipoAto ? (
+          ) : p?.review ? (
+            <div
+              className="border-border border-t pt-4"
+              aria-label="Revisão de tipo e prazo"
+            >
+              <h3 className="mb-3 text-sm font-medium">
+                Conferência da intimação
+              </h3>
+              <div className="border-border overflow-hidden rounded-xl border">
+                <div
+                  className={cn(
+                    "flex flex-wrap items-start gap-3 p-3",
+                    p.review.tipo.status === "pending" && "bg-gold/5",
+                  )}
+                >
+                  <ReviewStatus status={p.review.tipo.status} />
+                  <div className="min-w-0 flex-1 basis-40">
+                    <ReviewText
+                      dimension="Tipo"
+                      review={p.review.tipo}
+                      value={tipoValor}
+                    />
+                  </div>
+                  {revisarTipo ? (
                     <Button
                       variant="outline"
                       size="sm"
+                      className="ml-10 shrink-0 sm:ml-auto"
                       onClick={() => setDefinirTipoAberto(true)}
                     >
-                      Definir tipo do ato
+                      {p.tipo_ato && p.tipo_ato !== "indeterminado"
+                        ? "Revisar tipo"
+                        : "Definir tipo"}
                     </Button>
                   ) : null}
                 </div>
+                <div
+                  className={cn(
+                    "border-border flex flex-wrap items-start gap-3 border-t p-3",
+                    p.review.prazo.status === "pending" && "bg-gold/5",
+                  )}
+                >
+                  <ReviewStatus status={p.review.prazo.status} />
+                  <div className="min-w-0 flex-1 basis-40">
+                    <ReviewText
+                      dimension="Prazo"
+                      review={p.review.prazo}
+                      value={prazoValor}
+                      extra={[
+                        p.current_calculation?.fallback_used &&
+                        p.review.prazo.origin !== "generic_fallback"
+                          ? "Base genérica provisória"
+                          : null,
+                        p.current_calculation?.protected
+                          ? "Data protegida"
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    />
+                  </div>
+                  {revisarPrazo ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="ml-10 shrink-0 sm:ml-auto"
+                      onClick={() => setRevisarPrazoAberto(true)}
+                    >
+                      Revisar prazo
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+              {p.review.prazo.reason_codes.includes("date_divergence") ? (
+                <p role="note" className="text-gold-foreground text-xs">
+                  Há divergência entre as datas. Use a apuração para decidir o
+                  vencimento.
+                </p>
               ) : null}
+            </div>
+          ) : (
+            <div className="border-border border-t pt-4">
+              <p className="text-muted-foreground text-xs">
+                Informações de revisão ainda não disponíveis.
+              </p>
             </div>
           )}
           {compacto && det.memoria?.divergencia?.pendente ? (
@@ -832,7 +898,7 @@ export function PainelPrazo({
           {!compacto ? <CalculoDetalhado det={det} /> : null}
         </CardContent>
       </Card>
-      {podeDefinirTipoAto ? (
+      {revisarTipo ? (
         <Dialog.Root
           open={definirTipoAberto}
           onOpenChange={setDefinirTipoAberto}
@@ -863,7 +929,7 @@ export function PainelPrazo({
                     id={definirTipoTitleId}
                     className="font-display text-lg font-medium"
                   >
-                    Definir tipo do ato
+                    Confirmar tipo do ato
                   </Dialog.Title>
                   <Dialog.Close
                     aria-label="Fechar"
@@ -873,13 +939,72 @@ export function PainelPrazo({
                   </Dialog.Close>
                 </div>
                 <Dialog.Description className="text-muted-foreground mb-4 text-[13px] leading-relaxed">
-                  O tipo do ato desta intimação ainda não foi identificado.
-                  Defina o tipo e a contagem, ou marque que não há prazo.
+                  Confira o ato na publicação. Esta decisão confirma somente o
+                  tipo; a revisão do prazo é uma etapa separada.
                 </Dialog.Description>
                 <DefinirTipoAto
                   intimacaoId={m.id}
                   prazo={p}
                   onConfirmado={() => setDefinirTipoAberto(false)}
+                  onCancelar={() => setDefinirTipoAberto(false)}
+                />
+              </div>
+            </Dialog.Popup>
+          </Dialog.Portal>
+        </Dialog.Root>
+      ) : null}
+      {revisarPrazo && p ? (
+        <Dialog.Root
+          open={revisarPrazoAberto}
+          onOpenChange={setRevisarPrazoAberto}
+        >
+          <Dialog.Portal>
+            <Dialog.Backdrop
+              className={cn(
+                "fixed inset-0 z-40 backdrop-blur-[2px]",
+                "bg-[color-mix(in_oklch,var(--foreground)_34%,transparent)]",
+                "transition-opacity duration-200",
+                "data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
+              )}
+            />
+            <Dialog.Popup
+              role="dialog"
+              aria-labelledby={revisarPrazoTitleId}
+              aria-modal="true"
+              className={cn(
+                "fixed inset-0 z-50 flex items-center justify-center p-6",
+                "data-[starting-style]:[transform:translateY(8px)_scale(0.98)] data-[starting-style]:opacity-0",
+                "data-[ending-style]:[transform:translateY(8px)_scale(0.98)] data-[ending-style]:opacity-0",
+                "transition-all duration-[280ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]",
+              )}
+            >
+              <div className="bg-card border-line shadow-pop relative max-h-[calc(100vh-3rem)] w-full max-w-[480px] overflow-y-auto rounded-2xl border p-6">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <Dialog.Title
+                    id={revisarPrazoTitleId}
+                    className="font-display text-lg font-medium"
+                  >
+                    {confirmarPrazo ? "Confirmar prazo" : "Revisar prazo"}
+                  </Dialog.Title>
+                  <Dialog.Close
+                    aria-label="Fechar"
+                    render={<Button variant="ghost" size="icon-sm" />}
+                  >
+                    <X aria-hidden />
+                  </Dialog.Close>
+                </div>
+                <Dialog.Description className="text-muted-foreground mb-4 text-[13px] leading-relaxed">
+                  {confirmarPrazo
+                    ? "Confira a data atual ou ajuste a contagem. Confirmar o prazo não confirma o tipo."
+                    : "A revisão normal do prazo está indisponível. Você ainda pode registrar que não há prazo a cumprir, se a publicação indicar mera ciência."}
+                </Dialog.Description>
+                <ConfirmacaoPrazo
+                  id={m.id}
+                  prazo={p}
+                  estado={det.intimacao?.estado ?? ""}
+                  onConfirmado={() => setRevisarPrazoAberto(false)}
+                  onCancelar={() => setRevisarPrazoAberto(false)}
+                  tipoLabel={det.prazoTipoLabel}
                 />
               </div>
             </Dialog.Popup>
@@ -890,10 +1015,85 @@ export function PainelPrazo({
   );
 }
 
+function ReviewStatus({ status }: { status: DimensionReview["status"] }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "flex size-7 shrink-0 items-center justify-center rounded-full",
+        status === "pending"
+          ? "bg-gold/10 text-gold-foreground"
+          : status === "confirmed"
+            ? "bg-primary/10 text-primary"
+            : "bg-muted text-muted-foreground",
+      )}
+    >
+      {status === "pending" ? (
+        <CircleDashed className="size-4" />
+      ) : status === "confirmed" ? (
+        <Check className="size-4" />
+      ) : (
+        <Minus className="size-4" />
+      )}
+    </span>
+  );
+}
+
+function ReviewText({
+  dimension,
+  review,
+  value,
+  extra,
+}: {
+  dimension: "Tipo" | "Prazo";
+  review: DimensionReview;
+  value: string;
+  extra?: string | null;
+}) {
+  const origin = origemRevisaoLabel(review.origin);
+  const metadata = [origin, extra].filter(Boolean).join(" · ");
+  const status =
+    review.status === "pending"
+      ? "A revisar"
+      : review.status === "confirmed"
+        ? "Confirmado"
+        : "Revisão dispensada";
+  return (
+    <>
+      <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">
+        <span>{dimension}</span>
+        <span aria-hidden="true">·</span>
+        <span>{status}</span>
+      </p>
+      <p className="text-foreground mt-1 text-sm font-medium break-words">
+        {value}
+      </p>
+      {metadata ? (
+        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+          {metadata}
+        </p>
+      ) : null}
+      {review.reason ? (
+        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+          {motivoRevisaoLabel(review.origin, review.reason)}
+        </p>
+      ) : null}
+      {review.confirmed_at ? (
+        <p className="text-muted-foreground mt-1 text-xs">
+          {[review.confirmed_by_name, formatarData(review.confirmed_at)]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 function ApuracaoPrazo({ det }: { det: Detalhe }) {
   const [ajustando, setAjustando] = useState(false);
   const [data, setData] = useState("");
   const cv = det.memoria!.divergencia!;
+  const bloqueado = det.memoriaEmVoo || det.apuracaoObsoleta;
   return (
     <Card role="region" aria-label="Apuração do vencimento">
       <CardHeader>
@@ -927,14 +1127,14 @@ function ApuracaoPrazo({ det }: { det: Detalhe }) {
         <div className="flex flex-col gap-2">
           <Button
             variant="outline"
-            disabled={det.memoriaEmVoo}
+            disabled={bloqueado}
             onClick={det.onAceitarDeclarado}
           >
             Usar prazo informado no ato
           </Button>
           <Button
             variant="outline"
-            disabled={det.memoriaEmVoo}
+            disabled={bloqueado}
             onClick={det.onAceitarCalculado}
           >
             Usar data calculada pela regra
@@ -958,16 +1158,16 @@ function ApuracaoPrazo({ det }: { det: Detalhe }) {
                 required
                 value={data}
                 onChange={(e) => setData(e.target.value)}
-                disabled={det.memoriaEmVoo}
+                disabled={bloqueado}
               />
             </Field>
-            <Button disabled={!data || det.memoriaEmVoo} type="submit">
+            <Button disabled={!data || bloqueado} type="submit">
               Registrar data escolhida
             </Button>
             <Button
               variant="ghost"
               type="button"
-              disabled={det.memoriaEmVoo}
+              disabled={bloqueado}
               onClick={() => setAjustando(false)}
             >
               Cancelar ajuste
@@ -977,12 +1177,21 @@ function ApuracaoPrazo({ det }: { det: Detalhe }) {
           <Button
             variant="ghost"
             onClick={() => setAjustando(true)}
-            disabled={det.memoriaEmVoo}
+            disabled={bloqueado}
           >
             Escolher outra data
           </Button>
         )}
-        {det.apuracaoErro ? (
+        {det.apuracaoObsoleta ? (
+          <div role="alert" className="flex flex-col items-start gap-2">
+            <p className="text-destructive text-sm">
+              O prazo mudou. Confira os dados atualizados antes de decidir.
+            </p>
+            <Button variant="outline" size="sm" onClick={det.recarregarPrazo}>
+              Atualizar dados
+            </Button>
+          </div>
+        ) : det.apuracaoErro ? (
           <p role="alert" className="text-destructive text-sm">
             Não foi possível registrar a decisão. Tente novamente.
           </p>
@@ -1021,24 +1230,25 @@ function CalculoDetalhado({ det }: { det: Detalhe }) {
             Memória detalhada não disponível para este prazo.
           </p>
         ) : null}
-        {p.manual_extra_days ? (
+        {p.current_calculation?.manual_extra_days ? (
           <p className="text-sm">
-            {p.manual_extra_days} dia(s) adicional(is) na contagem.
+            {p.current_calculation.manual_extra_days} dia(s) adicional(is) na
+            contagem.
           </p>
         ) : null}
         {memoria.notaInterna ? (
           <p className="text-sm">{memoria.notaInterna}</p>
         ) : null}
-        {p.legal_citation ? (
+        {p.current_calculation?.legal_citation ? (
           <p className="text-muted-foreground text-xs">
-            Referência registrada: {p.legal_citation}
+            Referência registrada: {p.current_calculation.legal_citation}
           </p>
         ) : null}
         <div className="border-border border-t pt-3">
           <h3 className="text-sm font-medium">Feriados e suspensões</h3>
-          {dataEscolhidaNaApuracao(p) ? (
+          {!p.current_calculation ? (
             <p className="text-muted-foreground mt-1 text-xs">
-              Registros do cálculo anterior à escolha da data.
+              Feriados do cálculo atual indisponíveis.
             </p>
           ) : null}
           {memoria.feriados.length ? (
@@ -1057,11 +1267,11 @@ function CalculoDetalhado({ det }: { det: Detalhe }) {
                 </li>
               ))}
             </ul>
-          ) : (
+          ) : p.current_calculation ? (
             <p className="text-muted-foreground mt-1 text-xs">
               Nenhum feriado ou suspensão aplicado.
             </p>
-          )}
+          ) : null}
         </div>
       </div>
     </details>
