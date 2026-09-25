@@ -722,9 +722,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                   h.setPhase(e.target.value as ProcessoPhase | "")
                 }
               >
-                <option value="" disabled>
-                  Não informada
-                </option>
+                <option value="">Automática (sem ajuste manual)</option>
                 {FASE_STEPS.map((s) => (
                   <option value={s.key} key={s.key}>
                     {s.label}
@@ -732,7 +730,8 @@ export function ProcessoHub({ numero }: { numero: string }) {
                 ))}
               </NativeSelect>
               <p className="text-muted-foreground text-xs">
-                O ajuste manual passa a prevalecer na fase exibida.
+                Sem ajuste manual, a fase exibida volta a ser a derivada
+                automaticamente, quando disponível.
               </p>
             </div>
             <div className="space-y-2">

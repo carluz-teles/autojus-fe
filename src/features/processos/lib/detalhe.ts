@@ -1,5 +1,6 @@
 import type { IntimacaoView } from "@/features/intimacoes/types";
 import { daysLeftLabel } from "@/features/prazos/lib/labels";
+import type { ProcessoPhase } from "@/features/processos/types";
 
 export function intimacaoPendente(
   i: Pick<IntimacaoView, "status" | "user_status">,
@@ -48,4 +49,44 @@ export function parseValorCausa(input: string): number | null {
       : value;
   const amount = Number(normalized);
   return Number.isFinite(amount) && amount >= 0 ? amount : NaN;
+}
+
+export type EdicaoProcessoInput = {
+  label: string;
+  phase: ProcessoPhase | "";
+  valor: string;
+};
+
+export type EdicaoProcessoAtual = {
+  label: string | null;
+  phase: ProcessoPhase | null;
+  claim_value: number | null;
+};
+
+/** Build only changed fields; blank phase/amount explicitly clear manual values. */
+export function montarEdicaoProcesso(
+  input: EdicaoProcessoInput,
+  current: EdicaoProcessoAtual,
+): {
+  changes?: {
+    label?: string;
+    phase?: ProcessoPhase | null;
+    claim_value?: number | null;
+  };
+  error?: string;
+} {
+  const amount = parseValorCausa(input.valor);
+  if (amount !== null && Number.isNaN(amount)) {
+    return { error: "Informe um valor válido, como 1.500,00." };
+  }
+  const phase = input.phase || null;
+  return {
+    changes: {
+      ...(input.label.trim() !== (current.label || "")
+        ? { label: input.label.trim() }
+        : {}),
+      ...(phase !== current.phase ? { phase } : {}),
+      ...(amount !== current.claim_value ? { claim_value: amount } : {}),
+    },
+  };
 }
