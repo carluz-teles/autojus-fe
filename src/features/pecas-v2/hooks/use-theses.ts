@@ -24,6 +24,7 @@ import { useApi } from "@/lib/api/use-api";
 import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
 import { runAssessmentAndGenerate } from "../lib/assessment-lifecycle";
+import { extractErrorCode } from "../lib/peca-precondition";
 import { isSelectedForGeneration } from "../lib/thesis-selection";
 import * as svc from "../services/pecas-v2.service";
 import { buildAssessmentInput } from "../services/pecas-v2.service";
@@ -148,6 +149,7 @@ export interface ThesesController {
   theses: Thesis[];
   isLoading: boolean;
   isError: boolean;
+  errorCode?: string;
   /** Contagem selecionada (included ∪ pending_add). */
   selectedCount: number;
   /** thesisIds a passar pra geração (included ∪ pending_add). */
@@ -175,6 +177,7 @@ export function useThesesController(id: string): ThesesController {
     theses,
     isLoading: list.isLoading,
     isError: list.isError || regen.isError,
+    errorCode: extractErrorCode(regen.error),
     selectedCount: selected.length,
     selectedIds: selected.map((t) => t.id),
     toggle: (thesis) =>

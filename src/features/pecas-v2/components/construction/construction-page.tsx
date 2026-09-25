@@ -651,6 +651,7 @@ export function ConstructionPage({ id }: { id: string }) {
                         selectedCount={h.theses.selectedCount}
                         isLoading={h.theses.isLoading}
                         isError={h.theses.isError}
+                        errorMessage={h.theses.errorMessage}
                         onToggle={(t) =>
                           h.stage === "pregen"
                             ? h.theses.toggle(t)

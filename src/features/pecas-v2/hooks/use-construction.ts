@@ -28,7 +28,13 @@ import { preconditionFromCode } from "../lib/peca-precondition";
 import type { SagaState, Thesis } from "../types";
 import { useAssessment, useDraft } from "./use-draft";
 import { thesesKey, useGenerateDraft, useThesesController } from "./use-theses";
-import { useThesesStream } from "./use-theses-stream";
+import {
+  THESIS_EVIDENCE_INVALID_CODE,
+  useThesesStream,
+} from "./use-theses-stream";
+
+const THESIS_EVIDENCE_MESSAGE =
+  "Uma sugestão citou trecho ausente das fontes consultadas. Os fundamentos anteriores foram preservados; revise os autos e tente novamente.";
 
 /** Estágio do CENTRO da tela — a barra e o rail não mudam entre estágios. */
 export type CenterStage = "pregen" | "gerando" | "pronta" | "falha";
@@ -76,9 +82,12 @@ export function useConstruction(id: string) {
   // "Tentar novamente" (o próprio regenerate). Na `done`, semeia o cache draft-
   // scoped com a lista autoritativa pra o controller assumir os ids reais.
   const [streamFellBack, setStreamFellBack] = useState(false);
+  const [streamInvalid, setStreamInvalid] = useState(false);
+  const [autoFailed, setAutoFailed] = useState(false);
   const noPersisted =
     theses.theses.length === 0 && !theses.isLoading && !theses.isError;
-  const streamEnabled = hasOrigin && hasTeor && noPersisted && !streamFellBack;
+  const streamEnabled =
+    hasOrigin && hasTeor && noPersisted && !streamFellBack && !streamInvalid;
 
   // "Settled" = o stream (ou o fallback síncrono) já CONCLUIU pelo menos uma
   // tentativa real de obter teses — distinto de "ainda vazio porque a 1ª
@@ -98,14 +107,23 @@ export function useConstruction(id: string) {
     [qc, id],
   );
 
-  const onStreamError = useCallback((hadThesis: boolean) => {
-    // Falha pré-1ª-tese → degrada pro POST síncrono (desliga o stream). Falha
-    // mid-stream → mantém os cards; o erro inline vem do state do stream e o
-    // usuário reusa o regenerate. Em ambos os casos o stream por si só NÃO
-    // "settled" ainda — quem conclui é o POST síncrono (fallback) ou o próprio
-    // erro (`theses.isError`, já tratado à parte na decisão de auto-disparo).
-    if (!hadThesis) setStreamFellBack(true);
-  }, []);
+  const onStreamError = useCallback(
+    (hadThesis: boolean, _message?: string, code?: string) => {
+      if (code === THESIS_EVIDENCE_INVALID_CODE) {
+        settledRef.current = true;
+        setStreamInvalid(true);
+        setAutoFailed(true);
+        return;
+      }
+      // Falha pré-1ª-tese → degrada pro POST síncrono (desliga o stream). Falha
+      // mid-stream → mantém os cards; o erro inline vem do state do stream e o
+      // usuário reusa o regenerate. Em ambos os casos o stream por si só NÃO
+      // "settled" ainda — quem conclui é o POST síncrono (fallback) ou o próprio
+      // erro (`theses.isError`, já tratado à parte na decisão de auto-disparo).
+      if (!hadThesis) setStreamFellBack(true);
+    },
+    [],
+  );
 
   const stream = useThesesStream(`pecas/${id}`, {
     enabled: streamEnabled,
@@ -299,7 +317,6 @@ export function useConstruction(id: string) {
   // A DECISÃO (o que fazer dado o estado atual) é pura — `decidirAcaoAuto`,
   // testável sem montar o hook/efeitos reais. O efeito abaixo é só um
   // dispatcher fino sobre ela.
-  const [autoFailed, setAutoFailed] = useState(false);
   const autoFired = useRef(false);
   const retryInFlight = useRef(false);
   const [retrying, setRetrying] = useState(false);
@@ -466,6 +483,10 @@ export function useConstruction(id: string) {
           : undefined,
       }
     : { ...theses, streaming: undefined };
+  const thesisErrorMessage =
+    streamInvalid || theses.errorCode === THESIS_EVIDENCE_INVALID_CODE
+      ? THESIS_EVIDENCE_MESSAGE
+      : undefined;
 
   return {
     draft: draftQuery.data,
@@ -473,7 +494,7 @@ export function useConstruction(id: string) {
     isLoading: draftQuery.isLoading,
     isError: draftQuery.isError,
     stage,
-    theses: thesesView,
+    theses: { ...thesesView, errorMessage: thesisErrorMessage },
     highlightedDocId,
     focusSource,
     verAuto,
@@ -485,6 +506,7 @@ export function useConstruction(id: string) {
     // Pré-condições conhecidas (tipo do ato / trabalho não confirmado) ganham
     // frase clara e acionável; nunca a mensagem crua do BE nem "Tente novamente".
     generationError: (() => {
+      if (thesisErrorMessage) return thesisErrorMessage;
       const e = generate.error as
         { message?: string; code?: string } | undefined;
       if (!e)

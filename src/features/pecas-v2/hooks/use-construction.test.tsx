@@ -11,11 +11,16 @@ const mocks = vi.hoisted(() => ({
   contentHtml: "",
   theses: [] as { id: string }[],
   thesesError: true,
+  regenerate: vi.fn(),
   regenerateAsync: vi.fn(),
   mutate: vi.fn(),
   mutateAsync: vi.fn(),
   setQueryData: vi.fn(),
-  streamOptions: null as null | { onDone: (theses: { id: string }[]) => void },
+  streamOptions: null as null | {
+    onDone: (theses: { id: string }[]) => void;
+    onError: (hadThesis: boolean, message?: string, code?: string) => void;
+  },
+  streamCode: undefined as string | undefined,
   draftId: "",
   assessmentStatus: "ready" as "ready" | "loading" | "error",
   assessmentRequest: null as null | { status: string },
@@ -60,7 +65,7 @@ vi.mock("./use-theses", () => ({
     isError: mocks.thesesError,
     isRegenerating: false,
     isTogglingId: null,
-    regenerate: vi.fn(),
+    regenerate: mocks.regenerate,
     regenerateAsync: mocks.regenerateAsync,
   }),
   useGenerateDraft: (id: string) => {
@@ -74,9 +79,15 @@ vi.mock("./use-theses", () => ({
   },
 }));
 vi.mock("./use-theses-stream", () => ({
+  THESIS_EVIDENCE_INVALID_CODE: "thesis_evidence_invalid",
   useThesesStream: (_key: string, options: typeof mocks.streamOptions) => {
     mocks.streamOptions = options;
-    return { status: "idle", theses: [], count: 0 };
+    return {
+      status: mocks.streamCode ? "error" : "idle",
+      theses: [],
+      count: 0,
+      errorCode: mocks.streamCode,
+    };
   },
 }));
 
@@ -99,6 +110,8 @@ describe("useConstruction — dispatch real da geração", () => {
     mocks.contentHtml = "";
     mocks.theses = [];
     mocks.thesesError = true;
+    mocks.streamCode = undefined;
+    mocks.regenerate.mockReset();
     mocks.assessmentStatus = "ready";
     mocks.assessmentRequest = null;
     mocks.regenerateAsync.mockReset();
@@ -205,6 +218,56 @@ describe("useConstruction — dispatch real da geração", () => {
     });
     expect(latest.autoFailed).toBe(true);
     expect(mocks.mutate).not.toHaveBeenCalled();
+  });
+
+  it("coded evidence error stops automatic fallback and generation until explicit retry", async () => {
+    mocks.saga = "CREATED";
+    mocks.thesesError = false;
+    await act(async () => root.render(createElement(Probe)));
+    await act(async () => {
+      mocks.streamCode = "thesis_evidence_invalid";
+      mocks.streamOptions!.onError(
+        false,
+        "Uma sugestão citou trecho ausente das fontes consultadas.",
+        mocks.streamCode,
+      );
+      root.render(createElement(Probe));
+    });
+    expect(mocks.regenerate).not.toHaveBeenCalled();
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    expect(latest.autoFailed).toBe(true);
+    expect(latest.generationError).toMatch(/fontes consultadas/i);
+
+    mocks.regenerateAsync.mockResolvedValue([{ id: "valid-1" }]);
+    await act(async () => latest.retryAuto());
+    expect(mocks.regenerateAsync).toHaveBeenCalledTimes(1);
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("uncoded transport failure keeps the existing synchronous fallback", async () => {
+    mocks.saga = "CREATED";
+    mocks.thesesError = false;
+    await act(async () => root.render(createElement(Probe)));
+    await act(async () => mocks.streamOptions!.onError(false));
+    expect(mocks.regenerate).toHaveBeenCalledTimes(1);
+    expect(mocks.mutate).not.toHaveBeenCalled();
+  });
+
+  it("coded stream error cannot replace persisted cards or selection", async () => {
+    mocks.saga = "DRAFTED";
+    mocks.contentHtml = "<p>Peça existente</p>";
+    mocks.thesesError = false;
+    mocks.theses = [{ id: "persisted-1" }];
+    await act(async () => root.render(createElement(Probe)));
+    await act(async () => {
+      mocks.streamCode = "thesis_evidence_invalid";
+      mocks.streamOptions!.onError(false, "Erro", mocks.streamCode);
+      root.render(createElement(Probe));
+    });
+    expect(latest.theses.theses).toEqual([{ id: "persisted-1" }]);
+    expect(latest.theses.selectedIds).toEqual(["persisted-1"]);
+    expect(mocks.setQueryData).not.toHaveBeenCalled();
+    expect(mocks.regenerate).not.toHaveBeenCalled();
   });
 
   it("remount de CREATED vazio com assessment FAILED mostra retry sem auto-mutation", async () => {

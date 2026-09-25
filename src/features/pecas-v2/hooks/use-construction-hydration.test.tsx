@@ -60,6 +60,7 @@ vi.mock("./use-theses", () => ({
   }),
 }));
 vi.mock("./use-theses-stream", () => ({
+  THESIS_EVIDENCE_INVALID_CODE: "thesis_evidence_invalid",
   useThesesStream: () => ({ status: "idle", theses: [], count: 0 }),
 }));
 
