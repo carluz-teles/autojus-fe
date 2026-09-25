@@ -51,8 +51,15 @@ export function mapPecaDetailToDraft(api: PecaDetailAPI): Draft {
     status: (api.status as Status) ?? "DRAFT",
     sagaState: (api.saga_state as SagaState) ?? "CREATED",
     currentVersionId: api.current_version_id ?? null,
+    qualityAuthorization: api.quality_authorization
+      ? {
+          allowed: api.quality_authorization.allowed,
+          reasonCode: api.quality_authorization.reason_code,
+        }
+      : null,
     authorship: api.authorship,
     updatedAt: api.updated_at,
+    supersededAt: api.superseded_at ?? null,
     preamble: mapPreamble(structured),
     sections: mapSections(structured),
     intimation: mapIntimation(api.intimation),

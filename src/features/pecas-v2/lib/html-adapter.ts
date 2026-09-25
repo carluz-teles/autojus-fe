@@ -18,7 +18,7 @@
 // remontar sections com os mesmos ids (necessário pra iterate-section
 // mapear de volta ao BE).
 
-import type { StructuredContent } from "../../types";
+import type { StructuredContent } from "../types";
 
 /** Constrói HTML rico a partir de StructuredContent. Preamble vira <p>s;
  *  cada section vira <h2> + <p>s. Preserva IDs via data-section-id. */

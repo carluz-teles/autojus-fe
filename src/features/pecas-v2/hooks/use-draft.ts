@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef } from "react";
 
 import { useApi } from "@/lib/api/use-api";
 
@@ -30,16 +31,62 @@ export function useAssessment(id: string, enabled: boolean) {
 
 export function useDraft(id: string) {
   const fetcher = useApi();
+  const qc = useQueryClient();
+  const detailKey = draftKeys.detail(id);
+  const followup = useRef<{ version: string; startedAt: number } | null>(null);
   return useQuery({
-    queryKey: draftKeys.detail(id),
-    queryFn: () => svc.getDraft(fetcher, id),
+    queryKey: detailKey,
+    queryFn: async () => {
+      const incoming = await svc.getDraft(fetcher, id);
+      const current = qc.getQueryData<Draft>(detailKey);
+      if (current && current.id === incoming.id) {
+        const currentAt = Date.parse(current.updatedAt);
+        const incomingAt = Date.parse(incoming.updatedAt);
+        // A GET started before a newer generated version or local save ack
+        // cannot put its older body/revision back into the shared query.
+        if (
+          Number.isFinite(currentAt) &&
+          Number.isFinite(incomingAt) &&
+          currentAt >= incomingAt &&
+          (current.currentVersionId !== incoming.currentVersionId ||
+            current.contentRevision !== incoming.contentRevision)
+        )
+          return current;
+      }
+      return incoming;
+    },
     // Enquanto a geração está em curso (saga CREATED/EXTRACTING), o worker
     // já persistiu content_html no fim; polling curto garante que o FE veja
     // a transição pra EXTRACTING (ativando o SSE) e depois DRAFTED (parando).
     refetchIntervalInBackground: true,
     refetchInterval: (query) => {
-      const saga = (query.state.data as Draft | undefined)?.sagaState;
-      if (saga === "EXTRACTING") return 1000;
+      const draft = query.state.data as Draft | undefined;
+      if (!draft || draft.status !== "DRAFT" || draft.supersededAt)
+        return false;
+      if (draft.sagaState === "EXTRACTING") return 1000;
+      if (draft.sagaState !== "DRAFTED" || !draft.currentVersionId)
+        return false;
+      const reason = draft.qualityAuthorization?.reasonCode;
+      if (
+        reason !== "not_reviewed" &&
+        reason !== "checking" &&
+        reason !== "decision_pending" &&
+        reason !== "blocked"
+      )
+        return false;
+      // The BE quality decision has a 300s policy timeout. Anchor this
+      // follow-up once per generated version to the server's first observed
+      // update; status flips and unrelated refetches cannot renew it.
+      if (followup.current?.version !== draft.currentVersionId) {
+        const updated = Date.parse(draft.updatedAt);
+        followup.current = {
+          version: draft.currentVersionId,
+          startedAt: Number.isFinite(updated)
+            ? Math.min(updated, Date.now())
+            : Date.now(),
+        };
+      }
+      if (Date.now() - followup.current.startedAt < 300_000) return 1000;
       return false;
     },
   });

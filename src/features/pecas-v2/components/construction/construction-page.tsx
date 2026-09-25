@@ -65,7 +65,6 @@ export function ConstructionPage({ id }: { id: string }) {
   const fetcher = useApi();
   const router = useRouter();
   const qc = useQueryClient();
-  const save = useContentSave(id, draft);
   const editor = useRef<RichEditorHandle | null>(null);
   const [panel, setPanel] = useState<"context" | "assistant" | null>(null);
   const [contextCollapsed, setContextCollapsed] = useState(false);
@@ -78,22 +77,17 @@ export function ConstructionPage({ id }: { id: string }) {
   const [pdf, setPdf] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [liveHTML, setLiveHTML] = useState<string | null>(null);
+  const [hydrationKey, setHydrationKey] = useState(0);
   const [checked, setChecked] = useState(false);
+  const save = useContentSave(id, draft, (html) => {
+    editor.current?.setHtml(html);
+    setLiveHTML(html);
+    setHydrationKey((key) => key + 1);
+    setChecked(false);
+  });
   const generationActive =
     h.isGenerating || h.regenerating || h.stage === "gerando";
   const applyingRef = useRef(false);
-  const wasGenerating = useRef(generationActive);
-  useEffect(() => {
-    if (
-      wasGenerating.current &&
-      !generationActive &&
-      draft?.contentRevision &&
-      !save.queue.dirty
-    ) {
-      save.queue.acknowledge(draft.contentRevision);
-    }
-    wasGenerating.current = generationActive;
-  }, [generationActive, draft?.contentRevision, save.queue]);
   const guard = async (action: () => void | Promise<void>) => {
     try {
       await save.flush();
@@ -688,7 +682,9 @@ export function ConstructionPage({ id }: { id: string }) {
                 )}
                 {ready && !generationActive && (
                   <EditorCenter
+                    key={`${id}:${hydrationKey}`}
                     draft={draft}
+                    initialHtml={liveHTML ?? undefined}
                     editorRef={editor}
                     regenerating={busy}
                     actions={

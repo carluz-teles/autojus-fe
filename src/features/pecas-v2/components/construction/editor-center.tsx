@@ -1,17 +1,20 @@
 "use client";
 import { type ReactNode, type RefObject, useState } from "react";
 
+import { structuredToHtml } from "../../lib/html-adapter";
 import type { Draft } from "../../types";
-import { structuredToHtml } from "../rich-editor/html-adapter";
 import { RichEditor, type RichEditorHandle } from "../rich-editor/rich-editor";
+
 export function EditorCenter({
   draft,
+  initialHtml,
   editorRef,
   regenerating,
   onChange,
   actions,
 }: {
   draft: Draft;
+  initialHtml?: string;
   editorRef: RefObject<RichEditorHandle | null>;
   regenerating: boolean;
   onChange: (html: string) => void;
@@ -21,6 +24,7 @@ export function EditorCenter({
 
   const [initial] = useState(
     () =>
+      initialHtml ??
       draft.contentHtml ??
       structuredToHtml({ preamble: draft.preamble, sections: draft.sections }),
   );
