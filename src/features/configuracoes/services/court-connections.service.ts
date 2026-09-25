@@ -25,14 +25,17 @@ export async function listCourtConnections(
   return raw.data;
 }
 
-/** Um lote de busca de autos (sync_run do court). `records` = PROCESSOS
- *  fetchados no lote (não documentos — esses caem por-processo). */
+/** Uma sessão de busca de autos (sync_run do court). `records` = PROCESSOS
+ *  fetchados na sessão (não documentos — esses caem por-processo).
+ *  `status` é "RUNNING" enquanto drena, "OK" ou "FAILED" ao fechar.
+ *  `finished_at` é omitido enquanto RUNNING. */
 export interface AutosSyncRunView {
   id: string;
   records: number;
   retried: number;
-  status: string; // "OK" | "FAILED"
-  finished_at: string;
+  status: "RUNNING" | "OK" | "FAILED" | string;
+  started_at: string;
+  finished_at?: string;
   error?: string;
 }
 
