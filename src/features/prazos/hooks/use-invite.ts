@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
+import { inviteMember } from "@/features/organization/actions/invite-member";
 import {
   roleLabel as clerkRoleLabel,
   useOrgMembers,
@@ -28,11 +29,11 @@ export type InviteForm = z.infer<typeof inviteSchema>;
 
 // Modal "Convidar membro" (port de Atjus - Convite.dc.html, persona admin):
 // chips de e-mail → papel → "pode protocolar" → mensagem → enviar. Ligado ao
-// Clerk REAL: cada e-mail vira um organization.inviteMember({emailAddress, role});
+// Clerk REAL: cada e-mail é enviado no servidor com redirect para /convite;
 // os pendentes vêm de useOrganization().invitations (revogáveis). O Clerk envia o
 // e-mail de aceite — não há "link compartilhável" próprio, então a tela de sucesso
 // confirma o envio sem fabricar link. "Pode protocolar" e "Mensagem" ficam na UI
-// (fidelidade ao design), mas ainda NÃO são enviados: o Clerk client inviteMember
+// (fidelidade ao design), mas ainda NÃO são enviados: o fluxo atual
 // não aceita mensagem, e o claim de protocolar depende de plumbing de BE.
 export type Papel = "Sócio" | "Advogado" | "Estagiário";
 
@@ -152,7 +153,7 @@ export function useInvite() {
     setErroEnvio(null);
     const res = await Promise.allSettled(
       todos.map((emailAddress) =>
-        organization.inviteMember({ emailAddress, role }),
+        inviteMember({ organizationId: organization.id, emailAddress, role }),
       ),
     );
     void invitations?.revalidate?.();

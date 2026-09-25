@@ -6,7 +6,6 @@ import {
   useOrganizationList,
   useUser,
 } from "@clerk/nextjs";
-import type { OrganizationCustomRoleKey } from "@clerk/shared/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -15,6 +14,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { addWatchedOab } from "@/features/integrations/services/integrations.service";
+import { inviteMember } from "@/features/organization/actions/invite-member";
 import { useApi } from "@/lib/api/use-api";
 
 import { lookupCnpj } from "../lib/cnpj-lookup";
@@ -453,11 +453,10 @@ export function useOnboardingFlow() {
       if (!solo && team.rows.length > 0 && activeOrg) {
         const resInv = await Promise.allSettled(
           team.rows.map((r) =>
-            activeOrg.inviteMember({
+            inviteMember({
+              organizationId: activeOrg.id,
               emailAddress: r.email,
-              role: (r.role === "ADMIN"
-                ? "org:admin"
-                : "org:member") as OrganizationCustomRoleKey,
+              role: r.role === "ADMIN" ? "org:admin" : "org:member",
             }),
           ),
         );
