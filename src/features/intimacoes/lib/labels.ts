@@ -4,6 +4,7 @@
 import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
 
 import type { IntimacaoType } from "../types";
+import { tipoAtoLabel } from "./tipo-ato";
 
 /**
  * Mesmo título do read model em listas, prévia e detalhe completo. `cnjNumber`
@@ -35,3 +36,17 @@ export const TYPE_LABEL: Record<IntimacaoType, string> = {
   CITACAO: "Citação",
   COMUNICACAO: "Comunicação",
 };
+
+/** Rótulo visual do ato desta publicação, separado do trabalho exigido pelo prazo. */
+export function atoPublicacaoLabel(
+  aiAct: string | null | undefined,
+  prazoTipoAto: string | null | undefined,
+  type: IntimacaoType,
+): string {
+  return (
+    aiAct?.trim() ||
+    (prazoTipoAto ? tipoAtoLabel(prazoTipoAto) : "") ||
+    TYPE_LABEL[type] ||
+    "Intimação"
+  );
+}

@@ -11,6 +11,11 @@ export const DEGREE_LABEL: Record<ProcessoDegree, string> = {
   UNKNOWN: "—",
 };
 
+export function grauProcessoLabel(degree: string): string {
+  const label = DEGREE_LABEL[degree as ProcessoDegree];
+  return label && label !== "—" ? label : "Grau não informado";
+}
+
 // As 5 fases do stepper, em ordem, com rótulo pt-BR — fonte única do stepper e do label.
 export const FASE_STEPS: { key: ProcessoPhase; label: string }[] = [
   { key: "CONHECIMENTO", label: "Início" },
@@ -92,12 +97,7 @@ export function linhaProcesso(p: ProcessoView) {
     partes: [p.autor && `Autor: ${p.autor}`, p.reu && `Réu: ${p.reu}`]
       .filter(Boolean)
       .join(" · "),
-    tribunal: [
-      p.court,
-      DEGREE_LABEL[p.degree] === "—"
-        ? "Grau não informado"
-        : DEGREE_LABEL[p.degree],
-    ]
+    tribunal: [p.court, grauProcessoLabel(p.degree)]
       .filter(Boolean)
       .join(" · "),
     orgao: p.judging_body || "Órgão não informado",

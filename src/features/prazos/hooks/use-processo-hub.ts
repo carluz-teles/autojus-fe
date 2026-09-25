@@ -11,6 +11,7 @@ import {
   rotuloTipoAuto,
   visualDoAuto,
 } from "@/features/documentos/lib/tipo-autos";
+import { atoPublicacaoLabel } from "@/features/intimacoes/lib/labels";
 import { prazoVisivel } from "@/features/intimacoes/lib/prazo-visivel";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { usePecasByProcesso } from "@/features/pecas/hooks/use-peca";
@@ -88,11 +89,7 @@ export function useProcessoHub(id: string) {
       const ativo = intimacaoPendente(i);
       return {
         id: i.id,
-        titulo: prazo?.tipo_ato
-          ? tipoAtoLabel(prazo.tipo_ato)
-          : i.type === "CITACAO"
-            ? "Citação"
-            : "Intimação",
+        titulo: atoPublicacaoLabel(i.ai_act, i.prazo?.tipo_ato, i.type),
         descricao: i.content_preview,
         meta: `Publicada em ${formatDate(i.published_at)}`,
         responsavel: {

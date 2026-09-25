@@ -12,7 +12,10 @@ import {
   estadoIntimacao,
   type IntimacaoEstado,
 } from "../../intimacoes/lib/estado";
-import { tituloIntimacao } from "../../intimacoes/lib/labels";
+import {
+  atoPublicacaoLabel,
+  tituloIntimacao,
+} from "../../intimacoes/lib/labels";
 import { tipoAtoLabel } from "../../intimacoes/lib/tipo-ato";
 import type {
   IntimacaoCategoriaCoarse,
@@ -128,6 +131,8 @@ export interface PipelineRow {
   meta: string;
   /** O ato/o-que-fazer, rotulado (tipoAtoLabel). */
   ato: string;
+  /** Ato da publicação exibido na linha; não altera o rótulo da peça. */
+  atoPublicacao: string;
   geraPeca: boolean;
   prazo: PipelinePrazo;
   segment: PipelineSegment;
@@ -190,6 +195,7 @@ export function pipelineRow(i: IntimacaoView): PipelineRow {
       .filter(Boolean)
       .join(" · "),
     ato: p?.tipo_ato ? tipoAtoLabel(p.tipo_ato) : "Tipo a definir",
+    atoPublicacao: atoPublicacaoLabel(i.ai_act, i.prazo?.tipo_ato, i.type),
     // Alinhado ao `rec` GUARDADO (só oferece peça com prazo ativo e não-vencido): o badge
     // e o botão inline usam isto, então não sobra "Peça" morto num prazo vencido (QA D4).
     geraPeca: !!rec?.gera_peca,
