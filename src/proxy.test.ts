@@ -1,3 +1,4 @@
+import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { type NextFetchEvent, NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,9 +11,26 @@ vi.mock("@clerk/nextjs/server", () => ({
   createRouteMatcher: () => vi.fn(),
 }));
 
-import proxy from "./proxy";
+import proxy, { config } from "./proxy";
 
 const event = {} as NextFetchEvent;
+
+describe("proxy matcher for the PDF worker", () => {
+  it("serves the public PDF.js module without the authentication proxy", () => {
+    expect(
+      unstable_doesMiddlewareMatch({ config, url: "/pdf.worker.min.mjs" }),
+    ).toBe(false);
+  });
+
+  it.each([
+    "/processos",
+    "/api/private.mjs",
+    "/__clerk/session",
+    "/private.json",
+  ])("keeps %s behind the authentication proxy", (url) => {
+    expect(unstable_doesMiddlewareMatch({ config, url })).toBe(true);
+  });
+});
 
 describe("public marketing boundary", () => {
   beforeEach(() => {
