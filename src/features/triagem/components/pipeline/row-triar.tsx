@@ -367,7 +367,7 @@ export function RowReadonly({
               ·
             </span>
             <span className="text-foreground/70 shrink-0 truncate">
-              {row.atoPublicacao}
+              {row.summary || row.atoPublicacao}
             </span>
             <span
               className="ml-1 inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium"

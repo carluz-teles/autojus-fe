@@ -192,7 +192,6 @@ describe("pipelineRow — chip do brief (P0-2)", () => {
     );
     expect(row.categoriaLabel).toBe("resposta/contestação");
     expect(row.demandLabel).toBe("resposta/contestação");
-    expect(row.requiresWork).toBe(true);
     expect(row.summary).toBe(
       "Sentença de procedência — réu condenado a pagar.",
     );
@@ -208,7 +207,6 @@ describe("pipelineRow — chip do brief (P0-2)", () => {
       }),
     );
     expect(row.categoriaLabel).toBe("ciência");
-    expect(row.requiresWork).toBe(false);
   });
 
   it("demand_kind='undetermined' cai no chip de categoria_coarse (fallback, comportamento atual)", () => {

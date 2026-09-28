@@ -137,8 +137,11 @@ export interface PipelineRow {
   /** Rótulo pt-BR do brief_demand_kind (DEMAND_KIND_LABEL); "" quando não há
    *  brief ainda ou o demand_kind é "undetermined" (P0-2). */
   demandLabel: string;
-  /** brief_requires_work — false = mera ciência (tom neutro do chip). */
-  requiresWork: boolean;
+  // NOTA (review QA 2026-09-28): brief_requires_work NÃO vira campo aqui — o chip
+  // já é sempre neutro/single-tone (CategoriaChip não ramifica por categoria), então
+  // um `requiresWork: boolean` seria plumbed sem nenhum consumidor de UI (dead field
+  // silencioso). O dado cru continua em IntimacaoView.brief_requires_work (P0-1); entra
+  // no PipelineRow quando P1-1 (Disposição, que É onde a spec usa requires_work) precisar.
   /** brief_summary — "o que aconteceu" em 1 linha; "" quando não há brief ainda. */
   summary: string;
   /** Título serif — o mesmo builder do read model (title já vem do BE). */
@@ -222,7 +225,6 @@ export function pipelineRow(i: IntimacaoView): PipelineRow {
     categoria: chipCategoria,
     categoriaLabel: chipLabel,
     demandLabel,
-    requiresWork: i.brief_requires_work,
     summary: i.brief_summary,
     title: tituloIntimacao(i.title),
     meta: [formatarCNJ(i.cnj_number), i.court, grau]
