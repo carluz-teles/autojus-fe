@@ -134,8 +134,13 @@ export interface Draft {
   /** Versão atual persistida (null quando nunca gerou). Usada como
    *  `expected_current_version_id` no generate quando há assessment (OCC). */
   currentVersionId: string | null;
+  qualityAuthorization?: {
+    allowed: boolean;
+    reasonCode: string;
+  } | null;
   authorship: Authorship;
   updatedAt: string;
+  supersededAt?: string | null;
   preamble: DraftPreamble;
   sections: DraftSection[];
   intimation: DraftIntimation;

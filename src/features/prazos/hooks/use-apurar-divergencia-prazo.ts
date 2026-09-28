@@ -35,6 +35,7 @@ export function useApurarDivergenciaPrazo() {
     apurar: mutation.mutate,
     isPending: mutation.isPending,
     error: mutation.error,
+    lastExpectedRevision: mutation.variables?.body.expected_revision ?? null,
     isSuccess: mutation.isSuccess,
   };
 }

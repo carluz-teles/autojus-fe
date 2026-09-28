@@ -64,7 +64,7 @@ const defaultSleep = (ms: number) =>
 
 /**
  * Roda o ciclo completo assessment → generate. Retorna o resultado do generate
- * (202: {updated_at}). Lança AssessmentLifecycleError em qualquer falha, sem
+ * (202: {updated_at?}). Lança AssessmentLifecycleError em qualquer falha, sem
  * jamais chamar generate se a conferência não ficou pronta e validada.
  */
 export async function runAssessmentAndGenerate(
@@ -72,7 +72,7 @@ export async function runAssessmentAndGenerate(
   draftId: string,
   input: AssessmentInput,
   opts: RunAssessmentGenerateOptions,
-): Promise<{ updated_at: string }> {
+): Promise<{ updated_at?: string }> {
   const sleep = opts.sleep ?? defaultSleep;
   const now = opts.now ?? Date.now;
   const interval = opts.pollIntervalMs ?? 1000;

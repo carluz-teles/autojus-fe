@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import type { ProcessoView } from "../types";
 import {
+  assuntosDoProcesso,
+  CLAIM_VALUE_SOURCE_LABEL,
+  CLIENT_ROLE_LABEL,
   linhaProcesso,
   retornoProcessos,
   situacaoProcesso,
@@ -74,5 +77,85 @@ describe("situação do processo", () => {
     expect(situacaoProcesso({ ...processo, lifecycle: "UNKNOWN" }).label).toBe(
       "A verificar",
     );
+  });
+});
+
+// Cockpit R4.2 (P0-3) — rótulos pt-BR de client_role (court_case.client_role) e
+// claim_value_source (court_record.claim_value_source), ambos CHECK constraints
+// de migrations/0180_ingestao_v2_columns.up.sql.
+describe("CLIENT_ROLE_LABEL", () => {
+  // Reviewer (LOW, pré-merge): "UNKNOWN" NÃO entra no mapa — o único consumidor
+  // (processo-hub.tsx) desvia UNKNOWN pra "Não informado" antes de indexar,
+  // então uma entrada UNKNOWN aqui seria morta e duplicaria o mesmo significado
+  // de "ausente" com uma segunda string ("Não identificado"). Só os 3 valores
+  // DETERMINADOS do CHECK de court_case.client_role têm rótulo.
+  it("cobre os 3 valores determinados do CHECK (exclui UNKNOWN, que o consumidor desvia antes)", () => {
+    expect(CLIENT_ROLE_LABEL).toEqual({
+      PLAINTIFF: "Autor(a)",
+      DEFENDANT: "Réu(é)",
+      BOTH: "Autor(a) e réu(é)",
+    });
+  });
+});
+
+describe("CLAIM_VALUE_SOURCE_LABEL", () => {
+  it("cobre os 2 valores do CHECK de court_record.claim_value_source", () => {
+    expect(CLAIM_VALUE_SOURCE_LABEL).toEqual({
+      capa: "Capa do processo",
+      manual: "Informado manualmente",
+    });
+  });
+});
+
+describe("assuntosDoProcesso", () => {
+  const base = { subject: "", subjects: null } as const;
+
+  it("com subjects → chips, um por assunto, na ordem recebida", () => {
+    const r = assuntosDoProcesso({
+      ...base,
+      subjects: [
+        { codigo: 7771, nome: "Indenização por Dano Moral" },
+        { codigo: 7772, nome: "Indenização por Dano Material" },
+      ],
+    });
+    expect(r.chips.map((s) => s.nome)).toEqual([
+      "Indenização por Dano Moral",
+      "Indenização por Dano Material",
+    ]);
+    expect(r.texto).toBe("");
+  });
+
+  it("o rótulo acompanha a cardinalidade (um assunto não lê como vários, nem o contrário)", () => {
+    expect(
+      assuntosDoProcesso({ ...base, subjects: [{ codigo: 1, nome: "A" }] })
+        .label,
+    ).toBe("Assunto");
+    expect(
+      assuntosDoProcesso({
+        ...base,
+        subjects: [
+          { codigo: 1, nome: "A" },
+          { codigo: 2, nome: "B" },
+        ],
+      }).label,
+    ).toBe("Assuntos");
+  });
+
+  it("sem subjects → cai no `subject` legado como TEXTO (processo só-DJEN)", () => {
+    const r = assuntosDoProcesso({
+      subject: "Nota Promissória",
+      subjects: null,
+    });
+    expect(r.chips).toEqual([]);
+    expect(r.texto).toBe("Nota Promissória");
+    expect(r.label).toBe("Assunto");
+  });
+
+  it("array VAZIO é ausência, não 'zero chips' — cai no mesmo fallback do null", () => {
+    expect(assuntosDoProcesso({ subject: "X", subjects: [] }).texto).toBe("X");
+  });
+
+  it("sem nenhum dos dois → ausência explícita", () => {
+    expect(assuntosDoProcesso(base).texto).toBe("Não informado");
   });
 });

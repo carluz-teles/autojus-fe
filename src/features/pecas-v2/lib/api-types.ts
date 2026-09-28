@@ -30,8 +30,13 @@ export interface PecaDetailAPI {
    *  Necessário para o `expected_current_version_id` do generate quando há
    *  assessment ligado (OCC guard). */
   current_version_id: string | null;
+  quality_authorization?: {
+    allowed: boolean;
+    reason_code: string;
+  } | null;
   created_at: string;
   updated_at: string;
+  superseded_at?: string | null;
   structured_content: StructuredContentAPI | null;
   // Fase B do editor rico: HTML do Tiptap. null pra peças legacy ou geradas
   // pela IA antes do 1º save humano. Quando não-null, source-of-truth

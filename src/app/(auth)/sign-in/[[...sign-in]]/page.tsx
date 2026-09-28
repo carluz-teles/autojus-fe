@@ -1,6 +1,7 @@
 import { SignIn } from "@clerk/nextjs";
 
 import { InviteNotice } from "@/features/organization/components/invite-notice";
+import { APP_HOME_PATH } from "@/lib/routes";
 
 export default async function SignInPage({
   searchParams,
@@ -14,7 +15,7 @@ export default async function SignInPage({
   return (
     <div className="flex flex-col items-center gap-5">
       {isInvite ? <InviteNotice mode="sign_in" /> : null}
-      <SignIn />
+      <SignIn forceRedirectUrl={isInvite ? APP_HOME_PATH : undefined} />
     </div>
   );
 }

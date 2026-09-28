@@ -10,7 +10,12 @@ import type {
   PrazoDetalheView,
   PrazoPreviewInput,
   PrazoPreviewResult,
+  PrazoReviewInput,
+  PrazoReviewPreviewInput,
+  PrazoReviewPreviewResult,
+  PrazoReviewResult,
   PrazoStatus,
+  PrazoTipoCatalog,
   PrazoView,
 } from "../types";
 
@@ -66,6 +71,36 @@ export async function getPrazo(
   return fetcher<PrazoDetalheView>(`${ENDPOINT}/${id}`);
 }
 
+export async function getPrazoTipos(
+  fetcher: ApiFetcher,
+  intimationId: string,
+): Promise<PrazoTipoCatalog> {
+  return fetcher<PrazoTipoCatalog>(`${ENDPOINT}/tipos`, {
+    query: { intimation_id: intimationId },
+  });
+}
+
+export async function previewPrazoReview(
+  fetcher: ApiFetcher,
+  body: PrazoReviewPreviewInput,
+): Promise<PrazoReviewPreviewResult> {
+  return fetcher<PrazoReviewPreviewResult>(`${ENDPOINT}/preview`, {
+    method: "POST",
+    body,
+  });
+}
+
+export async function reviewPrazo(
+  fetcher: ApiFetcher,
+  id: string,
+  body: PrazoReviewInput,
+): Promise<PrazoReviewResult> {
+  return fetcher<PrazoReviewResult>(`${ENDPOINT}/${id}/review`, {
+    method: "POST",
+    body,
+  });
+}
+
 /**
  * F2 — o prazo (0 ou 1) derivado de uma intimação. O BE devolve um PageEnvelope
  * filtrado por intimation_id; pegamos o primeiro (ou null quando ainda não derivou).
@@ -97,15 +132,20 @@ export async function previewPrazo(
 }
 
 /**
- * Declara mera ciência — POST /v1/prazos/:id/no-deadline (sem corpo).
- * Transição: qualquer status → NO_DEADLINE.
+ * Declara ausência de prazo/mera ciência — POST /v1/prazos/:id/no-deadline.
+ * A revisão nova envia expected_revision; o servidor valida estado e versão.
  */
 export async function noDeadlinePrazo(
   fetcher: ApiFetcher,
   prazoId: string,
+  expectedRevision?: number,
 ): Promise<void> {
   return fetcher<void>(`${ENDPOINT}/${prazoId}/no-deadline`, {
     method: "POST",
+    body:
+      expectedRevision === undefined
+        ? undefined
+        : { expected_revision: expectedRevision },
   });
 }
 

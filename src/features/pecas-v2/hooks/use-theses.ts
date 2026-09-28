@@ -24,6 +24,7 @@ import { useApi } from "@/lib/api/use-api";
 import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 
 import { runAssessmentAndGenerate } from "../lib/assessment-lifecycle";
+import { extractErrorCode } from "../lib/peca-precondition";
 import { isSelectedForGeneration } from "../lib/thesis-selection";
 import * as svc from "../services/pecas-v2.service";
 import { buildAssessmentInput } from "../services/pecas-v2.service";
@@ -136,7 +137,13 @@ function useGenerateDraft(id: string) {
       );
       // Start polling/streaming immediately, including before the first refetch.
       qc.setQueryData(draftKeys.detail(id), (d: Draft | undefined) =>
-        d ? { ...d, sagaState: "EXTRACTING", updatedAt: result.updated_at } : d,
+        d
+          ? {
+              ...d,
+              sagaState: "EXTRACTING",
+              ...(result.updated_at ? { updatedAt: result.updated_at } : {}),
+            }
+          : d,
       );
       void qc.invalidateQueries({ queryKey: draftKeys.detail(id) });
       void qc.invalidateQueries({ queryKey: thesesKey(id) });
@@ -148,6 +155,7 @@ export interface ThesesController {
   theses: Thesis[];
   isLoading: boolean;
   isError: boolean;
+  errorCode?: string;
   /** Contagem selecionada (included ∪ pending_add). */
   selectedCount: number;
   /** thesisIds a passar pra geração (included ∪ pending_add). */
@@ -156,6 +164,7 @@ export interface ThesesController {
   toggle: (thesis: Thesis) => void;
   /** (Re)gera as teses de forma síncrona (botão "Atualizar" + fallback do stream). */
   regenerate: () => void;
+  regenerateAsync: () => Promise<Thesis[]>;
   isRegenerating: boolean;
   isTogglingId: string | null;
 }
@@ -174,6 +183,7 @@ export function useThesesController(id: string): ThesesController {
     theses,
     isLoading: list.isLoading,
     isError: list.isError || regen.isError,
+    errorCode: extractErrorCode(regen.error),
     selectedCount: selected.length,
     selectedIds: selected.map((t) => t.id),
     toggle: (thesis) =>
@@ -181,6 +191,7 @@ export function useThesesController(id: string): ThesesController {
     regenerate: () => {
       if (!regen.isPending) regen.mutate();
     },
+    regenerateAsync: () => regen.mutateAsync(),
     isRegenerating: regen.isPending,
     isTogglingId: patch.isPending ? (patch.variables?.thesisId ?? null) : null,
   };

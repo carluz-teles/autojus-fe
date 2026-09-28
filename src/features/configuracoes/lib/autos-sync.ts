@@ -15,13 +15,21 @@ export function autosSyncTargets(
   connections: CourtConnectionView[],
   scope: AutosSyncScope,
 ) {
-  if (scope.courtRecordId && !["G1", "JE"].includes(scope.degree ?? ""))
+  // UNKNOWN é o grau de descoberta (DJEN nunca revela o grau — degree=UNKNOWN até
+  // o DATAJUD enriquecer, ver internal/acquisition/enrichment.go) — não uma prova
+  // de portal incompatível. Incluí-lo aqui NÃO amplia suporte: o filtro por
+  // court+system+catalog abaixo continua sendo a única autoridade sobre QUAL
+  // portal sincroniza autos (A2). G2/SUPERIOR continuam de fora (não fazem parte
+  // do achado A1 — sem evidência de que esses graus tenham suporte de autos).
+  if (
+    scope.courtRecordId &&
+    !["G1", "JE", "UNKNOWN"].includes(scope.degree ?? "")
+  )
     return [];
   const seen = new Set<string>();
   return connections.filter((c) => {
     if (
       c.status !== "CONNECTED" ||
-      c.system !== "EPROC" ||
       (scope.court && c.court !== scope.court) ||
       (scope.connectionId && c.id !== scope.connectionId)
     )

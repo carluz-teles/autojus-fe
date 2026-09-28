@@ -59,6 +59,13 @@ export interface PrazoAgendaView extends PrazoView {
 
 // Detalhe (o "por quê" completo): como o prazo foi computado.
 export interface PrazoDetalheView extends PrazoAgendaView {
+  review_revision: number;
+  review: { tipo: DimensionReview; prazo: DimensionReview };
+  current_calculation: CalculationSnapshot | null;
+  calculation_audit_status: "current" | "historical" | "unavailable";
+  tipo_ato_origem: string;
+  provisorio: boolean;
+  no_deadline_reason: string | null;
   reopened_for_review?: boolean;
   start_date: string;
   days: number;
@@ -78,6 +85,84 @@ export interface PrazoDetalheView extends PrazoAgendaView {
   calc_memory?: PrazoCalcMemory | null;
   applied_holiday?: PrazoAppliedHoliday[];
   cross_validation?: PrazoCrossValidation | null;
+}
+
+export interface DimensionReview {
+  status: "pending" | "confirmed" | "not_required";
+  origin: string | null;
+  reason_codes: string[];
+  reason: string;
+  confirmed_by_id: string | null;
+  confirmed_by_name: string | null;
+  confirmed_at: string | null;
+  can_review: boolean;
+}
+
+export interface CalculationSnapshot {
+  schema_version: 1;
+  tipo_ato: string;
+  rito: string;
+  rule_key: string | null;
+  fallback_used: boolean;
+  reason: string | null;
+  source: "rule" | "generic_fallback" | "declared" | "manual" | "no_deadline";
+  protected: boolean;
+  days: number;
+  counting: PrazoCounting;
+  doubled: boolean;
+  manual_extra_days: number;
+  anchor_event: string;
+  start_date: string;
+  end_date: string | null;
+  legal_citation: string | null;
+  holidays_applied: string[];
+  calendar_provider_version: string | null;
+}
+
+export interface PrazoTipoCatalog {
+  rules_version: string;
+  rito: string;
+  items: { key: string; label: string; requires_anchor_review: boolean }[];
+}
+
+export interface ReviewDeadlineInput {
+  days: number;
+  counting: PrazoCounting;
+  doubled: boolean;
+  doubled_reason?: string;
+  anchor_event: PrazoAnchorEvent;
+  manual_extra_days: number;
+}
+
+export type PrazoReviewPreviewInput = {
+  mode: "review";
+  intimation_id: string;
+  expected_revision: number;
+} & (
+  | { dimension: "tipo"; tipo_ato: string }
+  | { dimension: "prazo"; deadline?: ReviewDeadlineInput }
+);
+
+export interface PrazoReviewPreviewResult {
+  review_revision: number;
+  preview_token: string;
+  dimension: "tipo" | "prazo";
+  tipo_ato: string;
+  calculation: CalculationSnapshot;
+  preserved_deadline: boolean;
+  impact_reason: string | null;
+}
+
+export type PrazoReviewInput = {
+  expected_revision: number;
+  preview_token: string;
+} & (
+  | { dimension: "tipo"; tipo_ato: string }
+  | { dimension: "prazo"; deadline?: ReviewDeadlineInput }
+);
+
+export interface PrazoReviewResult {
+  deadline: PrazoDetalheView;
 }
 
 export type PrazoOrigem = "declarado" | "calculado" | "ia" | "divergente";
@@ -130,6 +215,7 @@ type PrazoApurarDivergenciaDecisao =
 export interface PrazoApurarDivergenciaInput {
   decisao: PrazoApurarDivergenciaDecisao;
   end_date?: string;
+  expected_revision: number;
 }
 
 export interface PrazoApurarDivergenciaResult {

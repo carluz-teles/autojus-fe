@@ -1,5 +1,6 @@
 "use client";
 
+import { Dialog } from "@base-ui/react/dialog";
 import {
   AlertCircle,
   CheckCircle2,
@@ -7,7 +8,7 @@ import {
   Plus,
   ShieldCheck,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -15,10 +16,12 @@ import { SkeletonRows } from "@/components/ui/skeletons";
 import {
   useCourtCatalog,
   useCourtConnections,
+  useDeleteCourtConnection,
 } from "@/features/configuracoes/hooks/use-court-connections";
 import { useTestCourtConnection } from "@/features/configuracoes/hooks/use-test-court-connection";
 import {
   connectionForSystem,
+  courtSystemName,
   groupCourtCatalog,
 } from "@/features/configuracoes/lib/court-catalog";
 import type {
@@ -215,16 +218,25 @@ function AutosCard({
     (e) => e.connection_mode !== "PER_OPERATION",
   );
   const conns = connectable.map((e) => connectionForSystem(e, connections));
+  const test = useTestCourtConnection();
   const connected =
     connectable.length > 0 && conns.every((c) => c?.status === "CONNECTED");
   const authenticating = conns.some((c) => c?.status === "AUTHENTICATING");
   const needsAttention =
-    !connected && conns.some((c) => c != null && ATTENTION.includes(c.status));
+    !connected &&
+    (test.isError ||
+      conns.some((c) => c != null && ATTENTION.includes(c.status)));
   const hasFiling = group.systems.some((e) => hasCap(e, "PREPARE_FILING"));
   // "Testar conexão" — re-autentica a conexão eproc (connect = login real no
   // tribunal). Sucesso = conexão verificada agora; reusa o endpoint existente.
-  const test = useTestCourtConnection();
+  const remove = useDeleteCourtConnection();
+  const [removing, setRemoving] = useState<CourtConnectionView | null>(null);
+  const cardRef = useRef<HTMLElement>(null);
+  const removeTriggerRef = useRef<HTMLButtonElement>(null);
   const testConnId = conns.find((c) => c?.status === "CONNECTED")?.id ?? null;
+  const listedConnections = connections.filter(
+    (connection) => connection.court === group.court,
+  );
 
   const statusLabel = !available
     ? "Em preparação"
@@ -264,6 +276,7 @@ function AutosCard({
 
   return (
     <section
+      ref={cardRef}
       aria-label={`Autos · ${group.court}`}
       className="surface-panel relative flex flex-wrap items-center gap-x-4 gap-y-3 overflow-hidden px-4 py-3.5"
     >
@@ -334,7 +347,7 @@ function AutosCard({
                 : authenticating
                   ? "Conectando…"
                   : needsAttention
-                    ? "Retomar conexão"
+                    ? "Tentar novamente"
                     : "Conectar tribunal"}
             </Button>
           </div>
@@ -349,7 +362,8 @@ function AutosCard({
             >
               {test.isPending ? (
                 "Verificando o acesso ao tribunal…"
-              ) : test.isError ? (
+              ) : test.isError ||
+                (test.data && test.data.status !== "CONNECTED") ? (
                 "Não foi possível verificar. Tente de novo."
               ) : (
                 <>
@@ -366,6 +380,91 @@ function AutosCard({
       ) : (
         <StatusPill label="Em breve" tone="neutral" />
       )}
+      {listedConnections.length > 0 ? (
+        <div className="border-line2 flex w-full flex-col gap-2 border-t pt-2.5">
+          {listedConnections.map((connection) => (
+            <div
+              key={connection.id}
+              className="flex flex-wrap items-center justify-between gap-2 text-xs"
+            >
+              <span className="text-fg3">
+                {connection.court} · {courtSystemName(connection.system)}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={remove.isPending}
+                onClick={(event) => {
+                  removeTriggerRef.current = event.currentTarget;
+                  setRemoving(connection);
+                }}
+                aria-label={`Remover conexão ${connection.court} · ${courtSystemName(connection.system)}`}
+              >
+                Remover conexão
+              </Button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <Dialog.Root
+        open={removing !== null}
+        onOpenChange={(open) => {
+          if (!open && !remove.isPending) {
+            setRemoving(null);
+            remove.reset();
+          }
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/30" />
+          <Dialog.Popup
+            finalFocus={() =>
+              removeTriggerRef.current?.isConnected
+                ? removeTriggerRef.current
+                : cardRef.current?.querySelector("button")
+            }
+            className="surface-panel fixed top-1/2 left-1/2 z-40 max-h-[90dvh] w-[480px] max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-xl p-5"
+          >
+            <Dialog.Title className="text-base font-medium">
+              Remover conexão {removing?.court} ·{" "}
+              {removing && courtSystemName(removing.system)}?
+            </Dialog.Title>
+            <Dialog.Description className="text-fg3 mt-2 text-sm leading-relaxed">
+              Os processos e documentos já importados e o certificado serão
+              mantidos.
+            </Dialog.Description>
+            {remove.isError ? (
+              <p role="alert" className="text-destructive mt-3 text-sm">
+                Não foi possível remover a conexão. Tente novamente.
+              </p>
+            ) : null}
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <Button
+                variant="outline"
+                disabled={remove.isPending}
+                onClick={() => {
+                  setRemoving(null);
+                  remove.reset();
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={remove.isPending}
+                onClick={() => {
+                  if (!removing) return;
+                  remove.mutate(removing.id, {
+                    onSuccess: () => setRemoving(null),
+                  });
+                }}
+              >
+                {remove.isPending ? "Removendo…" : "Remover conexão"}
+              </Button>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
     </section>
   );
 }
@@ -448,7 +547,9 @@ export function ConfigTribunais() {
           aberto
           court={selected.court}
           courtName={selected.name}
-          entries={selected.systems.filter((e) => e.available)}
+          entries={selected.systems.filter(
+            (e) => e.available && e.connection_mode !== "PER_OPERATION",
+          )}
           connections={connections.data ?? []}
           onFechar={() => setSelected(null)}
         />

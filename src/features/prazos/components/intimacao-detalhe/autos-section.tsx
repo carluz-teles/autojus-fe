@@ -18,7 +18,7 @@ import {
   PdfDrawer,
 } from "@/features/documentos/components/pdf-drawer";
 import { useDocumentosDoProcesso } from "@/features/documentos/hooks/use-documentos-do-processo";
-import { rotuloTipoAuto } from "@/features/documentos/lib/tipo-autos";
+import { identificarAuto } from "@/features/documentos/lib/tipo-autos";
 
 /**
  * Autos do processo dentro do detalhe da intimação — parte do "ter tudo" na
@@ -58,14 +58,11 @@ export function AutosSection({ processId }: { processId: string }) {
         ) : (
           <div className="flex flex-col divide-y">
             {autos.documentos.map((doc) => {
-              const nome = rotuloTipoAuto(doc.document_type) || doc.title;
-              const meta = [
-                doc.title,
-                doc.pages ? `${doc.pages} pág.` : "",
-                doc.origin === "UPLOAD" ? "Anexo do escritório" : "Autos",
-              ]
-                .filter(Boolean)
-                .join(" · ");
+              // A4 — nome descritivo (tipo) + data na meta pra desambiguar autos
+              // do MESMO tipo. identificarAuto prefere a data JURÍDICA
+              // (court_event_date, agora projetada no DocumentView); sem ela, cai
+              // pra data de captura VISIVELMENTE rotulada, nunca como data do ato.
+              const { nome, meta } = identificarAuto(doc);
               const pronto = doc.status === "READY";
               return (
                 <div

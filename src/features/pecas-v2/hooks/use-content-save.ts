@@ -5,10 +5,15 @@ import { useEffect, useRef, useState } from "react";
 import { useApi } from "@/lib/api/use-api";
 
 import { ContentSaveQueue, type SaveState } from "../lib/content-save-queue";
+import { structuredToHtml } from "../lib/html-adapter";
 import type { Draft } from "../types";
 import { draftKeys } from "./use-draft";
 
-export function useContentSave(id: string, draft: Draft | undefined) {
+export function useContentSave(
+  id: string,
+  draft: Draft | undefined,
+  onHydrate?: (html: string) => void,
+) {
   const fetcher = useApi();
   const qc = useQueryClient();
   const [state, setState] = useState<SaveState>("saved");
@@ -20,6 +25,15 @@ export function useContentSave(id: string, draft: Draft | undefined) {
     }
   });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const baseline = useRef<{
+    version: string | null;
+    revision: string;
+    html: string;
+  } | null>(null);
+  const onHydrateRef = useRef(onHydrate);
+  useEffect(() => {
+    onHydrateRef.current = onHydrate;
+  }, [onHydrate]);
   const key = `peca-recovery:${id}`;
   const [queue] = useState(
     () =>
@@ -30,6 +44,11 @@ export function useContentSave(id: string, draft: Draft | undefined) {
             `/v1/pecas/${id}/content-html`,
             { method: "PUT", body: { content_html: html, revision } },
           );
+          // A GET started before this successful PUT cannot replace its ack.
+          await qc.cancelQueries({
+            queryKey: draftKeys.detail(id),
+            exact: true,
+          });
           return r.data.revision;
         },
         (next, html, revision) => {
@@ -60,14 +79,48 @@ export function useContentSave(id: string, draft: Draft | undefined) {
       ),
   );
   useEffect(() => {
+    const saved = queue.lastSaved;
     if (
-      draft?.contentRevision &&
-      !queue.revision &&
-      draft.sagaState !== "EXTRACTING" &&
-      draft.sagaState !== "CREATED"
+      saved &&
+      saved.revision === queue.revision &&
+      baseline.current &&
+      baseline.current.revision !== saved.revision
     )
-      queue.acknowledge(draft.contentRevision);
-  }, [draft?.contentRevision, draft?.sagaState, queue]);
+      baseline.current = {
+        ...baseline.current,
+        revision: saved.revision,
+        html: saved.html,
+      };
+    if (
+      !draft?.contentRevision ||
+      draft.sagaState === "EXTRACTING" ||
+      draft.sagaState === "CREATED" ||
+      queue.dirty ||
+      queue.state === "error"
+    )
+      return;
+    // Query cache is the freshness owner. A save ack can update it before
+    // this component receives the new prop; do not reapply that old render.
+    const current = qc.getQueryData<Draft>(draftKeys.detail(id));
+    if (current && current !== draft) return;
+    const html =
+      draft.contentHtml ??
+      structuredToHtml({ preamble: draft.preamble, sections: draft.sections });
+    const previous = baseline.current;
+    if (
+      previous?.revision === draft.contentRevision &&
+      previous.version === draft.currentVersionId &&
+      previous.html === html
+    )
+      return;
+    queue.acknowledge(draft.contentRevision);
+    baseline.current = {
+      version: draft.currentVersionId,
+      revision: draft.contentRevision,
+      html,
+    };
+    onHydrateRef.current?.(html);
+  }, [draft, id, qc, queue, state]);
   const flush = () => {
     if (timer.current) clearTimeout(timer.current);
     return queue.flush();

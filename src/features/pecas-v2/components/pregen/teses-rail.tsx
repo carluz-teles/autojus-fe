@@ -43,6 +43,7 @@ export function TesesRail({
   batch,
   isLoading,
   isError,
+  errorMessage,
   onToggle,
   onFonte,
   teorSourceId,
@@ -66,6 +67,7 @@ export function TesesRail({
   selectedCount: number;
   isLoading: boolean;
   isError: boolean;
+  errorMessage?: string;
   onToggle: (t: Thesis) => void | Promise<void>;
   onFonte: (id: string, page?: number) => void;
   teorSourceId: string;
@@ -177,8 +179,8 @@ export function TesesRail({
       </div>
       {isError && (
         <p role="alert" className="text-destructive text-xs">
-          Não foi possível atualizar os fundamentos. Suas escolhas foram
-          preservadas. Tente novamente.
+          {errorMessage ||
+            "Não foi possível atualizar os fundamentos. Suas escolhas foram preservadas. Tente novamente."}
         </p>
       )}
       {batch && theses.length > 0 && (

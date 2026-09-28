@@ -8,15 +8,22 @@
 import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
 import { formatarData } from "@/lib/utils";
 
+import { demandKindLabel } from "../../intimacoes/lib/demand-kind";
 import {
   estadoIntimacao,
   type IntimacaoEstado,
 } from "../../intimacoes/lib/estado";
+import {
+  atoPublicacaoLabel,
+  tituloIntimacao,
+} from "../../intimacoes/lib/labels";
 import { tipoAtoLabel } from "../../intimacoes/lib/tipo-ato";
 import type {
   IntimacaoCategoriaCoarse,
+  IntimacaoDemandKind,
   IntimacaoDisposicao,
   IntimacaoExcecaoMotivo,
+  IntimacaoLifecycle,
   IntimacaoView,
   RecommendedProvidencia,
 } from "../../intimacoes/types";
@@ -34,17 +41,29 @@ export const CATEGORIA_COARSE_LABEL: Record<IntimacaoCategoriaCoarse, string> =
   };
 
 /** Motivo da exceção → texto humano (tooltip do marcador ⚠). "" nunca deveria
- *  chegar aqui (só chamamos quando is_excecao), mas cai num fallback seguro. */
+ *  chegar aqui (só chamamos quando is_excecao), mas cai num fallback seguro.
+ *  `divergente` (prazo), `trabalho_divergente` (obrigação, conflito) e
+ *  `trabalho_nao_identificado` (obrigação, AUSÊNCIA — análise materializada sem
+ *  trabalho/ciência elegível) são motivos DISTINTOS — ver comentário de
+ *  IntimacaoExcecaoMotivo (types.ts) — cada um com o próprio rótulo, sem conflitar. */
 export const EXCECAO_MOTIVO_LABEL: Record<IntimacaoExcecaoMotivo, string> = {
   provisorio: "Prazo provisório (piso supletivo) — confirme a contagem.",
   ia_inferido: "Tipo de ato inferido — revise antes de confirmar.",
+  tipo_pendente: "Tipo de ato ainda precisa ser classificado.",
+  prazo_pendente: "Prazo calculado ainda precisa de revisão.",
   divergente: "Divergência entre a publicação e o cálculo do prazo.",
+  trabalho_divergente:
+    "Divergência entre a classificação da intimação e o trabalho identificado.",
+  trabalho_nao_identificado:
+    "A análise não identificou o trabalho a realizar. Revise o teor da intimação.",
   "": "Precisa de revisão.",
 };
 
-/** Segmento da linha = a DISPOSIÇÃO disjunta do BE (docs/erd-intimacao-triagem §4).
- *  Exceção é seu próprio segmento (disjunto de "trabalhar"), então "Pra trabalhar" não
- *  mistura mais exceção/ciência. Deriva 1:1 de IntimacaoView.disposicao (fonte única do BE). */
+/** Segmento da linha = a DISPOSIÇÃO disjunta do BE (docs/erd-intimacao-triagem §4) —
+ *  TRANSVERSAL a qualquer lifecycle/status (não mais restrita a "A triar"; ver
+ *  IntimacaoDisposicao em types.ts). Exceção é seu próprio segmento (disjunto de
+ *  "trabalhar"), então "Pra trabalhar" não mistura mais exceção/ciência. Deriva 1:1
+ *  de IntimacaoView.disposicao (fonte única do BE). */
 export type PipelineSegment =
   "trabalhar" | "excecao" | "ciencia" | "sem-prazo" | "analisando";
 
@@ -96,20 +115,43 @@ export interface PipelinePrazo {
   provisorio: boolean;
 }
 
-/** Props de uma linha densa da fila "A triar" — o único contrato que os
- *  componentes de apresentação consomem (nada de IntimacaoView solto no JSX). */
+/** Props de uma linha densa da Mesa de Trabalho — o único contrato que os componentes
+ *  de apresentação consomem (nada de IntimacaoView solto no JSX). Não é mais exclusivo
+ *  da fila "A triar": sob status "Abertas"/"Todas" a lista é MISTA (`lifecycle` abaixo
+ *  decide RowTriar × RowReadonly por item, ver triagem-view.tsx). */
 export interface PipelineRow {
   id: string;
+  /** Lane de ciclo de vida DESTA linha (a_triar|em_andamento|concluido) — dirige a
+   *  escolha de linha (RowTriar × RowReadonly) em vistas MISTAS (status "Abertas"/
+   *  "Todas" combinam lifecycles numa só lista; a escolha é por item, não por aba). */
+  lifecycle: IntimacaoLifecycle;
   /** Deep-link ao processo/intimação. */
   courtRecordId: string;
+  /** Rótulo do chip primário da linha — brief_demand_kind (P0-2) quando presente
+   *  e determinado, senão o rótulo de categoria_coarse (fallback, comportamento
+   *  anterior à P0-2). */
   categoriaLabel: string;
-  categoria: IntimacaoCategoriaCoarse;
+  /** Valor por trás de `categoriaLabel`, só pro atributo `data-categoria` do chip
+   *  (nenhuma lógica de UI ramifica nele). */
+  categoria: IntimacaoCategoriaCoarse | IntimacaoDemandKind;
+  /** Rótulo pt-BR do brief_demand_kind (DEMAND_KIND_LABEL); "" quando não há
+   *  brief ainda ou o demand_kind é "undetermined" (P0-2). */
+  demandLabel: string;
+  // NOTA (review QA 2026-09-28): brief_requires_work NÃO vira campo aqui — o chip
+  // já é sempre neutro/single-tone (CategoriaChip não ramifica por categoria), então
+  // um `requiresWork: boolean` seria plumbed sem nenhum consumidor de UI (dead field
+  // silencioso). O dado cru continua em IntimacaoView.brief_requires_work (P0-1); entra
+  // no PipelineRow quando P1-1 (Disposição, que É onde a spec usa requires_work) precisar.
+  /** brief_summary — "o que aconteceu" em 1 linha; "" quando não há brief ainda. */
+  summary: string;
   /** Título serif — o mesmo builder do read model (title já vem do BE). */
   title: string;
   /** Meta mono: "CNJ · Tribunal · Grau". */
   meta: string;
   /** O ato/o-que-fazer, rotulado (tipoAtoLabel). */
   ato: string;
+  /** Ato da publicação exibido na linha; não altera o rótulo da peça. */
+  atoPublicacao: string;
   geraPeca: boolean;
   prazo: PipelinePrazo;
   segment: PipelineSegment;
@@ -151,7 +193,8 @@ export function pipelineRow(i: IntimacaoView): PipelineRow {
   // document_type disser ciência num item que o motor marcou acionável (ex.: Ato ordinatório
   // com "manifeste-se"), mostramos o ATO. Analisando (motor não classificou) vira chip neutro.
   const acionavel = i.disposicao === "trabalho" || i.disposicao === "excecao";
-  let chipCategoria: IntimacaoCategoriaCoarse = i.categoria_coarse;
+  let chipCategoria: IntimacaoCategoriaCoarse | IntimacaoDemandKind =
+    i.categoria_coarse;
   let chipLabel =
     CATEGORIA_COARSE_LABEL[i.categoria_coarse] ?? CATEGORIA_COARSE_LABEL.outros;
   if (i.disposicao === "analisando") {
@@ -161,16 +204,34 @@ export function pipelineRow(i: IntimacaoView): PipelineRow {
     chipCategoria = "manifestacao";
     chipLabel = p?.tipo_ato ? tipoAtoLabel(p.tipo_ato) : "Providência";
   }
+  // Brief (P0-2, design §8): o demand_kind do brief é o chip PRIMÁRIO da Triagem —
+  // mais específico do que a categoria coarse determinística. Some por cima da
+  // derivação acima (inclusive do caso "Analisando": um brief já materializado
+  // conta mais do que o motor de prazo ainda não ter classificado). FALLBACK pro
+  // chip de categoria_coarse só quando brief_demand_kind é "" (sem brief ainda)
+  // ou "undetermined" (brief não conseguiu determinar a demanda).
+  const demandLabel =
+    i.brief_demand_kind && i.brief_demand_kind !== "undetermined"
+      ? demandKindLabel(i.brief_demand_kind)
+      : "";
+  if (demandLabel) {
+    chipCategoria = i.brief_demand_kind as IntimacaoDemandKind;
+    chipLabel = demandLabel;
+  }
   return {
     id: i.id,
+    lifecycle: i.lifecycle,
     courtRecordId: i.court_record_id,
     categoria: chipCategoria,
     categoriaLabel: chipLabel,
-    title: i.title.replace(/\s*·\s*$/, ""),
+    demandLabel,
+    summary: i.brief_summary,
+    title: tituloIntimacao(i.title),
     meta: [formatarCNJ(i.cnj_number), i.court, grau]
       .filter(Boolean)
       .join(" · "),
     ato: p?.tipo_ato ? tipoAtoLabel(p.tipo_ato) : "Tipo a definir",
+    atoPublicacao: atoPublicacaoLabel(i.ai_act, i.prazo?.tipo_ato, i.type),
     // Alinhado ao `rec` GUARDADO (só oferece peça com prazo ativo e não-vencido): o badge
     // e o botão inline usam isto, então não sobra "Peça" morto num prazo vencido (QA D4).
     geraPeca: !!rec?.gera_peca,

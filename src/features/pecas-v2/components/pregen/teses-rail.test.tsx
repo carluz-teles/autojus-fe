@@ -148,3 +148,26 @@ describe("TesesRail streaming", () => {
     expect(html).not.toContain("Lendo os autos e gerando fundamentos…");
   });
 });
+
+it("shows a validation error beside preserved authoritative cards", () => {
+  const html = renderToStaticMarkup(
+    <TesesRail
+      theses={[{ ...thesis, id: "persisted-1", state: "included" }]}
+      selectedCount={1}
+      isLoading={false}
+      isError
+      errorMessage="Uma sugestão citou trecho ausente das fontes consultadas."
+      isRegenerating={false}
+      teorSourceId="origin-1"
+      onToggle={() => {}}
+      onFonte={() => {}}
+      onRegenerate={() => {}}
+    />,
+  );
+  expect(html).toContain("Fundamento sugerido");
+  expect(html).toContain(
+    "Uma sugestão citou trecho ausente das fontes consultadas.",
+  );
+  expect(html).toContain('role="alert"');
+  expect(html).toContain("Tentar atualizar fundamentos novamente");
+});

@@ -26,11 +26,12 @@
 //   thesis   {…, n}           → mapeia e acrescenta um card (id local `stream-${n}`)
 //   review   {kept, order}    → poda cards fora de `kept` e reordena por `order`
 //   done     {data:[…]}       → substitui pela lista autoritativa (ids reais) + fecha
-//   error    {message}        → status "error", MANTÉM os cards já mostrados
+//   error    {message,code?}  → status "error", MANTÉM os cards já mostrados
 //
 // DEGRADAÇÃO: se o stream falhar ANTES da 1ª tese (token/SSE bloqueado), o
-// consumer cai no POST síncrono existente. Se falhar DEPOIS (≥1 card), mantém
-// os cards + erro inline. O flag `hadThesis` distingue os dois no callback.
+// consumer cai no POST síncrono existente, exceto erro de validação codificado.
+// Se falhar DEPOIS (≥1 card), mantém os cards + erro inline. O flag `hadThesis`
+// distingue os dois no callback.
 
 import { useAuth } from "@clerk/nextjs";
 import { useEffect, useRef, useState } from "react";
@@ -40,6 +41,7 @@ import type { ThesisAPI } from "../lib/api-types";
 import type { Thesis } from "../types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+export const THESIS_EVIDENCE_INVALID_CODE = "thesis_evidence_invalid";
 
 type ThesesStreamStatus = "idle" | "streaming" | "done" | "error";
 
@@ -51,14 +53,15 @@ export interface ThesesStreamState {
   status: ThesesStreamStatus;
   /** Mensagem de erro (evento `error`), quando houver. */
   error?: string;
+  errorCode?: string;
 }
 
 export interface UseThesesStreamOptions {
   enabled: boolean;
   /** Recebe a lista autoritativa (ids reais) no `done` — o consumer semeia o cache. */
   onDone?: (theses: Thesis[]) => void;
-  /** Erro do stream. `hadThesis=false` → falha PRÉ-1ª-tese → cair no POST síncrono. */
-  onError?: (hadThesis: boolean, message?: string) => void;
+  /** Erro do stream; o consumidor separa validação codificada de transporte. */
+  onError?: (hadThesis: boolean, message?: string, code?: string) => void;
 }
 
 interface ThesisFrameAPI extends ThesisAPI {
@@ -132,6 +135,7 @@ export function useThesesStream(
     if (!opts.enabled) return;
 
     let cancelled = false;
+    let finished = false;
     let es: EventSource | null = null;
     // Rastreia se já vimos ≥1 tese — decide a degradação no erro.
     let hadThesis = false;
@@ -188,7 +192,8 @@ export function useThesesStream(
       });
 
       es.addEventListener("done", (e: MessageEvent) => {
-        if (cancelled) return;
+        if (cancelled || finished) return;
+        finished = true;
         const { data } = JSON.parse(e.data as string) as { data: ThesisAPI[] };
         const authoritative = (data ?? []).map(mapThesisFromApi);
         setState((s) => ({ ...s, theses: authoritative, status: "done" }));
@@ -197,25 +202,37 @@ export function useThesesStream(
       });
 
       es.addEventListener("error", (e: MessageEvent) => {
-        if (cancelled) return;
+        if (cancelled || finished) return;
+        finished = true;
         // Evento `error` de aplicação (com data JSON) — distinto do onerror de
         // transporte. Mantém os cards já mostrados.
         let message: string | undefined;
+        let code: string | undefined;
         try {
-          message = (JSON.parse(e.data as string) as { message?: string })
-            .message;
+          const payload = JSON.parse(e.data as string) as {
+            message?: string;
+            code?: string;
+          };
+          message = payload.message;
+          code = typeof payload.code === "string" ? payload.code : undefined;
         } catch {
           message = undefined;
         }
-        setState((s) => ({ ...s, status: "error", error: message }));
-        onErrorRef.current?.(hadThesis, message);
+        setState((s) => ({
+          ...s,
+          status: "error",
+          error: message,
+          errorCode: code,
+        }));
+        onErrorRef.current?.(hadThesis, message, code);
         es?.close();
       });
 
       es.onerror = () => {
         // Falha de transporte. Se ainda não chegou nenhuma tese, sinaliza a
         // degradação pro POST síncrono; senão o EventSource tenta reconectar.
-        if (cancelled || hadThesis) return;
+        if (cancelled || finished || hadThesis) return;
+        finished = true;
         setState((s) => ({ ...s, status: "error" }));
         onErrorRef.current?.(false);
         es?.close();

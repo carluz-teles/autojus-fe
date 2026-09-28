@@ -5,6 +5,7 @@ export class ContentSaveQueue {
   private running: Promise<void> | null = null;
   state: SaveState = "saved";
   error: unknown;
+  lastSaved: { html: string; revision: string } | null = null;
   constructor(
     public revision: string,
     private save: (html: string, revision: string) => Promise<string>,
@@ -44,6 +45,7 @@ export class ContentSaveQueue {
       this.notify(this.state);
       try {
         this.revision = await this.save(html, this.revision);
+        this.lastSaved = { html, revision: this.revision };
         this.error = undefined;
         this.state = this.pending === null ? "saved" : "dirty";
         this.notify(this.state, html, this.revision);

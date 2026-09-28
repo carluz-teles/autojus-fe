@@ -17,6 +17,7 @@ export function notificationHref(
   // A antiga "primeira importação" foi absorvida por Configurações › Fontes de dados
   // (Tribunais cobre certificado/2FA). Notificações legadas apontam pro novo destino.
   if (href === "/primeira-importacao") return "/configuracoes?tab=fontes";
+  if (href === "/configuracoes?tab=fontes") return href;
   if (typeof href === "string" && ALLOWED_DESTINATION.test(href)) return href;
   // Legacy rows predate href. Only use an actual entity UUID, never deadline_id.
   // action_item não tem tela própria (a intimação é a unidade): notificações de

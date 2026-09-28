@@ -170,8 +170,8 @@ export async function generateDraft(
   instructions?: string,
   assessment?: GenerateAssessmentBinding,
   replacement?: { revision: string },
-): Promise<{ updated_at: string }> {
-  const response = await fetcher<DataEnvelope<{ updated_at: string }>>(
+): Promise<{ updated_at?: string }> {
+  const response = await fetcher<DataEnvelope<{ updated_at?: string }>>(
     `${ENDPOINT}/${id}/generate`,
     {
       method: "POST",

@@ -65,34 +65,62 @@ export function ShellBackLink({
 const PAGE_BACKDROP =
   "radial-gradient(ellipse 70% 40% at 50% -6%, color-mix(in oklch, var(--primary) 6%, transparent), transparent 60%), radial-gradient(ellipse 46% 36% at 100% 0%, color-mix(in oklch, var(--gold) 4%, transparent), transparent 55%)";
 
-/** O shell tem uma única área de rolagem; o cabeçalho permanece visível. */
+/**
+ * O shell tem uma única área de rolagem; o cabeçalho permanece visível.
+ *
+ * `fill` (mesa-detalhe): quando a tela é um layout mestre-detalhe, o PageFrame
+ * NÃO é o scrollport — a região de conteúdo vira um contêiner de altura definida
+ * (`flex-1 min-h-0`, sem `overflow-y-auto` e sem `data-slot="page-content"`), e
+ * a lista filha declara seu scrollport com `data-slot="page-content"`.
+ * A lista infinita não estica o body; a prévia ocupa a altura disponível com
+ * rolagem independente no corpo e CTAs fixos fora dele.
+ */
 export function PageFrame({
   header,
   toolbar,
   children,
+  fill = false,
 }: {
   header: ReactNode;
   toolbar?: ReactNode;
   children: ReactNode;
+  fill?: boolean;
 }) {
+  const backdrop = {
+    backgroundColor:
+      "color-mix(in oklch, var(--primary) 2.5%, var(--background))",
+    backgroundImage: PAGE_BACKDROP,
+    backgroundAttachment: "local" as const,
+    backgroundRepeat: "no-repeat",
+  };
   return (
     <div className="text-foreground flex min-h-0 min-w-0 flex-1 flex-col text-[13px]">
       <ShellHeader>{header}</ShellHeader>
-      {toolbar}
-      {/* Contém também os rótulos sr-only, que usam position: absolute. */}
-      <div
-        data-slot="page-content"
-        className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain"
-        style={{
-          backgroundColor:
-            "color-mix(in oklch, var(--primary) 2.5%, var(--background))",
-          backgroundImage: PAGE_BACKDROP,
-          backgroundAttachment: "local",
-          backgroundRepeat: "no-repeat",
-        }}
-      >
-        {children}
-      </div>
+      {fill && toolbar ? (
+        <div data-slot="workspace-toolbar" className="shrink-0">
+          {toolbar}
+        </div>
+      ) : (
+        toolbar
+      )}
+      {fill ? (
+        // Contêiner bounded: os filhos são os donos do overflow (scroll próprio).
+        <div
+          className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+          style={backdrop}
+        >
+          {children}
+        </div>
+      ) : (
+        // Scrollport único da tela. Contém também os rótulos sr-only (absolute).
+        <div
+          data-slot="page-content"
+          className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain"
+          style={backdrop}
+        >
+          {children}
+        </div>
+      )}
     </div>
   );
 }

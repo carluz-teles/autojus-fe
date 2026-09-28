@@ -1,97 +1,146 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import type { PrazoDetalheView } from "../../types";
+import type { CalculationSnapshot, PrazoDetalheView } from "../../types";
 import { ExplicacaoPrazo } from "./explicacao-prazo";
 
-const prazo = {
-  status: "PENDING",
-  origem: "ia",
-  confirmed: false,
-  start_date: "2026-08-14",
-  end_date: "2026-09-08",
+const calc: CalculationSnapshot = {
+  schema_version: 1,
+  tipo_ato: "manifestacao",
+  rito: "comum_civel",
+  rule_key: "manifestacao",
+  fallback_used: false,
+  reason: "Comando explícito na publicação",
+  source: "rule",
+  protected: false,
   days: 15,
   counting: "BUSINESS",
   doubled: false,
   manual_extra_days: 0,
-  calc_memory: {
-    prazo_base: "15 dias",
-    prazo_base_fonte: "Regra registrada para manifestação",
-    termo_inicial_regra: "Exclusão do dia de início",
-    dias_uteis: true,
-  },
-  applied_holiday: [{ data: "2026-09-07", nome: "Feriado registrado" }],
+  anchor_event: "PUBLISHED",
+  start_date: "2026-08-14",
+  end_date: "2026-09-08",
+  legal_citation: "Regra registrada para manifestação",
+  holidays_applied: ["2026-09-07"],
+  calendar_provider_version: null,
+};
+const prazo = {
+  status: "PENDING",
+  current_calculation: calc,
+  calculation_audit_status: "current",
 } as PrazoDetalheView;
-const render = (overrides: Partial<PrazoDetalheView> = {}, estado = "ia") =>
+const render = (
+  overrides: Partial<PrazoDetalheView> = {},
+  declaredDeadlineDays: number | null = null,
+) =>
   renderToStaticMarkup(
-    <ExplicacaoPrazo prazo={{ ...prazo, ...overrides }} estado={estado} />,
+    <ExplicacaoPrazo
+      prazo={{ ...prazo, ...overrides }}
+      estado="ia"
+      declaredDeadlineDays={declaredDeadlineDays}
+    />,
   );
 
-describe("ExplicacaoPrazo", () => {
-  it("explica os dados registrados sem esconder o cálculo numa expansão", () => {
+describe("ExplicacaoPrazo — memória corrente", () => {
+  it("explica a contagem a partir do snapshot corrente", () => {
     const html = render();
-    expect(html).toContain("Por que essa data?");
     expect(html).toContain("14/08/2026");
     expect(html).toContain("15 dias úteis");
     expect(html).toContain("08/09/2026");
-    expect(html).toContain("Exclusão do dia de início");
     expect(html).toContain("Regra registrada para manifestação");
     expect(html).toContain("1 feriado(s)");
-    expect(html).toContain(
-      "justificativa específica da classificação do ato não foi registrada",
-    );
     expect(html).not.toContain("<details");
   });
   it("distingue duração declarada de tipo inferido", () => {
-    const html = render({ origem: "declarado" });
-    expect(html).toContain("extraída da publicação");
+    const html = render({
+      current_calculation: {
+        ...calc,
+        source: "declared",
+        legal_citation: null,
+      },
+    });
+    expect(html).toContain("informada na publicação");
     expect(html).toContain("Publicação de origem");
     expect(html).not.toContain("Regra registrada para manifestação");
-    expect(html).toContain("classificação do ato não foi registrada");
-    expect(html).not.toContain(
-      "regra de prazo foi aplicada a um tipo de ato sugerido",
-    );
   });
-  it("não inventa fundamento quando a memória está ausente", () => {
-    const html = render({ calc_memory: null, legal_citation: "" });
-    expect(html).toContain("Fundamentação da duração não disponível");
-    expect(html).toContain("Memória detalhada indisponível");
-    expect(html).toContain("Regra de início não registrada");
-  });
-  it("usa os dados revisados, não a memória anterior", () => {
+  it("não apresenta memória histórica como cálculo atual", () => {
     const html = render({
-      confirmed: true,
-      days: 8,
-      counting: "CALENDAR",
-      legal_citation: "Referência revisada",
-      holidays_applied: [],
+      current_calculation: null,
+      calculation_audit_status: "historical",
+      calc_memory: {
+        prazo_base: "5 dias",
+        prazo_base_fonte: "Regra antiga",
+        termo_inicial_regra: "Antigo",
+        dias_uteis: true,
+      },
     });
-    expect(html).toContain("8 dias corridos");
-    expect(html).toContain("Referência revisada");
-    expect(html).toContain("0 feriado(s)");
-    expect(html).not.toContain("Regra registrada para manifestação");
-    expect(html).not.toContain("Exclusão do dia de início");
+    expect(html).toContain("memória disponível é histórica");
+    expect(html).not.toContain("5 dias");
+    expect(html).not.toContain("Regra antiga");
   });
-  it("não apresenta uma data escolhida como resultado de nova contagem", () => {
+  it("dados atuais indisponíveis são declarados como tal", () => {
     const html = render({
-      cross_validation: {
-        decisao: "ajuste_manual",
-      } as PrazoDetalheView["cross_validation"],
+      current_calculation: null,
+      calculation_audit_status: "unavailable",
     });
-    expect(html).toContain("escolhido diretamente na apuração");
-    expect(html).not.toContain("Etapas do cálculo");
-    expect(html).not.toContain("Fonte da duração");
+    expect(html).toContain("memória do cálculo atual não está disponível");
+    expect(html).not.toContain("Etapas do cálculo registrado");
   });
-  it("preserva ajustes e aponta divergência", () => {
+  it("data protegida e fallback ficam explícitos", () => {
+    const html = render({
+      current_calculation: {
+        ...calc,
+        source: "generic_fallback",
+        fallback_used: true,
+        protected: true,
+      },
+    });
+    expect(html).toContain("regra genérica");
+    expect(html).toContain("protegida");
+  });
+  it("não fabrica cálculo para ausência de prazo", () => {
+    expect(render({ status: "NO_DEADLINE" })).toBe("");
+  });
+});
+
+// P1-1 · prazo DECLARADO no teor (brief_declared_deadline_days) × contagem do
+// motor. O valor só vira texto quando DIVERGE: coincidindo, "Contagem: N dias"
+// já diz o mesmo e a repetição seria ruído (e pior, pareceria confirmação
+// independente de um número que é o MESMO dado).
+describe("ExplicacaoPrazo — prazo declarado no teor", () => {
+  it("declarado DIFERE da contagem → avisa a divergência com os dois números", () => {
+    const html = render({}, 5);
+    expect(html).toContain("O teor declara 5 dia(s)");
+    expect(html).toContain("(15)");
+  });
+
+  it("declarado IGUAL à contagem → não repete a informação", () => {
+    const html = render({}, 15);
+    expect(html).not.toContain("O teor declara");
+  });
+
+  it("sem brief (null) → nenhuma menção ao prazo declarado", () => {
+    const html = render();
+    expect(html).not.toContain("O teor declara");
+  });
+
+  // Caso REAL do banco (intimação fcae947a, prazo declarado/OPEN): o motor não
+  // gravou snapshot de cálculo. Sem esta ramificação o único dado de duração
+  // que existe — o que o próprio teor declara — nunca apareceria na tela.
+  it("sem memória de cálculo → informa o prazo declarado (é a única duração conhecida)", () => {
     const html = render(
-      { origem: "divergente", doubled: true, manual_extra_days: 2 },
-      "divergente",
+      { current_calculation: null, calculation_audit_status: "unavailable" },
+      10,
     );
-    expect(html).toContain("diverge do cálculo");
-    expect(html).toContain("Prazo em dobro registrado");
-    expect(html).toContain("2 dia(s) adicional(is)");
+    expect(html).toContain("O teor declara 10 dia(s) de prazo");
+    expect(html).not.toContain("diferente da contagem");
   });
-  it("não fabrica um cálculo para intimação sem prazo", () => {
-    expect(render({ status: "NO_DEADLINE" }, "a_classificar")).toBe("");
+
+  it("sem memória de cálculo e sem brief → segue sem nenhuma linha de prazo declarado", () => {
+    const html = render({
+      current_calculation: null,
+      calculation_audit_status: "unavailable",
+    });
+    expect(html).not.toContain("O teor declara");
   });
 });

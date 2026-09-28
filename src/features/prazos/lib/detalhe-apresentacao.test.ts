@@ -6,10 +6,36 @@ import {
   documentoOrigemUrl,
   feriadosVigentes,
   formatarCNJ,
+  motivoRevisaoLabel,
+  origemRevisaoLabel,
   situacaoRevisao,
+  tipoRevisaoLabel,
 } from "./detalhe-apresentacao";
 
 describe("apresentação do detalhe", () => {
+  it("apresenta origem e tipo legíveis sem exibir enums crus", () => {
+    expect(origemRevisaoLabel("generic_fallback")).toBe(
+      "Base genérica provisória",
+    );
+    expect(origemRevisaoLabel("declared")).toBe("Informado na publicação");
+    expect(origemRevisaoLabel("manual")).toBe("Ajustado manualmente");
+    expect(origemRevisaoLabel("unexpected_origin")).toBe(
+      "Origem não informada",
+    );
+    expect(
+      tipoRevisaoLabel(
+        "impugnacao_cumprimento",
+        "Impugnação ao cumprimento de sentença",
+      ),
+    ).toBe("Impugnação ao cumprimento de sentença");
+    expect(tipoRevisaoLabel("impugnacao_cumprimento")).toBe("Tipo registrado");
+    expect(
+      motivoRevisaoLabel(
+        "generic_fallback",
+        "Base genérica ou provisória requer revisão.",
+      ),
+    ).toBe("Confira a contagem antes de confirmar.");
+  });
   it("não apresenta ciência com prazo ativo como classificação aceita", () => {
     const p = {
       status: "OPEN",
@@ -25,10 +51,12 @@ describe("apresentação do detalhe", () => {
       situacaoRevisao({ ...p, confirmed: true }, "declarado").pendente,
     ).toBe(false);
   });
-  it("preserva nomes só dos feriados que continuam no cálculo revisado", () => {
+  it("mostra apenas feriados do snapshot corrente, sem nomes da memória histórica", () => {
     const p = {
-      confirmed: true,
-      holidays_applied: ["2026-09-07T00:00:00Z", "2026-09-10"],
+      calculation_audit_status: "current",
+      current_calculation: {
+        holidays_applied: ["2026-09-07T00:00:00Z", "2026-09-10"],
+      },
       applied_holiday: [
         {
           data: "2026-09-07",
@@ -39,9 +67,12 @@ describe("apresentação do detalhe", () => {
       ],
     } as PrazoDetalheView;
     expect(feriadosVigentes(p).map((h) => h.nome)).toEqual([
-      "Independência do Brasil",
+      "Feriado ou suspensão",
       "Feriado ou suspensão",
     ]);
+    expect(
+      feriadosVigentes({ ...p, calculation_audit_status: "historical" }),
+    ).toEqual([]);
   });
   it("não confunde revisão humana com cumprimento nem oculta divergência", () => {
     const p = { confirmed: true, status: "OPEN" } as PrazoDetalheView;
@@ -99,6 +130,75 @@ describe("apresentação do detalhe", () => {
       } as PrazoDetalheView),
     ).toBe(false);
   });
+  // Caso real 018f8dd1: deadline OPEN, tipo_ato='indeterminado', selo='a_apurar'
+  // (piso supletivo CPC 218§3), confirmacao_exigida=true, 0 action_items.
+  // EXCEÇÃO DE CLASSIFICAÇÃO — não "Revisão pendente" genérico (que soava como
+  // alarme sem causa) nem "Sem pendência" cosmético (a exceção é real).
+  it("prazo assumido pelo piso supletivo com tipo indeterminado → causa específica, nunca genérica nem cosmética", () => {
+    const p = {
+      status: "OPEN",
+      tipo_ato: "indeterminado",
+      selo: "a_apurar",
+      confirmacao_exigida: true,
+      confirmed: false,
+    } as PrazoDetalheView;
+    expect(situacaoRevisao(p, "manual")).toEqual({
+      label: "Tipo do ato não identificado",
+      pendente: true,
+    });
+  });
+
+  it("selo='a_apurar' sem tipo indeterminado → NÃO usa a causa de classificação (não é esse padrão)", () => {
+    const p = {
+      status: "OPEN",
+      tipo_ato: "apelacao",
+      selo: "a_apurar",
+      confirmacao_exigida: true,
+      confirmed: false,
+    } as PrazoDetalheView;
+    expect(situacaoRevisao(p, "manual").label).not.toBe(
+      "Tipo do ato não identificado",
+    );
+  });
+
+  it("tipo indeterminado com selo='confiavel' (não é o padrão supletivo/a_apurar) → NÃO usa a causa de classificação", () => {
+    const p = {
+      status: "OPEN",
+      tipo_ato: "indeterminado",
+      selo: "confiavel",
+      confirmacao_exigida: true,
+      confirmed: false,
+    } as PrazoDetalheView;
+    expect(situacaoRevisao(p, "manual").label).not.toBe(
+      "Tipo do ato não identificado",
+    );
+  });
+
+  // Pós-Confirm (018f8dd1 resolvido): BE a89 corrige `provisorio=false` e o
+  // Confirm real grava `tipo_ato` válido + `selo='confiavel'` + `confirmed_by`.
+  // `origem` continua HISTÓRICO ("supletivo" no payload real do BE) — este
+  // predicado nunca leu `origem` (só `selo`+`tipo_ato`), então não importa que
+  // ele permaneça "supletivo" para sempre; a causa/pendência têm de sumir
+  // porque as condições reais (`selo`, `tipo_ato`) mudaram, não porque
+  // fingimos que a origem histórica virou outra coisa.
+  it("pós-Confirm (tipo válido, selo='confiavel', confirmed) → motivo específico NÃO trava, mesmo com origem historicamente supletiva", () => {
+    const pos = {
+      status: "OPEN",
+      tipo_ato: "apelacao",
+      selo: "confiavel",
+      confirmacao_exigida: false,
+      confirmed: true,
+      confirmed_by_name: "Dra. Fulana",
+      confirmed_at: "2026-09-23T10:00:00Z",
+      // origem permanece histórica no BE real ("supletivo") — não modelado
+      // aqui de propósito: o predicado não lê `origem`, então omiti-lo prova
+      // que o resultado não depende dele.
+    } as PrazoDetalheView;
+    const r = situacaoRevisao(pos, "manual");
+    expect(r.label).not.toBe("Tipo do ato não identificado");
+    expect(r.pendente).toBe(false);
+  });
+
   it("formata o CNJ e só oferece documentos com URL http(s)", () => {
     expect(formatarCNJ("40127327120268260506")).toBe(
       "4012732-71.2026.8.26.0506",

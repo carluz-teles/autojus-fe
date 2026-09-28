@@ -32,7 +32,12 @@ import { Responsavel } from "@/features/organization/components/responsavel";
 import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
 import { ProximoPassoCard } from "@/features/processos/components/proximo-passo-card";
 import { ProcessoSituacao } from "@/features/processos/components/situacao-processo";
-import { FASE_STEPS } from "@/features/processos/lib/apresentacao";
+import {
+  assuntosDoProcesso,
+  CLAIM_VALUE_SOURCE_LABEL,
+  CLIENT_ROLE_LABEL,
+  FASE_STEPS,
+} from "@/features/processos/lib/apresentacao";
 import type { ProcessoPhase } from "@/features/processos/types";
 import { formatDate } from "@/lib/format";
 
@@ -175,6 +180,10 @@ export function ProcessoHub({ numero }: { numero: string }) {
   const uploadInput = useRef<HTMLInputElement>(null);
   const p = h.processo;
   const identity = h.identity;
+  // Assuntos (chips × texto legado × ausência) decididos numa fonte só — a
+  // Ficha abaixo só renderiza o resultado. `p` ainda pode não ter carregado:
+  // o objeto vazio resolve para "Não informado", igual ao processo sem dado.
+  const assuntos = assuntosDoProcesso(p ?? { subject: "", subjects: null });
   return (
     <PageFrame
       header={
@@ -637,9 +646,62 @@ export function ProcessoHub({ numero }: { numero: string }) {
                     />
                   </div>
                   <dl className="flex flex-col gap-3 border-t pt-3">
-                    <Fato label="Assunto">{p.subject || "Não informado"}</Fato>
+                    <Fato label="Cliente">
+                      {p.client_role && p.client_role !== "UNKNOWN" ? (
+                        <Badge variant="default">
+                          {CLIENT_ROLE_LABEL[p.client_role]}
+                        </Badge>
+                      ) : (
+                        "Não informado"
+                      )}
+                    </Fato>
+                    <Fato label="Magistrado">
+                      {p.magistrate || "Não informado"}
+                    </Fato>
+                    <Fato label="Comarca">
+                      {p.comarca_name || "Não informado"}
+                    </Fato>
+                    {/* Assuntos CNJ (court_record.subjects, migration 0180) —
+                        CHIPS, não texto corrido: são itens DISCRETOS de um
+                        conjunto e um processo pode ter meia dúzia, que como
+                        parágrafo separado por vírgula vira um bloco ilegível
+                        (não dá pra dizer onde um assunto termina e o outro
+                        começa — "Indenização por Dano Moral, Indenização por
+                        Dano Material"). O Badge é `whitespace-nowrap h-5` por
+                        default, o que CORTARIA nomes longos na coluna estreita
+                        da Ficha (~228px): aqui ele quebra linha
+                        (`h-auto whitespace-normal`) porque nome de assunto é
+                        informação jurídica e não pode ser truncado.
+                        `subject` (coluna legada, string única) segue como
+                        fallback do processo sem enriquecimento. */}
+                    <Fato label={assuntos.label}>
+                      {assuntos.chips.length > 0 ? (
+                        <span className="flex flex-wrap gap-1.5">
+                          {assuntos.chips.map((s, i) => (
+                            <Badge
+                              key={`${s.codigo}-${i}`}
+                              variant="outline"
+                              className="h-auto max-w-full rounded-md py-0.5 text-left leading-snug whitespace-normal"
+                            >
+                              {s.nome}
+                            </Badge>
+                          ))}
+                        </span>
+                      ) : (
+                        assuntos.texto
+                      )}
+                    </Fato>
                     <Fato label="Distribuição">{h.distribuido}</Fato>
-                    <Fato label="Valor da causa">{h.valorFormatado}</Fato>
+                    <Fato label="Valor da causa">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        {h.valorFormatado}
+                        {p.claim_value_source ? (
+                          <Badge variant="outline" className="text-[10px]">
+                            {CLAIM_VALUE_SOURCE_LABEL[p.claim_value_source]}
+                          </Badge>
+                        ) : null}
+                      </span>
+                    </Fato>
                     <Fato label="Publicidade">{h.segredo}</Fato>
                   </dl>
                 </section>
@@ -722,9 +784,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                   h.setPhase(e.target.value as ProcessoPhase | "")
                 }
               >
-                <option value="" disabled>
-                  Não informada
-                </option>
+                <option value="">Automática (sem ajuste manual)</option>
                 {FASE_STEPS.map((s) => (
                   <option value={s.key} key={s.key}>
                     {s.label}
@@ -732,7 +792,8 @@ export function ProcessoHub({ numero }: { numero: string }) {
                 ))}
               </NativeSelect>
               <p className="text-muted-foreground text-xs">
-                O ajuste manual passa a prevalecer na fase exibida.
+                Sem ajuste manual, a fase exibida volta a ser a derivada
+                automaticamente, quando disponível.
               </p>
             </div>
             <div className="space-y-2">

@@ -55,14 +55,33 @@ describe("ProvidenciaFulfillment", () => {
     );
   });
 
-  it("mostra obrigação, citação e fonte localizável com página", () => {
+  it("mostra obrigação, citação e fonte localizável com página (default — comportamento preservado p/ callers existentes)", () => {
     const html = renderToStaticMarkup(
       <FulfillmentAlert fulfillment={fulfillment()} />,
     );
     expect(html).toContain("Obrigação analisada");
+    expect(html).toContain("Comprovar o pagamento no prazo.");
     expect(html).toContain("O pagamento foi comprovado nos autos.");
     expect(html).toContain("Abrir Petição de pagamento, página 4");
     expect(html).toContain('data-icon="inline-start"');
+  });
+
+  // GAP 2 (docs/obrigacao-first-architecture.md v3): quando o CALLER já exibe
+  // `obligation_quote` separadamente (DisposicaoSection/ItemTrabalho, fora
+  // deste gate de `possible_fulfillment`), `showObligationQuote={false}` evita
+  // duplicar a mesma citação — extensão COMPATÍVEL (default `true` preserva
+  // qualquer caller existente/futuro que não passe a prop).
+  it("showObligationQuote={false} omite o bloco (evita duplicar com o caller), mantendo o resto do alerta", () => {
+    const html = renderToStaticMarkup(
+      <FulfillmentAlert
+        fulfillment={fulfillment()}
+        showObligationQuote={false}
+      />,
+    );
+    expect(html).not.toContain("Obrigação analisada");
+    expect(html).not.toContain("Comprovar o pagamento no prazo.");
+    expect(html).toContain("Possível cumprimento nos autos");
+    expect(html).toContain("O pagamento foi comprovado nos autos.");
   });
 
   it.each([

@@ -2,7 +2,8 @@
 
 // Hook do PRE-FLIGHT da geração de peça. A análise da intimação é horizontal/
 // cosmética e NUNCA bloqueia a peça — o gate real roda AQUI, ao clicar "Gerar peça":
-//  · Check 1 (tipo do ato): quando o tipo ainda não foi confirmado, o gate exige
+//  · Primeiro, a sugestão de tipo da providência formal exige confirmação explícita.
+//  · Check 1 (tipo do ato da intimação): quando o tipo ainda não foi confirmado, o gate exige
 //    a confirmação inline (reusa o control de definir tipo) antes de seguir.
 //  · Check 2 (autos): consulta GET /processos/:id/autos-status. Sem autos é só um
 //    AVISO de qualidade (não bloqueia) — o gate oferece o caminho certo conforme o
@@ -10,7 +11,6 @@
 // O componente chama só este hook (JSX + binding).
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
 import { toast } from "sonner";
 
 import { useSyncAutos } from "@/features/configuracoes/hooks/use-sync-autos";
@@ -20,6 +20,8 @@ import {
   getAutosStatus,
   priorizarAutos,
 } from "../../intimacoes/services/autos-status.service";
+import { generationBlockReason } from "../lib/generation-eligibility";
+import { useActionItemReview } from "./use-action-item-review";
 
 /** Caminho ACIONÁVEL oferecido quando o processo está sem autos carregados. */
 export type AutosPath =
@@ -29,28 +31,33 @@ export type AutosPath =
   | "unavailable"; // integração indisponível — só "Gerar mesmo assim"
 
 export interface UsePecaGateParams {
+  open: boolean;
   intimacaoId: string;
   processoId: string;
   /** Grau do processo (G1|JE|…) — recorte da cobertura da busca de autos. */
   degree?: string;
   /** true quando o tipo do ato JÁ está confirmado (Check 1 satisfeito de saída). */
   tipoConfirmado: boolean;
+  actionItemId?: string;
 }
 
 export function usePecaGate({
+  open,
   intimacaoId,
   processoId,
   degree,
   tipoConfirmado,
+  actionItemId = "",
 }: UsePecaGateParams) {
   const api = useApi();
-  const [aberto, setAberto] = useState(false);
+  const review = useActionItemReview(actionItemId, open);
+  const item = review.detail.data;
 
   // Status dos autos — só busca com o gate aberto (não paga a chamada à toa).
   const status = useQuery({
     queryKey: ["autos-status", processoId],
     queryFn: () => getAutosStatus(api, processoId),
-    enabled: aberto && !!processoId,
+    enabled: open && !!processoId,
     staleTime: 15_000,
   });
 
@@ -81,15 +88,22 @@ export function usePecaGate({
           : "fetch";
 
   return {
-    aberto,
-    abrir: () => setAberto(true),
-    fechar: () => setAberto(false),
-
+    reviewPending:
+      !!actionItemId && (review.detail.isPending || review.detail.isFetching),
+    reviewError: !!actionItemId && review.detail.isError,
+    retryReview: () => void review.detail.refetch(),
+    reviewItem:
+      item?.tipo_status === "a_confirmar" && !item.draft_id ? item : null,
+    reviewBlock:
+      actionItemId && item ? generationBlockReason(item, intimacaoId) : null,
+    confirmReview: () => void review.confirmOnce().catch(() => {}),
+    confirmPending: review.confirm.isPending,
+    confirmError: review.confirm.isError,
     // Check 1 — tipo do ato
     precisaTipo: !tipoConfirmado,
 
     // Check 2 — autos
-    statusPendente: status.isPending && status.fetchStatus !== "idle",
+    statusPendente: open && !!processoId && status.isPending,
     statusErro: status.isError,
     recarregarStatus: () => void status.refetch(),
     hasAutos,

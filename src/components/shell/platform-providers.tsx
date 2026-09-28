@@ -1,3 +1,4 @@
+import { ptBR } from "@clerk/localizations";
 import { ClerkProvider } from "@clerk/nextjs";
 
 import { Providers } from "@/app/providers";
@@ -13,6 +14,9 @@ export default function PlatformProviders({
   return (
     <ClerkProvider
       appearance={clerkAppearance}
+      localization={ptBR}
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
       signInFallbackRedirectUrl={APP_HOME_PATH}
       signUpFallbackRedirectUrl={ONBOARDING_PATH}
     >

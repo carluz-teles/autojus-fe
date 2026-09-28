@@ -23,7 +23,7 @@ import {
   analisarIntimacao,
   assignIntimacaoResponsavel,
   type AssignResponsavelParams,
-  confirmTrustedDeadlinesBatch,
+  type BatchIdsResult,
   getIntimacao,
   getPipelineCounts,
   ignoreIntimacao,
@@ -107,12 +107,16 @@ export interface IntimacoesFilters {
    *  sem_prazo) — aba de origem da Triagem. Vazio/undefined = "Todos" (sem
    *  filtro). Não afeta as contagens de `origemFacets`. */
   origem?: string;
-  /** Caixa operacional da triagem; ausente na tela completa de Intimações. */
-  triageLane?: "attention" | "ready" | "science" | "historical";
   /** Chip "Não confirmadas" (triagem) — filtra prazos sugeridos não confirmados. */
   naoConfirmado?: boolean;
   /** "me" (toggle "Minhas") ou um uuid; casa contra condutor OU revisor. */
   assignee?: string;
+  /** Escopo de responsável da mesa de trabalho (docs/revamp-mesa-trabalho-
+   *  intimacoes.md §8): "mine" | "unassigned" | "mine_or_unassigned". Mapeia pro
+   *  wire `assignee_scope`. Mutuamente exclusivo com `assignee` (o BE rejeita os
+   *  dois juntos com 400) — não combine os dois filtros na mesma chamada. Mesmo
+   *  predicado em list/count/buckets/origem_facets (e no PipelineCounts). */
+  assigneeScope?: "mine" | "unassigned" | "mine_or_unassigned";
   /** Lane de ciclo de vida da pipeline (a_triar|em_andamento|concluido); "" = todas.
    *  Filtra a lista server-side pra retornar SÓ aquela lane. */
   lifecycle?: string;
@@ -126,6 +130,13 @@ export interface IntimacoesFilters {
   prefetchNextPage?: boolean;
   /** Tamanho de página customizado — default PAGE_SIZE (20). */
   limit?: number;
+  /** S2 (docs/qa-remediation-evidence/fe-operations-architecture.md): BOUNDED —
+   *  `number` (ms) só enquanto uma captura está EM ANDAMENTO (sinal real de
+   *  `useCaptures`, nunca um polling permanente); `false`/ausente preserva o
+   *  comportamento de sempre (invalidação só por mutação client). O caller
+   *  (Mesa) liga/desliga isto sozinho ao observar o fim da captura — auto-off
+   *  real, não um novo subsistema de polling. */
+  refetchIntervalMs?: number | false;
 }
 
 /** Lista por cursor, com filtros no servidor e buffer opcional de uma página. */
@@ -148,9 +159,9 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     due_to: filters.dueTo || undefined,
     work_stage: filters.workStage || undefined,
     origem: filters.origem || undefined,
-    triage_lane: filters.triageLane || undefined,
     nao_confirmado: filters.naoConfirmado || undefined,
     assignee: filters.assignee || undefined,
+    assignee_scope: filters.assigneeScope || undefined,
     lifecycle: filters.lifecycle || undefined,
     disposicao: filters.disposicao || undefined,
     limit: filters.limit ?? PAGE_SIZE,
@@ -172,11 +183,16 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
     getNextPageParam: (lastPage) => lastPage.page.next_cursor || undefined,
     enabled: filters.enabled ?? true,
     // O trabalho necessário é determinístico (materializado na ingestão) — não há
-    // mais análise async pós-chegada, então a lista não faz poll esperando spinner.
+    // mais análise async pós-chegada, então a lista não faz poll esperando spinner
+    // POR ITEM. `refetchIntervalMs` é um sinal DIFERENTE (S2): enquanto uma
+    // captura está em andamento, NOVAS linhas chegam server-side sem nenhuma
+    // mutação client — sem isto a lista fica presa na página já carregada até
+    // reload manual. Ausente/false = comportamento de sempre (só mutação).
     // Mantém os dados da faixa/filtro anterior enquanto a nova query carrega, pra
     // trocar tab/filtro NÃO derrubar a página inteira no skeleton (isPending só é
     // true no 1º load). O loading da troca fica scoped na lista via isFetching.
     placeholderData: keepPreviousData,
+    refetchInterval: filters.refetchIntervalMs ?? false,
   });
 
   const pagination = useInfinitePageBuffer(
@@ -219,11 +235,16 @@ export function useIntimacoes(filters: IntimacoesFilters = {}) {
  * Keyada pelos filtros COMPARTILHADOS ativos (search/urgência/responsável/origem/…),
  * NÃO pela lifecycle/segmento (o BE particiona nessas dimensões). Alimenta os badges das
  * abas de ciclo de vida e dos segmentos — números reais sobre o conjunto inteiro, não a
- * página carregada. Invalidada junto do resto (intimacoesKeys.all) por qualquer mutação.
+ * página carregada. Invalidada junto do resto (intimacoesKeys.all) por qualquer mutação —
+ * isso JÁ FUNCIONA (não é o defeito de S2). `refetchIntervalMs` cobre o caso que a
+ * invalidação-por-mutação não cobre: mudança de fundo (captura/ingestão) sem nenhuma
+ * mutação client — BOUNDED (o caller liga só enquanto uma captura real está em
+ * andamento, via `useCaptures`) e nunca um polling permanente.
  */
 export function usePipelineCounts(
   params: PipelineCountsParams = {},
   enabled = true,
+  refetchIntervalMs: number | false = false,
 ) {
   const fetcher = useApi();
   const query = useQuery({
@@ -231,12 +252,17 @@ export function usePipelineCounts(
     queryFn: ({ signal }) => getPipelineCounts(fetcher, params, signal),
     enabled,
     placeholderData: keepPreviousData,
+    refetchInterval: refetchIntervalMs,
   });
   return {
     counts: query.data ?? EMPTY_PIPELINE_COUNTS,
     isPending: query.isPending,
     isFetching: query.isFetching,
     error: query.error,
+    // S2: exposto pra permitir o refetch FINAL único na transição
+    // running→terminal de uma captura (ver useCapturaBoundedRefetch) — sem
+    // isto, o caller não tem como pedir uma busca extra fora do intervalo.
+    refetch: query.refetch,
   };
 }
 
@@ -395,23 +421,6 @@ export function useResolverIntimacao() {
   });
 }
 
-/**
- * Confirma os prazos confiáveis em lote. Sem argumento (ou undefined) confirma TODOS os
- * confiáveis do escritório; com uma lista de intimation ids, confirma só os confiáveis
- * dessas intimações (o BE nunca inclui exceção) — usado pela seleção manual e pelo
- * "Confirmar" de uma linha só.
- */
-export function useConfirmarPrazosConfiaveisEmLote() {
-  const fetcher = useApi();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (intimationIds?: string[]) =>
-      confirmTrustedDeadlinesBatch(fetcher, intimationIds),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: intimacoesKeys.all }),
-  });
-}
-
 export function useDarCienciaEmLote() {
   const fetcher = useApi();
   const queryClient = useQueryClient();
@@ -499,18 +508,23 @@ export function useAssignIntimacaoResponsavelBatch() {
   const fetcher = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       ids,
       assigneeUserId,
     }: {
       ids: string[];
       assigneeUserId: string | null;
-    }) =>
-      Promise.all(
+    }): Promise<BatchIdsResult> => {
+      const results = await Promise.allSettled(
         ids.map((id) =>
           assignIntimacaoResponsavel(fetcher, id, { assigneeUserId }),
         ),
-      ),
+      );
+      return {
+        succeeded: ids.filter((_, i) => results[i].status === "fulfilled"),
+        failed: ids.filter((_, i) => results[i].status === "rejected"),
+      };
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: intimacoesKeys.all }),
   });
 }

@@ -1,9 +1,9 @@
 // Transporte das "instructions" (prompt opcional do GerarPecaModal) entre a
 // disposição → /pecas/nova → /pecas/:id, via sessionStorage (evita 2000 chars na
-// URL/history). BLOCKER-3: leitura NÃO apaga — sobrevive a retry; a limpeza só
-// acontece após o generate 202. Navegar-primeiro: a ConstructionEntry re-chaveia
-// o prompt sob o draftId antes de navegar, e a tela da peça (use-construction)
-// lê por draftId — sem precisar carregar o actionItemId na URL.
+// URL/history). Leitura NÃO apaga: o 202 apenas enfileira o worker e uma falha
+// posterior ainda precisa do prompt. A limpeza acontece quando a peça fica
+// pronta. ConstructionEntry re-chaveia a orientação pelo draftId antes de
+// navegar; a tela da peça lê por draftId, mesmo após refresh.
 
 const INSTRUCTIONS_SESSION_KEY = "peca:instructions:";
 

@@ -1,14 +1,11 @@
 "use client";
 
-import { useIntimacoes } from "@/features/intimacoes/hooks/use-intimacoes";
-import { TRIAGEM_STAGES } from "@/features/intimacoes/hooks/use-listagem-intimacoes";
+import { usePipelineCounts } from "@/features/intimacoes/hooks/use-intimacoes";
 
+// Badge do item de nav "Mesa de Trabalho" — mesma fonte única de contagem do
+// pipeline (usePipelineCounts) que a própria tela usa para a aba "A decidir",
+// sem filtros de responsável/busca (o nav mostra o volume total do escritório).
 export function useTriagemCount(): number | undefined {
-  const query = useIntimacoes({
-    workStage: TRIAGEM_STAGES,
-    user_status: "PENDING",
-    triageLane: "attention",
-    limit: 1,
-  });
-  return query.isPending ? undefined : query.totalCount;
+  const pipeline = usePipelineCounts();
+  return pipeline.isPending ? undefined : pipeline.counts.a_triar;
 }

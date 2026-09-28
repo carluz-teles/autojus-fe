@@ -11,6 +11,7 @@ import {
   rotuloTipoAuto,
   visualDoAuto,
 } from "@/features/documentos/lib/tipo-autos";
+import { atoPublicacaoLabel } from "@/features/intimacoes/lib/labels";
 import { prazoVisivel } from "@/features/intimacoes/lib/prazo-visivel";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { usePecasByProcesso } from "@/features/pecas/hooks/use-peca";
@@ -31,7 +32,7 @@ import {
 } from "@/features/processos/lib/apresentacao";
 import {
   intimacaoPendente,
-  parseValorCausa,
+  montarEdicaoProcesso,
   prazoPendente,
   urgenciaPrazo,
 } from "@/features/processos/lib/detalhe";
@@ -88,11 +89,7 @@ export function useProcessoHub(id: string) {
       const ativo = intimacaoPendente(i);
       return {
         id: i.id,
-        titulo: prazo?.tipo_ato
-          ? tipoAtoLabel(prazo.tipo_ato)
-          : i.type === "CITACAO"
-            ? "Citação"
-            : "Intimação",
+        titulo: atoPublicacaoLabel(i.ai_act, i.prazo?.tipo_ato, i.type),
         descricao: i.content_preview,
         meta: `Publicada em ${formatDate(i.published_at)}`,
         responsavel: {
@@ -250,24 +247,21 @@ export function useProcessoHub(id: string) {
     setEditando(true);
   }
   async function salvar() {
-    const amount = parseValorCausa(valor);
-    if (amount !== null && Number.isNaN(amount)) {
-      setFormError("Informe um valor válido, como 1.500,00.");
-      return;
-    }
-    if (amount === null && p?.claim_value != null) {
-      setFormError("Informe o valor da causa. Para valor zero, preencha 0,00.");
+    const result = montarEdicaoProcesso(
+      { label, phase, valor },
+      {
+        label: p?.label ?? null,
+        phase: p?.phase ?? null,
+        claim_value: p?.claim_value ?? null,
+      },
+    );
+    if (result.error) {
+      setFormError(result.error);
       return;
     }
     setFormError("");
     try {
-      const changes = {
-        ...(label.trim() !== (p?.label || "") ? { label: label.trim() } : {}),
-        ...(phase && phase !== p?.phase ? { phase } : {}),
-        ...(amount !== null && amount !== p?.claim_value
-          ? { claim_value: amount }
-          : {}),
-      };
+      const changes = result.changes ?? {};
       if (Object.keys(changes).length > 0) await manual.mutateAsync(changes);
       setEditando(false);
       toast.success("Dados do processo atualizados.");

@@ -2,7 +2,21 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ApiFetcher } from "@/lib/api/use-api";
 
-import { submitMfaSeed } from "./court-connections.service";
+import {
+  deleteCourtConnection,
+  submitMfaSeed,
+} from "./court-connections.service";
+
+describe("deleteCourtConnection", () => {
+  it("sends an empty DELETE for only the selected connection", async () => {
+    const fetcher = vi.fn().mockResolvedValue(undefined);
+    await deleteCourtConnection(fetcher as ApiFetcher, "selected-id");
+    expect(fetcher).toHaveBeenCalledExactlyOnceWith(
+      "/v1/court-connections/selected-id",
+      { method: "DELETE" },
+    );
+  });
+});
 
 describe("submitMfaSeed", () => {
   it("envia o QR como multipart sem definir Content-Type manualmente", async () => {

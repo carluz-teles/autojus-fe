@@ -1,13 +1,29 @@
 "use client";
 
-import { ChevronRight, Clock, Inbox, Sparkles } from "lucide-react";
+// Histórico de Intimações (`/intimacoes`) — superfície de CONSULTA/AUDITORIA de
+// TODAS as intimações que já passaram pelo sistema (todos os status, escritório
+// inteiro). Read-only: sem seleção/lote/painel/CTA operacional/pendência — "uma
+// tela é ação (Mesa), outra é histórico" (docs/history-design.md), inclusive
+// agrupado (o summary de grupo não sinaliza mais "precisa revisar"). Título/linha
+// navegam pro detalhe cheio (`/intimacoes/[id]`, modo consulta), reusando
+// useFilaNavigation (anterior/próxima + `?retorno=`).
+//
+// Composição da linha rebrand: identidade (título/meta/partes/teor) na coluna
+// corpo; cronologia de publicação em protagonismo + estado/prazo secundários
+// numa coluna, responsável numa 3ª coluna quando o espaço permitir. Responsivo
+// pela LARGURA DO CONTÊINER (`@container`, mesmo padrão de `pipeline/row-triar.tsx`
+// — não viewport): a lista pode estar mais estreita que a viewport (sidebar,
+// contexto embutido), então o reflow reage ao espaço real disponível, não a um
+// breakpoint de tela presumido. O summary de grupo (pré-existente) ganhou o
+// mesmo tratamento, pela mesma razão.
+
+import { ChevronRight, Inbox } from "lucide-react";
 import Link from "next/link";
 
 import { InfiniteListFooter } from "@/components/shell/infinite-list-footer";
 import { ListToolbar } from "@/components/shell/list-toolbar";
 import { PageFrame } from "@/components/shell/page-frame";
 import { TeorContent } from "@/components/teor-content";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -15,30 +31,24 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ProvidenciaFulfillment } from "@/features/action-items/components/providencia-fulfillment";
-import { hasActionableFulfillment } from "@/features/action-items/lib/fulfillment";
-import { WORK_TYPES } from "@/features/action-items/lib/piece-labels";
 import { Responsavel } from "@/features/organization/components/responsavel";
 import { cn } from "@/lib/utils";
 
 import { useListagemIntimacoes } from "../../hooks/use-listagem-intimacoes";
 import type { linhaIntimacao } from "../../lib/listagem";
-import { FilterTabs } from "../shared/filter-tabs";
 import { UrgenciaFilter } from "../shared/urgencia-filter";
-import { RevisaoOrigem } from "./revisao-origem";
 
 type Lista = ReturnType<typeof useListagemIntimacoes>;
 type Linha = ReturnType<typeof linhaIntimacao>;
 
-export function ListagemIntimacoes({ triagem = false }: { triagem?: boolean }) {
-  const m = useListagemIntimacoes(triagem);
+export function ListagemIntimacoes() {
+  const m = useListagemIntimacoes();
   return (
     <PageFrame
+      fill
       header={
         <>
-          <h1 className="shrink-0 text-[13px] font-medium">
-            {triagem ? "Triagem" : "Intimações"}
-          </h1>
+          <h1 className="shrink-0 text-[13px] font-medium">Intimações</h1>
           <span
             className="text-fg3 min-w-0 truncate font-mono text-[11px]"
             aria-live="polite"
@@ -94,36 +104,10 @@ export function ListagemIntimacoes({ triagem = false }: { triagem?: boolean }) {
               </NativeSelectOption>
             </NativeSelect>
           </ListToolbar>
-          {triagem && (
-            <>
-              <FilterTabs label="Fila de trabalho" tabs={m.laneTabs} />
-              {m.lane !== "historical" ? (
-                <FilterTabs
-                  label="Origem do prazo"
-                  title="Origem do prazo"
-                  tabs={m.origemTabs}
-                />
-              ) : null}
-            </>
-          )}
         </>
       }
     >
       <div className="flex w-full min-w-0 flex-col gap-4 px-3 py-4 sm:px-4 sm:py-5">
-        {m.bulkAction ? (
-          <div className="border-border bg-card flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 shadow-sm">
-            <p className="text-muted-foreground text-xs">
-              Revise o recorte e conclua os itens repetitivos de uma só vez.
-            </p>
-            <Button
-              size="sm"
-              disabled={m.bulkAction.pending}
-              onClick={() => void m.bulkAction?.run()}
-            >
-              {m.bulkAction.pending ? "Processando…" : m.bulkAction.label}
-            </Button>
-          </div>
-        ) : null}
         <div
           role="status"
           aria-live="polite"
@@ -196,9 +180,9 @@ export function ListagemIntimacoes({ triagem = false }: { triagem?: boolean }) {
                         onToggle={(e) =>
                           m.toggleGroup(g.cnj_number, e.currentTarget.open)
                         }
-                        className="group bg-card"
+                        className="group bg-card @container"
                       >
-                        <summary className="hover:bg-muted/30 focus-visible:ring-ring grid cursor-pointer list-none gap-4 px-4 py-4 outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-5 lg:grid-cols-[minmax(0,1fr)_180px_180px] lg:gap-5 [&::-webkit-details-marker]:hidden">
+                        <summary className="hover:bg-muted/30 focus-visible:ring-ring grid cursor-pointer list-none gap-4 px-4 py-4 outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-5 @min-[768px]:grid-cols-[minmax(0,1fr)_180px_180px] @min-[768px]:gap-5 [&::-webkit-details-marker]:hidden">
                           <div className="flex min-w-0 gap-2">
                             <ChevronRight
                               className="text-muted-foreground mt-0.5 size-4 shrink-0 group-open:rotate-90"
@@ -208,7 +192,7 @@ export function ListagemIntimacoes({ triagem = false }: { triagem?: boolean }) {
                               <h2 className="font-display text-base leading-snug font-medium break-words">
                                 {g.title}
                               </h2>
-                              <p className="text-muted-foreground mt-1 font-mono text-xs">
+                              <p className="text-muted-foreground mt-1 font-mono text-xs break-all">
                                 {g.cnj}
                               </p>
                               {g.partes && (
@@ -223,7 +207,7 @@ export function ListagemIntimacoes({ triagem = false }: { triagem?: boolean }) {
                             </div>
                           </div>
                           <div>
-                            <p className="text-muted-foreground text-xs lg:sr-only">
+                            <p className="text-muted-foreground text-xs @min-[768px]:sr-only">
                               Vencimento mais urgente neste filtro
                             </p>
                             <p
@@ -246,9 +230,6 @@ export function ListagemIntimacoes({ triagem = false }: { triagem?: boolean }) {
                               nome={g.responsavel}
                               multiplo={g.responsaveisDiferentes}
                             />
-                            {g.pending > 0 && (
-                              <Badge variant="warning">{g.pendencias}</Badge>
-                            )}
                           </div>
                         </summary>
                         <div className="border-border border-t">
@@ -305,20 +286,67 @@ export function ListagemIntimacoes({ triagem = false }: { triagem?: boolean }) {
   );
 }
 
-// PrazoBadge — pill de vencimento do card (mockup): ⏱ "vence 10/09 · 3 dias" com tom
-// atenção (amber) / atraso (vermelho) / normal. Deriva de vencimentoDaLinha (data/relative/alert).
-function PrazoBadge({ prazo }: { prazo: Linha["prazo"] }) {
+/** Publicação — a âncora cronológica do registro, em protagonismo (identidade
+ *  legível + tabular-nums): é o dado que organiza o histórico como um livro-razão.
+ *  `rotulo` distingue a FONTE real do dado ("Publicada" = published_at; "Disponibilizada"
+ *  = fallback made_available_at, que NÃO é a publicação — nunca afirmar uma coisa pela
+ *  outra, ver linhaIntimacao). */
+function PublicacaoLinha({
+  data,
+  rotulo,
+}: {
+  data: string;
+  rotulo: Linha["publicadoRotulo"];
+}) {
+  return (
+    <div className="@min-[560px]:text-right">
+      <p className="text-fg3 text-[11px]">{rotulo}</p>
+      <p className="font-display text-foreground text-[15px] leading-tight font-medium tabular-nums">
+        {data}
+      </p>
+    </div>
+  );
+}
+
+/** Chip de estado/desfecho — tokens de estadoIntimacao (cor≠único sinal: o
+ *  rótulo textual acompanha sempre a cor). Extraído 1:1 do card anterior. */
+function EstadoChip({ estado }: { estado: Linha["estado"] }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
+      style={{ color: estado.cor, backgroundColor: estado.fundo }}
+    >
+      <span
+        className="size-1.5 rounded-full"
+        style={{ backgroundColor: estado.cor }}
+        aria-hidden
+      />
+      {estado.label}
+    </span>
+  );
+}
+
+/** Prazo — secundário ao lado da publicação; texto simples tabular-nums (sem
+ *  pill), tom warning/destructive só reforçando o que o texto já diz por
+ *  extenso ("em atraso"/"vence hoje"…), nunca só cor. */
+function PrazoLinha({ prazo }: { prazo: Linha["prazo"] }) {
   const semPrazo = prazo.data === "Sem prazo" || prazo.data === "A definir";
   const atraso = prazo.relative.toLowerCase().includes("atraso");
-  const variant = atraso ? "destructive" : prazo.alert ? "warning" : "outline";
-  const label = semPrazo
-    ? prazo.data
-    : `vence ${prazo.data}${prazo.relative ? ` · ${prazo.relative}` : ""}`;
   return (
-    <Badge variant={variant}>
-      <Clock data-icon="inline-start" />
-      {label}
-    </Badge>
+    <p
+      className={cn(
+        "text-xs tabular-nums @min-[560px]:text-right",
+        atraso
+          ? "text-destructive font-medium"
+          : prazo.alert
+            ? "text-gold-foreground font-medium"
+            : "text-muted-foreground",
+      )}
+    >
+      {semPrazo
+        ? prazo.data
+        : `${prazo.data}${prazo.relative ? ` · ${prazo.relative}` : ""}`}
+    </p>
   );
 }
 
@@ -331,114 +359,61 @@ function LinhaIntimacao({
   m: Lista;
   grouped?: boolean;
 }) {
-  const rec = r.lifecycle.state === "recommended" ? r.lifecycle.rec : null;
+  const abrir = () => m.remember();
   return (
-    <article className="hover:bg-muted/25 flex min-w-0 flex-col gap-3 px-4 py-4 transition-colors sm:px-5">
-      {/* Header: prazo · desfecho · responsável */}
-      <div className="flex flex-wrap items-center gap-2">
-        <PrazoBadge prazo={r.prazo} />
-        {r.prazo.alert ? <Badge variant="warning">atenção</Badge> : null}
-        {r.estado.tone !== "pending" ? (
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
-            style={{ color: r.estado.cor, backgroundColor: r.estado.fundo }}
-          >
-            <span
-              className="size-1.5 rounded-full"
-              style={{ backgroundColor: r.estado.cor }}
-              aria-hidden
-            />
-            {r.estado.label}
-          </span>
-        ) : null}
-        <span className="ml-auto">
-          <Responsavel value={r.responsavelId} nome={r.responsavel} />
-        </span>
-      </div>
-
-      {/* Corpo: título + meta do processo + teor */}
-      <div className="min-w-0">
-        <Link
-          href={m.href(r.id)}
-          onClick={m.remember}
-          className="font-display text-foreground focus-visible:ring-ring hover:text-primary rounded text-base leading-snug font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-2"
-        >
-          {grouped ? r.ato : r.title}
-        </Link>
-        <p className="text-muted-foreground mt-1 font-mono text-xs">
-          {[grouped ? "" : r.ato, r.cnj, r.tribunal]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
-        {r.preview ? (
-          <TeorContent
-            content={r.preview}
-            allowLinks={false}
-            className="text-foreground/85 mt-1.5 line-clamp-2 text-sm leading-relaxed"
-          />
-        ) : r.partes ? (
-          <p className="text-muted-foreground mt-1 line-clamp-1 text-sm">
-            {r.partes}
-          </p>
-        ) : null}
-      </div>
-
-      {/* Seção de ação (border-t) — revisar / trabalho necessário / abrir */}
-      <div className="flex flex-col gap-3 border-t pt-3">
-        {r.revisao.pending ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <RevisaoOrigem
-              revisao={r.revisao}
-              origem=""
-              origemDescricao={r.origemDescricao}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              nativeButton={false}
-              render={<Link href={m.href(r.id)} onClick={m.remember} />}
-            >
-              Revisar tipo e prazo
-            </Button>
-          </div>
-        ) : rec ? (
-          <>
-            <p className="section-label flex items-center gap-1.5">
-              <Sparkles className="size-3" aria-hidden />
-              Trabalho necessário
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-display text-base font-medium">
-                {WORK_TYPES[rec.tipo]}
-              </span>
-              {rec.gera_peca ? (
-                <Badge variant="secondary">gera peça</Badge>
-              ) : null}
-            </div>
-            {hasActionableFulfillment(rec.fulfillment) ? (
-              <ProvidenciaFulfillment fulfillment={rec.fulfillment} />
-            ) : null}
-            <Link
-              href={m.href(r.id)}
-              onClick={m.remember}
-              aria-label={`Abrir intimação de ${r.publicado}, processo ${r.cnj}`}
-              className="text-primary focus-visible:ring-ring inline-flex items-center gap-1 self-start rounded text-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2"
-            >
-              Abrir intimação
-              <ChevronRight className="size-3" aria-hidden />
-            </Link>
-          </>
-        ) : (
+    <article className="hover:bg-muted/25 @container transition-colors">
+      {/* Responsivo pela largura do CONTÊINER (não viewport — mesmo padrão de
+          pipeline/row-triar.tsx): @560px empilha corpo+meta numa coluna
+          só; @900px abre a 3ª coluna pro responsável. Só 2 grupos reais
+          na coluna meta (cronologia, responsável) — cada um é UMA caixa com
+          altura pelo próprio conteúdo, sem row/col fantasma nem espaço vazio
+          artificial abaixo do corpo. */}
+      <div className="flex flex-col gap-3 px-4 py-4 sm:px-5 @min-[560px]:grid @min-[560px]:grid-cols-[minmax(0,1fr)_200px] @min-[560px]:items-start @min-[560px]:gap-x-6 @min-[900px]:grid-cols-[minmax(0,1fr)_180px_180px]">
+        {/* CORPO — identidade: título · meta do processo · partes (sempre que
+            houver, mesmo com teor) · teor */}
+        <div className="min-w-0">
           <Link
             href={m.href(r.id)}
-            onClick={m.remember}
-            aria-label={`Abrir intimação de ${r.publicado}, processo ${r.cnj}`}
-            className="text-primary focus-visible:ring-ring inline-flex items-center gap-1 self-start rounded text-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2"
+            onClick={abrir}
+            className="font-display text-foreground focus-visible:ring-ring hover:text-primary rounded text-base leading-snug font-medium break-words underline-offset-4 outline-none hover:underline focus-visible:ring-2"
           >
-            Abrir intimação
-            <ChevronRight className="size-3" aria-hidden />
+            {grouped ? r.ato : r.title}
           </Link>
-        )}
+          <p className="text-muted-foreground mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 font-mono text-xs">
+            {!grouped && r.ato ? <span>{r.ato}</span> : null}
+            {!grouped && r.ato ? <span aria-hidden>·</span> : null}
+            <span className="break-all">{r.cnj}</span>
+            {r.tribunal ? <span aria-hidden>·</span> : null}
+            {r.tribunal ? <span>{r.tribunal}</span> : null}
+          </p>
+          {r.partes ? (
+            <p className="text-muted-foreground mt-1 line-clamp-1 text-sm">
+              {r.partes}
+            </p>
+          ) : null}
+          {r.preview ? (
+            <TeorContent
+              content={r.preview}
+              allowLinks={false}
+              className="text-foreground/85 mt-1.5 line-clamp-2 text-sm leading-relaxed"
+            />
+          ) : null}
+        </div>
+
+        {/* Cronologia (grupo real, 1 caixa) — publicação protagonista + estado/prazo. */}
+        <div className="flex flex-col gap-2 @min-[560px]:items-end">
+          <PublicacaoLinha data={r.publicado} rotulo={r.publicadoRotulo} />
+          {r.estado.tone !== "pending" ? (
+            <EstadoChip estado={r.estado} />
+          ) : null}
+          <PrazoLinha prazo={r.prazo} />
+        </div>
+
+        {/* Responsável — 3ª coluna quando o contêiner comporta (@900px); antes
+            disso, cai junto da cronologia (2ª coluna, empilhado). */}
+        <div className="flex @min-[560px]:col-start-2 @min-[560px]:justify-end @min-[900px]:col-start-3 @min-[900px]:row-start-1 @min-[900px]:self-start">
+          <Responsavel value={r.responsavelId} nome={r.responsavel} />
+        </div>
       </div>
     </article>
   );

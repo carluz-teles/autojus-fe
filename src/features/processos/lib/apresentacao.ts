@@ -2,7 +2,14 @@ import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
 import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
 import { formatDate } from "@/lib/format";
 
-import type { ProcessoDegree, ProcessoPhase, ProcessoView } from "../types";
+import type {
+  ClaimValueSource,
+  ClientRole,
+  ProcessoDegree,
+  ProcessoPhase,
+  ProcessoSubject,
+  ProcessoView,
+} from "../types";
 export const DEGREE_LABEL: Record<ProcessoDegree, string> = {
   G1: "1º grau",
   G2: "2º grau",
@@ -10,6 +17,33 @@ export const DEGREE_LABEL: Record<ProcessoDegree, string> = {
   SUPERIOR: "Superior",
   UNKNOWN: "—",
 };
+
+/** Rótulo pt-BR de `client_role` (court_case.client_role — migration 0180) — de
+ *  que lado o escritório está na causa. Só os 3 valores DETERMINADOS têm
+ *  rótulo — "UNKNOWN" (ainda não identificado) nunca chega aqui: o único
+ *  consumidor (processo-hub.tsx) desvia pra "Não informado" antes de indexar
+ *  o mapa (mesmo padrão de "ausente" que o resto do card usa), então uma
+ *  entrada UNKNOWN aqui seria morta/duplicada com o mesmo significado. */
+export const CLIENT_ROLE_LABEL: Record<
+  Exclude<ClientRole, "UNKNOWN">,
+  string
+> = {
+  PLAINTIFF: "Autor(a)",
+  DEFENDANT: "Réu(é)",
+  BOTH: "Autor(a) e réu(é)",
+};
+
+/** Rótulo pt-BR de `claim_value_source` (court_record.claim_value_source —
+ *  migration 0180, CHECK ('capa','manual')). */
+export const CLAIM_VALUE_SOURCE_LABEL: Record<ClaimValueSource, string> = {
+  capa: "Capa do processo",
+  manual: "Informado manualmente",
+};
+
+export function grauProcessoLabel(degree: string): string {
+  const label = DEGREE_LABEL[degree as ProcessoDegree];
+  return label && label !== "—" ? label : "Grau não informado";
+}
 
 // As 5 fases do stepper, em ordem, com rótulo pt-BR — fonte única do stepper e do label.
 export const FASE_STEPS: { key: ProcessoPhase; label: string }[] = [
@@ -92,12 +126,7 @@ export function linhaProcesso(p: ProcessoView) {
     partes: [p.autor && `Autor: ${p.autor}`, p.reu && `Réu: ${p.reu}`]
       .filter(Boolean)
       .join(" · "),
-    tribunal: [
-      p.court,
-      DEGREE_LABEL[p.degree] === "—"
-        ? "Grau não informado"
-        : DEGREE_LABEL[p.degree],
-    ]
+    tribunal: [p.court, grauProcessoLabel(p.degree)]
       .filter(Boolean)
       .join(" · "),
     orgao: p.judging_body || "Órgão não informado",
@@ -136,4 +165,28 @@ export function linhaProcesso(p: ProcessoView) {
         }
       : null,
   };
+}
+
+/** Os assuntos do processo prontos para a Ficha, em UMA decisão só (o JSX não
+ *  reimplementa a cadeia de fallback):
+ *   - `subjects` (jsonb completo, migration 0180) → lista de CHIPS, um por
+ *     assunto, porque são itens discretos de um conjunto;
+ *   - sem `subjects` → `subject`, a coluna legada de string única (processo
+ *     ainda sem enriquecimento), como TEXTO;
+ *   - nenhum dos dois → ausência explícita.
+ *  `label` acompanha a cardinalidade ("Assunto"/"Assuntos") — um processo com
+ *  seis assuntos sob o rótulo singular lê como se fosse um só. */
+export function assuntosDoProcesso(p: {
+  subject: string;
+  subjects: ProcessoSubject[] | null;
+}): { label: string; chips: ProcessoSubject[]; texto: string } {
+  const chips = p.subjects ?? [];
+  if (chips.length > 0) {
+    return {
+      label: chips.length > 1 ? "Assuntos" : "Assunto",
+      chips,
+      texto: "",
+    };
+  }
+  return { label: "Assunto", chips: [], texto: p.subject || "Não informado" };
 }

@@ -1,7 +1,6 @@
 import {
   Bell,
   CalendarDays,
-  Clock,
   FolderOpen,
   ListChecks,
   type LucideIcon,
@@ -29,14 +28,14 @@ export interface NavSection {
 
 // Estrutura de navegação AUTORITATIVA do design (Claude Design · Prazos Linear).
 // A intimação é a unidade de trabalho: o antigo board "Providências" (/pipeline)
-// saiu do nav — o trabalho vive em Triagem, Meus Prazos e no detalhe da intimação.
+// saiu do nav — o trabalho vive na Mesa de Trabalho (com o filtro de responsável,
+// que cobre o recorte "meus prazos") e no detalhe da intimação.
 export const NAV_SECTIONS: readonly NavSection[] = [
   {
     titulo: "Espaço",
     itens: [
       { href: APP_HOME_PATH, label: "Notificações", icon: Bell },
-      { href: "/triagem", label: "Triagem", icon: ListChecks },
-      { href: "/meus-prazos", label: "Meus Prazos", icon: Clock },
+      { href: "/triagem", label: "Mesa de Trabalho", icon: ListChecks },
     ],
   },
   {
@@ -64,8 +63,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
 // (SEG_LABEL em breadcrumb-context) e dos comandos da paleta ⌘K.
 export const NAV_ITEMS: readonly NavItem[] = [
   { href: APP_HOME_PATH, label: "Notificações", icon: Bell },
-  { href: "/triagem", label: "Triagem", icon: ListChecks },
-  { href: "/meus-prazos", label: "Meus Prazos", icon: Clock },
+  { href: "/triagem", label: "Mesa de Trabalho", icon: ListChecks },
   { href: "/calendario", label: "Calendário", icon: CalendarDays },
   { href: "/processos", label: "Processos", icon: FolderOpen },
   { href: "/intimacoes", label: "Intimações", icon: Mail },

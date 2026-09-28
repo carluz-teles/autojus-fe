@@ -76,16 +76,72 @@ export type IntimacaoAcionabilidade = "ato" | "ciencia" | "a_classificar" | "";
 /** Lane de ciclo de vida derivada no BE (aba de topo da Triagem-pipeline). */
 export type IntimacaoLifecycle = "a_triar" | "em_andamento" | "concluido";
 
-/** Disposição — a PARTIÇÃO DISJUNTA de "A triar" (docs/erd-intimacao-triagem.md §4),
- *  derivada no BE (deriveDisposicao). Cada intimação de a_triar cai em EXATAMENTE UM
- *  bucket: exceção é seu próprio segmento (disjunto de trabalho), então "Pra trabalhar"
- *  não mistura mais exceção/ciência. Substitui o antigo eixo acionabilidade-segment. */
+/** Disposição — a PARTIÇÃO DISJUNTA da intimação (docs/erd-intimacao-triagem.md §4,
+ *  docs/navigation-architecture.md §4), derivada no BE (deriveDisposicao). É TRANSVERSAL
+ *  a qualquer `lifecycle`/status (a_triar/em_andamento/concluido) — não mais restrita a
+ *  "A triar": dirige as abas Todas/Trabalho/Ciência/Exceções sob QUALQUER status ativo.
+ *  Cada intimação cai em EXATAMENTE UM bucket: exceção é seu próprio segmento (disjunto
+ *  de trabalho), então "Pra trabalhar" não mistura mais exceção/ciência. Substitui o
+ *  antigo eixo acionabilidade-segment. */
 export type IntimacaoDisposicao =
   "analisando" | "trabalho" | "excecao" | "ciencia" | "sem_prazo";
 
-/** Motivo (de maior peso) de a intimação ser exceção; "" quando não é exceção. */
+/** Motivo (de maior peso) de a intimação ser exceção; "" quando não é exceção.
+ *  `divergente` = divergência de PRAZO (publicação × cálculo); `trabalho_divergente` =
+ *  divergência de OBRIGAÇÃO (a classificação da intimação × o trabalho identificado —
+ *  docs/navigation-architecture.md §2, conflito prazo×obrigação); `trabalho_nao_identificado`
+ *  = AUSÊNCIA (não conflito): a análise atual já materializou mas não produziu obrigação
+ *  nem ciência elegível — teor residuou (obrigacao-first-architecture.md §E). Três motivos
+ *  distintos, não confundir; espelha `ExcecaoMotivoTrabalhoNaoIdentificado` (BE read.go). */
 export type IntimacaoExcecaoMotivo =
-  "provisorio" | "ia_inferido" | "divergente" | "";
+  | "provisorio"
+  | "ia_inferido"
+  | "tipo_pendente"
+  | "prazo_pendente"
+  | "divergente"
+  | "trabalho_divergente"
+  | "trabalho_nao_identificado"
+  | "";
+
+/**
+ * Closed set de `demand_kind` do brief (intimation_brief.demand_kind) — a
+ * intenção da demanda extraída do teor (R4.1). Espelha VERBATIM o CHECK
+ * constraint de `migrations/0182_intimation_brief.up.sql` (20 valores) e o
+ * mapa `briefDemandLabels` do BE (internal/advisory/prompt_render.go, pinado
+ * por TestBriefDemandLabels_CoverEnum lá). Rótulos pt-BR em lib/demand-kind.ts
+ * (DEMAND_KIND_LABEL) — fonte única, como tipo-ato.ts. NÃO inclui "" (a
+ * ausência de brief é modelada à parte, no campo `brief_demand_kind` abaixo).
+ */
+export type IntimacaoDemandKind =
+  | "answer"
+  | "reply"
+  | "appeal"
+  | "interlocutory_appeal"
+  | "clarification_motion"
+  | "small_claims_appeal"
+  | "counter_arguments"
+  | "execution_objection"
+  | "enforcement_challenge"
+  | "manifest"
+  | "provide_address"
+  | "provide_document"
+  | "provide_calculation"
+  | "pay"
+  | "comply"
+  | "attend_hearing"
+  | "appoint_counsel"
+  | "acknowledge"
+  | "none"
+  | "undetermined";
+
+/** work_kind do brief — o tipo de trabalho quando `requires_work=true`.
+ *  Espelha migration 0182 (work_kind CHECK). */
+export type IntimacaoBriefWorkKind = "piece" | "task" | "acknowledge" | "none";
+
+/** demand_target_role do brief — contra quem/quem deve agir. Espelha migration
+ *  0182 (demand_target_role CHECK); só no detalhe (IntimacaoDetalheView). */
+export type BriefDemandTargetRole =
+  "PLAINTIFF" | "DEFENDANT" | "BOTH" | "COUNSEL" | "UNKNOWN";
 
 export interface IntimacaoView {
   id: string;
@@ -140,6 +196,8 @@ export interface IntimacaoView {
    * Espelha IntimacaoView.ai_analyzed_at do BE.
    */
   ai_analyzed_at: string | null;
+  /** Ato da publicação classificado pela IA; opcional durante a atualização da API. */
+  ai_act?: string;
   /** Id interno do responsável pela intimação (0057, ex-conductor/reviewer);
    *  null = não atribuído. Espelha o BE. */
   assignee_user_id: string | null;
@@ -180,6 +238,32 @@ export interface IntimacaoView {
   is_excecao: boolean;
   /** Motivo (de maior peso) da exceção; "" quando is_excecao=false. */
   excecao_motivo: IntimacaoExcecaoMotivo;
+  /**
+   * Estado de concordância prazo×obrigação (action_item), derivado no BE a partir dos
+   * mesmos flags de `disposicao`/exceção (docs/navigation-architecture.md §5 — contadores
+   * auditáveis): concordante (prazo e obrigação concordam) | divergente (os 2 conflitos que
+   * caem em disposicao='excecao') | mera_ciencia (subconjunto de concordante: ciencia+só
+   * ciência) | sem_analise (ainda não materializou action_item — indeterminado, NUNCA conta
+   * como concordância) | indeterminado (fallback). Aditivo/opcional enquanto o contrato do
+   * BE não estiver 100% do rollout; ausente = não renderizar o estado (não inventar).
+   */
+  agreement_state?:
+    | "concordante"
+    | "divergente"
+    | "mera_ciencia"
+    | "sem_analise"
+    | "indeterminado";
+  // ── Brief (R4.1 — docs/erd-brief.md) — a LEITURA da intimação, versão vigente ──
+  /** Intenção da demanda (closed set); "" quando não há brief ainda (BE faz
+   *  COALESCE(ib.demand_kind,'')). Rotulado via DEMAND_KIND_LABEL. */
+  brief_demand_kind: IntimacaoDemandKind | "";
+  /** true = exige trabalho do advogado além de mera ciência. */
+  brief_requires_work: boolean;
+  /** Tipo de trabalho quando `brief_requires_work=true`; "none" caso contrário
+   *  (ou antes do brief existir — BE faz COALESCE(ib.work_kind,'')). */
+  brief_work_kind: IntimacaoBriefWorkKind | "";
+  /** "O que aconteceu" — texto livre do brief; "" quando não há brief ainda. */
+  brief_summary: string;
 }
 
 // RecommendedProvidencia é o subset enxuto da 1ª providência que a LISTA carrega (o conjunto
@@ -328,7 +412,8 @@ type IntimacaoWorkStage =
   | "CONFIRMED"
   | "DRAFTING"
   | "PARTNER_REVIEW"
-  | "FILED";
+  | "FILED"
+  | "VENCIDA";
 
 export interface IntimacaoDetalheView extends IntimacaoView {
   /** Teor COMPLETO da publicação (não truncado como content_preview). */
@@ -366,6 +451,19 @@ export interface IntimacaoDetalheView extends IntimacaoView {
    * preenchido = pós-análise (o card mostra as providências).
    */
   ai_analyzed_at: string | null;
+
+  // ── Brief (R4.1) — o detalhe expõe os campos completos além dos da lista.
+  // null quando não há brief ainda (mesma condição de brief_demand_kind==="").
+  /** Objeto específico da demanda (ex.: "pagar honorários"). */
+  brief_demand_detail: string | null;
+  /** Contra quem/quem deve agir. */
+  brief_demand_target_role: BriefDemandTargetRole | null;
+  /** Prazo declarado no teor, em dias corridos (não é o prazo calculado pelo
+   *  motor — ver `prazo`). */
+  brief_declared_deadline_days: number | null;
+  /** Perfil de peça (catálogo GET /v1/piece-profiles) quando
+   *  `brief_work_kind="piece"`. */
+  brief_piece_profile_key: string | null;
 }
 
 /**
@@ -420,6 +518,26 @@ export interface TriagemBucketCounts {
   ciencia: number;
   /** Sem prazo — não datável (motor não soube); dentro de a_triar. */
   sem_prazo: number;
+  /**
+   * Matriz disposição × lifecycle (docs/navigation-architecture.md §4) — ADITIVA ao
+   * lado dos 8 campos legados acima (que só cobrem disposição dentro de a_triar).
+   * Cada lane expõe as MESMAS 6 células (total + as 5 disposições). Opcional: o BE
+   * está introduzindo este campo em paralelo (rollout a89a4e); ausente enquanto o
+   * rollout não completa — o FE NUNCA infere estas células a partir dos campos
+   * legados/página quando ausente (mostra loading/sem contagem, ver
+   * use-triagem-pipeline.ts).
+   */
+  by_lifecycle?: Record<
+    "a_triar" | "em_andamento" | "concluido",
+    {
+      total: number;
+      analisando: number;
+      trabalho: number;
+      excecao: number;
+      ciencia: number;
+      sem_prazo: number;
+    }
+  >;
 }
 
 /** Origem do prazo — closed set espelhado do BE (?origem=<v>). */
