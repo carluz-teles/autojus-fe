@@ -18,7 +18,8 @@ export function useAutosHistory() {
     staleTime: 30_000,
     refetchInterval: (query) => {
       const data = query.state.data;
-      const hasRunning = Array.isArray(data) && data.some((r) => r.status === "RUNNING");
+      const hasRunning =
+        Array.isArray(data) && data.some((r) => r.status === "RUNNING");
       return hasRunning ? 5_000 : false;
     },
   });

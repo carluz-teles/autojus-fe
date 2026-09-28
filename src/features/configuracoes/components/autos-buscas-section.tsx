@@ -88,7 +88,9 @@ export function AutosBuscasSection() {
                         <span className="text-fg3 font-normal">
                           {" "}
                           · {fmtDataHora(r.started_at)}
-                          {r.finished_at ? ` – ${fmtDataHora(r.finished_at)}` : ""}
+                          {r.finished_at
+                            ? ` – ${fmtDataHora(r.finished_at)}`
+                            : ""}
                         </span>
                       </span>
                     )}

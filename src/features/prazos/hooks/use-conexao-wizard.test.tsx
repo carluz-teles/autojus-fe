@@ -168,7 +168,12 @@ describe("useConexaoWizard retry", () => {
         created_at: "2026-09-25",
       },
     ];
-    mocks.syncCourtAutos.mockResolvedValue({ queued: 0, pending: 3, failed: 0, status: "pending" });
+    mocks.syncCourtAutos.mockResolvedValue({
+      queued: 0,
+      pending: 3,
+      failed: 0,
+      status: "pending",
+    });
     await render();
     await act(async () => {
       await latest.buscarAutos();

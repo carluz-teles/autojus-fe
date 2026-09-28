@@ -321,7 +321,12 @@ export function useConexaoWizard({
     setAutos({ fase: "buscando", queued: 0, pending: 0, erro: null });
     try {
       const r = await syncCourtAutos(api, alvo.connectionId);
-      setAutos({ fase: "ok", queued: r.queued ?? 0, pending: r.pending ?? 0, erro: null });
+      setAutos({
+        fase: "ok",
+        queued: r.queued ?? 0,
+        pending: r.pending ?? 0,
+        erro: null,
+      });
     } catch (e) {
       setAutos({ fase: "erro", queued: 0, pending: 0, erro: mensagemErro(e) });
     }
