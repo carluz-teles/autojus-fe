@@ -27,7 +27,8 @@ export function urgenciaPrazo(days: number) {
         ? "Vence hoje"
         : days < 0
           ? daysLeftLabel(days)
-          : `${daysLeftLabel(days)} corridos restantes`,
+          : // Rótulo NEUTRO: delta de calendário, não regime de contagem.
+            `${daysLeftLabel(days)} até o vencimento`,
     variant:
       days <= 0
         ? ("destructive" as const)

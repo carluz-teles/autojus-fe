@@ -1,5 +1,6 @@
 import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
 import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
+import { daysLeftLabel } from "@/features/prazos/lib/labels";
 import { formatDate } from "@/lib/format";
 
 import type {
@@ -150,12 +151,15 @@ export function linhaProcesso(p: ProcessoView) {
       ? {
           data: formatDate(deadline.end_date),
           ato: tipoAtoLabel(deadline.tipo_ato),
+          // Rótulo NEUTRO (mesma razão de listagem.ts/use-intimacao-detalhe): o countdown
+          // é delta de calendário até a data fatal; o regime de contagem (úteis/corridos)
+          // é outro eixo e aparece no "Por que essa data?".
           resumo:
             days < 0
-              ? `${-days} dias corridos em atraso`
+              ? daysLeftLabel(days)
               : days === 0
                 ? "Vence hoje"
-                : `${days} dias corridos restantes`,
+                : `${daysLeftLabel(days)} até o vencimento`,
           variant:
             days <= 0
               ? ("destructive" as const)

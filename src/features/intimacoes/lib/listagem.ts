@@ -1,4 +1,5 @@
 import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
+import { daysLeftLabel } from "@/features/prazos/lib/labels";
 import { grauProcessoLabel } from "@/features/processos/lib/apresentacao";
 import { formatarData } from "@/lib/utils";
 
@@ -40,11 +41,14 @@ function vencimentoDaLinha(i: IntimacaoView) {
         ? "Prazo cancelado"
         : !active
           ? "Vencimento registrado"
-          : p.days_left < 0
-            ? `${-p.days_left} dias corridos em atraso`
+          : // Rótulo NEUTRO: o countdown é o delta de calendário até a data fatal — NÃO é
+            // "corridos" nem "úteis" (a contagem real, quase sempre em dias úteis, vive no
+            // "Por que essa data?"). Dizer "corridos" aqui contradiz o regime do prazo.
+            p.days_left < 0
+            ? daysLeftLabel(p.days_left)
             : p.days_left === 0
               ? "Vence hoje"
-              : `${p.days_left} dias corridos restantes`;
+              : `${daysLeftLabel(p.days_left)} até o vencimento`;
   return {
     data: formatarData(p.end_date),
     relative,

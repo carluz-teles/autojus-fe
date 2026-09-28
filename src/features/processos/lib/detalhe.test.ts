@@ -83,6 +83,11 @@ describe("pendências do processo", () => {
       variant: "destructive",
     });
     expect(urgenciaPrazo(0).label).toBe("Vence hoje");
+    // Countdown = delta de CALENDÁRIO até a data fatal; o regime de contagem
+    // (úteis/corridos) é outro eixo e vive no "Por que essa data?". Ver a cerca
+    // equivalente em intimacoes/lib/listagem.test.ts.
+    expect(urgenciaPrazo(5).label).toBe("5 dias até o vencimento");
+    expect(urgenciaPrazo(5).label).not.toMatch(/corrido|útil|uteis|úteis/i);
   });
 });
 
