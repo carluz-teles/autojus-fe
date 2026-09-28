@@ -38,6 +38,46 @@ describe("listagem", () => {
     expect(row.ato).toBe("Especificação de Provas");
     expect(row.tribunal).toBe("TJSP · Grau não informado");
   });
+  // O countdown é o delta de CALENDÁRIO até a data fatal; o regime de contagem
+  // (dias úteis vs corridos) é outro eixo e vive no "Por que essa data?". Rotular o
+  // countdown como "corridos" contradiz o prazo em dias úteis — que é a regra da
+  // esmagadora maioria dos prazos. Já regrediu em 3 telas; este teste é a cerca.
+  it("nomeia o countdown de forma NEUTRA — nunca afirma o regime de contagem", () => {
+    const futuro = linhaIntimacao(item()).prazo.relative;
+    expect(futuro).toBe("9 dias até o vencimento");
+    expect(futuro).not.toMatch(/corrido|útil|uteis|úteis/i);
+
+    const atraso = linhaIntimacao(
+      item({
+        prazo: {
+          status: "PENDING",
+          end_date: "2026-09-01",
+          days_left: -3,
+          tipo_ato: "manifestacao",
+          selo: "a_apurar",
+          confirmed: false,
+        },
+      } as Partial<IntimacaoView>),
+    ).prazo.relative;
+    expect(atraso).toBe("3 dias em atraso");
+    expect(atraso).not.toMatch(/corrido|útil|uteis|úteis/i);
+
+    // Singular tratado (o rótulo antigo dizia "1 dias").
+    expect(
+      linhaIntimacao(
+        item({
+          prazo: {
+            status: "PENDING",
+            end_date: "2026-09-09",
+            days_left: 1,
+            tipo_ato: "manifestacao",
+            selo: "a_apurar",
+            confirmed: false,
+          },
+        } as Partial<IntimacaoView>),
+      ).prazo.relative,
+    ).toBe("1 dia até o vencimento");
+  });
   it("mostra publicação explícita e distingue prazo a definir de ausência de prazo", () => {
     expect(linhaIntimacao(item()).publicado).toBe("08/09/2026");
     expect(

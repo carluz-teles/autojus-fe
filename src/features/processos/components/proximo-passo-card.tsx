@@ -23,7 +23,7 @@ interface ProximoPassoPrazo {
   data: string;
   /** Tipo do ato (ex.: "Apelação"). */
   ato: string;
-  /** Resumo de urgência (ex.: "20 dias corridos restantes"). */
+  /** Resumo de urgência (ex.: "20 dias até o vencimento"). */
   resumo: string;
   variant: "destructive" | "warning" | "success";
 }
