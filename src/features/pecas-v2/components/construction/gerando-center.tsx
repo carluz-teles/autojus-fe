@@ -59,6 +59,8 @@ interface Props {
    * do generation-stream emitir qualquer stage.
    */
   assessmentActive?: boolean;
+  /** Processo tem autos carregados — a copy não promete autos inexistentes. */
+  hasAutos?: boolean;
 }
 
 export function GerandoCenter({
@@ -68,6 +70,7 @@ export function GerandoCenter({
   thesesDone = false,
   thesesCount,
   assessmentActive = false,
+  hasAutos = true,
 }: Props) {
   const qc = useQueryClient();
   const [html, setHtml] = useState("");
@@ -131,6 +134,7 @@ export function GerandoCenter({
         phase={phase}
         thesesCount={thesesCount}
         connectionError={connectionError}
+        hasAutos={hasAutos}
       />
     );
 

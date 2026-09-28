@@ -31,7 +31,13 @@ interface StepDef {
   sub: string;
 }
 
-const STEPS: StepDef[] = [
+// A etapa 3 tem DUAS redações porque a promessa tem que casar com o que existe:
+// processo sem autos carregados (o gate acabou de avisar) não tem peça nem prova
+// a consultar, e prometer "os autos do processo" ali é falso. A etapa continua
+// existindo — ela espelha o stage REAL `analyzing_sources`, que o BE emite de
+// todo jeito (o teor da publicação e os anexos manuais são as fontes) — mas
+// nomeia o que de fato está sendo lido.
+const STEPS_COM_AUTOS: StepDef[] = [
   { label: "Consultando teses", sub: "Fundamentos recomendados para o caso" },
   {
     label: "Reunindo o contexto",
@@ -45,6 +51,16 @@ const STEPS: StepDef[] = [
     label: "Redigindo a minuta",
     sub: "Ao começar, a folha abre e você acompanha",
   },
+];
+
+const STEPS_SEM_AUTOS: StepDef[] = [
+  STEPS_COM_AUTOS[0],
+  STEPS_COM_AUTOS[1],
+  {
+    label: "Conferindo as fontes",
+    sub: "Teor da publicação e anexos disponíveis",
+  },
+  STEPS_COM_AUTOS[3],
 ];
 
 // Spinner ring — matches design: teal ring on grey circle
@@ -61,13 +77,21 @@ export function GenerationLoading({
   phase,
   thesesCount,
   connectionError,
+  hasAutos = true,
 }: {
   /** Current phase (1-4). Missing/waiting = 1 shown as active. */
   phase: GenerationPhase;
   /** Live count from theses-stream `progress` event (shown in phase 1). */
   thesesCount?: number;
   connectionError: boolean;
+  /**
+   * Processo tem autos carregados (`draft.processDocuments`). Quando FALSO, a
+   * tela para de prometer autos que não existem — o gate da peça já avisou
+   * "Processo sem autos carregados" e a etapa 3 se contradizia com ele.
+   */
+  hasAutos?: boolean;
 }) {
+  const steps = hasAutos ? STEPS_COM_AUTOS : STEPS_SEM_AUTOS;
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-12 sm:py-16">
       {/* Halo icon */}
@@ -89,8 +113,11 @@ export function GenerationLoading({
           Preparando a sua peça.
         </h1>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Reunimos as teses e os autos do processo. Assim que a redação começa,
-          a folha abre para você acompanhar em tempo real.
+          {hasAutos
+            ? "Reunimos as teses e os autos do processo."
+            : "Reunimos as teses e o contexto do processo."}{" "}
+          Assim que a redação começa, a folha abre para você acompanhar em tempo
+          real.
         </p>
       </div>
 
@@ -99,7 +126,7 @@ export function GenerationLoading({
         className="border-line bg-panel flex flex-col gap-[2px] rounded-xl border p-1.5"
         aria-label="Etapas do processamento"
       >
-        {STEPS.map((step, index) => {
+        {steps.map((step, index) => {
           const stepPhase = (index + 1) as GenerationPhase;
           const isDone = phase > stepPhase;
           const isActive = phase === stepPhase;
