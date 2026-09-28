@@ -83,12 +83,16 @@ describe("situação do processo", () => {
 // claim_value_source (court_record.claim_value_source), ambos CHECK constraints
 // de migrations/0180_ingestao_v2_columns.up.sql.
 describe("CLIENT_ROLE_LABEL", () => {
-  it("cobre os 4 valores do CHECK de court_case.client_role", () => {
+  // Reviewer (LOW, pré-merge): "UNKNOWN" NÃO entra no mapa — o único consumidor
+  // (processo-hub.tsx) desvia UNKNOWN pra "Não informado" antes de indexar,
+  // então uma entrada UNKNOWN aqui seria morta e duplicaria o mesmo significado
+  // de "ausente" com uma segunda string ("Não identificado"). Só os 3 valores
+  // DETERMINADOS do CHECK de court_case.client_role têm rótulo.
+  it("cobre os 3 valores determinados do CHECK (exclui UNKNOWN, que o consumidor desvia antes)", () => {
     expect(CLIENT_ROLE_LABEL).toEqual({
       PLAINTIFF: "Autor(a)",
       DEFENDANT: "Réu(é)",
       BOTH: "Autor(a) e réu(é)",
-      UNKNOWN: "Não identificado",
     });
   });
 });

@@ -18,13 +18,18 @@ export const DEGREE_LABEL: Record<ProcessoDegree, string> = {
 };
 
 /** Rótulo pt-BR de `client_role` (court_case.client_role — migration 0180) — de
- *  que lado o escritório está na causa. "UNKNOWN" não renderiza rótulo próprio
- *  (a Ficha do processo cai em "Não informado", o padrão do card). */
-export const CLIENT_ROLE_LABEL: Record<ClientRole, string> = {
+ *  que lado o escritório está na causa. Só os 3 valores DETERMINADOS têm
+ *  rótulo — "UNKNOWN" (ainda não identificado) nunca chega aqui: o único
+ *  consumidor (processo-hub.tsx) desvia pra "Não informado" antes de indexar
+ *  o mapa (mesmo padrão de "ausente" que o resto do card usa), então uma
+ *  entrada UNKNOWN aqui seria morta/duplicada com o mesmo significado. */
+export const CLIENT_ROLE_LABEL: Record<
+  Exclude<ClientRole, "UNKNOWN">,
+  string
+> = {
   PLAINTIFF: "Autor(a)",
   DEFENDANT: "Réu(é)",
   BOTH: "Autor(a) e réu(é)",
-  UNKNOWN: "Não identificado",
 };
 
 /** Rótulo pt-BR de `claim_value_source` (court_record.claim_value_source —

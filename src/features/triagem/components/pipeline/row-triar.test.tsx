@@ -109,4 +109,29 @@ describe("subtítulo da linha (summary || atoPublicacao) — paridade entre abas
     );
     expect(html).toContain("Despacho de mero expediente");
   });
+
+  // Reviewer (pré-merge): `shrink-0` no span do subtítulo da RowReadonly
+  // impedia `truncate` de agir (o span nunca encolhe abaixo da largura
+  // intrínseca, então overflow-hidden não tem o que clipar) — inofensivo
+  // quando o conteúdo era o `atoPublicacao` curto ("Despacho"), mas estoura a
+  // linha com prosa longa do brief_summary. `min-w-0` (o mesmo da RowTriar,
+  // linha 195) corrige. Prova da classe, não do layout renderizado de fato
+  // (isso é o passe visual).
+  it("RowReadonly: o span do subtítulo usa min-w-0 (não shrink-0), igual à RowTriar — permite truncar prosa longa", () => {
+    const html = renderToStaticMarkup(
+      <RowReadonly
+        row={row({
+          summary:
+            "Sentença de procedência parcial — réu condenado ao pagamento de honorários advocatícios e custas processuais, com trânsito em julgado pendente de manifestação das partes.",
+        })}
+        density="confortavel"
+        href="/intimacoes/i-1"
+      />,
+    );
+    const match = html.match(/<span class="([^"]*)">Sentença de procedência/);
+    expect(match).not.toBeNull();
+    const classes = match![1];
+    expect(classes).toContain("min-w-0");
+    expect(classes).not.toContain("shrink-0");
+  });
 });

@@ -366,7 +366,7 @@ export function RowReadonly({
             <span aria-hidden className="shrink-0">
               ·
             </span>
-            <span className="text-foreground/70 shrink-0 truncate">
+            <span className="text-foreground/70 min-w-0 truncate">
               {row.summary || row.atoPublicacao}
             </span>
             <span
