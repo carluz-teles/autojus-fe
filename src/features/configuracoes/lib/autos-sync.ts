@@ -56,6 +56,14 @@ export interface AutosSyncStatus {
   queued: number;
   pending: number;
   failed: number;
+  /** Quantos processos da cobertura da conexão a sincronização VIU (materializou).
+   *  Fato DIFERENTE de `queued` (quantos passaram pelo gate e vão ser buscados) —
+   *  é a diferença que deixa a UI dizer "achei seu acervo e nada precisa de autos
+   *  agora" em vez de "não achei nada" (BE: AutosSyncResult.Discovered em
+   *  internal/court/manual_sync.go). Só o POST de sincronização a preenche; o GET
+   *  de status devolve 0 (nada foi descoberto ao só consultar). Opcional porque é
+   *  aditivo ao contrato: uma resposta antiga sem o campo continua válida. */
+  discovered?: number;
   status: "idle" | "pending" | "failed";
   error?: string;
 }
@@ -72,6 +80,7 @@ export function summarizeAutosSync(
   ];
   return {
     queued: results.reduce((sum, item) => sum + (item.queued ?? 0), 0),
+    discovered: results.reduce((sum, item) => sum + (item.discovered ?? 0), 0),
     pending,
     failed,
     status:
@@ -84,9 +93,19 @@ export function summarizeAutosSync(
   };
 }
 
+/** "N processos" / "1 processo" — a contagem aparece na cópia, então o plural também. */
+function contagemProcessos(total: number) {
+  return `${total} ${total === 1 ? "processo" : "processos"}`;
+}
+
 export function autosSyncFeedback(
   status: AutosSyncStatus,
-  request?: { queued: number; pending: number; failures: string[] },
+  request?: {
+    queued: number;
+    pending: number;
+    discovered?: number;
+    failures: string[];
+  },
 ) {
   if (status.status === "pending")
     return {
@@ -117,6 +136,16 @@ export function autosSyncFeedback(
       title: "Busca de autos finalizada",
       description:
         "A busca foi concluída. Atualize a lista para consultar os documentos disponíveis.",
+    };
+  // Acervo encontrado, nada enfileirado: o BE achou os processos da conexão e o gate
+  // de necessidade não admitiu nenhum (discovered > 0, queued = 0, status "idle").
+  // Dizer isso com os NÚMEROS é o ponto — o silêncio faz o usuário achar que o botão
+  // não funcionou. E nada de prometer busca: não há nada na fila.
+  if (request && (request.discovered ?? 0) > 0)
+    return {
+      failed: false,
+      title: "Nenhum processo precisa dos autos agora",
+      description: `Verificamos ${contagemProcessos(request.discovered ?? 0)} desta conexão e nenhum precisa dos autos neste momento — nada foi solicitado ao tribunal. Os autos são buscados quando um prazo ou uma nova publicação exige.`,
     };
   return {
     failed: false,
