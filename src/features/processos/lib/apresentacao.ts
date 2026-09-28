@@ -77,7 +77,9 @@ export function lifecycleInfo(lifecycle: string): LifecycleInfo {
     case "ARCHIVED":
       return { label: "Arquivado", cor: "var(--fg3)" };
     default:
-      return { label: lifecycle || "—", cor: "var(--fg2)" };
+      // `lifecycle` é string aberta: um estado novo do BE caía aqui e a tela
+      // imprimia o enum cru em SCREAMING_SNAKE. Rótulo neutro em pt-BR.
+      return { label: "Situação a verificar", cor: "var(--fg2)" };
   }
 }
 

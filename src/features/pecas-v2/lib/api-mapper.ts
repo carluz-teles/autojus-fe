@@ -3,6 +3,7 @@
 // deadline em dias) são derivados aqui pra manter a UI intocada.
 
 import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
+import { grauProcessoLabel } from "@/features/processos/lib/apresentacao";
 
 import type {
   ChatMessage,
@@ -165,7 +166,13 @@ function mapProcess(api: ProcessAPI | null): DraftProcess {
     classe: api.class,
     assunto: api.subject,
     orgao: api.judging_body,
-    tribunalGrau: `${api.court} · ${api.degree}`,
+    // `degree` é o enum do BE e guarda o sentinela LITERAL 'UNKNOWN': interpolado
+    // cru, a bancada imprimia "… · TJSP · UNKNOWN". `grauProcessoLabel` é a fonte
+    // única da tradução (a mesma que listagem/triagem/processos usam). filter+join
+    // porque tribunal vazio não deve deixar um " · " órfão.
+    tribunalGrau: [api.court, grauProcessoLabel(api.degree)]
+      .filter(Boolean)
+      .join(" · "),
     valor: formatBrl(api.claim_value),
     distribuicao: "", // BE não expõe no read model v0
   };
