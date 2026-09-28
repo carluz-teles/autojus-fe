@@ -184,14 +184,16 @@ export function RowTriar({
                 </Link>
               </div>
 
-              {/* linha 2: meta (CNJ · tribunal · ato) */}
+              {/* linha 2: meta (CNJ · tribunal) · subtítulo — brief_summary
+                  ("o que aconteceu", P0-2) quando presente, senão o ato da
+                  publicação (comportamento anterior, item sem brief ainda). */}
               <div className="text-fg3 flex min-w-0 flex-wrap items-center gap-1.5 text-[11.5px]">
                 <span className="min-w-0 truncate font-mono">{row.meta}</span>
                 <span aria-hidden className="shrink-0">
                   ·
                 </span>
                 <span className="text-foreground/70 min-w-0 truncate">
-                  {row.atoPublicacao}
+                  {row.summary || row.atoPublicacao}
                 </span>
               </div>
             </div>

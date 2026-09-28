@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { IntimacaoView } from "../../intimacoes/types";
-import { EXCECAO_MOTIVO_LABEL, pipelineRow } from "./pipeline";
+import {
+  CATEGORIA_COARSE_LABEL,
+  EXCECAO_MOTIVO_LABEL,
+  pipelineRow,
+} from "./pipeline";
 
 function item(overrides: Partial<IntimacaoView> = {}): IntimacaoView {
   return {
@@ -171,4 +175,60 @@ describe("EXCECAO_MOTIVO_LABEL — revisão independente", () => {
       expect(row.excecaoMotivo).toBe(label);
     },
   );
+});
+
+// P0-2 (docs/spec-fe-retrabalho-v3.27.md): o chip primário da Triagem passa a
+// ser o demand_kind do brief, com fallback pro chip de categoria_coarse
+// (comportamento anterior) quando brief_demand_kind é "" ou "undetermined".
+describe("pipelineRow — chip do brief (P0-2)", () => {
+  it("usa o rótulo do demand_kind como chip primário quando há brief determinado", () => {
+    const row = pipelineRow(
+      item({
+        brief_demand_kind: "answer",
+        brief_requires_work: true,
+        brief_work_kind: "piece",
+        brief_summary: "Sentença de procedência — réu condenado a pagar.",
+      }),
+    );
+    expect(row.categoriaLabel).toBe("resposta/contestação");
+    expect(row.demandLabel).toBe("resposta/contestação");
+    expect(row.requiresWork).toBe(true);
+    expect(row.summary).toBe(
+      "Sentença de procedência — réu condenado a pagar.",
+    );
+  });
+
+  it("demand_kind='acknowledge' mostra o chip 'ciência' (tom neutro, mesmo componente)", () => {
+    const row = pipelineRow(
+      item({
+        brief_demand_kind: "acknowledge",
+        brief_requires_work: false,
+        brief_work_kind: "acknowledge",
+        brief_summary: "Ciência de despacho de mero expediente.",
+      }),
+    );
+    expect(row.categoriaLabel).toBe("ciência");
+    expect(row.requiresWork).toBe(false);
+  });
+
+  it("demand_kind='undetermined' cai no chip de categoria_coarse (fallback, comportamento atual)", () => {
+    const row = pipelineRow(
+      item({
+        brief_demand_kind: "undetermined",
+        categoria_coarse: "despacho",
+        disposicao: "ciencia",
+      }),
+    );
+    expect(row.categoriaLabel).toBe(CATEGORIA_COARSE_LABEL.despacho);
+    expect(row.demandLabel).toBe("");
+  });
+
+  it('sem brief ainda ("") cai no chip de categoria_coarse (fallback)', () => {
+    const row = pipelineRow(
+      item({ categoria_coarse: "recurso", disposicao: "ciencia" }),
+    );
+    expect(row.categoriaLabel).toBe(CATEGORIA_COARSE_LABEL.recurso);
+    expect(row.demandLabel).toBe("");
+    expect(row.summary).toBe("");
+  });
 });

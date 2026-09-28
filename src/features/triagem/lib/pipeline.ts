@@ -8,6 +8,7 @@
 import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
 import { formatarData } from "@/lib/utils";
 
+import { demandKindLabel } from "../../intimacoes/lib/demand-kind";
 import {
   estadoIntimacao,
   type IntimacaoEstado,
@@ -19,6 +20,7 @@ import {
 import { tipoAtoLabel } from "../../intimacoes/lib/tipo-ato";
 import type {
   IntimacaoCategoriaCoarse,
+  IntimacaoDemandKind,
   IntimacaoDisposicao,
   IntimacaoExcecaoMotivo,
   IntimacaoLifecycle,
@@ -125,8 +127,20 @@ export interface PipelineRow {
   lifecycle: IntimacaoLifecycle;
   /** Deep-link ao processo/intimação. */
   courtRecordId: string;
+  /** Rótulo do chip primário da linha — brief_demand_kind (P0-2) quando presente
+   *  e determinado, senão o rótulo de categoria_coarse (fallback, comportamento
+   *  anterior à P0-2). */
   categoriaLabel: string;
-  categoria: IntimacaoCategoriaCoarse;
+  /** Valor por trás de `categoriaLabel`, só pro atributo `data-categoria` do chip
+   *  (nenhuma lógica de UI ramifica nele). */
+  categoria: IntimacaoCategoriaCoarse | IntimacaoDemandKind;
+  /** Rótulo pt-BR do brief_demand_kind (DEMAND_KIND_LABEL); "" quando não há
+   *  brief ainda ou o demand_kind é "undetermined" (P0-2). */
+  demandLabel: string;
+  /** brief_requires_work — false = mera ciência (tom neutro do chip). */
+  requiresWork: boolean;
+  /** brief_summary — "o que aconteceu" em 1 linha; "" quando não há brief ainda. */
+  summary: string;
   /** Título serif — o mesmo builder do read model (title já vem do BE). */
   title: string;
   /** Meta mono: "CNJ · Tribunal · Grau". */
@@ -176,7 +190,8 @@ export function pipelineRow(i: IntimacaoView): PipelineRow {
   // document_type disser ciência num item que o motor marcou acionável (ex.: Ato ordinatório
   // com "manifeste-se"), mostramos o ATO. Analisando (motor não classificou) vira chip neutro.
   const acionavel = i.disposicao === "trabalho" || i.disposicao === "excecao";
-  let chipCategoria: IntimacaoCategoriaCoarse = i.categoria_coarse;
+  let chipCategoria: IntimacaoCategoriaCoarse | IntimacaoDemandKind =
+    i.categoria_coarse;
   let chipLabel =
     CATEGORIA_COARSE_LABEL[i.categoria_coarse] ?? CATEGORIA_COARSE_LABEL.outros;
   if (i.disposicao === "analisando") {
@@ -186,12 +201,29 @@ export function pipelineRow(i: IntimacaoView): PipelineRow {
     chipCategoria = "manifestacao";
     chipLabel = p?.tipo_ato ? tipoAtoLabel(p.tipo_ato) : "Providência";
   }
+  // Brief (P0-2, design §8): o demand_kind do brief é o chip PRIMÁRIO da Triagem —
+  // mais específico do que a categoria coarse determinística. Some por cima da
+  // derivação acima (inclusive do caso "Analisando": um brief já materializado
+  // conta mais do que o motor de prazo ainda não ter classificado). FALLBACK pro
+  // chip de categoria_coarse só quando brief_demand_kind é "" (sem brief ainda)
+  // ou "undetermined" (brief não conseguiu determinar a demanda).
+  const demandLabel =
+    i.brief_demand_kind && i.brief_demand_kind !== "undetermined"
+      ? demandKindLabel(i.brief_demand_kind)
+      : "";
+  if (demandLabel) {
+    chipCategoria = i.brief_demand_kind as IntimacaoDemandKind;
+    chipLabel = demandLabel;
+  }
   return {
     id: i.id,
     lifecycle: i.lifecycle,
     courtRecordId: i.court_record_id,
     categoria: chipCategoria,
     categoriaLabel: chipLabel,
+    demandLabel,
+    requiresWork: i.brief_requires_work,
+    summary: i.brief_summary,
     title: tituloIntimacao(i.title),
     meta: [formatarCNJ(i.cnj_number), i.court, grau]
       .filter(Boolean)

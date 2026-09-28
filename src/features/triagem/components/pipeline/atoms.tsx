@@ -9,15 +9,20 @@ import { Clock, TriangleAlert } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-import type { IntimacaoCategoriaCoarse } from "../../../intimacoes/types";
+import type {
+  IntimacaoCategoriaCoarse,
+  IntimacaoDemandKind,
+} from "../../../intimacoes/types";
 import type { PipelinePrazo } from "../../lib/pipeline";
 
-/** Chip grosso da categoria coarse — pequeno, neutro/outline. */
+/** Chip grosso do rótulo primário da linha — categoria coarse OU (P0-2) o
+ *  demand_kind do brief quando presente/determinado; pequeno, neutro/outline
+ *  (a mesma tonalidade serve pra "Ciência" — não há tom de urgência aqui). */
 export function CategoriaChip({
   categoria,
   label,
 }: {
-  categoria: IntimacaoCategoriaCoarse;
+  categoria: IntimacaoCategoriaCoarse | IntimacaoDemandKind;
   label: string;
 }) {
   return (
