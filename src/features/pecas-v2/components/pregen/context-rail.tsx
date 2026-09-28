@@ -80,6 +80,22 @@ export function ContextRail({
               </p>
             </div>
             <dl className="flex flex-col gap-3">
+              {/* De que lado o escritório está — `is_client` (eixo de
+                  court_case.client_role) já vinha no payload e o rail o
+                  descartava. Sem marcação, "Partes envolvidas" listava as
+                  partes sem dizer qual delas é o cliente. Badge igual ao da
+                  Ficha do processo; "Não informado" quando o BE não marcou
+                  ninguém — nunca chutamos o polo. */}
+              <div>
+                <dt className="text-muted-foreground text-xs">Cliente</dt>
+                <dd>
+                  {processo.clientePolo ? (
+                    <Badge variant="default">{processo.clientePolo}</Badge>
+                  ) : (
+                    "Não informado"
+                  )}
+                </dd>
+              </div>
               <div>
                 <dt className="text-muted-foreground text-xs">Assunto</dt>
                 <dd>{processo.assunto || "Não informado"}</dd>
@@ -98,7 +114,15 @@ export function ContextRail({
                   className="border-l-2 pl-3"
                   key={`${p.roleLabel}-${p.name}`}
                 >
-                  <p className="text-muted-foreground text-xs">{p.roleLabel}</p>
+                  <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
+                    {p.roleLabel}
+                    {/* Cor não é o único sinal: o rótulo textual acompanha. */}
+                    {p.isClient && (
+                      <Badge variant="default" className="h-4 text-[10px]">
+                        Cliente do escritório
+                      </Badge>
+                    )}
+                  </p>
                   <p>{p.name}</p>
                   {p.counselLabel && (
                     <p className="text-muted-foreground text-xs">

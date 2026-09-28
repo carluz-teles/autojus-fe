@@ -124,6 +124,51 @@ describe("listagem", () => {
       ).title,
     ).toBe("Réu Fulano");
   });
+  // ITEM 2 — `brief_summary` ("o que aconteceu", 1 linha) está preenchido em
+  // TODOS os briefs do tenant e já vem na projeção do BE, mas a lista de
+  // intimações não o lia: o card mostrava só o DUMP do teor cru (content_preview,
+  // ~500 chars cortados no meio da palavra). O resumo é o subtítulo; o teor cru é
+  // só o fallback de quem ainda não tem brief.
+  it("expõe o resumo do brief como subtítulo da linha", () => {
+    const row = linhaIntimacao(
+      item({
+        brief_summary: "Sentença de procedência parcial; cabe apelação.",
+        content_preview: "PROCESSO Nº 4012732... PAULO SERGIO DE OLIVEI",
+      }),
+    );
+    expect(row.summary).toBe("Sentença de procedência parcial; cabe apelação.");
+  });
+
+  it("resumo vazio cai no teor cru (comportamento anterior preservado)", () => {
+    const row = linhaIntimacao(
+      item({ brief_summary: "", content_preview: "Teor cru da publicação" }),
+    );
+    expect(row.summary).toBe("");
+    expect(row.preview).toBe("Teor cru da publicação");
+  });
+
+  // O teor cru chega truncado pelo BE em ~500 chars, cortando no meio da palavra
+  // ("…PAULO SERGIO DE OLIVEI"). Enquanto ele é o fallback, a última palavra
+  // parcial sai e entra uma elipse — cortar no meio da palavra é sempre defeito.
+  it("apara a palavra partida do teor truncado", () => {
+    const row = linhaIntimacao(
+      item({
+        brief_summary: "",
+        content_preview: `${"a".repeat(480)} PAULO SERGIO DE OLIVEI`,
+      }),
+    );
+    expect(row.preview.endsWith("PAULO SERGIO DE…")).toBe(true);
+    expect(row.preview).not.toContain("OLIVEI");
+  });
+
+  it("teor curto (não truncado) fica intacto, sem elipse", () => {
+    expect(
+      linhaIntimacao(
+        item({ brief_summary: "", content_preview: "Teor curto." }),
+      ).preview,
+    ).toBe("Teor curto.");
+  });
+
   it("não colore como atraso ativo uma intimação resolvida", () => {
     const i = item({ user_status: "RESOLVED" });
     i.prazo!.days_left = -8;

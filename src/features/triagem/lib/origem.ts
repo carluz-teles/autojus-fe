@@ -23,8 +23,10 @@ export const ORIGEM_LABEL: Record<IntimacaoOrigem, string> = {
   sem_prazo: "Sem prazo",
 };
 
+/** Tooltip da origem. Mesma diretiva do ORIGEM_LABEL: a copy descreve a AÇÃO e a
+ *  FONTE do dado ("a partir do texto da publicação"), nunca a tecnologia. */
 export const ORIGEM_DESCRICAO: Partial<Record<IntimacaoOrigem, string>> = {
-  ia: "O tipo de ato foi sugerido por IA a partir da publicação. Quando há regra aplicável, o prazo é calculado pelo sistema. Esta é a origem da sugestão, não uma confirmação do advogado.",
+  ia: "O tipo de ato foi inferido a partir do texto da publicação. Quando há regra aplicável, o prazo é calculado pelo sistema. Esta é a origem da sugestão, não uma confirmação do advogado.",
 };
 
 /**

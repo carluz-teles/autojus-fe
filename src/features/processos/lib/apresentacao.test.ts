@@ -5,6 +5,8 @@ import {
   assuntosDoProcesso,
   CLAIM_VALUE_SOURCE_LABEL,
   CLIENT_ROLE_LABEL,
+  grauProcessoLabel,
+  lifecycleInfo,
   linhaProcesso,
   retornoProcessos,
   situacaoProcesso,
@@ -157,5 +159,34 @@ describe("assuntosDoProcesso", () => {
 
   it("sem nenhum dos dois → ausência explícita", () => {
     expect(assuntosDoProcesso(base).texto).toBe("Não informado");
+  });
+});
+
+// ITEM 3 (classe) — enum cru NUNCA chega à tela. `lifecycle` é string ABERTA no
+// tipo, então um estado novo do BE caía no default e a lista/cockpit imprimiam o
+// valor em SCREAMING_SNAKE. `degree` tem o mesmo risco e já era tratado; os dois
+// ficam travados aqui.
+describe("tradução de enum — nada de valor cru na UI", () => {
+  it("lifecycle desconhecido vira rótulo pt-BR, não o enum", () => {
+    const { label } = lifecycleInfo("SOME_NEW_STATE");
+    expect(label).toBe("Situação a verificar");
+    expect(label).not.toContain("SOME_NEW_STATE");
+    expect(label).not.toMatch(/[A-Z]{2,}_/);
+  });
+
+  it("lifecycle vazio também não vaza", () => {
+    expect(lifecycleInfo("").label).toBe("Situação a verificar");
+  });
+
+  it("os estados conhecidos seguem com o rótulo de sempre", () => {
+    expect(lifecycleInfo("ACTIVE").label).toBe("Em andamento");
+    expect(lifecycleInfo("ARCHIVED").label).toBe("Arquivado");
+    expect(lifecycleInfo("UNKNOWN").label).toBe("A verificar");
+  });
+
+  it("grau desconhecido vira 'Grau não informado', nunca o sentinela", () => {
+    expect(grauProcessoLabel("UNKNOWN")).toBe("Grau não informado");
+    expect(grauProcessoLabel("ALGO_NOVO")).toBe("Grau não informado");
+    expect(grauProcessoLabel("JE")).toBe("Juizado");
   });
 });

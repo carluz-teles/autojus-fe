@@ -25,7 +25,10 @@ import type {
 } from "@/features/intimacoes/types";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { nomeExibicao } from "@/features/organization/lib/labels";
-import { FASE_STEPS } from "@/features/processos/lib/apresentacao";
+import {
+  FASE_STEPS,
+  grauProcessoLabel,
+} from "@/features/processos/lib/apresentacao";
 import { ApiError } from "@/lib/api/errors";
 import { formatarData } from "@/lib/utils";
 
@@ -323,7 +326,11 @@ function useModel(i: IntimacaoDetalheView | undefined) {
       classe: i.class,
       assunto: i.subject,
       tribunal: i.court,
-      tribunalGrau: [i.court, i.degree].filter(Boolean).join(" · "),
+      // Mesmo tratamento do resto do FE: `degree` guarda o sentinela literal
+      // 'UNKNOWN' e não pode ser interpolado cru (ver grauProcessoLabel).
+      tribunalGrau: [i.court, grauProcessoLabel(i.degree)]
+        .filter(Boolean)
+        .join(" · "),
       // Destinatários (advogados endereçados) — "Partes/Procuradores" no rail.
       destinatarios: i.recipients.map((r) => ({
         nome: r.name,

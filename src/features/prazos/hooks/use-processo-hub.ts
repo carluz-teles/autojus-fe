@@ -13,6 +13,7 @@ import {
 } from "@/features/documentos/lib/tipo-autos";
 import { atoPublicacaoLabel } from "@/features/intimacoes/lib/labels";
 import { prazoVisivel } from "@/features/intimacoes/lib/prazo-visivel";
+import { resumoOuTeor } from "@/features/intimacoes/lib/resumo-intimacao";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { usePecasByProcesso } from "@/features/pecas/hooks/use-peca";
 import { rotuloTipoPeca } from "@/features/pecas/lib/labels";
@@ -90,7 +91,14 @@ export function useProcessoHub(id: string) {
       return {
         id: i.id,
         titulo: atoPublicacaoLabel(i.ai_act, i.prazo?.tipo_ato, i.type),
-        descricao: i.content_preview,
+        // "O que aconteceu" (brief_summary) em vez do DUMP do teor cru — o card
+        // mostrava ~500 chars da publicação cortados no meio da palavra. Fallback
+        // ao teor (aparado) quando a intimação ainda não tem brief.
+        // NOTA: GET /v1/processos/:id/intimacoes (ListIntimacoesByProcesso) ainda
+        // NÃO projeta brief_summary — só ListIntimacoes/GetIntimacao projetam.
+        // Até o BE incluir a coluna, isto cai no teor aparado (já uma melhora) e
+        // passa a mostrar o resumo sozinho no dia em que o campo chegar.
+        descricao: resumoOuTeor(i.brief_summary, i.content_preview),
         meta: `Publicada em ${formatDate(i.published_at)}`,
         responsavel: {
           id: i.assignee_user_id,

@@ -115,6 +115,53 @@ describe("GenerationLoading — 4 etapas reais sem timers", () => {
     expect(html).not.toContain("falhou");
   });
 
+  // ITEM 9 — a tela prometia "os autos do processo" e a etapa "Consultando os
+  // autos · Localizando peças e provas do processo" mesmo quando o processo não
+  // tem autos, logo depois do gate avisar "Processo sem autos carregados". A
+  // promessa tem que casar com o que existe.
+  describe("promessa de autos condicionada à existência real", () => {
+    const render = (hasAutos: boolean) =>
+      renderToStaticMarkup(
+        createElement(GenerationLoading, {
+          phase: 3,
+          connectionError: false,
+          hasAutos,
+        }),
+      );
+
+    it("processo SEM autos não promete autos em lugar nenhum", () => {
+      const html = render(false);
+      expect(html).not.toContain("os autos do processo");
+      expect(html).not.toContain("Consultando os autos");
+      expect(html).not.toContain("Localizando peças e provas do processo");
+    });
+
+    it("processo SEM autos nomeia as fontes que de fato existem", () => {
+      const html = render(false);
+      expect(html).toContain("Reunimos as teses e o contexto do processo");
+      expect(html).toContain("Conferindo as fontes");
+      expect(html).toContain("Teor da publicação e anexos disponíveis");
+    });
+
+    it("processo COM autos mantém a copy original", () => {
+      const html = render(true);
+      expect(html).toContain("Reunimos as teses e os autos do processo");
+      expect(html).toContain("Consultando os autos");
+    });
+
+    it("as 4 etapas continuam existindo nos dois casos (espelham stages reais)", () => {
+      expect(render(false).match(/<li [^>]*>/g) ?? []).toHaveLength(4);
+      expect(render(true).match(/<li [^>]*>/g) ?? []).toHaveLength(4);
+    });
+
+    it("default é COM autos — nenhum chamador existente muda de comportamento", () => {
+      const html = renderToStaticMarkup(
+        createElement(GenerationLoading, { phase: 3, connectionError: false }),
+      );
+      expect(html).toContain("Consultando os autos");
+    });
+  });
+
   it("não menciona fase 'retrieving_sources' nem stages removidos", () => {
     const html = renderToStaticMarkup(
       createElement(GenerationLoading, {

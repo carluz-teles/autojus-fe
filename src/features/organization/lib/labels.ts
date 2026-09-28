@@ -6,9 +6,10 @@ const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Administrador",
 };
 
-/** Papel do membro em pt-BR; cai no valor cru quando desconhecido. */
+/** Papel do membro em pt-BR. Papel desconhecido NÃO vaza o enum cru do BE:
+ *  cai num rótulo neutro (o card de Equipe renderiza isto direto). */
 export function roleLabel(role: string): string {
-  return ROLE_LABEL[role] ?? role;
+  return ROLE_LABEL[role] ?? "Membro";
 }
 
 /**

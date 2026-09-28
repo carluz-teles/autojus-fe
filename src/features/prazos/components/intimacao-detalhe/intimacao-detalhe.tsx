@@ -55,7 +55,11 @@ import {
   origemRevisaoLabel,
   tipoRevisaoLabel,
 } from "../../lib/detalhe-apresentacao";
-import { type ModoDetalhe, resolverModoDetalhe } from "../../lib/modo-detalhe";
+import {
+  capacidadesDoModo,
+  type ModoDetalhe,
+  resolverModoDetalhe,
+} from "../../lib/modo-detalhe";
 import type { DimensionReview } from "../../types";
 import { AutosSection } from "./autos-section";
 import { ConfirmacaoPrazo } from "./confirmacao-prazo";
@@ -773,7 +777,10 @@ export function PainelPrazo({
               <p className="text-muted-foreground mb-1 text-xs">
                 Responsável pela intimação
               </p>
-              {modo === "consulta" ? (
+              {/* Trocar o responsável é ação de execução: vale nos dois modos
+                  (a mesma intimação não pode ter dono editável numa tela e
+                  congelado na outra). */}
+              {!capacidadesDoModo(modo).executar ? (
                 <Responsavel value={m.responsavelId} nome={m.responsavelNome} />
               ) : (
                 <ResponsavelMenu
@@ -1294,10 +1301,12 @@ function Disposicao({
   compacto?: boolean;
 }) {
   const m = det.model!;
+  // "Revisar tipo"/"Revisar prazo" e as providências são ações POR ITEM —
+  // disponíveis nas duas telas (ver capacidadesDoModo).
   return (
     <DisposicaoSection
       compacto={compacto}
-      readOnly={modo === "consulta"}
+      readOnly={!capacidadesDoModo(modo).executar}
       intimationId={m.id}
       providencias={m.providencias}
       analyzing={det.analisando}
@@ -1352,28 +1361,27 @@ function AcoesPrimarias({
     },
   );
 
-  // Consulta (histórico de Intimações): nenhuma ação de EXECUÇÃO aqui — só
-  // "Abrir na Mesa", que leva ao mesmo id na aba/seção correspondente
-  // (docs/revamp-mesa-trabalho-intimacoes.md §4, tabela do Detalhe).
-  if (modo === "consulta") {
-    return (
-      <Button
-        size="sm"
-        variant="outline"
-        render={
-          <Link
-            href={`/triagem?painel=${encodeURIComponent(m.id)}${
-              det.intimacao?.lifecycle ? `&tab=${det.intimacao.lifecycle}` : ""
-            }`}
-          />
-        }
-        nativeButton={false}
-      >
-        Abrir na Mesa
-        <ExternalLink data-icon="inline-end" />
-      </Button>
-    );
-  }
+  // Consulta (histórico de Intimações) GANHA "Abrir na Mesa" — e não perde mais
+  // nada: as ações de execução valem nos dois modos, para a mesma intimação não
+  // divergir entre as duas telas (ver capacidadesDoModo, que é a fonte única da
+  // política e registra a contradição com o §4 do doc do revamp).
+  const abrirNaMesa = capacidadesDoModo(modo).abrirNaMesa ? (
+    <Button
+      size="sm"
+      variant="outline"
+      render={
+        <Link
+          href={`/triagem?painel=${encodeURIComponent(m.id)}${
+            det.intimacao?.lifecycle ? `&tab=${det.intimacao.lifecycle}` : ""
+          }`}
+        />
+      }
+      nativeButton={false}
+    >
+      Abrir na Mesa
+      <ExternalLink data-icon="inline-end" />
+    </Button>
+  ) : null;
 
   // Enquanto o prazo/memória carrega, seguramos as ações (evita agir sobre estado
   // incompleto). O gate cobre o pre-flight da peça inline (dentro do botão único).
@@ -1401,13 +1409,24 @@ function AcoesPrimarias({
   // Intimação em estado terminal (resolvida/ignorada) — a unidade de trabalho é a
   // própria intimação, então nada mais a gerar/concluir: só o menu (⋮ Reabrir).
   if (m.podeReabrir) {
-    return <AcoesIntimacao det={det} />;
+    return (
+      <div
+        className={cn(
+          "flex flex-wrap items-center justify-end gap-2",
+          className,
+        )}
+      >
+        {abrirNaMesa}
+        <AcoesIntimacao det={det} />
+      </div>
+    );
   }
 
   return (
     <div
       className={cn("flex flex-wrap items-center justify-end gap-2", className)}
     >
+      {abrirNaMesa}
       <GerarPecaButton
         intimacaoId={m.id}
         processoId={m.courtRecordId}

@@ -112,12 +112,17 @@ export function GerarPecaModal({
               Alguma orientação para esta peça?
             </Dialog.Title>
 
+            {/* `pecaLabel` pode ser um SUBSTANTIVO ("Contestação") ou uma oração
+                verbal ("Apresentar memória de cálculo atualizada"): o artigo "a"
+                hardcoded produzia "para a Apresentar memória de cálculo". O
+                template tem que ser livre de artigo e de gênero — daí o aposto
+                entre parênteses, que serve aos dois casos. */}
             <Dialog.Description className="text-muted-foreground mb-4 text-[13px] leading-relaxed">
               Diga o foco, se quiser (ex.: priorizar nulidade processual,
               enfatizar prescrição). Sem orientação, geramos com{" "}
-              <strong>todas as teses recomendadas</strong>
-              {pecaLabel ? ` para a ${pecaLabel}` : ""} — você remove depois as
-              que não fizerem sentido.
+              <strong>todas as teses recomendadas</strong> para esta peça
+              {pecaLabel ? ` (${pecaLabel})` : ""} — você remove depois as que
+              não fizerem sentido.
             </Dialog.Description>
 
             {/* Instructions textarea — pattern from preparation-canvas */}
