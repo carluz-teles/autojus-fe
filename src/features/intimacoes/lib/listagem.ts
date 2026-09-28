@@ -6,6 +6,7 @@ import { formatarData } from "@/lib/utils";
 import type { IntimacaoGroup, IntimacaoView } from "../types";
 import { estadoIntimacao } from "./estado";
 import { atoPublicacaoLabel, tituloIntimacao } from "./labels";
+import { apararTeorTruncado } from "./resumo-intimacao";
 
 export const SITUACAO_LABEL = {
   PENDING: "Pendente",
@@ -92,7 +93,12 @@ export function linhaIntimacao(i: IntimacaoView) {
         ? formatarData(i.made_available_at)
         : "Não informada",
     publicadoRotulo: i.published_at ? "Publicada" : "Disponibilizada",
-    preview: i.content_preview,
+    // Subtítulo da linha: "o que aconteceu" (brief_summary) — preenchido em todos
+    // os briefs e até aqui ignorado pela lista, que só mostrava o dump do teor.
+    // "" quando a intimação ainda não tem brief; aí o card cai no teor (preview).
+    summary: i.brief_summary ?? "",
+    // Teor cru — aparado, porque o BE o corta em ~500 chars no meio da palavra.
+    preview: apararTeorTruncado(i.content_preview),
   };
 }
 

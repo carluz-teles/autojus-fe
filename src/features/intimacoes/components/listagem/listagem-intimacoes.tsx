@@ -391,7 +391,15 @@ function LinhaIntimacao({
               {r.partes}
             </p>
           ) : null}
-          {r.preview ? (
+          {/* Subtítulo "o que aconteceu": o resumo do brief (mesmo padrão de
+              pipeline/row-triar.tsx — uma linha, min-w-0 + truncate) substitui o
+              DUMP do teor cru. Sem brief ainda, cai no teor (2 linhas), que é o
+              comportamento anterior. */}
+          {r.summary ? (
+            <p className="text-foreground/85 mt-1.5 min-w-0 truncate text-sm leading-relaxed">
+              {r.summary}
+            </p>
+          ) : r.preview ? (
             <TeorContent
               content={r.preview}
               allowLinks={false}
