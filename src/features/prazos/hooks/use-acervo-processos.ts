@@ -5,11 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { useProcessos } from "@/features/processos/hooks/use-processos";
 import {
-  DEGREE_LABEL,
+  grauProcessoLabelOuVazio,
   lifecycleInfo,
   linhaProcesso,
 } from "@/features/processos/lib/apresentacao";
-import type { ProcessoDegree } from "@/features/processos/types";
 import { useUrlFilters } from "@/lib/hooks/use-url-filters";
 
 export function useAcervoProcessos() {
@@ -47,10 +46,10 @@ export function useAcervoProcessos() {
       label: "Grau",
       options: (query.filters.degree ?? []).map((o) => ({
         ...o,
-        label:
-          DEGREE_LABEL[o.value as ProcessoDegree] === "—"
-            ? "Não informado"
-            : (DEGREE_LABEL[o.value as ProcessoDegree] ?? o.label),
+        // Mesma fonte única do rótulo de grau. O filtro chama a ausência de "Não
+        // informado" (é OPÇÃO de lista, não linha de meta) — e nunca cai no rótulo
+        // cru do BE, que pra grau é o próprio enum.
+        label: grauProcessoLabelOuVazio(o.value) || "Não informado",
       })),
     },
     {

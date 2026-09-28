@@ -230,3 +230,22 @@ describe("pipelineRow — chip do brief (P0-2)", () => {
     expect(row.summary).toBe("");
   });
 });
+
+// Decisão VISUAL declarada: o grau na linha da Triagem passou a usar a grafia
+// canônica do produto ("1º grau", de processos/lib/apresentacao.ts) em vez do "1º
+// Grau" que só existia aqui. Um mapa local com valores divergentes era duplicação
+// (Regra nº1); a grafia escolhida é a que o resto do produto já usa.
+describe("meta da linha (grau)", () => {
+  it("usa a grafia canônica do produto, não a variante local", () => {
+    const row = pipelineRow(item({ degree: "G1" }));
+    expect(row.meta).toBe("0000000-00.2026.8.26.0001 · TJSP · 1º grau");
+    expect(row.meta).not.toContain("1º Grau");
+  });
+
+  it("grau desconhecido é OMITIDO da meta (não vira sentinela nem enum cru)", () => {
+    const row = pipelineRow(item({ degree: "UNKNOWN" }));
+    expect(row.meta).toBe("0000000-00.2026.8.26.0001 · TJSP");
+    expect(row.meta).not.toContain("UNKNOWN");
+    expect(row.meta).not.toContain("—");
+  });
+});

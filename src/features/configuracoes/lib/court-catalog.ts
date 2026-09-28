@@ -15,8 +15,42 @@ export const courtConnectionLabels: Record<CourtConnectionStatus, string> = {
   DISCONNECTED: "Não conectado",
 };
 
+/**
+ * Nome do sistema como o tribunal o escreve. O mapa existe só pra CAPITALIZAÇÃO da
+ * marca ("EPROC" → "eproc", "ESAJ" → "e-SAJ"); o conjunto fechado vive em
+ * internal/court/catalog.go (hoje EPROC e ESAJ, nada mais).
+ *
+ * O fallback devolve o código cru DE PROPÓSITO e não é enum vazando: esses valores
+ * são siglas de marca, então um sistema novo ("PJE") já chega legível — inventar um
+ * rótulo pt-BR pra ele seria pior (batizaríamos o produto de outra empresa). O que
+ * NÃO se aceita é grafia errada, por isso cada sistema suportado tem entrada aqui.
+ */
 export function courtSystemName(system: string) {
   return { EPROC: "eproc", ESAJ: "e-SAJ" }[system] ?? system;
+}
+
+/**
+ * O único caminho pra frente é capturar o segundo fator (o QR/código): não há seed
+ * selado no BE pra reusar, então reconectar sozinho não resolve. Fonte única dos
+ * dois status que significam isso — o wizard e o botão "Reconectar" decidem pelo
+ * mesmo predicado (antes cada um repetia a comparação).
+ */
+export function precisaSegundoFator(
+  status: CourtConnectionStatus | null | undefined,
+): boolean {
+  return status === "MFA_REQUIRED" || status === "MFA_ENROLLMENT_REQUIRED";
+}
+
+/**
+ * A conexão existe mas não está servindo — tem o que reconectar. CONNECTED não tem
+ * (e o card já oferece "Testar conexão"), AUTHENTICATING está em curso (a lista
+ * repolla). Todo o resto — DISCONNECTED, ERROR, REAUTH_REQUIRED,
+ * CERTIFICATE_REQUIRED e os MFA_* — tem saída pela UI sem remover e recriar.
+ */
+export function podeReconectar(
+  status: CourtConnectionStatus | null | undefined,
+): boolean {
+  return !!status && status !== "CONNECTED" && status !== "AUTHENTICATING";
 }
 
 function courtName(entry: CourtCatalogEntry) {

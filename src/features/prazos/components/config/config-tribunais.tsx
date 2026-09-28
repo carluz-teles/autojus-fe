@@ -8,7 +8,7 @@ import {
   Plus,
   ShieldCheck,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { type MouseEvent, useRef, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -18,11 +18,13 @@ import {
   useCourtConnections,
   useDeleteCourtConnection,
 } from "@/features/configuracoes/hooks/use-court-connections";
+import { useReconnectCourtConnection } from "@/features/configuracoes/hooks/use-reconnect-court-connection";
 import { useTestCourtConnection } from "@/features/configuracoes/hooks/use-test-court-connection";
 import {
   connectionForSystem,
   courtSystemName,
   groupCourtCatalog,
+  podeReconectar,
 } from "@/features/configuracoes/lib/court-catalog";
 import type {
   CourtCatalogEntry,
@@ -192,6 +194,70 @@ function CapCheck({ label, active }: { label: string; active: boolean }) {
       />
       <span className={active ? "text-foreground" : "text-fg3"}>{label}</span>
     </span>
+  );
+}
+
+// Uma conexão do tribunal na lista do card. Cada linha tem o SEU reconectar (um
+// hook por linha, nada de estado local pra saber "qual linha pediu").
+//
+// Por que "Reconectar" existe: uma conexão caída só oferecia "Remover conexão", e
+// recriar pelo wizard pede o QR do 2FA de novo — capturado UMA vez, pode não existir
+// mais. O BE reusa o seed já selado em POST /:id/connect; aqui é só o fio.
+function ConnectionRow({
+  connection,
+  removendo,
+  onSegundoFator,
+  onRemover,
+}: {
+  connection: CourtConnectionView;
+  removendo: boolean;
+  /** Falta o segundo fator: o caminho é o wizard (subir o QR/código). */
+  onSegundoFator: () => void;
+  onRemover: (event: MouseEvent<HTMLButtonElement>) => void;
+}) {
+  const nome = `${connection.court} · ${courtSystemName(connection.system)}`;
+  const reconnect = useReconnectCourtConnection({ onSegundoFator });
+  const autenticando =
+    reconnect.autenticando || connection.status === "AUTHENTICATING";
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+      <span className="text-fg3 min-w-0 flex-1 basis-40">{nome}</span>
+      <span className="flex flex-none items-center gap-1">
+        {podeReconectar(connection.status) ? (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={reconnect.isPending}
+            onClick={() => void reconnect.reconectar(connection)}
+            aria-label={`Reconectar conexão ${nome}`}
+          >
+            {reconnect.isPending ? "Reconectando…" : "Reconectar"}
+          </Button>
+        ) : null}
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={removendo}
+          onClick={onRemover}
+          aria-label={`Remover conexão ${nome}`}
+        >
+          Remover conexão
+        </Button>
+      </span>
+      {reconnect.erro ? (
+        <p role="alert" className="text-destructive w-full text-[11px]">
+          {reconnect.erro}
+        </p>
+      ) : reconnect.conectada ? (
+        <p role="status" className="text-fg3 w-full text-[11px]">
+          Conexão restabelecida.
+        </p>
+      ) : autenticando ? (
+        <p role="status" className="text-fg3 w-full text-[11px]">
+          Validando o acesso no tribunal…
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -383,26 +449,16 @@ function AutosCard({
       {listedConnections.length > 0 ? (
         <div className="border-line2 flex w-full flex-col gap-2 border-t pt-2.5">
           {listedConnections.map((connection) => (
-            <div
+            <ConnectionRow
               key={connection.id}
-              className="flex flex-wrap items-center justify-between gap-2 text-xs"
-            >
-              <span className="text-fg3">
-                {connection.court} · {courtSystemName(connection.system)}
-              </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={remove.isPending}
-                onClick={(event) => {
-                  removeTriggerRef.current = event.currentTarget;
-                  setRemoving(connection);
-                }}
-                aria-label={`Remover conexão ${connection.court} · ${courtSystemName(connection.system)}`}
-              >
-                Remover conexão
-              </Button>
-            </div>
+              connection={connection}
+              removendo={remove.isPending}
+              onSegundoFator={onConnect}
+              onRemover={(event) => {
+                removeTriggerRef.current = event.currentTarget;
+                setRemoving(connection);
+              }}
+            />
           ))}
         </div>
       ) : null}

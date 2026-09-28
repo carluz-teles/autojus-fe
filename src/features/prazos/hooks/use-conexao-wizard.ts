@@ -9,7 +9,10 @@ import {
   useSubmitMfaCode,
   useSubmitMfaSeed,
 } from "@/features/configuracoes/hooks/use-court-connections";
-import { courtSystemName } from "@/features/configuracoes/lib/court-catalog";
+import {
+  courtSystemName,
+  precisaSegundoFator,
+} from "@/features/configuracoes/lib/court-catalog";
 import { syncCourtAutos } from "@/features/configuracoes/services/court-connections.service";
 import type {
   CourtCatalogEntry,
@@ -64,9 +67,7 @@ function mensagemErro(err: unknown): string {
 /** Mapeia o status devolvido pelo BE para a fase de UI de um sistema. */
 function faseDoStatus(status: CourtConnectionStatus): SistemaFase {
   if (status === "CONNECTED") return "conectado";
-  if (status === "MFA_REQUIRED" || status === "MFA_ENROLLMENT_REQUIRED") {
-    return "requer_2fa";
-  }
+  if (precisaSegundoFator(status)) return "requer_2fa";
   return "erro";
 }
 
@@ -86,13 +87,7 @@ function estadoInicial(
       secondFactor: entry.second_factor ?? "",
       connectionId: conn?.id ?? null,
       status,
-      fase: status
-        ? status === "CONNECTED"
-          ? "conectado"
-          : status === "MFA_REQUIRED" || status === "MFA_ENROLLMENT_REQUIRED"
-            ? "requer_2fa"
-            : "erro"
-        : "pendente",
+      fase: status ? faseDoStatus(status) : "pendente",
       erro: null,
       qrFile: null,
       secret: "",

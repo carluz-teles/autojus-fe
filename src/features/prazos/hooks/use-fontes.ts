@@ -5,6 +5,10 @@ import { toast } from "sonner";
 
 import { useCaptures } from "@/features/captures/hooks/use-captures";
 import {
+  captureKindLabel,
+  captureSourceLabel,
+} from "@/features/captures/lib/rotulos";
+import {
   useAddWatchedOab,
   useToggleWatchedOab,
   useWatchedOabs,
@@ -80,22 +84,6 @@ const MESES = [
   "nov",
   "dez",
 ];
-
-// Rótulo pt-BR do tipo de captura (CaptureKind).
-const KIND_LABEL: Record<string, string> = {
-  DAILY_CAPTURE: "Agendada",
-  ENRICHMENT: "Enriquecimento",
-  INITIAL_LOAD: "Carga inicial",
-  CATCH_UP: "Religada",
-};
-
-// A FONTE diz O QUE a ingestão trouxe: DJEN descobre publicações/intimações por OAB;
-// DATAJUD enriquece os processos (dados do tribunal). É a distinção que o usuário
-// pediu ver — não o jargão de sistema.
-const SOURCE_LABEL: Record<string, { rot: string; cor: string }> = {
-  DJEN: { rot: "Publicações", cor: "var(--primary)" },
-  DATAJUD: { rot: "Enriquecimento", cor: "var(--blue)" },
-};
 
 // Cores do badge de status da varredura (CaptureDisplayStatus).
 const STATUS_CORES: Record<string, { fg: string; bg: string }> = {
@@ -295,16 +283,13 @@ export function useFontes(initialTab: FontesTab = "tribunais") {
           fg: "var(--fg2)",
           bg: "var(--hover)",
         };
-        const src = SOURCE_LABEL[r.source] ?? {
-          rot: r.source,
-          cor: "var(--fg2)",
-        };
+        const src = captureSourceLabel(r.source);
         return {
           data,
           hora,
           tipo: src.rot,
           tipoCor: src.cor,
-          gatilho: KIND_LABEL[r.kind] ?? r.kind,
+          gatilho: captureKindLabel(r.kind),
           oabs: (r.trigger_oabs ?? []).map(fmtOab),
           dur: fmtDur(r.duration_sec),
           varridas: nf(r.court_records_new + r.court_records_updated),

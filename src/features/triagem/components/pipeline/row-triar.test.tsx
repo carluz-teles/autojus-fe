@@ -16,7 +16,7 @@ function row(overrides: Partial<PipelineRow> = {}): PipelineRow {
     demandLabel: "",
     summary: "",
     title: "Fulano de Tal · 0000000-00.2026.8.26.0001",
-    meta: "0000000-00.2026.8.26.0001 · TJSP · 1º Grau",
+    meta: "0000000-00.2026.8.26.0001 · TJSP · 1º grau",
     ato: "Manifestação",
     atoPublicacao: "Despacho de mero expediente",
     geraPeca: false,

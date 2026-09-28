@@ -71,9 +71,13 @@ describe("identificarAuto", () => {
     expect(meta).toBe("peticao.pdf · Autos");
   });
 
-  it("tipo desconhecido/vazio cai no fallback defensivo (nunca vazio) — comportamento preservado", () => {
+  // MUDANÇA DELIBERADA: o fallback era um title-case do código ("CODIGO_NOVO" →
+  // "Codigo_novo"), que fabricava palavra pt-BR errada em códigos reais do eproc
+  // ("SENTENCA" → "Sentenca", sem cedilha). Agora o código desconhecido aparece como
+  // código. O que segue garantido: nunca vazio.
+  it("tipo desconhecido/vazio cai no fallback defensivo (nunca vazio)", () => {
     expect(rotuloTipoAuto("")).toBe("Documento");
-    expect(rotuloTipoAuto("CODIGO_NOVO")).toBe("Codigo_novo");
+    expect(rotuloTipoAuto("CODIGO_NOVO")).toBe("CODIGO_NOVO");
   });
 
   // A4 — data JURÍDICA (court_event_date) agora projetada no DocumentView.
@@ -120,5 +124,23 @@ describe("identificarAuto", () => {
     expect(a.meta).not.toBe(b.meta); // desambiguados pela data do ato, não pela captura
     expect(a.meta).toContain("10/05/2026");
     expect(b.meta).toContain("15/05/2026");
+  });
+});
+
+// O title-case defensivo fabricava palavra pt-BR ERRADA: um código não mapeado como
+// "SENTENCA" saía "Sentenca" — sem cedilha, com cara de typo NOSSO. Código que não
+// conhecemos é mostrado como código (é o rótulo do tribunal), nunca como pseudo-palavra.
+describe("rotuloTipoAuto — código desconhecido", () => {
+  it("não inventa palavra pt-BR sem acento para código não mapeado", () => {
+    expect(rotuloTipoAuto("SENTENCA")).toBe("SENTENCA");
+    expect(rotuloTipoAuto("SENTENCA")).not.toBe("Sentenca");
+    expect(rotuloTipoAuto("DESPACHO_INICIAL")).toBe("DESPACHO_INICIAL");
+  });
+
+  it("segue traduzindo os códigos conhecidos e nunca devolve vazio", () => {
+    expect(rotuloTipoAuto("SENT")).toBe("Sentença");
+    expect(rotuloTipoAuto("sent")).toBe("Sentença");
+    expect(rotuloTipoAuto("  ")).toBe("Documento");
+    expect(rotuloTipoAuto("")).toBe("Documento");
   });
 });

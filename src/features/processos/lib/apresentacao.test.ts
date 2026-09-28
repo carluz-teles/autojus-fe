@@ -6,6 +6,7 @@ import {
   CLAIM_VALUE_SOURCE_LABEL,
   CLIENT_ROLE_LABEL,
   grauProcessoLabel,
+  grauProcessoLabelOuVazio,
   lifecycleInfo,
   linhaProcesso,
   retornoProcessos,
@@ -188,5 +189,24 @@ describe("tradução de enum — nada de valor cru na UI", () => {
     expect(grauProcessoLabel("UNKNOWN")).toBe("Grau não informado");
     expect(grauProcessoLabel("ALGO_NOVO")).toBe("Grau não informado");
     expect(grauProcessoLabel("JE")).toBe("Juizado");
+  });
+});
+
+// FONTE ÚNICA do rótulo de grau (Regra nº1): havia DOIS mapas com valores
+// DIVERGENTES — este ("1º grau") e um local da Triagem ("1º Grau"). A Triagem passou
+// a ler daqui; o que ela precisava era só a POLÍTICA de ausência (omitir em vez de
+// escrever "Grau não informado"), que agora é uma função nomeada, não outro mapa.
+describe("grauProcessoLabelOuVazio", () => {
+  it("devolve o MESMO rótulo canônico do resto do produto", () => {
+    expect(grauProcessoLabelOuVazio("G1")).toBe("1º grau");
+    expect(grauProcessoLabelOuVazio("G2")).toBe("2º grau");
+    expect(grauProcessoLabelOuVazio("JE")).toBe("Juizado");
+    expect(grauProcessoLabelOuVazio("SUPERIOR")).toBe("Superior");
+  });
+
+  it("grau ausente/desconhecido é omitido (string vazia), nunca o sentinela nem o enum cru", () => {
+    expect(grauProcessoLabelOuVazio("UNKNOWN")).toBe("");
+    expect(grauProcessoLabelOuVazio("ALGO_NOVO")).toBe("");
+    expect(grauProcessoLabelOuVazio("")).toBe("");
   });
 });

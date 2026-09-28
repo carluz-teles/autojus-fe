@@ -261,3 +261,61 @@ it("only reports completion when accepted work finishes without failures", () =>
   expect(feedback.failed).toBe(false);
   expect(feedback.title).toBe("Busca de autos finalizada");
 });
+
+// O BE deixou de marcar a conexão inteira como "precisa de autos" (internal/court/
+// manual_sync.go — o gate voltou a valer) e passou a devolver DOIS fatos diferentes:
+// `discovered` (o que a cobertura da conexão viu) e `queued` (o que de fato vai ser
+// buscado). `discovered > 0` com `queued = 0` e status "idle" é a resposta honesta
+// "achei seu acervo e nada precisa de autos agora" — a UI tem que DIZER isso, com os
+// números, em vez de cair no "Nenhum processo encontrado na cobertura".
+it("diz em voz alta que o acervo foi encontrado e nada precisa de autos (discovered > 0, queued = 0)", () => {
+  const feedback = autosSyncFeedback(
+    { queued: 0, pending: 0, failed: 0, status: "idle" },
+    { queued: 0, pending: 0, discovered: 1067, failures: [] },
+  );
+  expect(feedback.failed).toBe(false);
+  expect(feedback.title).toBe("Nenhum processo precisa dos autos agora");
+  // Os NÚMEROS aparecem — é o que separa "achei 1.067 e nada precisa" de "não achei nada".
+  expect(feedback.description).toContain("1067");
+  // Nada de promessa que não vai acontecer: queued = 0 não é "buscando autos".
+  expect(feedback.description).not.toMatch(/buscando|em andamento/i);
+  expect(feedback.title).not.toContain("finalizada");
+  // A UI do produto não cita tecnologia/IA.
+  expect(`${feedback.title} ${feedback.description}`).not.toMatch(
+    /\bia\b|intelig/i,
+  );
+});
+
+it("mantém 'nada na cobertura' quando a conexão não achou processo algum (discovered = 0)", () => {
+  const feedback = autosSyncFeedback(
+    { queued: 0, pending: 0, failed: 0, status: "idle" },
+    { queued: 0, pending: 0, discovered: 0, failures: [] },
+  );
+  expect(feedback.title).toBe("Nenhum processo para sincronizar");
+});
+
+it("singulariza a contagem do acervo descoberto", () => {
+  const feedback = autosSyncFeedback(
+    { queued: 0, pending: 0, failed: 0, status: "idle" },
+    { queued: 0, pending: 0, discovered: 1, failures: [] },
+  );
+  expect(feedback.description).toContain("1 processo ");
+  expect(feedback.description).not.toContain("1 processos");
+});
+
+it("soma o discovered de cada tribunal no resumo da solicitação", () => {
+  expect(
+    summarizeAutosSync([
+      { queued: 0, pending: 0, failed: 0, discovered: 12, status: "idle" },
+      { queued: 2, pending: 2, failed: 0, discovered: 30, status: "pending" },
+    ]),
+  ).toMatchObject({ discovered: 42, queued: 2, status: "pending" });
+});
+
+it("trabalho enfileirado ganha a cópia de sucesso mesmo com discovered alto", () => {
+  const feedback = autosSyncFeedback(
+    { queued: 0, pending: 0, failed: 0, status: "idle" },
+    { queued: 3, pending: 3, discovered: 1067, failures: [] },
+  );
+  expect(feedback.title).toBe("Busca de autos finalizada");
+});

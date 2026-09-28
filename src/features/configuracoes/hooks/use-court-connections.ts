@@ -50,13 +50,30 @@ export function useCreateCourtConnection() {
   });
 }
 
-/** Autentica a conexão. Em sucesso invalida a lista (status muda). */
+/**
+ * Escreve na lista o estado que o BE acabou de devolver e só então revalida.
+ * Fonte única (Regra nº1) de "como uma conexão fresca entra no cache": o connect
+ * responde 200 com o estado resultante mesmo em falha (MFA/ERROR), então aplicar a
+ * resposta é mais correto do que esperar o refetch — e deixar isso em UM lugar
+ * evita que um chamador (Reconectar, Testar conexão, wizard) mostre estado velho.
+ */
+export function applyConnectionToCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  connection: CourtConnectionView,
+) {
+  queryClient.setQueryData<CourtConnectionView[]>(QUERY_KEY, (current) =>
+    current?.map((item) => (item.id === connection.id ? connection : item)),
+  );
+  void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+}
+
+/** Autentica a conexão. Em sucesso aplica o novo estado na lista e revalida. */
 export function useConnectCourtConnection() {
   const fetcher = useApi();
   const queryClient = useQueryClient();
   return useMutation<CourtConnectionView, Error, string>({
     mutationFn: (id) => connectCourtConnection(fetcher, id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    onSuccess: (connection) => applyConnectionToCache(queryClient, connection),
   });
 }
 

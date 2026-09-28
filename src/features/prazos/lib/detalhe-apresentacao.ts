@@ -20,6 +20,13 @@ export function origemRevisaoLabel(origin: string | null): string {
   return origin ? (REVIEW_ORIGIN_LABEL[origin] ?? "Origem não informada") : "";
 }
 
+/**
+ * O MOTIVO da revisão é texto do BE (frase pronta do motor de prazos, não enum), e
+ * o dono da redação é o BE — por isso o retorno é o `reason` verbatim, e não um mapa
+ * de rótulos daqui: duplicar a frase no FE criaria duas versões da mesma explicação.
+ * A única intervenção é a do `generic_fallback`, onde a frase técnica do motor não
+ * serve pro usuário e a orientação prática substitui.
+ */
 export function motivoRevisaoLabel(
   origin: string | null,
   reason: string,
