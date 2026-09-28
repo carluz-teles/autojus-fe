@@ -6,6 +6,7 @@
 // urgência a partir do prazo (mesma regra da listagem: estado.ts/lib/listagem.ts).
 
 import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
+import { grauProcessoLabelOuVazio } from "@/features/processos/lib/apresentacao";
 import { formatarData } from "@/lib/utils";
 
 import { demandKindLabel } from "../../intimacoes/lib/demand-kind";
@@ -169,18 +170,13 @@ export interface PipelineRow {
   preview: string;
 }
 
-const DEGREE_LABEL: Record<string, string> = {
-  G1: "1º Grau",
-  G2: "2º Grau",
-  JE: "Juizado",
-  SUPERIOR: "Superior",
-  UNKNOWN: "",
-};
-
 export function pipelineRow(i: IntimacaoView): PipelineRow {
   const p = i.prazo;
   const daysLeft = p && p.status !== "NO_DEADLINE" ? p.days_left : null;
-  const grau = DEGREE_LABEL[i.degree] ?? "";
+  // Rótulo do grau vem da FONTE ÚNICA de processos (Regra nº1): havia um mapa local
+  // aqui com valores divergentes ("1º Grau" vs "1º grau" do resto do produto). A
+  // política de ausência da linha de meta é OMITIR — daí a variante "OuVazio".
+  const grau = grauProcessoLabelOuVazio(i.degree);
   const rec =
     i.recommended_providencia &&
     !!p &&

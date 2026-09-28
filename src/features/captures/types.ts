@@ -1,5 +1,14 @@
-type CaptureSource = "DJEN" | "DATAJUD";
-type CaptureKind = "DAILY_CAPTURE" | "ENRICHMENT" | "INITIAL_LOAD" | "CATCH_UP";
+export type CaptureSource = "DJEN" | "DATAJUD";
+// Conjunto fechado do BE: os 3 kinds de capture_run (migrations 0046 e 0155 —
+// MANUAL_IMPORT é o import manual de CNJ) + os 2 derivados na UNION do read model
+// (INITIAL_LOAD do backfill_job, CATCH_UP do sync_run avulso). Ver
+// internal/acquisition/queries/captures.sql.
+export type CaptureKind =
+  | "DAILY_CAPTURE"
+  | "ENRICHMENT"
+  | "MANUAL_IMPORT"
+  | "INITIAL_LOAD"
+  | "CATCH_UP";
 type CaptureDisplayStatus =
   "Concluída" | "Concluída com avisos" | "Falha parcial" | "Em andamento";
 type CaptureTriggerReason = "OAB_ADDED" | "OAB_REENABLED" | "OAB_DAILY";

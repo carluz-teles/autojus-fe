@@ -41,9 +41,20 @@ export const CLAIM_VALUE_SOURCE_LABEL: Record<ClaimValueSource, string> = {
   manual: "Informado manualmente",
 };
 
-export function grauProcessoLabel(degree: string): string {
+/**
+ * Rótulo do grau quando ele É conhecido; "" quando não é. FONTE ÚNICA de "esse grau
+ * tem rótulo de verdade?" — o sentinela "—" do mapa mora só aqui, ninguém mais
+ * compara com ele. Quem exibe escolhe a política de ausência em cima disto:
+ * `grauProcessoLabel` escreve "Grau não informado", as linhas de meta
+ * (Triagem, filtros) simplesmente omitem.
+ */
+export function grauProcessoLabelOuVazio(degree: string): string {
   const label = DEGREE_LABEL[degree as ProcessoDegree];
-  return label && label !== "—" ? label : "Grau não informado";
+  return label && label !== "—" ? label : "";
+}
+
+export function grauProcessoLabel(degree: string): string {
+  return grauProcessoLabelOuVazio(degree) || "Grau não informado";
 }
 
 // As 5 fases do stepper, em ordem, com rótulo pt-BR — fonte única do stepper e do label.

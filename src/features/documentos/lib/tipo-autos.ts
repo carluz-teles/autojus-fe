@@ -2,7 +2,7 @@
 // grava o CÓDIGO cru do eproc (ex.: PET, SENT, DESPADEC, ATOORD) — hoje ele chega
 // no campo `title` do DocumentView. Este mapa é a fonte única (Regra nº1) que traduz
 // esse código para o rótulo que o card AUTOS exibe. Código desconhecido cai no
-// fallback (title-case do próprio código), nunca fica vazio.
+// fallback (o próprio código, como o tribunal o nomeia), nunca fica vazio.
 
 import { formatarData } from "@/lib/utils";
 
@@ -53,14 +53,18 @@ const TIPO_AUTOS_LABEL: Record<string, string> = {
   OUT: "Outros",
 };
 
-// Converte um código cru (SENT, DESPADEC…) no rótulo pt-BR. Sem match, faz um
-// title-case defensivo do código para nunca renderizar em branco.
+// Converte um código cru (SENT, DESPADEC…) no rótulo pt-BR. Sem match, devolve o
+// PRÓPRIO código, que é como o tribunal o nomeia — nunca renderiza em branco.
+//
+// Antes havia um title-case "defensivo" aqui, e ele fabricava palavra pt-BR errada:
+// um código não mapeado como "SENTENCA" saía "Sentenca", sem cedilha, com cara de
+// erro de digitação NOSSO. O código cru é honesto (lê-se como código do tribunal) e
+// é o mesmo fallback future-proof que o resto do produto usa. Código novo que mereça
+// rótulo entra em TIPO_AUTOS_LABEL — a lista é a fonte única.
 export function rotuloTipoAuto(codigo: string): string {
   const chave = (codigo || "").trim().toUpperCase();
   if (!chave) return "Documento";
-  return (
-    TIPO_AUTOS_LABEL[chave] ?? chave.charAt(0) + chave.slice(1).toLowerCase()
-  );
+  return TIPO_AUTOS_LABEL[chave] ?? chave;
 }
 
 // Categoria semântica do auto — o "Tipo" do subtítulo "Tipo · Origem" e a base da cor.
