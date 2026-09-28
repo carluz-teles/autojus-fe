@@ -5,6 +5,8 @@ import { useUpdateActionItem } from "@/features/action-items/hooks/use-update-ac
 import { STATUS_LABEL } from "@/features/action-items/lib/status-pill";
 import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
+
+import { prazoProvidenciaLabel } from "../../lib/direcao-peca";
 export function ProvidenceContext({ id }: { id: string }) {
   const action = useActionItemDetalhe(id);
   const update = useUpdateActionItem();
@@ -12,6 +14,7 @@ export function ProvidenceContext({ id }: { id: string }) {
   const p = action.data;
   if (!p) return null;
   const members = directory.members;
+  const prazoLabel = prazoProvidenciaLabel(p.due_date);
   return (
     <section
       aria-label="Origem do trabalho"
@@ -39,14 +42,14 @@ export function ProvidenceContext({ id }: { id: string }) {
           })
         }
       />
-      <p className="text-muted-foreground text-xs">
-        Prazo:{" "}
-        {p.due_date
-          ? new Date(p.due_date).toLocaleDateString("pt-BR", {
-              timeZone: "UTC",
-            })
-          : "Não definido"}
-      </p>
+      {/* O painel mostra DOIS prazos de coisas diferentes: o da intimação (topo
+          do rail) e o desta providência. Sem dizer de quem é cada um, "Prazo:
+          Não definido" embaixo de "Prazo da intimação · 30/09/2026" é lido como
+          defeito — daí o rótulo explícito. Providência sem prazo não rende linha
+          alguma: "Não definido" não informa nada e só cria a contradição. */}
+      {prazoLabel && (
+        <p className="text-muted-foreground text-xs">{prazoLabel}</p>
+      )}
     </section>
   );
 }

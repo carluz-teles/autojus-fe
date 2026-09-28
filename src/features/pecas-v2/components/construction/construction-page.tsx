@@ -41,6 +41,7 @@ import { useContentSave } from "../../hooks/use-content-save";
 import { draftKeys } from "../../hooks/use-draft";
 import { useThesisBatch } from "../../hooks/use-thesis-batch";
 import { derivarTelaConstrucao } from "../../lib/auto-flow";
+import { direcaoDaPeca } from "../../lib/direcao-peca";
 import { draftToPecaContexto } from "../../lib/peca-contexto";
 import type { Draft } from "../../types";
 import { ContextRail } from "../pregen/context-rail";
@@ -626,8 +627,7 @@ export function ConstructionPage({ id }: { id: string }) {
                             Direção da peça
                           </p>
                           <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap">
-                            {draft.instructions ||
-                              "Objetivo não confirmado nesta peça."}
+                            {direcaoDaPeca(draft.instructions, draft.title)}
                           </p>
                         </div>
                         {draft.actionItemId && (
@@ -708,6 +708,7 @@ export function ConstructionPage({ id }: { id: string }) {
                     thesesDone={h.theses.theses.length > 0}
                     thesesCount={h.theses.streaming?.count}
                     assessmentActive={h.assessmentActive}
+                    hasAutos={draft.processDocuments.length > 0}
                   />
                 )}
                 {ready && !generationActive && (
@@ -960,7 +961,7 @@ export function ConstructionPage({ id }: { id: string }) {
               >
                 <div className="space-y-5">
                   <p className="text-xs whitespace-pre-wrap">
-                    {draft.instructions || "Objetivo não confirmado."}
+                    {direcaoDaPeca(draft.instructions, draft.title)}
                   </p>
                   <div>
                     <h3 className="font-medium">Pendências no texto</h3>
