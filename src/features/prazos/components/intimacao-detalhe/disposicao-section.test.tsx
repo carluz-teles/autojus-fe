@@ -663,4 +663,46 @@ describe("DisposicaoSection", () => {
       },
     );
   });
+
+  // P0-4 (docs/spec-fe-retrabalho-v3.27.md): "O que aconteceu" usa brief_summary
+  // como frase principal quando presente; ato (ai_act) recua a chip secundário.
+  // Sem brief ainda (summary=""), o comportamento é idêntico ao anterior.
+  describe("'O que aconteceu' — brief_summary (P0-4)", () => {
+    const providencias = [
+      prov({
+        id: "cump-p04",
+        tipo: "cumprir",
+        gera_peca: false,
+        title: "Pagar o valor da condenação",
+        description: null,
+      }),
+    ];
+
+    it("com summary: vira a frase principal; ato vira chip secundário (não some)", () => {
+      const html = renderSection(providencias, {
+        summary: "Sentença de procedência — réu condenado a pagar.",
+        ato: "Sentença",
+        tipoLabel: "Cumprimento de sentença",
+      });
+      expect(html).toContain(
+        "Sentença de procedência — réu condenado a pagar.",
+      );
+      // ato continua presente (chip secundário), não é descartado.
+      expect(html).toContain("Sentença");
+    });
+
+    it("sem brief ainda (summary=''): comportamento idêntico ao anterior (ato como frase principal)", () => {
+      const semSummary = renderSection(providencias, {
+        ato: "Sentença",
+        tipoLabel: "Cumprimento de sentença",
+      });
+      const comSummaryVazio = renderSection(providencias, {
+        summary: "",
+        ato: "Sentença",
+        tipoLabel: "Cumprimento de sentença",
+      });
+      expect(semSummary).toBe(comSummaryVazio);
+      expect(semSummary).toContain("Sentença");
+    });
+  });
 });

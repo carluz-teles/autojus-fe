@@ -144,6 +144,7 @@ export function DisposicaoSection({
   ato,
   tipoLabel,
   assunto,
+  summary = "",
   compacto = false,
   readOnly = false,
   disposicaoBE,
@@ -167,6 +168,11 @@ export function DisposicaoSection({
   ato: string;
   tipoLabel: string;
   assunto: string;
+  /** brief_summary — "o que aconteceu" (R4.1), texto livre do brief. Quando
+   *  presente, vira a frase principal de "O que aconteceu" (P0-4) e `ato` recua
+   *  a chip secundário; "" (sem brief ainda) preserva o comportamento anterior
+   *  (`ato || tipoLabel` como frase principal). */
+  summary?: string;
   compacto?: boolean;
   readOnly?: boolean;
   /** Disposição já classificada pelo BE (GET detalhe, `IntimacaoView.disposicao`)
@@ -343,15 +349,23 @@ export function DisposicaoSection({
         </div>
       ) : (
         <div className="flex flex-col gap-5">
-          {/* O QUE ACONTECEU */}
+          {/* O QUE ACONTECEU — brief_summary (R4.1) é a frase principal quando
+              presente (P0-4); ato (ai_act) recua a chip secundário na linha de
+              baixo. Sem brief ainda (summary===""): comportamento idêntico ao
+              anterior (ato || tipoLabel como frase principal, sem chip). */}
           {!compacto ? (
             <div className="flex flex-col gap-1.5">
               <p className="section-label">O que aconteceu</p>
               <p className="font-display text-lg leading-snug font-medium">
-                {ato || tipoLabel}
+                {summary || ato || tipoLabel}
               </p>
-              <p className="text-muted-foreground text-sm">
-                {[tipoLabel, assunto].filter(Boolean).join(" · ")}
+              <p className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
+                {summary && ato ? (
+                  <span className="border-border/80 bg-muted/50 text-muted-foreground shrink-0 rounded px-1.5 py-px text-[10px] font-medium tracking-wide uppercase">
+                    {ato}
+                  </span>
+                ) : null}
+                <span>{[tipoLabel, assunto].filter(Boolean).join(" · ")}</span>
               </p>
             </div>
           ) : null}

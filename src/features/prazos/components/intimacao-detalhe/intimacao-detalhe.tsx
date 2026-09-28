@@ -1308,6 +1308,7 @@ function Disposicao({
       ato={det.intimacao?.ai_act ?? ""}
       tipoLabel={m.tipoLabel}
       assunto={m.assunto}
+      summary={det.intimacao?.brief_summary ?? ""}
       disposicaoBE={det.intimacao?.disposicao}
       agreementState={det.intimacao?.agreement_state}
       prazo={det.prazoDetalhe}
