@@ -33,6 +33,7 @@ import { ResponsavelMenu } from "@/features/organization/components/responsavel-
 import { ProximoPassoCard } from "@/features/processos/components/proximo-passo-card";
 import { ProcessoSituacao } from "@/features/processos/components/situacao-processo";
 import {
+  assuntosDoProcesso,
   CLAIM_VALUE_SOURCE_LABEL,
   CLIENT_ROLE_LABEL,
   FASE_STEPS,
@@ -179,6 +180,10 @@ export function ProcessoHub({ numero }: { numero: string }) {
   const uploadInput = useRef<HTMLInputElement>(null);
   const p = h.processo;
   const identity = h.identity;
+  // Assuntos (chips × texto legado × ausência) decididos numa fonte só — a
+  // Ficha abaixo só renderiza o resultado. `p` ainda pode não ter carregado:
+  // o objeto vazio resolve para "Não informado", igual ao processo sem dado.
+  const assuntos = assuntosDoProcesso(p ?? { subject: "", subjects: null });
   return (
     <PageFrame
       header={
@@ -656,10 +661,35 @@ export function ProcessoHub({ numero }: { numero: string }) {
                     <Fato label="Comarca">
                       {p.comarca_name || "Não informado"}
                     </Fato>
-                    <Fato label="Assunto">
-                      {p.subjects && p.subjects.length > 0
-                        ? p.subjects.map((s) => s.nome).join(", ")
-                        : p.subject || "Não informado"}
+                    {/* Assuntos CNJ (court_record.subjects, migration 0180) —
+                        CHIPS, não texto corrido: são itens DISCRETOS de um
+                        conjunto e um processo pode ter meia dúzia, que como
+                        parágrafo separado por vírgula vira um bloco ilegível
+                        (não dá pra dizer onde um assunto termina e o outro
+                        começa — "Indenização por Dano Moral, Indenização por
+                        Dano Material"). O Badge é `whitespace-nowrap h-5` por
+                        default, o que CORTARIA nomes longos na coluna estreita
+                        da Ficha (~228px): aqui ele quebra linha
+                        (`h-auto whitespace-normal`) porque nome de assunto é
+                        informação jurídica e não pode ser truncado.
+                        `subject` (coluna legada, string única) segue como
+                        fallback do processo sem enriquecimento. */}
+                    <Fato label={assuntos.label}>
+                      {assuntos.chips.length > 0 ? (
+                        <span className="flex flex-wrap gap-1.5">
+                          {assuntos.chips.map((s, i) => (
+                            <Badge
+                              key={`${s.codigo}-${i}`}
+                              variant="outline"
+                              className="h-auto max-w-full rounded-md py-0.5 text-left leading-snug whitespace-normal"
+                            >
+                              {s.nome}
+                            </Badge>
+                          ))}
+                        </span>
+                      ) : (
+                        assuntos.texto
+                      )}
                     </Fato>
                     <Fato label="Distribuição">{h.distribuido}</Fato>
                     <Fato label="Valor da causa">

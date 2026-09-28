@@ -5,7 +5,7 @@
 // valores, migrations/0182_intimation_brief.up.sql). Não editar sem conferir a
 // fonte do BE primeiro.
 
-import type { IntimacaoDemandKind } from "../types";
+import type { BriefDemandTargetRole, IntimacaoDemandKind } from "../types";
 
 /** Rótulo pt-BR de cada demand_kind. Chaves = intimation_brief.demand_kind. */
 export const DEMAND_KIND_LABEL: Record<IntimacaoDemandKind, string> = {
@@ -42,4 +42,33 @@ export const DEMAND_KIND_LABEL: Record<IntimacaoDemandKind, string> = {
 export function demandKindLabel(kind: IntimacaoDemandKind | ""): string {
   if (!kind) return "";
   return DEMAND_KIND_LABEL[kind] ?? kind;
+}
+
+/** Rótulo pt-BR de `demand_target_role` (intimation_brief.demand_target_role —
+ *  migration 0182) — QUEM deve agir, o eixo que o `demand_kind` (o QUE fazer)
+ *  não cobre. Eixo DIFERENTE do `client_role` do processo (de que lado o
+ *  escritório está — `processos/lib/apresentacao.ts`): um é a parte onerada
+ *  pela intimação, o outro é a posição do escritório na causa; por isso os
+ *  rótulos são frases ("Cabe ao réu"), não substantivos ("Réu(é)").
+ *
+ *  "UNKNOWN" não tem entrada de propósito (mesmo padrão do CLIENT_ROLE_LABEL):
+ *  o único consumidor desvia antes de indexar o mapa — "papel não identificado"
+ *  não é informação, é ausência, e a UI simplesmente não mostra o selo. */
+export const DEMAND_TARGET_ROLE_LABEL: Record<
+  Exclude<BriefDemandTargetRole, "UNKNOWN">,
+  string
+> = {
+  PLAINTIFF: "Cabe ao autor",
+  DEFENDANT: "Cabe ao réu",
+  BOTH: "Cabe a ambas as partes",
+  COUNSEL: "Cabe ao advogado",
+};
+
+/** Selo pt-BR de quem deve agir; "" quando ausente ou não identificado
+ *  (UNKNOWN) — o chamador não renderiza o selo nesse caso. */
+export function demandTargetRoleLabel(
+  role: BriefDemandTargetRole | null,
+): string {
+  if (!role || role === "UNKNOWN") return "";
+  return DEMAND_TARGET_ROLE_LABEL[role];
 }

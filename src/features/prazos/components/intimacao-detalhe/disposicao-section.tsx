@@ -25,9 +25,15 @@ import { Button } from "@/components/ui/button";
 import { ProvidenciaFulfillment } from "@/features/action-items/components/providencia-fulfillment";
 import { hasActionableFulfillment } from "@/features/action-items/lib/fulfillment";
 import type { ProvidenciaFulfillment as ProvidenciaFulfillmentType } from "@/features/action-items/types";
+import {
+  demandKindLabel,
+  demandTargetRoleLabel,
+} from "@/features/intimacoes/lib/demand-kind";
 import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
 import type {
+  BriefDemandTargetRole,
   IntimacaoAcionabilidade,
+  IntimacaoDemandKind,
   IntimacaoDisposicao,
   IntimacaoProvidencia,
   IntimacaoView,
@@ -145,6 +151,9 @@ export function DisposicaoSection({
   tipoLabel,
   assunto,
   summary = "",
+  demandKind = "",
+  demandDetail = null,
+  demandTargetRole = null,
   compacto = false,
   readOnly = false,
   disposicaoBE,
@@ -173,6 +182,14 @@ export function DisposicaoSection({
    *  a chip secundário; "" (sem brief ainda) preserva o comportamento anterior
    *  (`ato || tipoLabel` como frase principal). */
   summary?: string;
+  /** brief_demand_kind — O QUE a intimação exige (P1-1). "" = sem brief ainda;
+   *  "none"/"undetermined" são estados, não demanda, e não rendem bloco. */
+  demandKind?: IntimacaoDemandKind | "";
+  /** brief_demand_detail — o objeto específico da demanda ("apresentar
+   *  contestação à ação de obrigação de fazer"), texto livre do brief. */
+  demandDetail?: string | null;
+  /** brief_demand_target_role — QUEM deve agir. "UNKNOWN"/null não viram selo. */
+  demandTargetRole?: BriefDemandTargetRole | null;
   compacto?: boolean;
   readOnly?: boolean;
   /** Disposição já classificada pelo BE (GET detalhe, `IntimacaoView.disposicao`)
@@ -268,6 +285,20 @@ export function DisposicaoSection({
   // desconhecido + 1 oportunidade) mostra as TRÊS classes, nenhuma esconde a
   // outra: obrigação aqui, indeterminado aqui, oportunidade na caixa própria
   // abaixo (nunca "dever de recorrer" misturado com obrigação real).
+  // O QUE É EXIGIDO (P1-1) — a demanda ESTRUTURADA do brief, eixo diferente do
+  // "o que aconteceu" (summary, o fato) e da lista de itens abaixo (o que o
+  // escritório materializou como trabalho). "none"/"undetermined" são ESTADOS,
+  // não demanda: mostrá-los como "o que é exigido" afirmaria algo que o brief
+  // justamente não afirma — a ausência já é dita pelo headline da disposição
+  // ("Trabalho a identificar"). O bloco só existe quando sobra informação real:
+  // um rótulo de demanda determinado OU o detalhe em texto.
+  const demandaLabel =
+    demandKind && demandKind !== "none" && demandKind !== "undetermined"
+      ? demandKindLabel(demandKind)
+      : "";
+  const demandaSelo = demandTargetRoleLabel(demandTargetRole);
+  const mostraDemanda = !!(demandaLabel || demandDetail);
+
   const itensTrabalho = [
     ...disposicao.pecas,
     ...disposicao.obrigacoes,
@@ -367,6 +398,36 @@ export function DisposicaoSection({
                 ) : null}
                 <span>{[tipoLabel, assunto].filter(Boolean).join(" · ")}</span>
               </p>
+            </div>
+          ) : null}
+
+          {/* O QUE É EXIGIDO (P1-1) — demand_kind + demand_detail + quem deve
+              agir. Fica ENTRE o fato ("O que aconteceu") e o trabalho
+              materializado (caixa abaixo): responde "o que a publicação
+              cobra", que nenhum dos dois respondia. `first-letter:uppercase`
+              porque DEMAND_KIND_LABEL é minúsculo na fonte (o chip da Mesa
+              usa `uppercase` no CSS pelo mesmo motivo) — nunca duplicar o
+              rótulo capitalizado num segundo mapa. */}
+          {!compacto && mostraDemanda ? (
+            <div className="flex flex-col gap-1.5">
+              <p className="section-label">O que é exigido</p>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                {demandaLabel ? (
+                  <p className="font-display text-base leading-snug font-medium first-letter:uppercase">
+                    {demandaLabel}
+                  </p>
+                ) : null}
+                {demandaSelo ? (
+                  <span className="border-border/80 bg-muted/50 text-muted-foreground shrink-0 rounded px-1.5 py-px text-[10px] font-medium tracking-wide uppercase">
+                    {demandaSelo}
+                  </span>
+                ) : null}
+              </div>
+              {demandDetail ? (
+                <p className="text-muted-foreground text-sm leading-relaxed break-words">
+                  {demandDetail}
+                </p>
+              ) : null}
             </div>
           ) : null}
 

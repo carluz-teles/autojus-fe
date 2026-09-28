@@ -29,9 +29,16 @@ const prazo = {
   current_calculation: calc,
   calculation_audit_status: "current",
 } as PrazoDetalheView;
-const render = (overrides: Partial<PrazoDetalheView> = {}) =>
+const render = (
+  overrides: Partial<PrazoDetalheView> = {},
+  declaredDeadlineDays: number | null = null,
+) =>
   renderToStaticMarkup(
-    <ExplicacaoPrazo prazo={{ ...prazo, ...overrides }} estado="ia" />,
+    <ExplicacaoPrazo
+      prazo={{ ...prazo, ...overrides }}
+      estado="ia"
+      declaredDeadlineDays={declaredDeadlineDays}
+    />,
   );
 
 describe("ExplicacaoPrazo — memória corrente", () => {
@@ -93,5 +100,47 @@ describe("ExplicacaoPrazo — memória corrente", () => {
   });
   it("não fabrica cálculo para ausência de prazo", () => {
     expect(render({ status: "NO_DEADLINE" })).toBe("");
+  });
+});
+
+// P1-1 · prazo DECLARADO no teor (brief_declared_deadline_days) × contagem do
+// motor. O valor só vira texto quando DIVERGE: coincidindo, "Contagem: N dias"
+// já diz o mesmo e a repetição seria ruído (e pior, pareceria confirmação
+// independente de um número que é o MESMO dado).
+describe("ExplicacaoPrazo — prazo declarado no teor", () => {
+  it("declarado DIFERE da contagem → avisa a divergência com os dois números", () => {
+    const html = render({}, 5);
+    expect(html).toContain("O teor declara 5 dia(s)");
+    expect(html).toContain("(15)");
+  });
+
+  it("declarado IGUAL à contagem → não repete a informação", () => {
+    const html = render({}, 15);
+    expect(html).not.toContain("O teor declara");
+  });
+
+  it("sem brief (null) → nenhuma menção ao prazo declarado", () => {
+    const html = render();
+    expect(html).not.toContain("O teor declara");
+  });
+
+  // Caso REAL do banco (intimação fcae947a, prazo declarado/OPEN): o motor não
+  // gravou snapshot de cálculo. Sem esta ramificação o único dado de duração
+  // que existe — o que o próprio teor declara — nunca apareceria na tela.
+  it("sem memória de cálculo → informa o prazo declarado (é a única duração conhecida)", () => {
+    const html = render(
+      { current_calculation: null, calculation_audit_status: "unavailable" },
+      10,
+    );
+    expect(html).toContain("O teor declara 10 dia(s) de prazo");
+    expect(html).not.toContain("diferente da contagem");
+  });
+
+  it("sem memória de cálculo e sem brief → segue sem nenhuma linha de prazo declarado", () => {
+    const html = render({
+      current_calculation: null,
+      calculation_audit_status: "unavailable",
+    });
+    expect(html).not.toContain("O teor declara");
   });
 });

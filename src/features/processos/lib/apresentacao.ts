@@ -7,6 +7,7 @@ import type {
   ClientRole,
   ProcessoDegree,
   ProcessoPhase,
+  ProcessoSubject,
   ProcessoView,
 } from "../types";
 export const DEGREE_LABEL: Record<ProcessoDegree, string> = {
@@ -164,4 +165,28 @@ export function linhaProcesso(p: ProcessoView) {
         }
       : null,
   };
+}
+
+/** Os assuntos do processo prontos para a Ficha, em UMA decisão só (o JSX não
+ *  reimplementa a cadeia de fallback):
+ *   - `subjects` (jsonb completo, migration 0180) → lista de CHIPS, um por
+ *     assunto, porque são itens discretos de um conjunto;
+ *   - sem `subjects` → `subject`, a coluna legada de string única (processo
+ *     ainda sem enriquecimento), como TEXTO;
+ *   - nenhum dos dois → ausência explícita.
+ *  `label` acompanha a cardinalidade ("Assunto"/"Assuntos") — um processo com
+ *  seis assuntos sob o rótulo singular lê como se fosse um só. */
+export function assuntosDoProcesso(p: {
+  subject: string;
+  subjects: ProcessoSubject[] | null;
+}): { label: string; chips: ProcessoSubject[]; texto: string } {
+  const chips = p.subjects ?? [];
+  if (chips.length > 0) {
+    return {
+      label: chips.length > 1 ? "Assuntos" : "Assunto",
+      chips,
+      texto: "",
+    };
+  }
+  return { label: "Assunto", chips: [], texto: p.subject || "Não informado" };
 }

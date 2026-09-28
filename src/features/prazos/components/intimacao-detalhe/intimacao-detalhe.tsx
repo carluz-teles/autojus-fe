@@ -893,7 +893,13 @@ export function PainelPrazo({
             </p>
           ) : null}
           {!compacto && p && p.status !== "NO_DEADLINE" ? (
-            <ExplicacaoPrazo prazo={p} estado={det.intimacao?.estado ?? ""} />
+            <ExplicacaoPrazo
+              prazo={p}
+              estado={det.intimacao?.estado ?? ""}
+              declaredDeadlineDays={
+                det.intimacao?.brief_declared_deadline_days ?? null
+              }
+            />
           ) : null}
           {!compacto ? <CalculoDetalhado det={det} /> : null}
         </CardContent>
@@ -1309,6 +1315,9 @@ function Disposicao({
       tipoLabel={m.tipoLabel}
       assunto={m.assunto}
       summary={det.intimacao?.brief_summary ?? ""}
+      demandKind={det.intimacao?.brief_demand_kind ?? ""}
+      demandDetail={det.intimacao?.brief_demand_detail ?? null}
+      demandTargetRole={det.intimacao?.brief_demand_target_role ?? null}
       disposicaoBE={det.intimacao?.disposicao}
       agreementState={det.intimacao?.agreement_state}
       prazo={det.prazoDetalhe}

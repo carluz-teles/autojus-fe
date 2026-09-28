@@ -115,6 +115,77 @@ function renderSection(
 }
 
 describe("DisposicaoSection", () => {
+  // ── P1-1 · "O que é exigido" (demand_* do brief) ──────────────────────────
+  // O bloco é um EIXO NOVO: nem o fato (summary) nem o trabalho materializado
+  // (action_item) dizem o que a publicação cobra. Os testes fixam as duas
+  // metades do contrato: aparece com demanda determinada, e NÃO aparece quando
+  // o brief não determinou nada (afirmar "indeterminado" como exigência seria
+  // inventar um fato que o brief não tem).
+  it("demand_kind determinado → mostra 'O que é exigido' com rótulo, detalhe e quem deve agir", () => {
+    const html = renderSection(
+      [prov({ id: "p1", tipo: "cumprir", title: "Contestar" })],
+      {
+        demandKind: "answer",
+        demandDetail: "Apresentar contestação à ação de obrigação de fazer.",
+        demandTargetRole: "DEFENDANT",
+      },
+    );
+    expect(html).toContain("O que é exigido");
+    expect(html).toContain("resposta/contestação");
+    expect(html).toContain(
+      "Apresentar contestação à ação de obrigação de fazer.",
+    );
+    expect(html).toContain("Cabe ao réu");
+  });
+
+  it("sem brief (demandKind='') → nenhum bloco 'O que é exigido' (comportamento anterior intacto)", () => {
+    const html = renderSection([
+      prov({ id: "p1", tipo: "cumprir", title: "Contestar" }),
+    ]);
+    expect(html).not.toContain("O que é exigido");
+  });
+
+  it("demand_kind 'undetermined'/'none' são ESTADOS, não demanda → sem bloco e sem o rótulo cru", () => {
+    for (const kind of ["undetermined", "none"] as const) {
+      const html = renderSection(
+        [prov({ id: "p1", tipo: "cumprir", title: "Cumprir" })],
+        { demandKind: kind },
+      );
+      expect(html).not.toContain("O que é exigido");
+      expect(html).not.toContain("indeterminado");
+      expect(html).not.toContain("nenhuma providência");
+    }
+  });
+
+  it("demand_kind indeterminado MAS com demand_detail → bloco aparece (o detalhe é informação real)", () => {
+    const html = renderSection(
+      [prov({ id: "p1", tipo: "cumprir", title: "Cumprir" })],
+      {
+        demandKind: "undetermined",
+        demandDetail: "Manifestar-se sobre a petição de fls. 120.",
+      },
+    );
+    expect(html).toContain("O que é exigido");
+    expect(html).toContain("Manifestar-se sobre a petição de fls. 120.");
+  });
+
+  it("demand_target_role UNKNOWN → sem selo de quem deve agir (ausência não vira rótulo)", () => {
+    const html = renderSection(
+      [prov({ id: "p1", tipo: "cumprir", title: "Contestar" })],
+      { demandKind: "answer", demandTargetRole: "UNKNOWN" },
+    );
+    expect(html).toContain("O que é exigido");
+    expect(html).not.toContain("Cabe a");
+  });
+
+  it("modo compacto (painel) não renderiza o bloco — mesma regra do 'O que aconteceu'", () => {
+    const html = renderSection(
+      [prov({ id: "p1", tipo: "cumprir", title: "Contestar" })],
+      { compacto: true, demandKind: "answer", demandDetail: "Contestar." },
+    );
+    expect(html).not.toContain("O que é exigido");
+  });
+
   it("vazia, mesmo com analyzed=true → CTA Analisar (nunca 'mera ciência' por omissão)", () => {
     const html = renderSection([], { analyzed: true });
     expect(html).toContain("Analisar intimação");

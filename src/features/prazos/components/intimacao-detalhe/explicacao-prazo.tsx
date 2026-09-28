@@ -6,14 +6,32 @@ import type { PrazoDetalheView } from "../../types";
 /** Explains only the verified current snapshot; birth memory is historical. */
 export function ExplicacaoPrazo({
   prazo: p,
+  declaredDeadlineDays = null,
 }: {
   prazo: PrazoDetalheView;
   estado: string;
+  /** brief_declared_deadline_days (P1-1) — a duração que o TEOR declara, um
+   *  fato independente do cálculo do motor. Só é exibida quando DIVERGE da
+   *  contagem vigente: quando coincide, "Contagem: N dias" já diz o mesmo e
+   *  repetir seria ruído. null = sem brief / sem prazo declarado no teor. */
+  declaredDeadlineDays?: number | null;
 }) {
   if (p.status === "NO_DEADLINE") return null;
   const calc =
     p.calculation_audit_status === "current" ? p.current_calculation : null;
   const holidays = feriadosVigentes(p);
+  // O prazo declarado no teor é um fato INDEPENDENTE do cálculo do motor, e
+  // vale exibir em dois casos distintos — nunca no terceiro:
+  //   1. sem memória corrente (`calc` null): é a ÚNICA duração conhecida da
+  //      publicação, então informa (tom neutro);
+  //   2. com memória que DIVERGE: são dois números conflitantes sobre a mesma
+  //      coisa, e o advogado precisa decidir qual vale (tom de alerta);
+  //   3. com memória que COINCIDE: "Contagem: N dias" já disse — repetir daria
+  //      a impressão de duas fontes confirmando o mesmo, quando é um dado só.
+  const declarado = declaredDeadlineDays;
+  const declaradoDiverge =
+    declarado !== null && !!calc && declarado !== calc.days;
+  const declaradoSozinho = declarado !== null && !calc;
   return (
     <section
       aria-label="Explicação do prazo"
@@ -57,6 +75,20 @@ export function ExplicacaoPrazo({
             </p>
           </>
         )}
+        {declaradoSozinho ? (
+          <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+            O teor declara {declarado} dia(s) de prazo.
+          </p>
+        ) : null}
+        {declaradoDiverge ? (
+          <p
+            role="note"
+            className="text-gold-foreground mt-1 text-xs leading-relaxed"
+          >
+            O teor declara {declarado} dia(s) — diferente da contagem registrada
+            ({calc?.days}). Confira o tipo e o prazo.
+          </p>
+        ) : null}
       </div>
       {calc ? (
         <>

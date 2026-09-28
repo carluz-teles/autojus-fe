@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ProcessoView } from "../types";
 import {
+  assuntosDoProcesso,
   CLAIM_VALUE_SOURCE_LABEL,
   CLIENT_ROLE_LABEL,
   linhaProcesso,
@@ -103,5 +104,58 @@ describe("CLAIM_VALUE_SOURCE_LABEL", () => {
       capa: "Capa do processo",
       manual: "Informado manualmente",
     });
+  });
+});
+
+describe("assuntosDoProcesso", () => {
+  const base = { subject: "", subjects: null } as const;
+
+  it("com subjects → chips, um por assunto, na ordem recebida", () => {
+    const r = assuntosDoProcesso({
+      ...base,
+      subjects: [
+        { codigo: 7771, nome: "Indenização por Dano Moral" },
+        { codigo: 7772, nome: "Indenização por Dano Material" },
+      ],
+    });
+    expect(r.chips.map((s) => s.nome)).toEqual([
+      "Indenização por Dano Moral",
+      "Indenização por Dano Material",
+    ]);
+    expect(r.texto).toBe("");
+  });
+
+  it("o rótulo acompanha a cardinalidade (um assunto não lê como vários, nem o contrário)", () => {
+    expect(
+      assuntosDoProcesso({ ...base, subjects: [{ codigo: 1, nome: "A" }] })
+        .label,
+    ).toBe("Assunto");
+    expect(
+      assuntosDoProcesso({
+        ...base,
+        subjects: [
+          { codigo: 1, nome: "A" },
+          { codigo: 2, nome: "B" },
+        ],
+      }).label,
+    ).toBe("Assuntos");
+  });
+
+  it("sem subjects → cai no `subject` legado como TEXTO (processo só-DJEN)", () => {
+    const r = assuntosDoProcesso({
+      subject: "Nota Promissória",
+      subjects: null,
+    });
+    expect(r.chips).toEqual([]);
+    expect(r.texto).toBe("Nota Promissória");
+    expect(r.label).toBe("Assunto");
+  });
+
+  it("array VAZIO é ausência, não 'zero chips' — cai no mesmo fallback do null", () => {
+    expect(assuntosDoProcesso({ subject: "X", subjects: [] }).texto).toBe("X");
+  });
+
+  it("sem nenhum dos dois → ausência explícita", () => {
+    expect(assuntosDoProcesso(base).texto).toBe("Não informado");
   });
 });

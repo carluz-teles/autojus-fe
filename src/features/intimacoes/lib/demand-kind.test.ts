@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { DEMAND_KIND_LABEL, demandKindLabel } from "./demand-kind";
+import {
+  DEMAND_KIND_LABEL,
+  DEMAND_TARGET_ROLE_LABEL,
+  demandKindLabel,
+  demandTargetRoleLabel,
+} from "./demand-kind";
 
 describe("DEMAND_KIND_LABEL", () => {
   it("cobre exatamente os 20 valores do BE (migrations/0182), verbatim", () => {
@@ -37,5 +42,28 @@ describe("demandKindLabel", () => {
 
   it("devolve '' quando não há brief ainda", () => {
     expect(demandKindLabel("")).toBe("");
+  });
+});
+
+describe("demandTargetRoleLabel", () => {
+  it("rotula os papéis determinados como FRASE (quem deve agir), não substantivo", () => {
+    expect(demandTargetRoleLabel("PLAINTIFF")).toBe("Cabe ao autor");
+    expect(demandTargetRoleLabel("DEFENDANT")).toBe("Cabe ao réu");
+    expect(demandTargetRoleLabel("BOTH")).toBe("Cabe a ambas as partes");
+    expect(demandTargetRoleLabel("COUNSEL")).toBe("Cabe ao advogado");
+  });
+
+  it("UNKNOWN e ausência são a MESMA coisa pra UI: '' (nunca um selo de ignorância)", () => {
+    expect(demandTargetRoleLabel("UNKNOWN")).toBe("");
+    expect(demandTargetRoleLabel(null)).toBe("");
+  });
+
+  it("o mapa cobre exatamente os 4 papéis determinados do CHECK da migration 0182", () => {
+    expect(Object.keys(DEMAND_TARGET_ROLE_LABEL).sort()).toEqual([
+      "BOTH",
+      "COUNSEL",
+      "DEFENDANT",
+      "PLAINTIFF",
+    ]);
   });
 });
