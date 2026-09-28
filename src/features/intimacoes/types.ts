@@ -103,6 +103,46 @@ export type IntimacaoExcecaoMotivo =
   | "trabalho_nao_identificado"
   | "";
 
+/**
+ * Closed set de `demand_kind` do brief (intimation_brief.demand_kind) — a
+ * intenção da demanda extraída do teor (R4.1). Espelha VERBATIM o CHECK
+ * constraint de `migrations/0182_intimation_brief.up.sql` (20 valores) e o
+ * mapa `briefDemandLabels` do BE (internal/advisory/prompt_render.go, pinado
+ * por TestBriefDemandLabels_CoverEnum lá). Rótulos pt-BR em lib/demand-kind.ts
+ * (DEMAND_KIND_LABEL) — fonte única, como tipo-ato.ts. NÃO inclui "" (a
+ * ausência de brief é modelada à parte, no campo `brief_demand_kind` abaixo).
+ */
+export type IntimacaoDemandKind =
+  | "answer"
+  | "reply"
+  | "appeal"
+  | "interlocutory_appeal"
+  | "clarification_motion"
+  | "small_claims_appeal"
+  | "counter_arguments"
+  | "execution_objection"
+  | "enforcement_challenge"
+  | "manifest"
+  | "provide_address"
+  | "provide_document"
+  | "provide_calculation"
+  | "pay"
+  | "comply"
+  | "attend_hearing"
+  | "appoint_counsel"
+  | "acknowledge"
+  | "none"
+  | "undetermined";
+
+/** work_kind do brief — o tipo de trabalho quando `requires_work=true`.
+ *  Espelha migration 0182 (work_kind CHECK). */
+export type IntimacaoBriefWorkKind = "piece" | "task" | "acknowledge" | "none";
+
+/** demand_target_role do brief — contra quem/quem deve agir. Espelha migration
+ *  0182 (demand_target_role CHECK); só no detalhe (IntimacaoDetalheView). */
+export type BriefDemandTargetRole =
+  "PLAINTIFF" | "DEFENDANT" | "BOTH" | "COUNSEL" | "UNKNOWN";
+
 export interface IntimacaoView {
   id: string;
   cnj_number: string;
@@ -213,6 +253,17 @@ export interface IntimacaoView {
     | "mera_ciencia"
     | "sem_analise"
     | "indeterminado";
+  // ── Brief (R4.1 — docs/erd-brief.md) — a LEITURA da intimação, versão vigente ──
+  /** Intenção da demanda (closed set); "" quando não há brief ainda (BE faz
+   *  COALESCE(ib.demand_kind,'')). Rotulado via DEMAND_KIND_LABEL. */
+  brief_demand_kind: IntimacaoDemandKind | "";
+  /** true = exige trabalho do advogado além de mera ciência. */
+  brief_requires_work: boolean;
+  /** Tipo de trabalho quando `brief_requires_work=true`; "none" caso contrário
+   *  (ou antes do brief existir — BE faz COALESCE(ib.work_kind,'')). */
+  brief_work_kind: IntimacaoBriefWorkKind | "";
+  /** "O que aconteceu" — texto livre do brief; "" quando não há brief ainda. */
+  brief_summary: string;
 }
 
 // RecommendedProvidencia é o subset enxuto da 1ª providência que a LISTA carrega (o conjunto
@@ -400,6 +451,19 @@ export interface IntimacaoDetalheView extends IntimacaoView {
    * preenchido = pós-análise (o card mostra as providências).
    */
   ai_analyzed_at: string | null;
+
+  // ── Brief (R4.1) — o detalhe expõe os campos completos além dos da lista.
+  // null quando não há brief ainda (mesma condição de brief_demand_kind==="").
+  /** Objeto específico da demanda (ex.: "pagar honorários"). */
+  brief_demand_detail: string | null;
+  /** Contra quem/quem deve agir. */
+  brief_demand_target_role: BriefDemandTargetRole | null;
+  /** Prazo declarado no teor, em dias corridos (não é o prazo calculado pelo
+   *  motor — ver `prazo`). */
+  brief_declared_deadline_days: number | null;
+  /** Perfil de peça (catálogo GET /v1/piece-profiles) quando
+   *  `brief_work_kind="piece"`. */
+  brief_piece_profile_key: string | null;
 }
 
 /**

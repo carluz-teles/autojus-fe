@@ -128,6 +128,10 @@ function item(id: string): IntimacaoView {
     disposicao: "analisando",
     is_excecao: false,
     excecao_motivo: "",
+    brief_demand_kind: "",
+    brief_requires_work: false,
+    brief_work_kind: "",
+    brief_summary: "",
   };
 }
 
