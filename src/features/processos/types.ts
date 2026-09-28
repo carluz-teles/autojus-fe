@@ -4,6 +4,23 @@
 export type ProcessoDegree = "UNKNOWN" | "G1" | "G2" | "JE" | "SUPERIOR";
 type ProcessoSecrecy = "PUBLIC" | "RESTRICTED" | "SECRET";
 
+/** De que lado o escritório está na causa (court_case.client_role — migration
+ *  0180). "UNKNOWN" é o default até o DJEN casar um advogado monitorado a um
+ *  polo inequívoco; nunca inventado no FE. */
+export type ClientRole = "PLAINTIFF" | "DEFENDANT" | "BOTH" | "UNKNOWN";
+
+/** Fonte do `claim_value` (court_record.claim_value_source — migration 0180).
+ *  "capa" = extraído da capa do processo (DATAJUD); "manual" = digitado pelo
+ *  escritório (PATCH /v1/processos/:id). */
+export type ClaimValueSource = "capa" | "manual";
+
+/** Um assunto CNJ do processo (court_record.subjects — jsonb array
+ *  {codigo,nome} COMPLETO, migration 0180). `codigo` é o código TPU (int). */
+export interface ProcessoSubject {
+  codigo: number;
+  nome: string;
+}
+
 /** Fase processual — o stepper do cockpit. Conjunto fechado, alinhado ao BE (court_record.phase). */
 export type ProcessoPhase =
   "CONHECIMENTO" | "INSTRUCAO" | "SENTENCA" | "RECURSO" | "EXECUCAO";
@@ -70,6 +87,23 @@ export interface ProcessoView {
    * Contrato: docs/contrato-proximo-passo.md (backend).
    */
   proximo_passo?: ProximoPasso | null;
+  // ── Cockpit (R4.2 — docs/erd-brief.md) ──
+  /** Fonte do `claim_value`; null quando o valor não veio de nenhuma fonte
+   *  automática/manual identificada ainda. */
+  claim_value_source: ClaimValueSource | null;
+  /** Nome do magistrado (enriquecimento DATAJUD); null quando não preenchido. */
+  magistrate: string | null;
+  /** Nome da comarca (enriquecimento DATAJUD); null quando não preenchido. */
+  comarca_name: string | null;
+  /** Código IBGE do município da comarca (enriquecimento DATAJUD); null quando
+   *  não preenchido. */
+  comarca_ibge_code: number | null;
+  /** Assuntos completos do processo (substitui/complementa `subject`, que
+   *  continua o assunto único legado); null quando não há lista estruturada
+   *  ainda (DJEN não carrega — só DATAJUD preenche). */
+  subjects: ProcessoSubject[] | null;
+  /** De que lado o escritório está nesta causa. */
+  client_role: ClientRole | null;
 }
 
 /** Conjunto fechado de ações do motor de próximo passo (espelha o BE). */

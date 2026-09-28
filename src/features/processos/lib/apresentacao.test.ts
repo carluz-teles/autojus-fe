@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { ProcessoView } from "../types";
 import {
+  CLAIM_VALUE_SOURCE_LABEL,
+  CLIENT_ROLE_LABEL,
   linhaProcesso,
   retornoProcessos,
   situacaoProcesso,
@@ -74,5 +76,28 @@ describe("situação do processo", () => {
     expect(situacaoProcesso({ ...processo, lifecycle: "UNKNOWN" }).label).toBe(
       "A verificar",
     );
+  });
+});
+
+// Cockpit R4.2 (P0-3) — rótulos pt-BR de client_role (court_case.client_role) e
+// claim_value_source (court_record.claim_value_source), ambos CHECK constraints
+// de migrations/0180_ingestao_v2_columns.up.sql.
+describe("CLIENT_ROLE_LABEL", () => {
+  it("cobre os 4 valores do CHECK de court_case.client_role", () => {
+    expect(CLIENT_ROLE_LABEL).toEqual({
+      PLAINTIFF: "Autor(a)",
+      DEFENDANT: "Réu(é)",
+      BOTH: "Autor(a) e réu(é)",
+      UNKNOWN: "Não identificado",
+    });
+  });
+});
+
+describe("CLAIM_VALUE_SOURCE_LABEL", () => {
+  it("cobre os 2 valores do CHECK de court_record.claim_value_source", () => {
+    expect(CLAIM_VALUE_SOURCE_LABEL).toEqual({
+      capa: "Capa do processo",
+      manual: "Informado manualmente",
+    });
   });
 });

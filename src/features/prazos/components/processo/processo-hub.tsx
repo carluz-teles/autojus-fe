@@ -32,7 +32,11 @@ import { Responsavel } from "@/features/organization/components/responsavel";
 import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
 import { ProximoPassoCard } from "@/features/processos/components/proximo-passo-card";
 import { ProcessoSituacao } from "@/features/processos/components/situacao-processo";
-import { FASE_STEPS } from "@/features/processos/lib/apresentacao";
+import {
+  CLAIM_VALUE_SOURCE_LABEL,
+  CLIENT_ROLE_LABEL,
+  FASE_STEPS,
+} from "@/features/processos/lib/apresentacao";
 import type { ProcessoPhase } from "@/features/processos/types";
 import { formatDate } from "@/lib/format";
 
@@ -637,9 +641,37 @@ export function ProcessoHub({ numero }: { numero: string }) {
                     />
                   </div>
                   <dl className="flex flex-col gap-3 border-t pt-3">
-                    <Fato label="Assunto">{p.subject || "Não informado"}</Fato>
+                    <Fato label="Cliente">
+                      {p.client_role && p.client_role !== "UNKNOWN" ? (
+                        <Badge variant="default">
+                          {CLIENT_ROLE_LABEL[p.client_role]}
+                        </Badge>
+                      ) : (
+                        "Não informado"
+                      )}
+                    </Fato>
+                    <Fato label="Magistrado">
+                      {p.magistrate || "Não informado"}
+                    </Fato>
+                    <Fato label="Comarca">
+                      {p.comarca_name || "Não informado"}
+                    </Fato>
+                    <Fato label="Assunto">
+                      {p.subjects && p.subjects.length > 0
+                        ? p.subjects.map((s) => s.nome).join(", ")
+                        : p.subject || "Não informado"}
+                    </Fato>
                     <Fato label="Distribuição">{h.distribuido}</Fato>
-                    <Fato label="Valor da causa">{h.valorFormatado}</Fato>
+                    <Fato label="Valor da causa">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        {h.valorFormatado}
+                        {p.claim_value_source ? (
+                          <Badge variant="outline" className="text-[10px]">
+                            {CLAIM_VALUE_SOURCE_LABEL[p.claim_value_source]}
+                          </Badge>
+                        ) : null}
+                      </span>
+                    </Fato>
                     <Fato label="Publicidade">{h.segredo}</Fato>
                   </dl>
                 </section>

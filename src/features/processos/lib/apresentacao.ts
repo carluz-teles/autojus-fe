@@ -2,13 +2,36 @@ import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
 import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
 import { formatDate } from "@/lib/format";
 
-import type { ProcessoDegree, ProcessoPhase, ProcessoView } from "../types";
+import type {
+  ClaimValueSource,
+  ClientRole,
+  ProcessoDegree,
+  ProcessoPhase,
+  ProcessoView,
+} from "../types";
 export const DEGREE_LABEL: Record<ProcessoDegree, string> = {
   G1: "1º grau",
   G2: "2º grau",
   JE: "Juizado",
   SUPERIOR: "Superior",
   UNKNOWN: "—",
+};
+
+/** Rótulo pt-BR de `client_role` (court_case.client_role — migration 0180) — de
+ *  que lado o escritório está na causa. "UNKNOWN" não renderiza rótulo próprio
+ *  (a Ficha do processo cai em "Não informado", o padrão do card). */
+export const CLIENT_ROLE_LABEL: Record<ClientRole, string> = {
+  PLAINTIFF: "Autor(a)",
+  DEFENDANT: "Réu(é)",
+  BOTH: "Autor(a) e réu(é)",
+  UNKNOWN: "Não identificado",
+};
+
+/** Rótulo pt-BR de `claim_value_source` (court_record.claim_value_source —
+ *  migration 0180, CHECK ('capa','manual')). */
+export const CLAIM_VALUE_SOURCE_LABEL: Record<ClaimValueSource, string> = {
+  capa: "Capa do processo",
+  manual: "Informado manualmente",
 };
 
 export function grauProcessoLabel(degree: string): string {
