@@ -3,7 +3,7 @@
 // intimação (partida, pré-geração). Assim o rail rico (ContextRail) é único: a
 // partida deixa de ser uma tela paralela e mais pobre.
 
-import type { Draft } from "../types";
+import type { Draft, DraftPartyGroup } from "../types";
 
 interface PecaContextoProcesso {
   cnj: string;
@@ -13,6 +13,10 @@ interface PecaContextoProcesso {
   tribunalGrau: string;
   /** "" quando desconhecido (a intimação não carrega o valor da causa). */
   valor: string;
+  /** Polo que o escritório representa ("Autor"/"Réu"/"Terceiro"), derivado da
+   *  parte marcada `is_client` pelo BE. "" quando nenhuma parte está marcada —
+   *  a UI mostra "Não informado" e NUNCA chuta o polo. */
+  clientePolo: string;
 }
 
 interface PecaContextoIntimacao {
@@ -50,6 +54,18 @@ export interface PecaContexto {
   autos: PecaContextoDoc[];
 }
 
+/**
+ * De que lado o escritório está na causa, a partir das partes do draft.
+ *
+ * `is_client` é derivado no BE da parte cujo advogado carrega a OAB vigiada
+ * (o mesmo eixo de `court_case.client_role`), já vinha no payload de
+ * `GET /v1/pecas/:id` e o rail o descartava — daí "Partes envolvidas" nunca
+ * dizer qual das partes é o cliente. "" quando o BE não marcou ninguém.
+ */
+export function poloDoCliente(partes: DraftPartyGroup[]): string {
+  return partes.find((p) => p.isClient)?.roleLabel || "";
+}
+
 /** Draft (construção) → contexto do rail. */
 export function draftToPecaContexto(d: Draft): PecaContexto {
   return {
@@ -60,6 +76,7 @@ export function draftToPecaContexto(d: Draft): PecaContexto {
       orgao: d.process.orgao,
       tribunalGrau: d.process.tribunalGrau,
       valor: d.process.valor,
+      clientePolo: poloDoCliente(d.partyGroups),
     },
     intimacao: {
       id: d.intimation.id,
