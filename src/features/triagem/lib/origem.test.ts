@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import type { OrigemFacets } from "@/features/intimacoes/types";
 
-import { ABA_TODOS_LABEL, abasVisiveis, ORIGEM_LABEL } from "./origem";
+import {
+  ABA_TODOS_LABEL,
+  abasVisiveis,
+  ORIGEM_DESCRICAO,
+  ORIGEM_LABEL,
+} from "./origem";
 
 function facets(overrides: Partial<OrigemFacets> = {}): OrigemFacets {
   return {
@@ -38,6 +43,18 @@ describe("ORIGEM_LABEL", () => {
       expect(label.toLowerCase()).not.toContain("ia");
       expect(label.toLowerCase()).not.toContain("inteligência");
     }
+  });
+
+  // A diretiva vale para TODO texto visível, não só para o rótulo curto: a
+  // descrição (tooltip) dizia "sugerido por IA a partir da publicação". A copy
+  // comunica pela AÇÃO e pela FONTE do dado, nunca pela tecnologia.
+  it("a DESCRIÇÃO da origem também não cita tecnologia", () => {
+    for (const texto of Object.values(ORIGEM_DESCRICAO)) {
+      expect(texto).not.toMatch(
+        /\bIA\b|intelig[êe]ncia artificial|\bLLM\b|modelo de linguagem/i,
+      );
+    }
+    expect(ORIGEM_DESCRICAO.ia).toContain("inferido a partir do texto");
   });
 });
 
