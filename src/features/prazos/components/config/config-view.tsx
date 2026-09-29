@@ -1,15 +1,16 @@
 "use client";
 
-import { Clock, Settings2 } from "lucide-react";
+import { Settings2 } from "lucide-react";
 
 import { ShellHeader } from "@/components/shell/page-frame";
+import { BillingPanel } from "@/features/billing/components/billing-panel";
 import { NotificationPreferences } from "@/features/notifications/notification-preferences";
 import { cn } from "@/lib/utils";
 
 import { useConfig } from "../../hooks/use-config";
 import { ConfigEquipe } from "./config-equipe";
 import { ConfigFontes } from "./config-fontes";
-import { BRAND_GRADIENT, SettingsSection } from "./config-kit";
+import { SettingsSection } from "./config-kit";
 import { ConfigOrg } from "./config-org";
 import { ConfigPerfil } from "./config-perfil";
 
@@ -67,25 +68,7 @@ export function ConfigView() {
                 title="Plano & cobrança"
                 subtitle="Planos e faturamento do escritório."
               >
-                <div
-                  className="surface-panel relative flex flex-col items-center gap-3 overflow-hidden px-6 py-12 text-center"
-                  style={{
-                    backgroundImage:
-                      "radial-gradient(120% 90% at 50% 0%, color-mix(in oklch, var(--gold) 8%, transparent), transparent 60%)",
-                  }}
-                >
-                  <span
-                    className="text-primary-foreground grid size-12 place-items-center rounded-2xl shadow-sm"
-                    style={{ backgroundImage: BRAND_GRADIENT }}
-                  >
-                    <Clock className="size-5" strokeWidth={1.9} />
-                  </span>
-                  <div className="text-[14px] font-medium">Em breve</div>
-                  <p className="text-fg3 max-w-[320px] text-[12.5px] leading-[1.5]">
-                    A gestão de plano, uso e faturas chega em uma próxima
-                    atualização.
-                  </p>
-                </div>
+                <BillingPanel />
               </SettingsSection>
             ) : null}
 

@@ -27,3 +27,13 @@ const countFormatter = new Intl.NumberFormat("pt-BR");
 export function formatCount(n: number): string {
   return countFormatter.format(n);
 }
+
+const brlFormatter = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+});
+
+/** Formata centavos (padrão Stripe) em moeda pt-BR — ex. `2990` → "R$ 29,90". */
+export function formatCentsToBRL(cents: number): string {
+  return brlFormatter.format(cents / 100);
+}
