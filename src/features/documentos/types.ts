@@ -44,6 +44,34 @@ export interface DocumentView {
    * rotulada como data de captura, nunca apresentada como data do ato.
    */
   court_event_date?: string | null;
+  /** Vínculo confirmado pelo tribunal; ausente em uploads e autos legados. */
+  autos_event_id?: string;
+  court_document_code?: string;
+  court_reference?: { event_number: number; document_code: string };
+}
+
+export interface AutosNode {
+  kind: "event" | "unmapped";
+  id: string;
+  event_number?: number;
+  occurred_at?: string;
+  description?: string;
+  detail?: string;
+  actor?: string;
+  documents: DocumentView[];
+}
+
+export interface AutosTreePage {
+  data: AutosNode[];
+  page: {
+    next_cursor: string | null;
+    limit: number;
+    total_count: number;
+    total: number;
+  };
+  filters: Record<string, never>;
+  document_total: number;
+  document_filtered_total: number;
 }
 
 // ── Upload presigned (3 passos) ──

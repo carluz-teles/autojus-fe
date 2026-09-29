@@ -2,7 +2,6 @@
 import {
   ArrowRight,
   Copy,
-  FileText,
   FolderOpen,
   Pencil,
   RefreshCw,
@@ -16,7 +15,6 @@ import { SectionTitle } from "@/components/shell/section-title";
 import { TeorContent } from "@/components/teor-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 import { IconAction } from "@/components/ui/icon-action";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -26,6 +24,7 @@ import { SkeletonRows } from "@/components/ui/skeletons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AutosFetchingBadge } from "@/features/configuracoes/components/autos-fetching-badge";
 import { SyncAutosButton } from "@/features/configuracoes/components/sync-autos-button";
+import { AutosTree } from "@/features/documentos/components/autos-tree";
 import { PdfDrawer } from "@/features/documentos/components/pdf-drawer";
 import { CourtAccessNotice } from "@/features/onboarding/components/court-access-notice";
 import { Responsavel } from "@/features/organization/components/responsavel";
@@ -496,61 +495,7 @@ export function ProcessoHub({ numero }: { numero: string }) {
                           …
                         </p>
                       )}
-                      <Colecao
-                        query={h.autos}
-                        count={h.docs.length}
-                        empty={
-                          <EmptyState
-                            icon={FolderOpen}
-                            title="Os autos ainda não estão disponíveis"
-                            description="Sincronize com o tribunal ou adicione um PDF do escritório para consultar os documentos aqui."
-                            className="bg-card"
-                          />
-                        }
-                      >
-                        <div className="divide-y">
-                          {h.docs.map((doc) => (
-                            <div
-                              key={doc.id}
-                              className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center"
-                            >
-                              <div className="bg-primary/10 text-primary hidden size-10 shrink-0 place-items-center rounded-lg sm:grid">
-                                <FileText className="size-5" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium break-words">
-                                  {doc.titulo}
-                                </p>
-                                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-                                  {doc.meta}
-                                </p>
-                                <Badge className="mt-2" variant={doc.variant}>
-                                  {doc.status}
-                                </Badge>
-                              </div>
-                              <Button
-                                variant="outline"
-                                disabled={
-                                  !doc.podeAbrir ||
-                                  (!doc.visualizavel &&
-                                    h.autos.baixar.isPending)
-                                }
-                                onClick={() =>
-                                  doc.visualizavel
-                                    ? h.abrirDocumento(doc)
-                                    : h.autos.baixar.mutate(doc.id)
-                                }
-                                aria-label={`${doc.visualizavel ? "Abrir" : "Baixar"} ${doc.titulo}`}
-                              >
-                                {doc.visualizavel
-                                  ? "Abrir documento"
-                                  : "Baixar arquivo"}
-                                <ArrowRight />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </Colecao>
+                      <AutosTree autos={h.autosTree} />
                     </TabsContent>
                     <TabsContent className="animate-none" value="andamentos">
                       <Colecao

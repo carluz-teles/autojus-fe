@@ -144,3 +144,9 @@ describe("rotuloTipoAuto — código desconhecido", () => {
     expect(rotuloTipoAuto("")).toBe("Documento");
   });
 });
+
+it("normalizes descriptive portal types without inventing a classification", () => {
+  expect(rotuloTipoAuto("PLANILHA DE CÁLCULO")).toBe("Planilha de cálculo");
+  expect(rotuloTipoAuto("IMPUGNAÇÃO")).toBe("Impugnação");
+  expect(rotuloTipoAuto("OUTROS")).toBe("Outros");
+});

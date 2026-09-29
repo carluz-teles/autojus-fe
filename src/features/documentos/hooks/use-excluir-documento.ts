@@ -16,9 +16,13 @@ export function useExcluirDocumento(processoId: string) {
 
   return useMutation<void, Error, string>({
     mutationFn: (id) => deleteDocumento(fetcher, id),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["documentos", "autos", processoId],
+      });
+      return queryClient.invalidateQueries({
         queryKey: ["documentos", "processo", processoId],
-      }),
+      });
+    },
   });
 }

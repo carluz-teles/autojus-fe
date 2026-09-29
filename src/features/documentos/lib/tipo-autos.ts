@@ -42,6 +42,7 @@ const TIPO_AUTOS_LABEL: Record<string, string> = {
   CONTR: "Contrato",
   CONTRSOCIAL: "Contrato social",
   CALC: "Cálculo",
+  "PLANILHA DE CÁLCULO": "Planilha de cálculo",
   COMP: "Comprovante",
   GUIA: "Guia",
   CDA: "Certidão de dívida ativa",
@@ -50,7 +51,10 @@ const TIPO_AUTOS_LABEL: Record<string, string> = {
   "REL.PESQ.ENDERECO": "Pesquisa de endereço",
   "PROTOCOLO ORDEM": "Protocolo",
   DETSISPARTOT: "Detalhamento",
+  ANEXO: "Anexo",
+  IMPUGNAÇÃO: "Impugnação",
   OUT: "Outros",
+  OUTROS: "Outros",
 };
 
 // Converte um código cru (SENT, DESPADEC…) no rótulo pt-BR. Sem match, devolve o

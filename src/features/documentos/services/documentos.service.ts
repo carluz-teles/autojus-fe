@@ -1,6 +1,7 @@
 import type { ApiFetcher } from "@/lib/api/use-api";
 
 import type {
+  AutosTreePage,
   CompleteUploadInput,
   DocumentView,
   DownloadUrlResult,
@@ -8,6 +9,26 @@ import type {
   StartUploadInput,
   StartUploadResult,
 } from "../types";
+
+export async function listAutosTree(
+  fetcher: ApiFetcher,
+  params: {
+    processoId: string;
+    search: string;
+    order: "newest" | "oldest";
+    cursor?: string;
+    limit?: number;
+  },
+): Promise<AutosTreePage> {
+  return fetcher<AutosTreePage>(`/v1/processos/${params.processoId}/autos`, {
+    query: {
+      search: params.search,
+      order: params.order,
+      limit: params.limit ?? 20,
+      cursor: params.cursor,
+    },
+  });
+}
 
 const ENDPOINT = "/v1/documentos";
 

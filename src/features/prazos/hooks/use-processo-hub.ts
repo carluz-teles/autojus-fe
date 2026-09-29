@@ -6,11 +6,8 @@ import { toast } from "sonner";
 
 import { useAndamentosDoProcesso } from "@/features/andamentos/hooks/use-andamentos-do-processo";
 import type { OpenDocument } from "@/features/documentos/components/pdf-drawer";
+import { useAutosTree } from "@/features/documentos/hooks/use-autos-tree";
 import { useDocumentosDoProcesso } from "@/features/documentos/hooks/use-documentos-do-processo";
-import {
-  rotuloTipoAuto,
-  visualDoAuto,
-} from "@/features/documentos/lib/tipo-autos";
 import { atoPublicacaoLabel } from "@/features/intimacoes/lib/labels";
 import { prazoVisivel } from "@/features/intimacoes/lib/prazo-visivel";
 import { resumoOuTeor } from "@/features/intimacoes/lib/resumo-intimacao";
@@ -72,6 +69,7 @@ export function useProcessoHub(id: string) {
   const [trabalhoTab, setTrabalhoTab] = useState("intimacoes");
   const [acervoTab, setAcervoTab] = useState("autos");
   const [documento, setDocumento] = useState<OpenDocument | null>(null);
+  const autosTree = useAutosTree(id, setDocumento);
   const [editando, setEditando] = useState(false);
   const [label, setLabel] = useState("");
   const [phase, setPhase] = useState<ProcessoPhase | "">("");
@@ -164,40 +162,6 @@ export function useProcessoHub(id: string) {
             : undefined,
       };
     });
-  const docs = autos.documentos.map((d) => {
-    const vis = visualDoAuto(d.document_type || d.title);
-    return {
-      id: d.id,
-      titulo: d.title || d.original_filename || rotuloTipoAuto(d.document_type),
-      meta: `${d.origin === "UPLOAD" ? "Enviado pelo escritório" : `${vis.categoria} · ${vis.origem}`} · ${formatDate(d.created_at)}${d.pages ? ` · ${d.pages} ${d.pages === 1 ? "página" : "páginas"}` : ""}`,
-      status:
-        d.status === "FAILED"
-          ? "Falha no processamento"
-          : d.status === "READY"
-            ? "Disponível"
-            : d.status === "PENDING"
-              ? "Envio pendente"
-              : "Processando texto",
-      variant:
-        d.status === "FAILED"
-          ? ("warning" as const)
-          : d.status === "READY"
-            ? ("success" as const)
-            : ("secondary" as const),
-      podeAbrir: d.status !== "PENDING",
-      visualizavel:
-        !d.mime_type ||
-        [
-          "application/pdf",
-          "pdf",
-          "text/html",
-          "application/xhtml+xml",
-          "html",
-          "htm",
-        ].includes(d.mime_type.split(";")[0].trim().toLowerCase()) ||
-        /\.(pdf|html?)$/i.test(d.original_filename || d.title),
-    };
-  });
   const pecas: RegistroProcesso[] = pecasQ.items.map((d) => ({
     id: d.id,
     titulo: d.title || rotuloTipoPeca(d.piece_type),
@@ -319,12 +283,12 @@ export function useProcessoHub(id: string) {
     intQ,
     prazoQ,
     autos,
+    autosTree,
     pecasQ,
     partesQ,
     andQ,
     intimacoes,
     prazos,
-    docs,
     pecas,
     partes,
     historico,

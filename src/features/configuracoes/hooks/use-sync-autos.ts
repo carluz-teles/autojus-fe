@@ -33,14 +33,24 @@ export function useSyncAutos(scope: AutosSyncScope) {
     connections.data ?? [],
     scope,
   );
+  const documentQueryPrefixes = [
+    [
+      "documentos",
+      "processo",
+      ...(scope.courtRecordId ? [scope.courtRecordId] : []),
+    ],
+    [
+      "documentos",
+      "autos",
+      ...(scope.courtRecordId ? [scope.courtRecordId] : []),
+    ],
+  ] as const;
   const refreshDocuments = () =>
-    queryClient.invalidateQueries({
-      queryKey: [
-        "documentos",
-        "processo",
-        ...(scope.courtRecordId ? [scope.courtRecordId] : []),
-      ],
-    });
+    Promise.all(
+      documentQueryPrefixes.map((queryKey) =>
+        queryClient.invalidateQueries({ queryKey }),
+      ),
+    );
   const statusKey = [
     "court-autos-sync",
     scope.courtRecordId ?? "all",
@@ -63,14 +73,11 @@ export function useSyncAutos(scope: AutosSyncScope) {
   });
   const requesting =
     useIsMutating({ mutationKey: ["court-autos-sync-request"] }) > 0;
-  const refreshingDocuments =
-    useIsFetching({
-      queryKey: [
-        "documentos",
-        "processo",
-        ...(scope.courtRecordId ? [scope.courtRecordId] : []),
-      ],
-    }) > 0;
+  const refreshingLegacy = useIsFetching({
+    queryKey: documentQueryPrefixes[0],
+  });
+  const refreshingAutos = useIsFetching({ queryKey: documentQueryPrefixes[1] });
+  const refreshingDocuments = refreshingLegacy + refreshingAutos > 0;
   const mutation = useMutation({
     mutationKey: ["court-autos-sync-request"],
     mutationFn: async () => {

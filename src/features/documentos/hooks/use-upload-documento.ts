@@ -37,10 +37,14 @@ export function useUploadDocumento(processoId: string) {
       await putToStorage(started.upload_url, file, setProgress);
       return completeUpload(fetcher, started.document_id);
     },
-    onSuccess: () =>
-      queryClient.invalidateQueries({
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["documentos", "autos", processoId],
+      });
+      return queryClient.invalidateQueries({
         queryKey: ["documentos", "processo", processoId],
-      }),
+      });
+    },
     onSettled: () => setProgress(null),
   });
 
