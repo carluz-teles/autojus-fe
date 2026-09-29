@@ -2,14 +2,8 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
+import { useClerk, useOrganization, useUser } from "@clerk/nextjs";
 import {
-  useClerk,
-  useOrganization,
-  useOrganizationList,
-  useUser,
-} from "@clerk/nextjs";
-import {
-  Building2,
   Check,
   ChevronDown,
   LogOut,
@@ -19,7 +13,6 @@ import {
   PanelLeftOpen,
   Settings2,
   User,
-  UserPlus,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -36,9 +29,9 @@ import { APP_HOME_PATH } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 import { NAV_SECTIONS } from "./nav-config";
+import { useOrganizationCoordinator } from "./organization-coordinator";
 
 // Fundos com tinta de marca (accent) nos valores exatos do mockup.
-const TINT_12 = "color-mix(in oklch, var(--primary) 12%, transparent)";
 const TINT_14 = "color-mix(in oklch, var(--primary) 14%, transparent)";
 
 // Iniciais para avatares/monogramas sem imagem.
@@ -339,12 +332,9 @@ function NavItemLink({
   );
 }
 
-function OrgSwitcher({ collapsed }: { collapsed: boolean }) {
-  const router = useRouter();
+export function OrgSwitcher({ collapsed }: { collapsed: boolean }) {
   const { organization } = useOrganization();
-  const { userMemberships, setActive, isLoaded } = useOrganizationList({
-    userMemberships: { infinite: true },
-  });
+  const coordinator = useOrganizationCoordinator();
 
   const nome = organization?.name ?? "Sem organização";
 
@@ -400,52 +390,36 @@ function OrgSwitcher({ collapsed }: { collapsed: boolean }) {
               <div className="text-fg3 px-2.5 pt-[7px] pb-[5px] text-[10px] font-medium tracking-[0.05em] uppercase">
                 Organizações
               </div>
-              {isLoaded &&
-                userMemberships.data?.map((m) => {
-                  const ativa = m.organization.id === organization?.id;
-                  return (
-                    <Menu.Item
-                      key={m.organization.id}
-                      onClick={() =>
-                        setActive?.({ organization: m.organization.id })
-                      }
-                      className="hover:bg-hover data-highlighted:bg-hover flex w-full items-center gap-[9px] rounded-lg px-2.5 py-2 text-left outline-none"
-                    >
-                      <span
-                        className="text-primary grid size-[26px] shrink-0 place-items-center rounded-[7px] text-[10px] font-semibold"
-                        style={{ background: TINT_12 }}
-                      >
-                        {iniciais(m.organization.name)}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[12.5px] font-medium">
-                          {m.organization.name}
-                        </span>
-                      </span>
-                      {ativa ? (
-                        <Check
-                          className="text-primary size-3.5 shrink-0"
-                          strokeWidth={2.4}
-                        />
-                      ) : null}
-                    </Menu.Item>
-                  );
-                })}
-              <div className="bg-line2 my-[5px] h-px" />
-              <Menu.Item
-                onClick={() => router.push("/configuracoes")}
-                className="hover:bg-hover data-highlighted:bg-hover text-foreground flex w-full items-center gap-[9px] rounded-lg px-2.5 py-2 text-left text-[12.5px] outline-none"
+              <Menu.RadioGroup
+                value={organization?.id ?? ""}
+                onValueChange={(value) => {
+                  if (typeof value === "string") {
+                    void coordinator?.switchOrganization(value);
+                  }
+                }}
               >
-                <Building2 className="text-fg3 size-3.5" strokeWidth={1.8} />
-                Configurações da organização
-              </Menu.Item>
-              <Menu.Item
-                onClick={() => router.push("/configuracoes")}
-                className="hover:bg-hover data-highlighted:bg-hover text-foreground flex w-full items-center gap-[9px] rounded-lg px-2.5 py-2 text-left text-[12.5px] outline-none"
-              >
-                <UserPlus className="text-fg3 size-3.5" strokeWidth={1.8} />
-                Convidar membros
-              </Menu.Item>
+                {coordinator?.memberships.map((m) => (
+                  <Menu.RadioItem
+                    key={m.organization.id}
+                    value={m.organization.id}
+                    disabled={coordinator.switching}
+                    className="hover:bg-hover data-highlighted:bg-hover flex w-full items-center gap-[9px] rounded-lg px-2.5 py-2 text-left outline-none"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12.5px] font-medium">
+                        {m.organization.name}
+                      </span>
+                    </span>
+                    <Menu.RadioItemIndicator className="ml-auto">
+                      <Check
+                        aria-hidden="true"
+                        className="text-primary size-3.5 shrink-0"
+                        strokeWidth={2.4}
+                      />
+                    </Menu.RadioItemIndicator>
+                  </Menu.RadioItem>
+                ))}
+              </Menu.RadioGroup>
             </Menu.Group>
           </Menu.Popup>
         </Menu.Positioner>

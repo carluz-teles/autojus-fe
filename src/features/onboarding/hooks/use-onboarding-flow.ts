@@ -2,6 +2,7 @@
 
 import {
   useAuth,
+  useClerk,
   useOrganization,
   useOrganizationList,
   useUser,
@@ -15,11 +16,17 @@ import { z } from "zod";
 
 import { addWatchedOab } from "@/features/integrations/services/integrations.service";
 import { inviteMember } from "@/features/organization/actions/invite-member";
+import { apiFetch } from "@/lib/api/client";
 import { useApi } from "@/lib/api/use-api";
+import {
+  activateAndVerifyOrganization,
+  beginOrganizationTransition,
+  verifyOrganizationTransition,
+} from "@/lib/auth/organization-transition";
 
 import { lookupCnpj } from "../lib/cnpj-lookup";
-import { getMe } from "../services/onboarding.service";
-import type { AccountType } from "../types";
+import { completePersonalProfile } from "../services/onboarding.service";
+import type { AccountType, Me } from "../types";
 import { ME_KEY } from "./use-me";
 import { useOnboarding } from "./use-onboarding";
 
@@ -144,18 +151,6 @@ function useUserStep() {
     [user],
   );
 
-  // Persiste nome/sobrenome no Clerk (fonte da identidade) antes de avançar.
-  const persistName = useCallback(
-    async (values: UserForm) => {
-      if (!user) return;
-      await user.update({
-        firstName: values.firstName.trim(),
-        lastName: values.lastName.trim(),
-      });
-    },
-    [user],
-  );
-
   const fullName = useCallback(() => {
     const { firstName, lastName } = getValues();
     return `${firstName} ${lastName}`.trim();
@@ -167,7 +162,6 @@ function useUserStep() {
     avatarUrl: user?.hasImage ? user.imageUrl : null,
     uploadAvatar,
     savingAvatar,
-    persistName,
   };
 }
 
@@ -288,14 +282,17 @@ function useTeam() {
   return { rows, email, setEmail, role, setRole, add, remove };
 }
 
-export function useOnboardingFlow() {
+export function useOnboardingFlow(existingOrganization = false) {
   const router = useRouter();
+  const clerk = useClerk();
   const { userId, orgId } = useAuth();
   const { isLoaded, createOrganization, setActive, userMemberships } =
     useOrganizationList({ userMemberships: { infinite: true } });
   const { organization: activeOrg } = useOrganization();
 
-  const [step, setStep] = useState<OnbStep>("user");
+  const [step, setStep] = useState<OnbStep>(
+    existingOrganization ? "org" : "user",
+  );
   const [phase, setPhase] = useState<Phase>("idle");
   const [capturasAtivadas, setCapturasAtivadas] = useState(0);
   const [convitesEnviados, setConvitesEnviados] = useState(0);
@@ -317,6 +314,7 @@ export function useOnboardingFlow() {
   // Progresso visual local, isolado por Clerk user. Passos que dependem do tenant só
   // voltam depois que a org foi reativada e seu org_id voltou ao token.
   useEffect(() => {
+    if (existingOrganization) return;
     if (!stepStorageKey || restoredStepFor.current === stepStorageKey) return;
     const stored = window.localStorage.getItem(
       stepStorageKey,
@@ -327,35 +325,27 @@ export function useOnboardingFlow() {
       }
     }
     restoredStepFor.current = stepStorageKey;
-  }, [orgId, stepStorageKey]);
+  }, [existingOrganization, orgId, stepStorageKey]);
 
   useEffect(() => {
+    if (existingOrganization) return;
     if (!stepStorageKey || restoredStepFor.current !== stepStorageKey) return;
     window.localStorage.setItem(stepStorageKey, step);
-  }, [step, stepStorageKey]);
-
-  // Clerk permite sessão pessoal mesmo já pertencendo a uma org (acontece após hard
-  // refresh). Reativa a membership existente antes que o wizard crie uma 2ª org.
-  // Com a org ativa, o `orgId` volta ao token e a query /me busca o tenant sozinha.
-  useEffect(() => {
-    if (!isLoaded || orgId || phase !== "idle") return;
-    const membership = userMemberships.data?.[0];
-    if (!membership || !setActive) return;
-    void setActive({ organization: membership.organization.id })
-      .then(() => setErro(null))
-      .catch(() =>
-        setErro("Não foi possível restaurar o escritório. Tente novamente."),
-      );
-  }, [isLoaded, orgId, phase, setActive, userMemberships.data]);
+  }, [existingOrganization, step, stepStorageKey]);
 
   // Passo 1 → 2: valida (RHF) → persiste nome no Clerk e avança. handleSubmit só
   // chama isto com nome/sobrenome já preenchidos (schema); erro trava no campo.
   const continuarUser = u.form.handleSubmit(async (values) => {
     setErro(null);
     try {
-      await u.persistName(values);
+      await completePersonalProfile(
+        api,
+        values.firstName.trim(),
+        values.lastName.trim(),
+      );
     } catch {
-      // nome é best-effort no Clerk; não trava o fluxo
+      setErro("Não foi possível salvar seu perfil. Tente novamente.");
+      return;
     }
     setStep("org");
   });
@@ -372,21 +362,41 @@ export function useOnboardingFlow() {
       try {
         let org = activeOrg ?? null;
         if (!org) {
-          if (!createOrganization || !setActive) {
+          if (
+            !createOrganization ||
+            !setActive ||
+            userMemberships.hasNextPage ||
+            userMemberships.isFetching ||
+            (userMemberships.data?.length ?? 0) > 0
+          ) {
             setPhase("idle");
+            setErro("Verifique seus escritórios antes de criar outro.");
             return;
           }
           const created = await createOrganization({ name: nome });
-          await setActive({ organization: created.id });
           org = created;
         }
-        const me = await qc.fetchQuery({
-          queryKey: [...ME_KEY, org.id],
-          queryFn: () => getMe(api),
-        });
-        if (!me?.tenant_id) {
+        const generation = beginOrganizationTransition();
+        await qc.cancelQueries();
+        qc.clear();
+        if (!setActive) throw new Error("Clerk indisponível");
+        if (!userId) throw new Error("Sessão indisponível");
+        const me = await activateAndVerifyOrganization<Me>(
+          org.id,
+          userId,
+          (organization) => setActive({ organization }),
+          (organizationId) =>
+            clerk.session?.getToken({ organizationId, skipCache: true }) ??
+            Promise.resolve(null),
+          (token) =>
+            apiFetch<Me>("/v1/identity/me", { getToken: async () => token }),
+        );
+        if (!me.tenant_id) {
           throw new Error("provisionamento não devolveu tenant");
         }
+        if (!verifyOrganizationTransition(generation, org.id))
+          throw new Error("organização não confirmada");
+        qc.setQueryData([...ME_KEY, org.id], me);
         if (!solo && o.logoFile) {
           await org.setLogo({ file: o.logoFile }).catch(() => undefined);
         }
@@ -406,7 +416,9 @@ export function useOnboardingFlow() {
       solo,
       o.logoFile,
       qc,
-      api,
+      clerk.session,
+      userMemberships,
+      userId,
     ],
   );
 

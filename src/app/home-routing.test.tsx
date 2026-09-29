@@ -20,6 +20,9 @@ vi.mock("@/features/notifications/notifications-page", () => ({
 vi.mock("@/features/onboarding/components/onboarding-flow", () => ({
   OnboardingFlow: () => <main>Configurar escritório</main>,
 }));
+vi.mock("@/components/shell/organization-coordinator", () => ({
+  OrganizationCoordinator: () => <main>Verificando escritório</main>,
+}));
 vi.mock("@clerk/nextjs", () => ({ ClerkProvider: clerkProvider }));
 vi.mock("@/app/providers", () => ({
   Providers: ({ children }: { children: React.ReactNode }) => children,
@@ -73,16 +76,11 @@ describe("public home and authenticated entry", () => {
     expect(redirect).not.toHaveBeenCalled();
   });
 
-  it("returns an onboarded user to notifications", async () => {
-    apiFetch.mockResolvedValue({ onboarding_completed_at: "2026-09-11" });
-    await expect(OnboardingPage()).rejects.toThrow("REDIRECT:/notificacoes");
-  });
-
-  it("retains onboarding for a user who has not completed it", async () => {
-    apiFetch.mockResolvedValue({ onboarding_completed_at: null });
+  it("delegates authenticated onboarding routing to the organization coordinator", async () => {
     expect(renderToStaticMarkup(await OnboardingPage())).toContain(
-      "Configurar escritório",
+      "Verificando escritório",
     );
+    expect(apiFetch).not.toHaveBeenCalled();
     expect(redirect).not.toHaveBeenCalled();
   });
 

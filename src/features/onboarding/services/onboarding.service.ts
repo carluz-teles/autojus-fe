@@ -11,6 +11,17 @@ export async function getMe(fetcher: ApiFetcher): Promise<Me> {
   return fetcher<Me>("/v1/identity/me");
 }
 
+export async function completePersonalProfile(
+  fetcher: ApiFetcher,
+  firstName: string,
+  lastName: string,
+): Promise<void> {
+  await fetcher<void>("/v1/identity/profile/complete", {
+    method: "POST",
+    body: { first_name: firstName, last_name: lastName },
+  });
+}
+
 /** Grava o perfil da organização (passo 2). Auth ADMIN — resolvido pelo JWT. */
 export async function updateOrgProfile(
   fetcher: ApiFetcher,

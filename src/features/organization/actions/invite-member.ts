@@ -42,7 +42,11 @@ export async function inviteMember(input: {
     ...invitation,
     organizationId: orgId,
     inviterUserId: userId,
-    redirectUrl: new URL("/convite", origin).href,
+    redirectUrl: (() => {
+      const url = new URL("/convite", origin);
+      url.searchParams.set("org_id", orgId);
+      return url.href;
+    })(),
   });
   return { id: created.id };
 }

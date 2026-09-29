@@ -108,7 +108,11 @@ export async function resendTeamInvitation(invitationId: string) {
       inviterUserId: userId,
       emailAddress: invitation.emailAddress,
       role: invitation.role,
-      redirectUrl: new URL("/convite", origin).href,
+      redirectUrl: (() => {
+        const url = new URL("/convite", origin);
+        url.searchParams.set("org_id", orgId);
+        return url.href;
+      })(),
     });
     return { sent: true as const, id: created.id };
   } catch {
@@ -142,7 +146,11 @@ export async function replaceExpiredTeamInvitation(invitationId: string) {
     inviterUserId: userId,
     emailAddress: invitation.emailAddress,
     role: invitation.role,
-    redirectUrl: new URL("/convite", origin).href,
+    redirectUrl: (() => {
+      const url = new URL("/convite", origin);
+      url.searchParams.set("org_id", orgId);
+      return url.href;
+    })(),
   });
   return { id: created.id };
 }

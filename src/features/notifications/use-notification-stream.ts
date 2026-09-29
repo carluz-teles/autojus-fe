@@ -8,6 +8,11 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 
 import { COURT_CONNECTIONS_QUERY_KEY } from "@/features/configuracoes/hooks/use-court-connections";
+import {
+  isCurrentOrganizationRequest,
+  subscribeTransition,
+  transitionSnapshot,
+} from "@/lib/auth/organization-transition";
 
 import { notificationKeys } from "./notification-keys";
 import { notificationHref } from "./notification-presentation";
@@ -35,6 +40,11 @@ export function useNotificationStream() {
 
     const url = `${process.env.NEXT_PUBLIC_API_URL ?? ""}${STREAM_PATH}`;
     const ctrl = new AbortController();
+    const generation = transitionSnapshot().generation;
+    const current = () => isCurrentOrganizationRequest(generation, orgId);
+    const unsubscribe = subscribeTransition(() => {
+      if (!current()) ctrl.abort();
+    });
 
     void fetchEventSource(url, {
       signal: ctrl.signal,
@@ -43,7 +53,11 @@ export function useNotificationStream() {
       // Token novo por tentativa de conexão: fetch-event-source chama isto no connect
       // inicial e em cada retry.
       fetch: async (input, init) => {
-        const token = await getToken();
+        if (!current())
+          throw new DOMException("Organization changed", "AbortError");
+        const token = await getToken({ organizationId: orgId });
+        if (!current() || !token)
+          throw new DOMException("Organization changed", "AbortError");
         return fetch(input, {
           ...init,
           headers: { ...init?.headers, Authorization: `Bearer ${token}` },
@@ -61,6 +75,7 @@ export function useNotificationStream() {
         throw new Error(`notifications stream: HTTP ${res.status}`);
       },
       onmessage: (ev) => {
+        if (!current()) return;
         if (ev.event !== "notification" || !ev.data) return;
         let n: NotificationView;
         try {
@@ -104,6 +119,9 @@ export function useNotificationStream() {
       // A única rejeição esperada é o abort no unmount; ignorar.
     });
 
-    return () => ctrl.abort();
+    return () => {
+      unsubscribe();
+      ctrl.abort();
+    };
   }, [isSignedIn, orgId, userId, getToken, queryClient, router]);
 }
