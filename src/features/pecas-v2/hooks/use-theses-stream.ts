@@ -36,6 +36,12 @@
 import { useAuth } from "@clerk/nextjs";
 import { useEffect, useRef, useState } from "react";
 
+import {
+  isCurrentOrganizationRequest,
+  subscribeTransition,
+  transitionSnapshot,
+} from "@/lib/auth/organization-transition";
+
 import { mapThesisFromApi } from "../lib/api-mapper";
 import type { ThesisAPI } from "../lib/api-types";
 import type { Thesis } from "../types";
@@ -117,7 +123,7 @@ export function useThesesStream(
   resourcePath: string,
   opts: UseThesesStreamOptions,
 ): ThesesStreamState {
-  const { getToken } = useAuth();
+  const { getToken, orgId } = useAuth();
   const [state, setState] = useState<ThesesStreamState>({
     theses: [],
     count: 0,
@@ -132,11 +138,20 @@ export function useThesesStream(
   }, [opts.onDone, opts.onError]);
 
   useEffect(() => {
-    if (!opts.enabled) return;
+    if (!opts.enabled || !orgId) return;
 
     let cancelled = false;
     let finished = false;
     let es: EventSource | null = null;
+    const generation = transitionSnapshot().generation;
+    const current = () =>
+      !cancelled && isCurrentOrganizationRequest(generation, orgId);
+    const unsubscribe = subscribeTransition(() => {
+      if (!current()) {
+        cancelled = true;
+        es?.close();
+      }
+    });
     // Rastreia se já vimos ≥1 tese — decide a degradação no erro.
     let hadThesis = false;
 
@@ -144,8 +159,9 @@ export function useThesesStream(
       // Reseta o state por conexão (novo `enabled` recomeça do zero). Fica no
       // corpo do async (não do efeito) pra não disparar cascata de re-render.
       setState({ theses: [], count: 0, status: "streaming" });
-      const jwt = await getToken();
-      if (cancelled) return;
+      if (!current()) return;
+      const jwt = await getToken({ organizationId: orgId });
+      if (!current()) return;
       if (!jwt)
         throw new Error("Sessão indisponível para acompanhar os fundamentos.");
 
@@ -153,13 +169,13 @@ export function useThesesStream(
         `${API}/v1/${resourcePath}/theses-stream-token`,
         { method: "POST", headers: { Authorization: `Bearer ${jwt}` } },
       );
-      if (cancelled) return;
+      if (!current()) return;
       if (!tokenRes.ok)
         throw new Error("Não foi possível abrir o acompanhamento.");
       const { token: streamToken } = (await tokenRes.json()) as {
         token: string;
       };
-      if (cancelled) return;
+      if (!current()) return;
       if (!streamToken)
         throw new Error("Token de acompanhamento indisponível.");
 
@@ -167,20 +183,20 @@ export function useThesesStream(
       es = new EventSource(url, { withCredentials: false });
 
       es.addEventListener("progress", (e: MessageEvent) => {
-        if (cancelled) return;
+        if (!current()) return;
         const { count } = JSON.parse(e.data as string) as { count: number };
         setState((s) => ({ ...s, count }));
       });
 
       es.addEventListener("thesis", (e: MessageEvent) => {
-        if (cancelled) return;
+        if (!current()) return;
         const frame = JSON.parse(e.data as string) as ThesisFrameAPI;
         hadThesis = true;
         setState((s) => ({ ...s, theses: applyThesisFrame(s.theses, frame) }));
       });
 
       es.addEventListener("review", (e: MessageEvent) => {
-        if (cancelled) return;
+        if (!current()) return;
         const { kept, order } = JSON.parse(e.data as string) as {
           kept: number[];
           order: number[];
@@ -192,7 +208,7 @@ export function useThesesStream(
       });
 
       es.addEventListener("done", (e: MessageEvent) => {
-        if (cancelled || finished) return;
+        if (!current() || finished) return;
         finished = true;
         const { data } = JSON.parse(e.data as string) as { data: ThesisAPI[] };
         const authoritative = (data ?? []).map(mapThesisFromApi);
@@ -202,7 +218,7 @@ export function useThesesStream(
       });
 
       es.addEventListener("error", (e: MessageEvent) => {
-        if (cancelled || finished) return;
+        if (!current() || finished) return;
         finished = true;
         // Evento `error` de aplicação (com data JSON) — distinto do onerror de
         // transporte. Mantém os cards já mostrados.
@@ -231,14 +247,14 @@ export function useThesesStream(
       es.onerror = () => {
         // Falha de transporte. Se ainda não chegou nenhuma tese, sinaliza a
         // degradação pro POST síncrono; senão o EventSource tenta reconectar.
-        if (cancelled || finished || hadThesis) return;
+        if (!current() || finished || hadThesis) return;
         finished = true;
         setState((s) => ({ ...s, status: "error" }));
         onErrorRef.current?.(false);
         es?.close();
       };
     })().catch((error: unknown) => {
-      if (cancelled) return;
+      if (!current()) return;
       // Falha no token/fetch → pré-1ª-tese → degradar.
       setState((s) => ({
         ...s,
@@ -253,9 +269,10 @@ export function useThesesStream(
 
     return () => {
       cancelled = true;
+      unsubscribe();
       es?.close();
     };
-  }, [resourcePath, opts.enabled, getToken]);
+  }, [resourcePath, opts.enabled, getToken, orgId]);
 
   return state;
 }

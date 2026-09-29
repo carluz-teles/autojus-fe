@@ -3,7 +3,6 @@ import { NotificationStream } from "@/features/notifications/notification-stream
 import { ImportAccessBanner } from "@/features/onboarding/components/import-access-banner";
 import { OnboardingWidget } from "@/features/onboarding-widget/components/onboarding-widget";
 
-import { EnsureActiveOrg } from "./ensure-active-org";
 import { ShellContent } from "./shell-content";
 import { Sidebar } from "./sidebar";
 
@@ -15,7 +14,6 @@ import { Sidebar } from "./sidebar";
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-full flex-1 flex-col">
-      <EnsureActiveOrg />
       {/* Conexão SSE de notificações: sem UI, empurra toast + invalida as queries. */}
       <NotificationStream />
       {/* Aviso de trial acabando/expirado — full-width, acima de sidebar+conteúdo. */}

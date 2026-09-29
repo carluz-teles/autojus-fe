@@ -109,7 +109,7 @@ describe("team invitation mutations", () => {
       inviterUserId: "user_1",
       emailAddress: "person@example.com",
       role: "org:member",
-      redirectUrl: "https://app.example.com/convite",
+      redirectUrl: "https://app.example.com/convite?org_id=org_1",
     });
     expect(revoke.mock.invocationCallOrder[0]).toBeLessThan(
       create.mock.invocationCallOrder[0],
@@ -172,5 +172,10 @@ describe("team invitation mutations", () => {
     });
     expect(revoke).not.toHaveBeenCalled();
     expect(create).toHaveBeenCalledOnce();
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        redirectUrl: "https://app.example.com/convite?org_id=org_1",
+      }),
+    );
   });
 });

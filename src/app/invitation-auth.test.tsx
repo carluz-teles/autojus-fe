@@ -39,6 +39,27 @@ describe("invitation authentication", () => {
   );
 
   it.each([
+    ["sign_in", SignInPage, signIn],
+    ["sign_up", SignUpPage, signUp],
+  ] as const)(
+    "carries the %s organization hint after authentication",
+    async (status, Page, component) => {
+      renderToStaticMarkup(
+        await Page({
+          searchParams: Promise.resolve({
+            __clerk_status: status,
+            __clerk_ticket: "ticket",
+            org_id: "org_B",
+          }),
+        }),
+      );
+      expect(component.mock.calls[0][0].forceRedirectUrl).toBe(
+        "/notificacoes?org_id=org_B",
+      );
+    },
+  );
+
+  it.each([
     [SignInPage, signIn],
     [SignUpPage, signUp],
   ] as const)(

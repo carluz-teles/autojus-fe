@@ -42,7 +42,7 @@ describe("organization invitation delivery", () => {
       inviterUserId: "user_1",
       emailAddress: "person@example.com",
       role: "org:member",
-      redirectUrl: "https://app.atjud.com.br/convite",
+      redirectUrl: "https://app.atjud.com.br/convite?org_id=org_1",
     });
   });
 
@@ -51,7 +51,7 @@ describe("organization invitation delivery", () => {
     await inviteMember({ ...input, role: "org:admin" });
     expect(createInvitation).toHaveBeenCalledWith(
       expect.objectContaining({
-        redirectUrl: "http://localhost:3000/convite",
+        redirectUrl: "http://localhost:3000/convite?org_id=org_1",
         role: "org:admin",
       }),
     );

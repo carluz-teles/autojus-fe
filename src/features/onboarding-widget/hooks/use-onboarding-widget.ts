@@ -65,6 +65,7 @@ export function useOnboardingWidget(): OnboardingWidgetViewModel | null {
   if (isMePending || !me || !onboardingCompleted) return null;
   if (isProgressPending || !progress) return null;
   if (progress.dismissed_at != null) return null;
+  if (me.role !== "ADMIN" && me.role !== "LAWYER") return null;
 
   const order = ONBOARDING_STEP_ORDER[me.role];
   if (!hasCurrentStep(order, progress.steps)) return null;

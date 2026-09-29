@@ -6,15 +6,23 @@ export function GET(request: Request) {
   const url = new URL(request.url);
   const status = url.searchParams.get("__clerk_status");
   const ticket = url.searchParams.get("__clerk_ticket");
+  const orgHint = url.searchParams.get("org_id");
+  const validOrgHint =
+    orgHint && /^org_[A-Za-z0-9]+$/.test(orgHint) ? orgHint : null;
   const headers = {
     "Cache-Control": "no-store",
     "Referrer-Policy": "no-referrer",
   };
 
   if (status === "complete") {
+    const destination = new URL(APP_HOME_PATH, url);
+    if (validOrgHint) destination.searchParams.set("org_id", validOrgHint);
     return new Response(null, {
       status: 303,
-      headers: { ...headers, Location: APP_HOME_PATH },
+      headers: {
+        ...headers,
+        Location: destination.pathname + destination.search,
+      },
     });
   }
   if (!ticket || (status !== "sign_in" && status !== "sign_up")) {
@@ -33,6 +41,7 @@ export function GET(request: Request) {
   );
   destination.searchParams.set("__clerk_ticket", ticket);
   destination.searchParams.set("__clerk_status", status);
+  if (validOrgHint) destination.searchParams.set("org_id", validOrgHint);
   // Relative redirects preserve the public host behind Railway/reverse proxies.
   // In standalone mode request.url can contain the internal container origin.
   return new Response(null, {

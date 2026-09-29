@@ -24,6 +24,12 @@
 import { useAuth } from "@clerk/nextjs";
 import { useEffect, useRef } from "react";
 
+import {
+  isCurrentOrganizationRequest,
+  subscribeTransition,
+  transitionSnapshot,
+} from "@/lib/auth/organization-transition";
+
 import { GenerationStreamBuffer } from "../lib/generation-stream-buffer";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
@@ -41,7 +47,7 @@ interface Options {
 }
 
 export function useDraftStream(draftId: string, opts: Options): void {
-  const { getToken } = useAuth();
+  const { getToken, orgId } = useAuth();
   // Buffer cru de markdown acumulado (não JSON). Zerado por conexão e ao receber
   // o StreamResetMarker.
   const accRef = useRef("");
@@ -57,17 +63,27 @@ export function useDraftStream(draftId: string, opts: Options): void {
   }, [opts.onProgress, opts.onDone, opts.onStage, opts.onError]);
 
   useEffect(() => {
-    if (!opts.enabled) return;
+    if (!opts.enabled || !orgId) return;
 
     let cancelled = false;
     let es: EventSource | null = null;
+    const generation = transitionSnapshot().generation;
+    const current = () =>
+      !cancelled && isCurrentOrganizationRequest(generation, orgId);
+    const unsubscribe = subscribeTransition(() => {
+      if (!current()) {
+        cancelled = true;
+        es?.close();
+      }
+    });
 
     (async () => {
       // Fluxo em 2 passos (spec HTML5 EventSource não aceita headers custom):
       // 1) POST /stream-token com Bearer JWT → recebe token opaco (2min)
       // 2) EventSource com ?stream_token=xxx (token não é JWT — não vaza credencial)
-      const jwt = await getToken();
-      if (cancelled) return;
+      if (!current()) return;
+      const jwt = await getToken({ organizationId: orgId });
+      if (!current()) return;
       if (!jwt)
         throw new Error("Sessão indisponível para acompanhar a geração.");
 
@@ -75,13 +91,13 @@ export function useDraftStream(draftId: string, opts: Options): void {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}` },
       });
-      if (cancelled) return;
+      if (!current()) return;
       if (!tokenRes.ok)
         throw new Error("Não foi possível abrir o acompanhamento da geração.");
       const { token: streamToken } = (await tokenRes.json()) as {
         token: string;
       };
-      if (cancelled) return;
+      if (!current()) return;
       if (!streamToken)
         throw new Error("Token de acompanhamento indisponível.");
 
@@ -122,33 +138,34 @@ export function useDraftStream(draftId: string, opts: Options): void {
         pending = true;
         setTimeout(() => {
           pending = false;
-          if (!cancelled) onProgressRef.current(accRef.current);
+          if (current()) onProgressRef.current(accRef.current);
         }, 16);
       });
 
       es.addEventListener("stage", (e: MessageEvent) => {
-        if (!cancelled && buffer.acceptsStage()) {
+        if (current() && buffer.acceptsStage()) {
           onStageRef.current?.(String(e.data));
         }
       });
 
       es.addEventListener("done", (e: MessageEvent) => {
-        onDoneRef.current?.(e.data);
+        if (current()) onDoneRef.current?.(e.data);
         es?.close();
       });
 
       es.onerror = (e) => {
-        onErrorRef.current?.(e);
+        if (current()) onErrorRef.current?.(e);
         // EventSource reconecta sozinho em caso de queda temporária. Só
         // fecha explicitamente no `done`.
       };
     })().catch((error: unknown) => {
-      if (!cancelled) onErrorRef.current?.(error);
+      if (current()) onErrorRef.current?.(error);
     });
 
     return () => {
       cancelled = true;
+      unsubscribe();
       es?.close();
     };
-  }, [draftId, opts.enabled, opts.startedAt, getToken]);
+  }, [draftId, opts.enabled, opts.startedAt, getToken, orgId]);
 }

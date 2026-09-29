@@ -3,11 +3,16 @@ import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  beginOrganizationTransition,
+  verifyOrganizationTransition,
+} from "@/lib/auth/organization-transition";
+
 import { useThesesStream } from "./use-theses-stream";
 
 const mocks = vi.hoisted(() => ({ getToken: vi.fn() }));
 vi.mock("@clerk/nextjs", () => ({
-  useAuth: () => ({ getToken: mocks.getToken }),
+  useAuth: () => ({ getToken: mocks.getToken, orgId: "org_A" }),
 }));
 
 class FakeEventSource {
@@ -47,6 +52,8 @@ describe("useThesesStream application and transport errors", () => {
   let root: Root;
   let host: HTMLDivElement;
   beforeEach(async () => {
+    const generation = beginOrganizationTransition();
+    verifyOrganizationTransition(generation, "org_A");
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     vi.stubGlobal("EventSource", FakeEventSource);
     vi.stubGlobal(

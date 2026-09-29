@@ -33,8 +33,16 @@ export type AccountType = "solo" | "firm";
 export interface Me {
   user_id: string;
   tenant_id: string | null;
+  clerk_org_id: string;
+  profile_onboarding_completed_at: string | null;
+  organization_state:
+    | "no_active_org"
+    | "provisioning"
+    | "membership_pending"
+    | "onboarding_required"
+    | "ready";
   onboarding_completed_at: string | null;
-  role: Role;
+  role: Role | "";
   account_type: AccountType | "";
 }
 

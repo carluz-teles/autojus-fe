@@ -41,6 +41,21 @@ describe("invitation callback", () => {
     );
   });
 
+  it("preserves a valid organization hint and drops an invalid one", () => {
+    const valid = GET(
+      new Request(
+        "https://app.atjud.com.br/convite?__clerk_status=sign_in&__clerk_ticket=ticket&org_id=org_B",
+      ),
+    );
+    expect(valid.headers.get("location")).toContain("org_id=org_B");
+    const invalid = GET(
+      new Request(
+        "https://app.atjud.com.br/convite?__clerk_status=sign_in&__clerk_ticket=ticket&org_id=javascript%3Aalert(1)",
+      ),
+    );
+    expect(invalid.headers.get("location")).not.toContain("org_id");
+  });
+
   it("returns an already accepted invitation to the protected app without leaking the ticket", () => {
     const response = GET(
       new Request(
@@ -48,6 +63,15 @@ describe("invitation callback", () => {
       ),
     );
     expect(response.headers.get("location")).toBe("/notificacoes");
+  });
+
+  it("keeps the organization target on a completed invitation", () => {
+    const response = GET(
+      new Request(
+        "https://app.atjud.com.br/convite?__clerk_status=complete&org_id=org_B&__clerk_ticket=secret",
+      ),
+    );
+    expect(response.headers.get("location")).toBe("/notificacoes?org_id=org_B");
   });
 
   it.each([

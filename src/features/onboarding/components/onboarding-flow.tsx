@@ -45,8 +45,12 @@ const BRAND_GRADIENT = "linear-gradient(135deg, var(--primary), var(--gold))";
 // Onboarding guiado por persona: user → org → oab → team → done. Componente = JSX +
 // binding; a lógica/conclusão vive no hook. Tokens da casca: bg-bg, surface-panel,
 // bg-panel, border-line, text-fg3, font-display, bg-primary. Campo obrigatório = "*".
-export function OnboardingFlow() {
-  const f = useOnboardingFlow();
+export function OnboardingFlow({
+  existingOrganization = false,
+}: {
+  existingOrganization?: boolean;
+}) {
+  const f = useOnboardingFlow(existingOrganization);
 
   return (
     <div

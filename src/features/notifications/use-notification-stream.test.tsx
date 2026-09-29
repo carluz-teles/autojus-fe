@@ -3,6 +3,11 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 
+import {
+  beginOrganizationTransition,
+  verifyOrganizationTransition,
+} from "@/lib/auth/organization-transition";
+
 import { useNotificationStream } from "./use-notification-stream";
 
 const mocks = vi.hoisted(() => ({
@@ -36,6 +41,8 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 it("refreshes court connections when an established or failed SSE notification arrives", async () => {
+  const generation = beginOrganizationTransition();
+  verifyOrganizationTransition(generation, "org");
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   mocks.stream.mockResolvedValue(undefined);
   const container = document.createElement("div");
