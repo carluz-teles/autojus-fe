@@ -125,7 +125,10 @@ describe("PainelPrazo — revisão por dimensão", () => {
   });
   it("mostra tipo inferido preenchido e fallback provisório com ações independentes, mesmo sem action items", () => {
     const html = renderPainel(prazoFixture());
-    expect(html).toContain("Conferência da intimação");
+    // Título NEUTRO: "Conferência da intimação" prometia tarefa e o corpo
+    // desmentia na linha seguinte ("Revisão dispensada") nos casos limpos.
+    expect(html).toContain("Tipo e prazo");
+    expect(html).not.toContain("Conferência da intimação");
     expect(html).toContain("Impugnação ao cumprimento de sentença");
     expect(html).toContain("<span>A revisar</span>");
     expect(html).toContain("Revisar tipo");
@@ -133,6 +136,30 @@ describe("PainelPrazo — revisão por dimensão", () => {
     expect(html).toContain("Base genérica provisória");
     expect(html).not.toContain("generic_fallback");
   });
+  // A MESMA intimação tem de mostrar a MESMA coisa nas duas telas. Já regrediu
+  // DUAS vezes: primeiro `modo === "consulta"` descartava a barra de ações
+  // inteira; depois, com a política `capacidadesDoModo` já criada e as
+  // providências migradas, `revisarTipo`/`revisarPrazo` continuaram comparando
+  // `modo === "execucao"` direto — então a Mesa oferecia "Revisar tipo" e
+  // /intimacoes/<id> escondia. Este teste compara as duas renderizações campo a
+  // campo, em vez de checar uma tela só.
+  it("Mesa e histórico mostram a MESMA seção de tipo e prazo", () => {
+    const fixture = prazoFixture();
+    const execucao = renderPainel(fixture, "execucao");
+    const consulta = renderPainel(fixture, "consulta");
+
+    for (const esperado of [
+      "Tipo e prazo",
+      "Impugnação ao cumprimento de sentença",
+      "<span>A revisar</span>",
+      "Revisar tipo",
+      "Revisar prazo",
+    ]) {
+      expect(execucao).toContain(esperado);
+      expect(consulta).toContain(esperado);
+    }
+  });
+
   it("NO_DEADLINE aguardando classificação permite apenas definir tipo", () => {
     const p = prazoFixture({
       status: "NO_DEADLINE",
@@ -164,11 +191,19 @@ describe("PainelPrazo — revisão por dimensão", () => {
     expect(html).not.toContain("23/09/2026");
     expect(html).not.toContain("Definir tipo");
   });
-  it("consulta informa as duas dimensões sem controles de mutação", () => {
+  // REESCRITO (2026-09-28). A versão anterior — "consulta informa as duas
+  // dimensões SEM controles de mutação" — afirmava justamente a divergência que
+  // o usuário reportou: os botões existiam na Mesa e desapareciam em
+  // /intimacoes/<id>. Ela passava porque `revisarTipo`/`revisarPrazo` comparavam
+  // `modo === "execucao"` direto, contornando `capacidadesDoModo`. O teste
+  // codificava o bug, então pinar o comportamento antigo era o defeito, não a
+  // garantia. A política é explícita: consulta só GANHA "Abrir na Mesa", nunca
+  // subtrai ação.
+  it("consulta mostra as duas dimensões E os controles — modo nunca subtrai", () => {
     const html = renderPainel(prazoFixture(), "consulta");
     expect(html).toContain("<span>A revisar</span>");
-    expect(html).not.toContain("Revisar tipo");
-    expect(html).not.toContain("Revisar prazo");
+    expect(html).toContain("Revisar tipo");
+    expect(html).toContain("Revisar prazo");
   });
   it.each(["MISSED", "MET", "CANCELLED"] as const)(
     "estado terminal %s não abre revisão",

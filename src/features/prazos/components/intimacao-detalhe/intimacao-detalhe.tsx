@@ -668,19 +668,27 @@ export function PainelPrazo({
   const [revisarPrazoAberto, setRevisarPrazoAberto] = useState(false);
   const definirTipoTitleId = useId();
   const revisarPrazoTitleId = useId();
+  // Revisar tipo/prazo são ações POR ITEM e valem nos DOIS modos — a política
+  // vive em `capacidadesDoModo`, não num `modo === "execucao"` solto aqui.
+  // Comparar o modo direto era a última fonte de verdade paralela sobrevivente:
+  // as providências já tinham migrado para a política, estas três não, e o
+  // resultado era a MESMA intimação oferecendo "Revisar tipo" na Mesa e
+  // escondendo em /intimacoes/<id> — a divergência entre telas que a política
+  // existe para impedir.
+  const podeExecutar = capacidadesDoModo(modo).executar;
   const revisarTipo =
-    modo === "execucao" &&
+    podeExecutar &&
     !!p?.review?.tipo.can_review &&
     (["OPEN", "PENDING"].includes(p.status) ||
       (p.status === "NO_DEADLINE" &&
         p.no_deadline_reason === "CLASSIFICAR_MANUAL"));
   const confirmarPrazo =
-    modo === "execucao" &&
+    podeExecutar &&
     !!p?.review?.prazo.can_review &&
     !p.review.prazo.reason_codes.includes("date_divergence") &&
     ["OPEN", "PENDING"].includes(p.status);
   const declararSemPrazo =
-    modo === "execucao" && !!p && ["OPEN", "PENDING"].includes(p.status);
+    podeExecutar && !!p && ["OPEN", "PENDING"].includes(p.status);
   const revisarPrazo = confirmarPrazo || declararSemPrazo;
   const tipoValor = tipoRevisaoLabel(p?.tipo_ato, det.prazoTipoLabel);
   const prazoValor =
@@ -809,11 +817,18 @@ export function PainelPrazo({
           ) : p?.review ? (
             <div
               className="border-border border-t pt-4"
-              aria-label="Revisão de tipo e prazo"
+              aria-label="Tipo e prazo"
             >
-              <h3 className="mb-3 text-sm font-medium">
-                Conferência da intimação
-              </h3>
+              {/* Título NEUTRO de propósito. "Conferência da intimação" prometia
+                  tarefa e o corpo desmentia na linha seguinte ("Revisão
+                  dispensada"): a seção renderiza sempre que existe `review`, não
+                  quando há pendência, e no caso limpo o advogado lia um chamado
+                  para agir que não existia. A seção CONTINUA visível porque é o
+                  único lugar onde ele discorda do motor (Revisar tipo/prazo vivem
+                  aqui) e onde a procedência aparece ("Classificado pelo texto",
+                  "CPC art. 1.003 §5º"). Quem comunica pendência é o status de
+                  cada dimensão ("A revisar"), não o cabeçalho. */}
+              <h3 className="mb-3 text-sm font-medium">Tipo e prazo</h3>
               <div className="border-border overflow-hidden rounded-xl border">
                 <div
                   className={cn(
