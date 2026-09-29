@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g" x1="0.15" y1="0" x2="0.9" y2="1">
+      <stop offset="0%" stop-color="#35785f" />
+      <stop offset="55%" stop-color="#2d6753" />
+      <stop offset="100%" stop-color="#204a3c" />
+    </linearGradient>
+    <radialGradient id="sheen" cx="22%" cy="12%" r="75%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.16" />
+      <stop offset="55%" stop-color="#ffffff" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#g)" />
+  <rect width="512" height="512" rx="112" fill="url(#sheen)" />
+
+  <text
+    x="256"
+    y="306"
+    text-anchor="middle"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-weight="700"
+    font-size="140"
+    fill="#faf9f1"
+  >A<tspan fill="#cc9b4f">&#183;</tspan>J</text>
+</svg>
