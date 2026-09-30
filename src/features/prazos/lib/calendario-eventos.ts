@@ -1,7 +1,7 @@
 import type { PrazoAgendaView } from "../types";
 import type { CalEvento } from "./calendario";
 import { formatarCNJ } from "./detalhe-apresentacao";
-import { prazoStatusLabel, tipoAtoLabel } from "./labels";
+import { contagemLabel, prazoStatusLabel, tipoAtoLabel } from "./labels";
 
 // O calendário é agenda de PRAZOS das intimações (a intimação move o prazo). O
 // mapeador de action_item→evento saiu junto com o conceito de providência.
@@ -17,7 +17,7 @@ export function prazoParaEvento(p: PrazoAgendaView): CalEvento | null {
         ? "Pendente"
         : prazoStatusLabel(p.status, p.days_left),
     contagem: p.days
-      ? `${p.days} ${p.counting === "BUSINESS" ? "dias úteis" : "dias corridos"}${p.doubled ? " · em dobro" : ""}`
+      ? `${p.days} dias ${contagemLabel(p.counting)}${p.doubled ? " · em dobro" : ""}`
       : undefined,
     dia: p.end_date.slice(0, 10),
     dias: p.days_left,

@@ -55,6 +55,7 @@ import {
   origemRevisaoLabel,
   tipoRevisaoLabel,
 } from "../../lib/detalhe-apresentacao";
+import { contagemLabel } from "../../lib/labels";
 import {
   capacidadesDoModo,
   type ModoDetalhe,
@@ -699,7 +700,7 @@ export function PainelPrazo({
       : p?.end_date
         ? [
             p.days > 0
-              ? `${p.days} ${p.days === 1 ? "dia" : "dias"} ${p.counting === "BUSINESS" ? "úteis" : "corridos"}`
+              ? `${p.days} ${p.days === 1 ? "dia" : "dias"} ${contagemLabel(p.counting)}`
               : null,
             formatarData(p.end_date),
           ]
