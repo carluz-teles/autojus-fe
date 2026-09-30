@@ -68,6 +68,12 @@ function response(overrides: Partial<AutosStatus> = {}): AutosStatus {
     fetch_running: true,
     court: "TJSP",
     system: null,
+    autos_stage: "fetching",
+    peca_ready: false,
+    autos_needed: true,
+    documents_total: 0,
+    documents_with_text: 0,
+    last_fetch_status: "pending",
     ...overrides,
   };
 }

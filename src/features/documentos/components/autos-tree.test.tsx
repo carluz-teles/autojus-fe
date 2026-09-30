@@ -72,6 +72,156 @@ afterEach(() => {
   host = undefined;
 });
 
+it("explains when the tribunal check completed without autos", () => {
+  host = window.document.createElement("div");
+  window.document.body.append(host);
+  root = createRoot(host);
+
+  act(() =>
+    root?.render(
+      <AutosTree
+        autos={{
+          ...state([]),
+          total: 0,
+          filteredTotal: 0,
+          filteredNodes: 0,
+        }}
+        emptyFetchResult={{
+          checkedAt: "2026-09-30T15:20:00Z",
+          status: "completed",
+          code: "PROCESS_FOUND",
+        }}
+      />,
+    ),
+  );
+
+  expect(host.textContent).toContain("Processo localizado sem documentos");
+  expect(host.textContent).toContain(
+    "tribunal não disponibilizou documentos para importação",
+  );
+  expect(host.textContent).not.toContain(
+    "Os autos ainda não estão disponíveis",
+  );
+});
+
+it("explains when the process was not found in the consulted portal", () => {
+  host = window.document.createElement("div");
+  window.document.body.append(host);
+  root = createRoot(host);
+
+  act(() =>
+    root?.render(
+      <AutosTree
+        autos={{
+          ...state([]),
+          total: 0,
+          filteredTotal: 0,
+          filteredNodes: 0,
+        }}
+        emptyFetchResult={{
+          checkedAt: "2026-09-30T15:20:00Z",
+          status: "completed",
+          code: "PROCESS_NOT_FOUND",
+        }}
+      />,
+    ),
+  );
+
+  expect(host.textContent).toContain("Processo não localizado no tribunal");
+  expect(host.textContent).toContain(
+    "Confira o número CNJ, o sistema e o grau",
+  );
+  expect(host.textContent).not.toContain(
+    "tribunal não disponibilizou documentos",
+  );
+});
+
+it("keeps the generic copy for historical fetches without result evidence", () => {
+  host = window.document.createElement("div");
+  window.document.body.append(host);
+  root = createRoot(host);
+
+  act(() =>
+    root?.render(
+      <AutosTree
+        autos={{
+          ...state([]),
+          total: 0,
+          filteredTotal: 0,
+          filteredNodes: 0,
+        }}
+        emptyFetchResult={{
+          checkedAt: "2026-09-30T15:20:00Z",
+          status: "completed",
+          code: null,
+        }}
+      />,
+    ),
+  );
+
+  expect(host.textContent).toContain("Consulta concluída sem autos");
+  expect(host.textContent).toContain(
+    "nenhum auto ficou disponível para este processo",
+  );
+});
+
+it("shows an actionable stable message for an irreversible access denial", () => {
+  host = window.document.createElement("div");
+  window.document.body.append(host);
+  root = createRoot(host);
+
+  act(() =>
+    root?.render(
+      <AutosTree
+        autos={{
+          ...state([]),
+          total: 0,
+          filteredTotal: 0,
+          filteredNodes: 0,
+        }}
+        emptyFetchResult={{
+          checkedAt: "2026-09-30T16:10:00Z",
+          status: "failed",
+          code: "ACCESS_DENIED",
+        }}
+      />,
+    ),
+  );
+
+  expect(host.textContent).toContain("Acesso aos autos negado");
+  expect(host.textContent).toContain(
+    "Confira a habilitação do advogado e o sigilo do processo",
+  );
+  expect(host.textContent).not.toContain("Tente novamente mais tarde");
+});
+
+it("distinguishes exhausted retries from a permanent process error", () => {
+  host = window.document.createElement("div");
+  window.document.body.append(host);
+  root = createRoot(host);
+
+  act(() =>
+    root?.render(
+      <AutosTree
+        autos={{
+          ...state([]),
+          total: 0,
+          filteredTotal: 0,
+          filteredNodes: 0,
+        }}
+        emptyFetchResult={{
+          checkedAt: null,
+          status: "failed",
+          code: "RETRY_EXHAUSTED",
+        }}
+      />,
+    ),
+  );
+
+  expect(host.textContent).toContain("Consulta interrompida");
+  expect(host.textContent).toContain("Tente novamente");
+});
+
 it("keeps a 60+ document event compact until expanded", () => {
   host = window.document.createElement("div");
   window.document.body.append(host);

@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -11,6 +12,7 @@ import { useDocumentosDoProcesso } from "@/features/documentos/hooks/use-documen
 import { atoPublicacaoLabel } from "@/features/intimacoes/lib/labels";
 import { prazoVisivel } from "@/features/intimacoes/lib/prazo-visivel";
 import { resumoOuTeor } from "@/features/intimacoes/lib/resumo-intimacao";
+import { getAutosStatus } from "@/features/intimacoes/services/autos-status.service";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { usePecasByProcesso } from "@/features/pecas/hooks/use-peca";
 import { rotuloTipoPeca } from "@/features/pecas/lib/labels";
@@ -36,6 +38,7 @@ import {
 } from "@/features/processos/lib/detalhe";
 import type { ProcessoPhase } from "@/features/processos/types";
 import { ORIGEM_LABEL } from "@/features/triagem/lib/origem";
+import { useApi } from "@/lib/api/use-api";
 import { formatDate } from "@/lib/format";
 
 import { tipoAtoLabel } from "../lib/labels";
@@ -53,6 +56,7 @@ export interface RegistroProcesso {
 }
 
 export function useProcessoHub(id: string) {
+  const api = useApi();
   const params = useSearchParams();
   const processoQ = useProcesso(id);
   const p = processoQ.data;
@@ -70,6 +74,14 @@ export function useProcessoHub(id: string) {
   const [acervoTab, setAcervoTab] = useState("autos");
   const [documento, setDocumento] = useState<OpenDocument | null>(null);
   const autosTree = useAutosTree(id, setDocumento);
+  const autosStatus = useQuery({
+    queryKey: ["autos-status", id],
+    queryFn: () => getAutosStatus(api, id),
+    enabled: !!id,
+    staleTime: 15_000,
+    refetchInterval: (query) =>
+      query.state.data?.fetch_running ? 5000 : false,
+  });
   const [editando, setEditando] = useState(false);
   const [label, setLabel] = useState("");
   const [phase, setPhase] = useState<ProcessoPhase | "">("");
@@ -272,11 +284,25 @@ export function useProcessoHub(id: string) {
       (max, d) => (!max || d.created_at > max ? d.created_at : max),
       null,
     );
+  const consultaAutosSemDocumentos =
+    autosStatus.data?.documents_total === 0 &&
+    (autosStatus.data.last_fetch_status === "completed" ||
+      autosStatus.data.last_fetch_status === "failed")
+      ? {
+          checkedAt:
+            autosStatus.data.last_checked_at ??
+            autosStatus.data.last_failure_at ??
+            null,
+          status: autosStatus.data.last_fetch_status,
+          code: autosStatus.data.fetch_result_code ?? null,
+        }
+      : undefined;
 
   return {
     irParaTrabalho,
     processoQ,
     ultimaSincronizacaoAutos,
+    consultaAutosSemDocumentos,
     processo: p,
     identity: p ? linhaProcesso(p) : null,
     voltarHref,

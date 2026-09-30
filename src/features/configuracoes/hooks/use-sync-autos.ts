@@ -105,6 +105,11 @@ export function useSyncAutos(scope: AutosSyncScope) {
     onSuccess: (result) => {
       queryClient.setQueryData(statusKey, result);
       void queryClient.invalidateQueries({ queryKey: ["court-autos-sync"] });
+      if (scope.courtRecordId) {
+        void queryClient.invalidateQueries({
+          queryKey: ["autos-status", scope.courtRecordId],
+        });
+      }
       void refreshDocuments();
     },
     onError: () => {

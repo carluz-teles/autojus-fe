@@ -3,11 +3,14 @@
 import {
   ArrowDownUp,
   ChevronRight,
+  CircleAlert,
+  CircleCheck,
   FileText,
   FolderOpen,
   FolderTree,
   Info,
   Search,
+  SearchX,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +18,11 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { SkeletonRows } from "@/components/ui/skeletons";
+import {
+  type AutosFetchResultCode,
+  autosFetchResultLabel,
+} from "@/features/intimacoes/lib/autos-fetch-result";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import type { AutosTreeState } from "../hooks/use-autos-tree";
@@ -23,6 +31,92 @@ import type { AutosNode, AutosUnavailableDocument } from "../types";
 
 const EVENT_DETAIL_PREVIEW_LENGTH = 180;
 
+interface EmptyFetchResult {
+  checkedAt: string | null;
+  status: "completed" | "failed";
+  code: AutosFetchResultCode | null;
+}
+
+function fetchResultCopy(result: EmptyFetchResult) {
+  const date = result.checkedAt ? ` em ${formatDate(result.checkedAt)}` : "";
+  switch (result.code) {
+    case "PROCESS_FOUND":
+      return {
+        icon: CircleCheck,
+        title: `${autosFetchResultLabel(result.code)} sem documentos`,
+        description: `O processo foi localizado no portal${date}, mas o tribunal não disponibilizou documentos para importação. Você pode consultar novamente ou adicionar um PDF do escritório.`,
+      };
+    case "PROCESS_NOT_FOUND":
+      return {
+        icon: SearchX,
+        title: autosFetchResultLabel(result.code),
+        description: `A consulta ao tribunal${date} não localizou este processo no portal configurado. Confira o número CNJ, o sistema e o grau antes de tentar novamente.`,
+      };
+    case "AUTHENTICATION_REQUIRED":
+      return {
+        icon: CircleAlert,
+        title: autosFetchResultLabel(result.code),
+        description:
+          "Reconecte o certificado e o segundo fator nas configurações antes de consultar novamente.",
+      };
+    case "ACCESS_DENIED":
+      return {
+        icon: CircleAlert,
+        title: autosFetchResultLabel(result.code),
+        description:
+          "O tribunal localizou o processo, mas não autorizou o acesso aos autos. Confira a habilitação do advogado e o sigilo do processo.",
+      };
+    case "INVALID_PROCESS_DATA":
+      return {
+        icon: CircleAlert,
+        title: autosFetchResultLabel(result.code),
+        description:
+          "Confira o número CNJ, o sistema e o grau cadastrados antes de fazer uma nova consulta.",
+      };
+    case "INTEGRATION_UNSUPPORTED":
+      return {
+        icon: CircleAlert,
+        title: autosFetchResultLabel(result.code),
+        description:
+          "Este processo não está coberto pela integração atual. Adicione um PDF do escritório para continuar.",
+      };
+    case "PORTAL_CHANGED":
+      return {
+        icon: CircleAlert,
+        title: autosFetchResultLabel(result.code),
+        description:
+          "A integração precisa ser atualizada para o formato atual do portal. Enquanto isso, você pode adicionar um PDF do escritório.",
+      };
+    case "PORTAL_UNAVAILABLE":
+      return {
+        icon: CircleAlert,
+        title: autosFetchResultLabel(result.code),
+        description:
+          "O portal permaneceu indisponível após várias tentativas. Tente novamente mais tarde ou adicione um PDF do escritório.",
+      };
+    case "RETRY_EXHAUSTED":
+      return {
+        icon: CircleAlert,
+        title: autosFetchResultLabel(result.code),
+        description:
+          "Não foi possível concluir a consulta após várias tentativas. Tente novamente ou adicione um PDF do escritório.",
+      };
+    default:
+      return result.status === "failed"
+        ? {
+            icon: CircleAlert,
+            title: "Não foi possível concluir a consulta",
+            description:
+              "A consulta terminou com erro, mas o resultado histórico não informa a causa. Tente novamente ou adicione um PDF do escritório.",
+          }
+        : {
+            icon: CircleCheck,
+            title: "Consulta concluída sem autos",
+            description: `A consulta ao tribunal foi concluída${date}, mas nenhum auto ficou disponível para este processo. Você pode consultar novamente ou adicionar um PDF do escritório.`,
+          };
+  }
+}
+
 function eventDetailPreview(detail: string): string {
   const normalized = detail.trim().replace(/\s+/g, " ");
   return normalized.length > EVENT_DETAIL_PREVIEW_LENGTH
@@ -30,7 +124,13 @@ function eventDetailPreview(detail: string): string {
     : normalized;
 }
 
-export function AutosTree({ autos }: { autos: AutosTreeState }) {
+export function AutosTree({
+  autos,
+  emptyFetchResult,
+}: {
+  autos: AutosTreeState;
+  emptyFetchResult?: EmptyFetchResult;
+}) {
   // The API paginates unmapped documents individually. Merge every loaded page
   // into one UI group without changing its cursor or inventing an event identity.
   const displayedNodes: AutosNode[] = autos.nodes.filter(
@@ -46,6 +146,10 @@ export function AutosTree({ autos }: { autos: AutosTreeState }) {
       documents: unmappedDocuments,
     });
   }
+  const completedWithoutAutos = emptyFetchResult !== undefined;
+  const emptyFetchCopy = emptyFetchResult
+    ? fetchResultCopy(emptyFetchResult)
+    : null;
   return (
     <div>
       <div className="min-w-0">
@@ -106,16 +210,24 @@ export function AutosTree({ autos }: { autos: AutosTreeState }) {
         ) : null}
         {!autos.isPending && !autos.isError && autos.nodes.length === 0 ? (
           <EmptyState
-            icon={FolderOpen}
+            icon={
+              completedWithoutAutos && !autos.search
+                ? emptyFetchCopy!.icon
+                : FolderOpen
+            }
             title={
               autos.search
                 ? "Nenhum auto encontrado"
-                : "Os autos ainda não estão disponíveis"
+                : completedWithoutAutos
+                  ? emptyFetchCopy!.title
+                  : "Os autos ainda não estão disponíveis"
             }
             description={
               autos.search
                 ? "Busque pelo número do evento, código, título ou arquivo."
-                : "Sincronize com o tribunal ou adicione um PDF do escritório."
+                : completedWithoutAutos
+                  ? emptyFetchCopy!.description
+                  : "Sincronize com o tribunal ou adicione um PDF do escritório."
             }
           />
         ) : null}
@@ -180,7 +292,9 @@ export function AutosTree({ autos }: { autos: AutosTreeState }) {
                           {node.occurred_at ? (
                             <time dateTime={node.occurred_at}>
                               {node.kind === "document" ? "Incluído em " : ""}
-                              {new Date(node.occurred_at).toLocaleString("pt-BR")}
+                              {new Date(node.occurred_at).toLocaleString(
+                                "pt-BR",
+                              )}
                             </time>
                           ) : (
                             <span>Data não informada</span>

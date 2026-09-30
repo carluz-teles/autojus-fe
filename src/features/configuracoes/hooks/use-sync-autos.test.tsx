@@ -128,6 +128,11 @@ beforeEach(async () => {
     pageParams: [""],
   });
   client.setQueryData(legacyKey, "legacy-empty");
+  client.setQueryData(["autos-status", "record-1"], {
+    has_autos: false,
+    fetch_running: false,
+    last_fetch_status: "none",
+  });
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -168,4 +173,7 @@ it("refetches cached empty autos and legacy lists on explicit refresh and sync s
   await vi.waitFor(() => expect(mocks.api).toHaveBeenCalledTimes(4));
   await vi.waitFor(() => expect(mocks.legacy).toHaveBeenCalledTimes(2));
   expect(mocks.sync).toHaveBeenCalledTimes(1);
+  expect(
+    client.getQueryState(["autos-status", "record-1"])?.isInvalidated,
+  ).toBe(true);
 });

@@ -495,7 +495,10 @@ export function ProcessoHub({ numero }: { numero: string }) {
                           …
                         </p>
                       )}
-                      <AutosTree autos={h.autosTree} />
+                      <AutosTree
+                        autos={h.autosTree}
+                        emptyFetchResult={h.consultaAutosSemDocumentos}
+                      />
                     </TabsContent>
                     <TabsContent className="animate-none" value="andamentos">
                       <Colecao
