@@ -51,6 +51,21 @@ describe("ExplicacaoPrazo — memória corrente", () => {
     expect(html).toContain("1 feriado(s)");
     expect(html).not.toContain("<details");
   });
+  // Regressão: o marco inicial saía como o enum cru do BE ("PUBLISHED") na
+  // linha 1 da explicação. Nenhum enum pode chegar à tela — nem o conhecido
+  // (tem rótulo pt-BR) nem um valor novo do BE (cai no fallback).
+  it("traduz o termo inicial em vez de imprimir o enum", () => {
+    const html = render();
+    expect(html).toContain("Publicação");
+    expect(html).not.toContain("PUBLISHED");
+  });
+  it("marco desconhecido cai no rótulo neutro, nunca no enum", () => {
+    const html = render({
+      current_calculation: { ...calc, anchor_event: "MARCO_NOVO_DO_BE" },
+    });
+    expect(html).toContain("Marco não registrado");
+    expect(html).not.toContain("MARCO_NOVO_DO_BE");
+  });
   it("distingue duração declarada de tipo inferido", () => {
     const html = render({
       current_calculation: {

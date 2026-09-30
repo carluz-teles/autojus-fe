@@ -41,7 +41,7 @@ import { ORIGEM_LABEL } from "@/features/triagem/lib/origem";
 import { useApi } from "@/lib/api/use-api";
 import { formatDate } from "@/lib/format";
 
-import { tipoAtoLabel } from "../lib/labels";
+import { contagemLabel, tipoAtoLabel } from "../lib/labels";
 
 export interface RegistroProcesso {
   id: string;
@@ -147,7 +147,7 @@ export function useProcessoHub(id: string) {
         meta:
           d.status === "NO_DEADLINE"
             ? "Sem vencimento aplicável"
-            : `Início: ${formatDate(d.start_date ?? null)} · ${d.days ? `${d.days} dias` : "Contagem em dias"} ${d.counting === "BUSINESS" ? "úteis" : "corridos"}${d.doubled ? " · Prazo em dobro" : ""}`,
+            : `Início: ${formatDate(d.start_date ?? null)} · ${d.days ? `${d.days} dias` : "Contagem em dias"} ${contagemLabel(d.counting)}${d.doubled ? " · Prazo em dobro" : ""}`,
         status:
           d.status === "NO_DEADLINE"
             ? "Sem prazo"
