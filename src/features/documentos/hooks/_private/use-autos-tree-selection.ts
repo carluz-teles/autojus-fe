@@ -4,7 +4,7 @@ import { type MouseEvent, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import type { OpenDocument } from "../../components/pdf-drawer";
-import { rotuloTipoAuto } from "../../lib/tipo-autos";
+import { formatarReferenciaAuto, rotuloTipoAuto } from "../../lib/tipo-autos";
 import type { AutosNode, DocumentView } from "../../types";
 import { useBaixarDocumento } from "../use-baixar-documento";
 
@@ -27,11 +27,9 @@ export function useAutosTreeSelection(
   }, [nodes]);
   const selected =
     (selectedId && documents.get(selectedId)) || selectedSnapshot;
+  const groups = nodes.filter((node) => node.kind !== "unmapped");
   const allVisibleExpanded =
-    nodes.filter((node) => node.kind === "event").length > 0 &&
-    nodes
-      .filter((node) => node.kind === "event")
-      .every((node) => expanded.has(node.id));
+    groups.length > 0 && groups.every((node) => expanded.has(node.id));
 
   function onEventToggle(event: MouseEvent<HTMLButtonElement>) {
     const id = event.currentTarget.value;
@@ -46,12 +44,10 @@ export function useAutosTreeSelection(
   function toggleVisibleEvents() {
     setExpanded((current) => {
       const next = new Set(current);
-      nodes
-        .filter((node) => node.kind === "event")
-        .forEach((node) => {
-          if (allVisibleExpanded) next.delete(node.id);
-          else next.add(node.id);
-        });
+      groups.forEach((node) => {
+        if (allVisibleExpanded) next.delete(node.id);
+        else next.add(node.id);
+      });
       return next;
     });
   }
@@ -88,15 +84,20 @@ export function useAutosTreeSelection(
     }
     setOpenDocument({
       id: doc.id,
-      titulo: rotuloTipoAuto(doc.document_type),
+      titulo:
+        doc.source_system === "ESAJ"
+          ? doc.title || "Documento dos autos"
+          : rotuloTipoAuto(doc.document_type),
       meta: doc.court_reference
-        ? `Evento ${doc.court_reference.event_number}, documento ${doc.court_reference.document_code}`
-        : "Sem evento confirmado",
+        ? formatarReferenciaAuto(doc.court_reference)
+        : doc.source_system === "ESAJ"
+          ? "Sem referência confirmada"
+          : "Sem evento confirmado",
     });
   }
 
   const reference = selected?.court_reference
-    ? `Evento ${selected.court_reference.event_number}, documento ${selected.court_reference.document_code}`
+    ? formatarReferenciaAuto(selected.court_reference)
     : null;
 
   async function copyReference() {

@@ -27,6 +27,8 @@ export function useAutosTree(
     nodes,
     total: firstPage?.document_total ?? 0,
     filteredTotal: firstPage?.document_filtered_total ?? 0,
+    unavailableTotal: firstPage?.unavailable_total ?? 0,
+    unavailableFilteredTotal: firstPage?.unavailable_filtered_total ?? 0,
     filteredNodes: firstPage?.page.total_count ?? 0,
     isPending: query.isPending,
     isError: query.isError,

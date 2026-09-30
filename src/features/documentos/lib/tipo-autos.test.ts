@@ -1,6 +1,58 @@
 import { describe, expect, it } from "vitest";
 
-import { identificarAuto, rotuloTipoAuto } from "./tipo-autos";
+import {
+  formatarReferenciaAuto,
+  identificarAuto,
+  rotuloTipoAuto,
+} from "./tipo-autos";
+
+describe("formatarReferenciaAuto", () => {
+  const esaj = {
+    source_system: "ESAJ",
+    reference_kind: "DOCUMENT",
+    document_code: "CD999",
+    logical_doc_ref: "CD999",
+    unit_index: 2,
+    folio_start: 4,
+    folio_end: 5,
+  } as const;
+
+  it("shows official process folios only after verification", () => {
+    expect(
+      formatarReferenciaAuto({
+        ...esaj,
+        numbering_scope: "PROCESS",
+        folio_verified: true,
+      }),
+    ).toBe("Documento CD999, fls. 4–5");
+    expect(
+      formatarReferenciaAuto({
+        ...esaj,
+        numbering_scope: "PROCESS",
+        folio_verified: false,
+      }),
+    ).toBe("Documento CD999, unidade 2, página 1 do PDF");
+  });
+
+  it("labels restricted document folios as local pagination", () => {
+    expect(
+      formatarReferenciaAuto({
+        ...esaj,
+        numbering_scope: "DOCUMENT",
+        folio_verified: true,
+      }),
+    ).toBe("Documento CD999, páginas locais 4–5");
+    expect(formatarReferenciaAuto({ ...esaj, folio_verified: true })).toBe(
+      "Documento CD999, unidade 2, página 1 do PDF",
+    );
+  });
+
+  it("preserves the EPROC event and document number", () => {
+    expect(
+      formatarReferenciaAuto({ event_number: 42, document_code: "DOC60" }),
+    ).toBe("Evento 42, documento DOC60");
+  });
+});
 
 // A4 (docs/qa-remediation-evidence/fe-operations-architecture.md): documentos do
 // MESMO tipo (ex.: 3 "Petição") precisam ser distinguíveis — nome descritivo

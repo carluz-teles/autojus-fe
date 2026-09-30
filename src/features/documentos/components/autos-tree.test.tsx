@@ -42,6 +42,8 @@ function state(
     order: "newest",
     total: 62,
     filteredTotal: 62,
+    unavailableTotal: 0,
+    unavailableFilteredTotal: 0,
     filteredNodes: 2,
     allVisibleExpanded: expanded.has("event-42"),
     isPending: false,
@@ -79,6 +81,7 @@ it("keeps a 60+ document event compact until expanded", () => {
       kind: "event",
       id: "event-42",
       event_number: 42,
+      occurred_at: "2026-09-28T15:00:00Z",
       description: "Juntada de documentos",
       documents: Array.from({ length: 60 }, (_, i) => document(i + 1)),
     },
@@ -86,10 +89,10 @@ it("keeps a 60+ document event compact until expanded", () => {
   ];
   act(() => root?.render(<AutosTree autos={state(nodes)} />));
   expect(host.textContent).toContain(
-    "Esta árvore mostra somente eventos do EPROC que possuem documentos.",
+    "Esta árvore mostra eventos e documentos com autos associados.",
   );
   expect(host.textContent).toContain(
-    "Eventos que não geraram documento não aparecem aqui.",
+    "Movimentos sem documentos não aparecem aqui.",
   );
   const eventButton = host.querySelector<HTMLButtonElement>(
     'button[aria-expanded="false"]',
@@ -98,6 +101,8 @@ it("keeps a 60+ document event compact until expanded", () => {
   expect(host.querySelectorAll('button[value^="doc-"]')).toHaveLength(0);
   expect(host.textContent).toContain("Sem evento confirmado");
   expect(host.textContent).toContain("62 de 62 documentos");
+  expect(host.textContent).toContain("28/09/2026");
+  expect(host.textContent).not.toContain("Incluído em");
   act(() =>
     root?.render(<AutosTree autos={state(nodes, new Set(["event-42"]))} />),
   );
@@ -107,6 +112,157 @@ it("keeps a 60+ document event compact until expanded", () => {
   expect(host.querySelector('button[value="doc-60"]')?.textContent).toContain(
     "DOC60",
   );
+});
+
+it("shows ESAJ document groups, verified folios, and unavailable units without event numbers", () => {
+  host = window.document.createElement("div");
+  window.document.body.append(host);
+  root = createRoot(host);
+  const esajDoc: DocumentView = {
+    ...document(1),
+    title: "Petição inicial",
+    source_system: "ESAJ",
+    court_reference: {
+      source_system: "ESAJ",
+      reference_kind: "DOCUMENT",
+      document_code: "CD123",
+      logical_doc_ref: "CD123",
+      unit_index: 1,
+      page_count: 3,
+      folio_start: 10,
+      folio_end: 12,
+      numbering_scope: "PROCESS",
+      folio_verified: true,
+    },
+  };
+  const nodes: AutosNode[] = [
+    {
+      kind: "document",
+      id: "group-1",
+      source_system: "ESAJ",
+      reference_kind: "DOCUMENT",
+      external_group_ref: "CD123",
+      group_scope: "PRIMARY",
+      occurred_at: "2026-09-28T15:00:00Z",
+      description: "Petição inicial",
+      documents: [esajDoc],
+      unavailable_count: 1,
+      unavailable_documents: [
+        {
+          external_ref: "CD123",
+          external_page: 2,
+          reason: "access_denied",
+          numbering_scope: "PROCESS",
+          page_count: 1,
+        },
+      ],
+    },
+  ];
+  const open = vi.fn();
+  function Harness() {
+    const selection = useAutosTreeSelection(nodes, open);
+    return <AutosTree autos={{ ...state(nodes), ...selection }} />;
+  }
+  act(() => root?.render(<Harness />));
+  expect(host.textContent).toContain("Documento CD123");
+  expect(host.textContent).toContain("Petição inicial");
+  expect(host.textContent).toContain("Incluído em 28/09/2026");
+  expect(host.textContent).not.toContain("Evento undefined");
+  act(() =>
+    host?.querySelector<HTMLButtonElement>('button[value="group-1"]')?.click(),
+  );
+  const row = host.querySelector<HTMLButtonElement>('button[value="doc-1"]');
+  expect(row?.textContent).toContain("fls. 10–12");
+  expect(host.textContent).toContain("Acesso negado");
+  expect(host.querySelectorAll('button[value="CD123-2"]')).toHaveLength(0);
+  act(() => row?.click());
+  expect(open).toHaveBeenCalledWith({
+    id: "doc-1",
+    titulo: "Petição inicial",
+    meta: "Documento CD123, fls. 10–12",
+  });
+});
+
+it("uses document-local references for ESAJ without verified process folios", () => {
+  host = window.document.createElement("div");
+  window.document.body.append(host);
+  root = createRoot(host);
+  const secret: DocumentView = {
+    ...document(2),
+    title: "Documento sigiloso",
+    source_system: "ESAJ",
+    court_reference: {
+      source_system: "ESAJ",
+      reference_kind: "DOCUMENT",
+      document_code: "CD999",
+      logical_doc_ref: "CD999",
+      unit_index: 2,
+      page_count: 2,
+      folio_start: 4,
+      folio_end: 5,
+      numbering_scope: "DOCUMENT",
+      folio_verified: false,
+    },
+  };
+  const nodes: AutosNode[] = [
+    {
+      kind: "document",
+      id: "group-secret",
+      source_system: "ESAJ",
+      external_group_ref: "CD999",
+      group_scope: "SIGILOSOS",
+      description: "Documento sigiloso",
+      documents: [secret],
+    },
+  ];
+  const open = vi.fn();
+  function Harness() {
+    const selection = useAutosTreeSelection(nodes, open);
+    return <AutosTree autos={{ ...state(nodes), ...selection }} />;
+  }
+  act(() => root?.render(<Harness />));
+  expect(host.textContent).toContain("Sigiloso");
+  act(() =>
+    host
+      ?.querySelector<HTMLButtonElement>('button[value="group-secret"]')
+      ?.click(),
+  );
+  expect(host.textContent).toContain("unidade 2");
+  expect(host.textContent).not.toContain("Fls. 4–5");
+  act(() =>
+    host?.querySelector<HTMLButtonElement>('button[value="doc-2"]')?.click(),
+  );
+  expect(open).toHaveBeenCalledWith({
+    id: "doc-2",
+    titulo: "Documento sigiloso",
+    meta: "Documento CD999, unidade 2, página 1 do PDF",
+  });
+});
+
+it("keeps an ESAJ group visible when its only unit is unavailable", () => {
+  host = window.document.createElement("div");
+  window.document.body.append(host);
+  root = createRoot(host);
+  const nodes: AutosNode[] = [
+    {
+      kind: "document",
+      id: "group-closed",
+      source_system: "ESAJ",
+      external_group_ref: "CD404",
+      description: "Certidão",
+      documents: [],
+      unavailable_count: 1,
+      unavailable_documents: [
+        { external_ref: "CD404", external_page: 1, reason: "opening_pending" },
+      ],
+    },
+  ];
+  act(() =>
+    root?.render(<AutosTree autos={state(nodes, new Set(["group-closed"]))} />),
+  );
+  expect(host.textContent).toContain("Documento CD404");
+  expect(host.textContent).toContain("Abertura pendente");
+  expect(host.querySelectorAll('button[value^="doc-"]')).toHaveLength(0);
 });
 
 it("shows deterministic portal metadata and uses the document type as the child name", () => {

@@ -6,6 +6,35 @@
 
 import { formatarData } from "@/lib/utils";
 
+import type { CourtReference } from "../types";
+
+export function formatarReferenciaAuto(ref: CourtReference): string {
+  if (ref.source_system === "ESAJ" && ref.reference_kind === "DOCUMENT") {
+    const code = ref.logical_doc_ref || ref.document_code;
+    const prefix = `Documento ${code}`;
+    if (
+      ref.folio_verified &&
+      ref.folio_start &&
+      ref.folio_end &&
+      (ref.numbering_scope === "PROCESS" || ref.numbering_scope === "DOCUMENT")
+    ) {
+      const range =
+        ref.folio_start === ref.folio_end
+          ? `${ref.folio_start}`
+          : `${ref.folio_start}–${ref.folio_end}`;
+      return ref.numbering_scope === "PROCESS"
+        ? `${prefix}, fls. ${range}`
+        : `${prefix}, páginas locais ${range}`;
+    }
+    return ref.unit_index
+      ? `${prefix}, unidade ${ref.unit_index}, página 1 do PDF`
+      : `${prefix}, página 1 do PDF`;
+  }
+  return ref.event_number && ref.document_code
+    ? `Evento ${ref.event_number}, documento ${ref.document_code}`
+    : `Documento ${ref.document_code}`;
+}
+
 const TIPO_AUTOS_LABEL: Record<string, string> = {
   // petições / manifestações
   PET: "Petição",

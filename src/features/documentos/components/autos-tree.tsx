@@ -18,8 +18,8 @@ import { SkeletonRows } from "@/components/ui/skeletons";
 import { cn } from "@/lib/utils";
 
 import type { AutosTreeState } from "../hooks/use-autos-tree";
-import { rotuloTipoAuto } from "../lib/tipo-autos";
-import type { AutosNode } from "../types";
+import { formatarReferenciaAuto, rotuloTipoAuto } from "../lib/tipo-autos";
+import type { AutosNode, AutosUnavailableDocument } from "../types";
 
 const EVENT_DETAIL_PREVIEW_LENGTH = 180;
 
@@ -34,7 +34,7 @@ export function AutosTree({ autos }: { autos: AutosTreeState }) {
   // The API paginates unmapped documents individually. Merge every loaded page
   // into one UI group without changing its cursor or inventing an event identity.
   const displayedNodes: AutosNode[] = autos.nodes.filter(
-    (node) => node.kind === "event",
+    (node) => node.kind !== "unmapped",
   );
   const unmappedDocuments = autos.nodes.flatMap((node) =>
     node.kind === "unmapped" ? node.documents : [],
@@ -52,8 +52,8 @@ export function AutosTree({ autos }: { autos: AutosTreeState }) {
         <div className="bg-muted/40 text-muted-foreground mb-4 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-xs">
           <Info aria-hidden className="mt-0.5 size-3.5 shrink-0" />
           <p>
-            Esta árvore mostra somente eventos do EPROC que possuem documentos.
-            Eventos que não geraram documento não aparecem aqui.
+            Esta árvore mostra eventos e documentos com autos associados.
+            Movimentos sem documentos não aparecem aqui.
           </p>
         </div>
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -66,7 +66,7 @@ export function AutosTree({ autos }: { autos: AutosTreeState }) {
             <Input
               value={autos.search}
               onChange={autos.onSearchChange}
-              placeholder="Evento, descrição ou documento"
+              placeholder="Evento, título ou documento"
               className="pl-9"
             />
           </label>
@@ -81,15 +81,16 @@ export function AutosTree({ autos }: { autos: AutosTreeState }) {
               onClick={autos.toggleVisibleEvents}
             >
               <FolderTree data-icon="inline-start" aria-hidden />
-              {autos.allVisibleExpanded
-                ? "Recolher eventos"
-                : "Expandir eventos"}
+              {autos.allVisibleExpanded ? "Recolher grupos" : "Expandir grupos"}
             </Button>
           </div>
         </div>
         <p className="text-muted-foreground mb-3 text-xs" aria-live="polite">
           {displayedNodes.length} grupos carregados · {autos.filteredTotal} de{" "}
           {autos.total} documentos
+          {autos.unavailableTotal > 0
+            ? ` · ${autos.unavailableFilteredTotal} referências indisponíveis`
+            : null}
         </p>
         {autos.isPending ? <SkeletonRows rows={4} /> : null}
         {autos.isError ? (
@@ -108,7 +109,7 @@ export function AutosTree({ autos }: { autos: AutosTreeState }) {
             icon={FolderOpen}
             title={
               autos.search
-                ? "Nenhum evento encontrado"
+                ? "Nenhum auto encontrado"
                 : "Os autos ainda não estão disponíveis"
             }
             description={
@@ -128,7 +129,7 @@ export function AutosTree({ autos }: { autos: AutosTreeState }) {
                 key={node.id}
                 className="border-border border-l-2 pl-4 [contain-intrinsic-size:0_74px] [content-visibility:auto] sm:pl-5"
               >
-                {node.kind === "event" ? (
+                {node.kind !== "unmapped" ? (
                   <>
                     <button
                       type="button"
@@ -156,11 +157,19 @@ export function AutosTree({ autos }: { autos: AutosTreeState }) {
                       <span className="min-w-0 flex-1">
                         <span className="flex flex-wrap items-center gap-2">
                           <Badge variant="outline">
-                            Evento {node.event_number}
+                            {node.kind === "event"
+                              ? `Evento ${node.event_number}`
+                              : `Documento ${node.external_group_ref || "dos autos"}`}
                           </Badge>
                           <span className="text-sm font-medium">
-                            {node.description || "Evento do processo"}
+                            {node.description ||
+                              (node.kind === "event"
+                                ? "Evento do processo"
+                                : "Documento dos autos")}
                           </span>
+                          {node.group_scope === "SIGILOSOS" ? (
+                            <Badge variant="secondary">Sigiloso</Badge>
+                          ) : null}
                         </span>
                         {node.detail ? (
                           <span className="text-muted-foreground mt-1 block text-xs">
@@ -170,20 +179,26 @@ export function AutosTree({ autos }: { autos: AutosTreeState }) {
                         <span className="text-muted-foreground mt-1 flex flex-wrap gap-x-2 text-xs">
                           {node.occurred_at ? (
                             <time dateTime={node.occurred_at}>
-                              {new Date(node.occurred_at).toLocaleString(
-                                "pt-BR",
-                              )}
+                              {node.kind === "document" ? "Incluído em " : ""}
+                              {new Date(node.occurred_at).toLocaleString("pt-BR")}
                             </time>
                           ) : (
                             <span>Data não informada</span>
                           )}
                           <span aria-hidden>·</span>
                           <span>
-                            {node.documents.length}{" "}
-                            {node.documents.length === 1
-                              ? "documento"
-                              : "documentos"}
+                            {node.kind === "document"
+                              ? `${node.documents.length} ${node.documents.length === 1 ? "unidade carregada" : "unidades carregadas"}`
+                              : `${node.documents.length} ${node.documents.length === 1 ? "documento" : "documentos"}`}
                           </span>
+                          {node.unavailable_count ? (
+                            <>
+                              <span aria-hidden>·</span>
+                              <span>
+                                {node.unavailable_count} indisponíveis
+                              </span>
+                            </>
+                          ) : null}
                           {node.actor ? (
                             <>
                               <span aria-hidden>·</span>
@@ -203,6 +218,13 @@ export function AutosTree({ autos }: { autos: AutosTreeState }) {
                             key={doc.id}
                             doc={doc}
                             autos={autos}
+                          />
+                        ))}
+                        {node.unavailable_documents?.map((doc) => (
+                          <AutosUnavailableRow
+                            key={`${doc.external_ref}-${doc.external_page}`}
+                            doc={doc}
+                            sourceSystem={node.source_system}
                           />
                         ))}
                       </ol>
@@ -268,7 +290,7 @@ export function AutosTree({ autos }: { autos: AutosTreeState }) {
             disabled={autos.isFetchingNextPage}
             onClick={autos.loadMore}
           >
-            {autos.isFetchingNextPage ? "Carregando…" : "Mostrar mais eventos"}
+            {autos.isFetchingNextPage ? "Carregando…" : "Mostrar mais grupos"}
           </Button>
         ) : null}
       </div>
@@ -283,12 +305,25 @@ function AutosDocumentRow({
   doc: AutosTreeState["nodes"][number]["documents"][number];
   autos: AutosTreeState;
 }) {
+  const isESAJ = doc.source_system === "ESAJ";
+  const title = isESAJ
+    ? doc.title || "Documento dos autos"
+    : rotuloTipoAuto(doc.document_type);
+  const reference =
+    isESAJ && doc.court_reference
+      ? formatarReferenciaAuto(doc.court_reference)
+      : null;
+  const pages =
+    doc.pages ||
+    (isESAJ && doc.court_reference?.folio_verified
+      ? doc.court_reference.page_count
+      : undefined);
   return (
     <li className="list-none pl-3 [contain-intrinsic-size:0_48px] [content-visibility:auto]">
       <button
         type="button"
         value={doc.id}
-        aria-label={`${doc.status === "PENDING" ? "Selecionar" : "Abrir"} documento ${rotuloTipoAuto(doc.document_type)}`}
+        aria-label={`${doc.status === "PENDING" ? "Selecionar" : "Abrir"} documento ${title}`}
         aria-current={doc.id === autos.selectedId ? "true" : undefined}
         onClick={autos.onDocumentSelect}
         className={cn(
@@ -302,18 +337,17 @@ function AutosDocumentRow({
         />
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-baseline gap-2">
-            <span className="text-sm font-medium">
-              {rotuloTipoAuto(doc.document_type)}
-            </span>
-            {doc.court_document_code ? (
+            <span className="text-sm font-medium">{title}</span>
+            {!isESAJ && doc.court_document_code ? (
               <code className="text-muted-foreground text-[11px]">
                 {doc.court_document_code}
               </code>
             ) : null}
           </span>
           <span className="text-muted-foreground mt-0.5 block text-xs">
-            {doc.pages
-              ? `${doc.pages} ${doc.pages === 1 ? "página" : "páginas"}`
+            {reference ? `${reference} · ` : ""}
+            {pages
+              ? `${pages} ${pages === 1 ? "página" : "páginas"}${isESAJ ? " no PDF" : ""}`
               : "Páginas ainda não identificadas"}
           </span>
         </span>
@@ -333,6 +367,36 @@ function AutosDocumentRow({
               : "Processando"}
         </Badge>
       </button>
+    </li>
+  );
+}
+
+function AutosUnavailableRow({
+  doc,
+  sourceSystem,
+}: {
+  doc: AutosUnavailableDocument;
+  sourceSystem?: string;
+}) {
+  const reason =
+    doc.reason === "access_denied" || doc.reason === "absolute_restriction"
+      ? "Acesso negado"
+      : doc.reason === "opening_pending"
+        ? "Abertura pendente"
+        : doc.reason === "unsupported_media_type"
+          ? "Formato indisponível"
+          : "Indisponível";
+  return (
+    <li className="list-none pl-3 [contain-intrinsic-size:0_48px] [content-visibility:auto]">
+      <div className="text-muted-foreground my-0.5 flex items-center gap-3 rounded-lg px-3 py-2 text-sm">
+        <FileText aria-hidden className="size-4 shrink-0" />
+        <span className="min-w-0 flex-1">
+          {sourceSystem === "ESAJ"
+            ? `Documento ${doc.external_ref}, unidade ${doc.external_page}`
+            : `Documento ${doc.court_document_code || doc.external_ref}`}
+        </span>
+        <Badge variant="warning">{reason}</Badge>
+      </div>
     </li>
   );
 }

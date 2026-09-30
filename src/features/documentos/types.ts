@@ -47,18 +47,55 @@ export interface DocumentView {
   /** Vínculo confirmado pelo tribunal; ausente em uploads e autos legados. */
   autos_event_id?: string;
   court_document_code?: string;
-  court_reference?: { event_number: number; document_code: string };
+  source_system?: string;
+  logical_doc_ref?: string;
+  external_page?: number;
+  court_reference?: CourtReference;
+}
+
+export interface CourtReference {
+  event_number?: number;
+  document_code: string;
+  source_system?: string;
+  reference_kind?: string;
+  logical_doc_ref?: string;
+  unit_index?: number;
+  page_count?: number;
+  folio_start?: number;
+  folio_end?: number;
+  numbering_scope?: "PROCESS" | "DOCUMENT";
+  folio_verified?: boolean;
+}
+
+export interface AutosUnavailableDocument {
+  external_ref: string;
+  external_page: number;
+  court_document_code?: string;
+  court_document_order?: number;
+  portal_mime_type?: string;
+  reason: string;
+  page_count?: number;
+  folio_start?: number;
+  folio_end?: number;
+  numbering_scope?: "PROCESS" | "DOCUMENT";
+  folio_verified?: boolean;
 }
 
 export interface AutosNode {
-  kind: "event" | "unmapped";
+  kind: "event" | "document" | "unmapped";
   id: string;
   event_number?: number;
+  source_system?: string;
+  reference_kind?: string;
+  external_group_ref?: string;
+  group_scope?: string;
   occurred_at?: string;
   description?: string;
   detail?: string;
   actor?: string;
   documents: DocumentView[];
+  unavailable_documents?: AutosUnavailableDocument[];
+  unavailable_count?: number;
 }
 
 export interface AutosTreePage {
@@ -72,6 +109,8 @@ export interface AutosTreePage {
   filters: Record<string, never>;
   document_total: number;
   document_filtered_total: number;
+  unavailable_total?: number;
+  unavailable_filtered_total?: number;
 }
 
 // ── Upload presigned (3 passos) ──
