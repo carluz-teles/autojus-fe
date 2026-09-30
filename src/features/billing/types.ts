@@ -17,3 +17,13 @@ export interface Subscription {
   days_until_trial_end: number | null;
   trial_status: TrialStatus;
 }
+
+/** Um plano do catálogo — GET /v1/billing/plans, lido AO VIVO da Stripe pelo BE
+ * (produto ativo + preço recorrente). `amount` vem em centavos. */
+export interface Plan {
+  price_id: string;
+  name: string;
+  amount: number;
+  interval: string;
+  active_process_limit: number;
+}
