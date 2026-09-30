@@ -20,6 +20,7 @@ import { formatarData } from "@/lib/utils";
 
 import { useConfirmacaoPrazo } from "../../hooks/use-confirmacao-prazo";
 import { tipoRevisaoLabel } from "../../lib/detalhe-apresentacao";
+import { TERMO_INICIAL_OPCOES } from "../../lib/labels";
 import type { PrazoDetalheView } from "../../types";
 
 export function ConfirmacaoPrazo({
@@ -139,15 +140,11 @@ export function ConfirmacaoPrazo({
               id="revisar-prazo-inicio"
               {...register("anchor_event")}
             >
-              <NativeSelectOption value="DEADLINE_START">
-                Início informado na intimação
-              </NativeSelectOption>
-              <NativeSelectOption value="PUBLISHED">
-                Publicação
-              </NativeSelectOption>
-              <NativeSelectOption value="MADE_AVAILABLE">
-                Disponibilização
-              </NativeSelectOption>
+              {TERMO_INICIAL_OPCOES.map(([value, label]) => (
+                <NativeSelectOption key={value} value={value}>
+                  {label}
+                </NativeSelectOption>
+              ))}
             </NativeSelect>
           </Field>
           <Field data-invalid={!!errors.manual_extra_days}>

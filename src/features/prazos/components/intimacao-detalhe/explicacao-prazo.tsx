@@ -1,6 +1,7 @@
 import { formatarData } from "@/lib/utils";
 
 import { feriadosVigentes } from "../../lib/detalhe-apresentacao";
+import { contagemLabel, termoInicialLabel } from "../../lib/labels";
 import type { PrazoDetalheView } from "../../types";
 
 /** Explains only the verified current snapshot; birth memory is historical. */
@@ -102,11 +103,11 @@ export function ExplicacaoPrazo({
                 value: calc.start_date
                   ? formatarData(calc.start_date)
                   : "Não informado",
-                detail: calc.anchor_event || "Marco não registrado",
+                detail: termoInicialLabel(calc.anchor_event),
               },
               {
                 label: "Contagem",
-                value: `${calc.days} dias ${calc.counting === "BUSINESS" ? "úteis" : "corridos"}`,
+                value: `${calc.days} dias ${contagemLabel(calc.counting)}`,
                 detail: calc.doubled
                   ? "Prazo em dobro registrado."
                   : "Sem prazo em dobro.",

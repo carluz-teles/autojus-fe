@@ -39,6 +39,7 @@ import {
   formatarCNJ,
   situacaoRevisao,
 } from "../lib/detalhe-apresentacao";
+import { contagemLabel, termoInicialLabel } from "../lib/labels";
 import type {
   PrazoCrossValidationDecisao,
   PrazoDetalheView,
@@ -190,7 +191,7 @@ function buildMemoria(p: PrazoDetalheView | null): MemoriaCalculoVM | null {
           valor: calc.start_date
             ? formatarData(calc.start_date)
             : "Não informado",
-          sub: calc.anchor_event || "Marco não registrado",
+          sub: termoInicialLabel(calc.anchor_event),
         },
         {
           kicker: "PRAZO BASE",
@@ -206,7 +207,7 @@ function buildMemoria(p: PrazoDetalheView | null): MemoriaCalculoVM | null {
         },
         {
           kicker: "CONTAGEM",
-          valor: calc.counting === "BUSINESS" ? "Dias úteis" : "Dias corridos",
+          valor: `Dias ${contagemLabel(calc.counting)}`,
           sub: `${holidays.length} feriado(s) ou suspensão(ões) nesta contagem.`,
         },
         {

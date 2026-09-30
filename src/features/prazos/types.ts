@@ -8,7 +8,8 @@ export type PrazoStatus =
   "PENDING" | "OPEN" | "MET" | "MISSED" | "CANCELLED" | "NO_DEADLINE";
 
 /** Evento de ancoragem do prazo — de onde começa a contagem. */
-type PrazoAnchorEvent = "MADE_AVAILABLE" | "PUBLISHED" | "DEADLINE_START";
+export type PrazoAnchorEvent =
+  "MADE_AVAILABLE" | "PUBLISHED" | "DEADLINE_START";
 
 /** Regime de contagem: BUSINESS = dias úteis; CALENDAR = dias corridos. */
 type PrazoCounting = "BUSINESS" | "CALENDAR";
