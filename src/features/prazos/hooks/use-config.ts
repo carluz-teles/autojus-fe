@@ -5,7 +5,7 @@ import { useMemo } from "react";
 
 // Aba ativa da tela de configurações.
 export type ConfigTab =
-  "perfil" | "org" | "plano" | "equipe" | "fontes" | "notificacoes";
+  "perfil" | "org" | "plano" | "equipe" | "fontes" | "notificacoes" | "modelos";
 
 // Item da sub-nav esquerda (Perfil / Organização / Plano & cobrança / ...).
 export interface ConfigNavItem {
@@ -32,6 +32,7 @@ const TABS: { key: ConfigTab; label: string }[] = [
   { key: "plano", label: "Plano & cobrança" },
   { key: "equipe", label: "Equipe" },
   { key: "fontes", label: "Fontes de dados" },
+  { key: "modelos", label: "Modelos de documentos" },
   { key: "notificacoes", label: "Notificações" },
 ];
 

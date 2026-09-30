@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils";
 import { useConstruction } from "../../hooks/use-construction";
 import { useContentSave } from "../../hooks/use-content-save";
 import { draftKeys } from "../../hooks/use-draft";
+import { usePdfExport } from "../../hooks/use-pdf-export";
 import { useThesisBatch } from "../../hooks/use-thesis-batch";
 import { derivarTelaConstrucao } from "../../lib/auto-flow";
 import { direcaoDaPeca } from "../../lib/direcao-peca";
@@ -77,7 +78,6 @@ export function ConstructionPage({ id }: { id: string }) {
   const completionRef = useRef(false);
   const [versions, setVersions] = useState<Version[] | null>(null);
   const [preview, setPreview] = useState<Version | null>(null);
-  const [pdf, setPdf] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [liveHTML, setLiveHTML] = useState<string | null>(null);
   const [hydrationKey, setHydrationKey] = useState(0);
@@ -88,6 +88,7 @@ export function ConstructionPage({ id }: { id: string }) {
     setHydrationKey((key) => key + 1);
     setChecked(false);
   });
+  const pdfExport = usePdfExport(id, draft ?? undefined, save.flush);
   const generationActive =
     h.isGenerating || h.regenerating || h.stage === "gerando";
   const applyingRef = useRef(false);
@@ -193,21 +194,6 @@ export function ConstructionPage({ id }: { id: string }) {
     );
     await refresh();
     await qc.invalidateQueries({ queryKey: ["pecas-v2", "theses", id] });
-  };
-  const exportPDF = async () => {
-    setBusy(true);
-    try {
-      await save.flush();
-      const r = await fetcher<{ data: { url: string } }>(
-        `/v1/pecas/${id}/export`,
-        { query: { format: "pdf" } },
-      );
-      setPdf(r.data.url);
-    } catch {
-      toast.error("Não foi possível preparar o PDF.");
-    } finally {
-      setBusy(false);
-    }
   };
   if (h.isLoading) return <SkeletonDetail />;
   if (!draft || h.isError)
@@ -738,8 +724,8 @@ export function ConstructionPage({ id }: { id: string }) {
                         <Button
                           variant="ghost"
                           size="xs"
-                          disabled={busy}
-                          onClick={() => void exportPDF()}
+                          disabled={busy || pdfExport.pending}
+                          onClick={() => void pdfExport.exportPDF()}
                         >
                           <FileText data-icon="inline-start" />
                           Visualizar PDF
@@ -747,6 +733,7 @@ export function ConstructionPage({ id }: { id: string }) {
                       </>
                     }
                     onChange={(html) => {
+                      pdfExport.invalidate();
                       setLiveHTML(html);
                       setChecked(false);
                       save.change(html);
@@ -1008,19 +995,14 @@ export function ConstructionPage({ id }: { id: string }) {
                 </div>
               </SheetContent>
             </Sheet>
-            <Sheet
-              open={!!pdf}
-              onOpenChange={(v) => {
-                if (!v) setPdf(null);
-              }}
-            >
+            <Sheet open={pdfExport.open} onOpenChange={pdfExport.setOpen}>
               <SheetContent
                 title="PDF da minuta"
                 className="max-w-4xl"
                 footer={
-                  pdf ? (
+                  pdfExport.downloadURL ? (
                     <a
-                      href={pdf}
+                      href={pdfExport.downloadURL}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary underline"
@@ -1030,7 +1012,9 @@ export function ConstructionPage({ id }: { id: string }) {
                   ) : undefined
                 }
               >
-                {pdf && <PdfPreview key={pdf} url={pdf} />}
+                {pdfExport.artifact && (
+                  <PdfPreview blob={pdfExport.artifact.blob} />
+                )}
               </SheetContent>
             </Sheet>
           </div>

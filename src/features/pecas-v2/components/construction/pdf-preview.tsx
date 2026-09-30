@@ -11,11 +11,15 @@ const PdfCanvas = dynamic(
     ),
   { ssr: false },
 );
-export function PdfPreview({ url }: { url: string }) {
+export function PdfPreview({
+  url,
+  blob: suppliedBlob,
+}: { url: string; blob?: never } | { url?: never; blob: Blob }) {
   const [blob, setBlob] = useState<Blob | null>(null);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    if (!url) return;
     const controller = new AbortController();
     void fetch(url, { signal: controller.signal })
       .then(async (response) => {
@@ -40,8 +44,8 @@ export function PdfPreview({ url }: { url: string }) {
         </Button>
       </div>
     );
-  return blob ? (
-    <PdfCanvas blob={blob} />
+  return suppliedBlob || blob ? (
+    <PdfCanvas blob={(suppliedBlob ?? blob)!} />
   ) : (
     <Skeleton className="h-[70vh] min-h-64 w-full rounded-xl" />
   );

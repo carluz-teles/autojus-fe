@@ -12,6 +12,16 @@ const mocks = vi.hoisted(() => ({
   draft: null as Record<string, unknown> | null,
 }));
 vi.mock("@/lib/api/use-api", () => ({ useApi: () => mocks.api }));
+vi.mock("../../hooks/use-pdf-export", () => ({
+  usePdfExport: () => ({
+    artifact: null,
+    downloadURL: null,
+    open: false,
+    setOpen: vi.fn(),
+    pending: false,
+    exportPDF: vi.fn(),
+  }),
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));

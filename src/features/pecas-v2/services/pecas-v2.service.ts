@@ -30,6 +30,54 @@ import type { ChatMessage, Draft, Thesis, ThesisState } from "../types";
 
 const ENDPOINT = "/v1/pecas";
 
+export interface DocumentRender {
+  id: string;
+  draft_id: string;
+  draft_version_id: string;
+  template_version_id: string;
+  content_sha256: string;
+  template_sha256: string;
+  status: string;
+  diagnostic?: string;
+  pdf_sha256?: string;
+  pdf_url?: string;
+  engine_version: string;
+  resolved_params: Record<string, unknown>;
+  certificate_id?: string;
+}
+
+export async function exportDraftPDF(fetcher: ApiFetcher, id: string) {
+  const response = await fetcher<DataEnvelope<{ url: string }>>(
+    `${ENDPOINT}/${id}/export`,
+    { query: { format: "pdf" } },
+  );
+  return response.data.url;
+}
+
+export async function renderDraftPDF(
+  fetcher: ApiFetcher,
+  id: string,
+  templateVersionId: string,
+  idempotencyKey: string,
+) {
+  const response = await fetcher<DataEnvelope<DocumentRender>>(
+    `${ENDPOINT}/${id}/renders`,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: { template_version_id: templateVersionId },
+    },
+  );
+  return response.data;
+}
+
+export async function getDocumentRender(fetcher: ApiFetcher, renderId: string) {
+  const response = await fetcher<DataEnvelope<DocumentRender>>(
+    `/v1/document-renders/${renderId}`,
+  );
+  return response.data;
+}
+
 // ── Criação (POST /v1/pecas) ─────────────────────────────────────────────────
 
 export interface CreateDraftInput {

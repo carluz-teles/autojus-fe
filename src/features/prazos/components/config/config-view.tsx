@@ -4,6 +4,7 @@ import { Settings2 } from "lucide-react";
 
 import { ShellHeader } from "@/components/shell/page-frame";
 import { BillingPanel } from "@/features/billing/components/billing-panel";
+import { ConfigDocumentTemplates } from "@/features/document-templates/components/config-document-templates";
 import { NotificationPreferences } from "@/features/notifications/notification-preferences";
 import { cn } from "@/lib/utils";
 
@@ -59,7 +60,12 @@ export function ConfigView() {
 
         {/* conteúdo */}
         <div className="min-w-0 flex-1 overflow-y-auto">
-          <div className="max-w-[680px] px-4 pt-7 pb-28 sm:px-8">
+          <div
+            className={cn(
+              "px-4 pt-7 pb-28 sm:px-8",
+              cfg.tab === "modelos" ? "max-w-[1200px]" : "max-w-[680px]",
+            )}
+          >
             {cfg.tab === "perfil" ? <ConfigPerfil /> : null}
             {cfg.tab === "org" ? <ConfigOrg /> : null}
 
@@ -74,6 +80,7 @@ export function ConfigView() {
 
             {cfg.tab === "equipe" ? <ConfigEquipe /> : null}
             {cfg.tab === "fontes" ? <ConfigFontes /> : null}
+            {cfg.tab === "modelos" ? <ConfigDocumentTemplates /> : null}
             {cfg.tab === "notificacoes" ? (
               <div className="reveal">
                 <NotificationPreferences />

@@ -28,11 +28,20 @@ export interface ApiRequest {
   getToken?: TokenGetter;
 }
 
-function buildUrl(path: string, query?: ApiRequest["query"]): string {
-  const url = new URL(
-    path.replace(/^\//, ""),
-    `${BASE_URL.replace(/\/$/, "")}/`,
-  );
+function buildUrl(
+  path: string,
+  query?: ApiRequest["query"],
+  authenticated = false,
+): string {
+  const origin =
+    typeof window === "undefined" ? "http://localhost" : window.location.origin;
+  const base = new URL(`${BASE_URL.replace(/\/$/, "")}/`, origin);
+  const url = new URL(path.replace(/^\//, ""), base);
+  if (authenticated) {
+    if (url.origin !== base.origin) {
+      throw new Error("Requisição autenticada fora da origem da API.");
+    }
+  }
   if (query) {
     for (const [k, v] of Object.entries(query)) {
       if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
@@ -84,7 +93,7 @@ export async function apiFetch<T>(
 
   let res: Response;
   try {
-    res = await fetch(buildUrl(path, query), {
+    res = await fetch(buildUrl(path, query, !!getToken), {
       method,
       headers: finalHeaders,
       body: fetchBody,
@@ -134,7 +143,7 @@ export async function apiFetchBlob(
 
   let res: Response;
   try {
-    res = await fetch(buildUrl(path, query), {
+    res = await fetch(buildUrl(path, query, !!getToken), {
       method: "GET",
       headers: finalHeaders,
       signal,
@@ -143,6 +152,66 @@ export async function apiFetchBlob(
     throw networkError(cause);
   }
 
+  if (!res.ok) throw await apiErrorFromResponse(res);
+  return res.blob();
+}
+
+const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+function checkedPresignedUrl(url: string): string {
+  const parsed = new URL(url);
+  if (
+    !["http:", "https:"].includes(parsed.protocol) ||
+    parsed.username ||
+    parsed.password
+  )
+    throw new Error("URL de armazenamento inválida.");
+  return parsed.toString();
+}
+
+/** PUT direto no armazenamento: bytes crus, MIME assinado, sem JWT ou cookies. */
+export async function apiPutPresigned(
+  url: string,
+  file: Blob,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(checkedPresignedUrl(url), {
+      method: "PUT",
+      headers: { "Content-Type": DOCX_MIME },
+      body: file,
+      credentials: "omit",
+      redirect: "error",
+      signal,
+    });
+  } catch (cause) {
+    if (signal?.aborted)
+      throw new DOMException("Request aborted", "AbortError");
+    throw networkError(cause);
+  }
+  if (!res.ok) throw await apiErrorFromResponse(res);
+}
+
+/** GET binário por URL assinada, sem JWT ou cookies. */
+export async function apiGetPresignedBlob(
+  url: string,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  let res: Response;
+  try {
+    res = await fetch(checkedPresignedUrl(url), {
+      method: "GET",
+      credentials: "omit",
+      redirect: "error",
+      signal,
+    });
+  } catch (cause) {
+    if (signal?.aborted)
+      throw new DOMException("Request aborted", "AbortError");
+    throw networkError(cause);
+  }
   if (!res.ok) throw await apiErrorFromResponse(res);
   return res.blob();
 }
