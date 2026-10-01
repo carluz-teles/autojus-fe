@@ -3,6 +3,7 @@ import { daysLeftLabel } from "@/features/prazos/lib/labels";
 import { grauProcessoLabel } from "@/features/processos/lib/apresentacao";
 import { formatarData } from "@/lib/utils";
 
+import { briefSummaryResult } from "../services/brief-summary-result";
 import type { IntimacaoGroup, IntimacaoView } from "../types";
 import { estadoIntimacao } from "./estado";
 import { atoPublicacaoLabel, tituloIntimacao } from "./labels";
@@ -97,6 +98,7 @@ export function linhaIntimacao(i: IntimacaoView) {
     // os briefs e até aqui ignorado pela lista, que só mostrava o dump do teor.
     // "" quando a intimação ainda não tem brief; aí o card cai no teor (preview).
     summary: i.brief_summary ?? "",
+    summaryFeedback: briefSummaryResult(i),
     // Teor cru — aparado, porque o BE o corta em ~500 chars no meio da palavra.
     preview: apararTeorTruncado(i.content_preview),
   };

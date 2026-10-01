@@ -12,8 +12,10 @@ type TokenGetter = () => Promise<string | null | undefined>;
 
 export interface ApiRequest {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  /** Serializado como JSON no corpo (não usar com FormData). */
+  /** Valor que o interceptor serializa como JSON (não usar com FormData). */
   body?: unknown;
+  /** JSON já serializado, preservado byte a byte. Exclusivo com body/formData. */
+  serializedJson?: string;
   /**
    * Enviado como multipart/form-data. Exclui `body`.
    * O browser define o Content-Type + boundary automaticamente — NÃO setar
@@ -45,14 +47,20 @@ function buildUrl(path: string, query?: ApiRequest["query"]): string {
  * Fetch tipado + interceptor. ÚNICO ponto de contato com o BE:
  * monta URL/headers, anexa o JWT, e converte qualquer falha em ApiError.
  */
-export async function apiFetch<T>(
+async function apiResponse(
   path: string,
-  req: ApiRequest = {},
-): Promise<T> {
+  req: ApiRequest,
+  policy: {
+    accept?: string;
+    privateBinary?: boolean;
+    observeAI?: boolean;
+  } = {},
+): Promise<Response> {
   const started = typeof window === "undefined" ? 0 : performance.now();
   const {
     method = "GET",
     body,
+    serializedJson,
     formData,
     query,
     signal,
@@ -60,13 +68,24 @@ export async function apiFetch<T>(
     getToken,
   } = req;
 
+  if (
+    serializedJson !== undefined &&
+    (body !== undefined || formData !== undefined)
+  )
+    throw new TypeError(
+      "Use somente um corpo: body, serializedJson ou formData.",
+    );
+
   const finalHeaders: Record<string, string> = {
-    Accept: "application/json",
+    Accept: policy.accept ?? "application/json",
     ...headers,
   };
   // Para JSON body: define Content-Type. Para FormData: NÃO definir — o browser
   // inclui o boundary automaticamente. São mutuamente exclusivos.
-  if (body !== undefined && formData === undefined) {
+  if (
+    (body !== undefined || serializedJson !== undefined) &&
+    formData === undefined
+  ) {
     finalHeaders["Content-Type"] = "application/json";
   }
 
@@ -78,6 +97,8 @@ export async function apiFetch<T>(
   let fetchBody: BodyInit | undefined;
   if (formData !== undefined) {
     fetchBody = formData;
+  } else if (serializedJson !== undefined) {
+    fetchBody = serializedJson;
   } else if (body !== undefined) {
     fetchBody = JSON.stringify(body);
   }
@@ -89,12 +110,15 @@ export async function apiFetch<T>(
       headers: finalHeaders,
       body: fetchBody,
       signal,
+      ...(policy.privateBinary
+        ? { redirect: "error" as const, cache: "no-store" as const }
+        : {}),
     });
   } catch (cause) {
     throw networkError(cause);
   }
 
-  if (isAIRequest(path, method)) {
+  if (policy.observeAI && isAIRequest(path, method)) {
     const operationId = res.headers.get("X-AI-Operation-ID");
     if (operationId) rememberAIRequest(path, operationId, started);
     if (operationId && !res.ok) {
@@ -110,6 +134,13 @@ export async function apiFetch<T>(
   }
   if (!res.ok) throw await apiErrorFromResponse(res);
 
+  return res;
+}
+export async function apiFetch<T>(
+  path: string,
+  req: ApiRequest = {},
+): Promise<T> {
+  const res = await apiResponse(path, req, { observeAI: true });
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
@@ -124,25 +155,82 @@ export async function apiFetchBlob(
   path: string,
   req: ApiRequest = {},
 ): Promise<Blob> {
-  const { query, signal, headers, getToken } = req;
-
-  const finalHeaders: Record<string, string> = { ...headers };
-  if (getToken) {
-    const token = await getToken();
-    if (token) finalHeaders["Authorization"] = `Bearer ${token}`;
-  }
-
-  let res: Response;
-  try {
-    res = await fetch(buildUrl(path, query), {
+  const res = await apiResponse(
+    path,
+    {
+      ...req,
       method: "GET",
-      headers: finalHeaders,
-      signal,
-    });
-  } catch (cause) {
-    throw networkError(cause);
-  }
-
-  if (!res.ok) throw await apiErrorFromResponse(res);
+      body: undefined,
+      serializedJson: undefined,
+      formData: undefined,
+    },
+    { accept: "*/*" },
+  );
   return res.blob();
+}
+
+export interface ApiBinaryRequest extends ApiRequest {
+  maxBytes: number;
+  expectedContentType: string;
+  responseHeaders?: string[];
+}
+export interface ApiBinaryResult {
+  blob: Blob;
+  headers: Record<string, string>;
+}
+
+// Bounded, explicit private transfers. No Response or bearer token escapes this
+// interceptor, and a redirect cannot silently repeat a POST at another origin.
+export async function apiFetchBinary(
+  path: string,
+  req: ApiBinaryRequest,
+): Promise<ApiBinaryResult> {
+  if (!Number.isSafeInteger(req.maxBytes) || req.maxBytes < 1)
+    throw new TypeError("Limite de download inválido.");
+  const res = await apiResponse(path, req, {
+    accept: req.expectedContentType,
+    privateBinary: true,
+  });
+  const type = res.headers.get("Content-Type")?.split(";")[0].trim();
+  const declared = res.headers.get("Content-Length");
+  if (
+    type !== req.expectedContentType ||
+    (declared !== null &&
+      (!/^\d+$/.test(declared) || Number(declared) > req.maxBytes))
+  ) {
+    await res.body?.cancel();
+    throw new Error("Tipo ou tamanho do arquivo inválido.");
+  }
+  if (!res.body) throw new Error("Download sem conteúdo.");
+  const reader = res.body.getReader(),
+    chunks: Uint8Array<ArrayBuffer>[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      req.signal?.throwIfAborted();
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > req.maxBytes)
+        throw new Error("Arquivo excede o limite de download.");
+      chunks.push(new Uint8Array(value));
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw networkError(error);
+  } finally {
+    reader.releaseLock();
+  }
+  req.signal?.throwIfAborted();
+  if (declared !== null && size !== Number(declared))
+    throw new Error("Download incompleto.");
+  return {
+    blob: new Blob(chunks, { type }),
+    headers: Object.fromEntries(
+      (req.responseHeaders ?? []).map((name) => [
+        name.toLowerCase(),
+        res.headers.get(name) ?? "",
+      ]),
+    ),
+  };
 }

@@ -8,25 +8,33 @@ import {
   verifyOrganizationTransition,
 } from "@/lib/auth/organization-transition";
 
-const { getToken, apiFetch } = vi.hoisted(() => ({
+const { getToken, apiFetch, apiFetchBinary } = vi.hoisted(() => ({
   getToken: vi.fn(),
   apiFetch: vi.fn(),
+  apiFetchBinary: vi.fn(),
 }));
 vi.mock("@clerk/nextjs", () => ({
   useAuth: () => ({ orgId: "org_A", getToken }),
 }));
-vi.mock("./client", () => ({ apiFetch, apiFetchBlob: vi.fn() }));
+vi.mock("./client", () => ({
+  apiFetch,
+  apiFetchBlob: vi.fn(),
+  apiFetchBinary,
+}));
 
-import { useApi } from "./use-api";
+import { useApi, useApiBinary } from "./use-api";
 
 let request: ReturnType<typeof useApi>;
+let binary: ReturnType<typeof useApiBinary>;
 let root: Root;
 let host: HTMLDivElement;
 function Probe() {
   const api = useApi();
+  const bytes = useApiBinary();
   useEffect(() => {
     request = api;
-  }, [api]);
+    binary = bytes;
+  }, [api, bytes]);
   return null;
 }
 
@@ -49,6 +57,28 @@ afterEach(async () => {
 });
 
 describe("organization bound API requests", () => {
+  it("discovers internal access before organization verification and rejects a late discovery", async () => {
+    await act(async () => {
+      beginOrganizationTransition();
+    });
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    apiFetch.mockImplementation(async (_path, req) => {
+      await req.getToken();
+      await pending;
+      return { data: { organization_id: "org_A" } };
+    });
+    const result = request("/v1/backoffice/session");
+    await vi.waitFor(() => expect(getToken).toHaveBeenCalled());
+    await act(async () => {
+      beginOrganizationTransition();
+    });
+    release();
+    await expect(result).rejects.toMatchObject({ name: "AbortError" });
+  });
+
   it("does not let an old closure acquire credentials after a switch", async () => {
     const oldRequest = request;
     const generation = beginOrganizationTransition();
@@ -80,4 +110,28 @@ describe("organization bound API requests", () => {
     release();
     await expect(result).rejects.toMatchObject({ name: "AbortError" });
   });
+});
+
+it("rejects late private binary content when the organization changes", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  apiFetchBinary.mockImplementation(async (_path, req) => {
+    await req.getToken();
+    await gate;
+    return { blob: new Blob(["private"]), headers: {} };
+  });
+  const response = binary("/v1/curation/dataset-releases/id/downloads", {
+    method: "POST",
+    body: { request_id: "r" },
+    maxBytes: 10,
+    expectedContentType: "application/zip",
+  });
+  await vi.waitFor(() => expect(getToken).toHaveBeenCalled());
+  await act(async () => {
+    beginOrganizationTransition();
+  });
+  release();
+  await expect(response).rejects.toMatchObject({ name: "AbortError" });
 });

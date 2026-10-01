@@ -264,6 +264,8 @@ export interface IntimacaoView {
   brief_work_kind: IntimacaoBriefWorkKind | "";
   /** "O que aconteceu" — texto livre do brief; "" quando não há brief ainda. */
   brief_summary: string;
+  /** Identity of the displayed summary, independent from the current analysis. */
+  brief_summary_result_id?: string;
 }
 
 // RecommendedProvidencia é o subset enxuto da 1ª providência que a LISTA carrega (o conjunto
@@ -388,6 +390,8 @@ interface IntimacaoAnaliseCandidate {
  * (que é a view persistida, materializada assincronamente após esta resposta).
  */
 export interface IntimacaoAnalise {
+  ai_result_id?: string;
+  result_origin?: "ai_with_rules";
   providencias: IntimacaoAnaliseCandidate[];
   /** ISO timestamp de quando a análise foi (re)gerada. */
   analyzed_at: string;
@@ -445,6 +449,8 @@ export interface IntimacaoDetalheView extends IntimacaoView {
   /** Providências PERSISTIDAS (action_item) — sempre array (nunca null); vazio
    *  antes da análise ou enquanto a materialização assíncrona não rodou ainda
    *  (ver heurística de poll em useIntimacaoDetalhe). */
+  ai_analysis_result?: unknown;
+  deadline_classification_result?: unknown;
   ai_providencias: IntimacaoProvidencia[];
   /**
    * ISO timestamp da última análise IA; null = pré-análise (o card mostra o CTA);

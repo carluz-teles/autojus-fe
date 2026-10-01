@@ -1,10 +1,13 @@
+import {
+  type BriefSummaryResult,
+  briefSummaryResult,
+} from "@/features/intimacoes/services/brief-summary-result";
 // Mapeamento IntimacaoView (read model do BE) → props das linhas densas da
 // Triagem-pipeline. Fonte ÚNICA da tradução "linha real → UI da pipeline" (Regra
 // nº1): o componente de apresentação não conhece o shape do BE; a view não repete
 // derivação. Os sinais U0 (categoria_coarse/acionabilidade/provisorio/lifecycle/
 // is_excecao/excecao_motivo) já vêm prontos do BE — aqui só rotulamos e derivamos
 // urgência a partir do prazo (mesma regra da listagem: estado.ts/lib/listagem.ts).
-
 import { formatarCNJ } from "@/features/prazos/lib/detalhe-apresentacao";
 import { grauProcessoLabelOuVazio } from "@/features/processos/lib/apresentacao";
 import { formatarData } from "@/lib/utils";
@@ -145,6 +148,7 @@ export interface PipelineRow {
   // no PipelineRow quando P1-1 (Disposição, que É onde a spec usa requires_work) precisar.
   /** brief_summary — "o que aconteceu" em 1 linha; "" quando não há brief ainda. */
   summary: string;
+  summaryFeedback?: BriefSummaryResult | null;
   /** Título serif — o mesmo builder do read model (title já vem do BE). */
   title: string;
   /** Meta mono: "CNJ · Tribunal · Grau". */
@@ -222,6 +226,7 @@ export function pipelineRow(i: IntimacaoView): PipelineRow {
     categoriaLabel: chipLabel,
     demandLabel,
     summary: i.brief_summary,
+    summaryFeedback: briefSummaryResult(i),
     title: tituloIntimacao(i.title),
     meta: [formatarCNJ(i.cnj_number), i.court, grau]
       .filter(Boolean)

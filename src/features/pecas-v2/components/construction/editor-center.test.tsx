@@ -3,7 +3,7 @@ import { act, createRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Draft } from "../../types";
+import { draftFixture } from "../../__tests__/fixtures";
 import type { RichEditorHandle } from "../rich-editor/rich-editor";
 import { EditorCenter } from "./editor-center";
 
@@ -25,12 +25,12 @@ describe("EditorCenter authoritative clean hydration", () => {
   it("mounts the full final body when its accepted hydration replaces an interim version, without emitting save", async () => {
     const ref = createRef<RichEditorHandle>();
     const onChange = vi.fn();
-    const draft = {
+    const draft = draftFixture({
       status: "DRAFT",
       contentHtml: "<p>Interim</p>",
       preamble: { paragraphs: [] },
       sections: [],
-    } as Draft;
+    });
     await act(async () =>
       root.render(
         <EditorCenter

@@ -37,6 +37,8 @@ import { Input } from "@/components/ui/input";
 import { MENU_ANIM } from "@/components/ui/menu-styles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonDetail } from "@/components/ui/skeletons";
+import { AnalysisResult } from "@/features/intimacoes/components/analysis-result";
+import { ClassificationResult } from "@/features/intimacoes/components/classification-result";
 import { useFilaNavigation } from "@/features/intimacoes/hooks/use-fila-navigation";
 import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
 import { Responsavel } from "@/features/organization/components/responsavel";
@@ -1319,35 +1321,40 @@ function Disposicao({
   // "Revisar tipo"/"Revisar prazo" e as providências são ações POR ITEM —
   // disponíveis nas duas telas (ver capacidadesDoModo).
   return (
-    <DisposicaoSection
-      compacto={compacto}
-      readOnly={!capacidadesDoModo(modo).executar}
-      intimationId={m.id}
-      providencias={m.providencias}
-      analyzing={det.analisando}
-      analysisError={det.analiseErro}
-      analysisProcessingTimeout={det.analiseTimeout}
-      analyzed={m.analisada}
-      onAnalyze={det.onAnalisar}
-      reviewBlocked={bloqueiaProvidencias(
-        det.prazoDetalhe,
-        det.intimacao?.estado ?? "",
-      )}
-      checkingReview={det.memoriaPending || det.memoriaErro}
-      resolvida={m.userStatus === "RESOLVED"}
-      ato={det.intimacao?.ai_act ?? ""}
-      tipoLabel={m.tipoLabel}
-      assunto={m.assunto}
-      summary={det.intimacao?.brief_summary ?? ""}
-      demandKind={det.intimacao?.brief_demand_kind ?? ""}
-      demandDetail={det.intimacao?.brief_demand_detail ?? null}
-      demandTargetRole={det.intimacao?.brief_demand_target_role ?? null}
-      disposicaoBE={det.intimacao?.disposicao}
-      agreementState={det.intimacao?.agreement_state}
-      prazo={det.prazoDetalhe}
-      origemLabel={det.memoria?.origem?.label ?? null}
-      acionabilidade={det.intimacao?.acionabilidade}
-    />
+    <>
+      <DisposicaoSection
+        compacto={compacto}
+        readOnly={!capacidadesDoModo(modo).executar}
+        intimationId={m.id}
+        providencias={m.providencias}
+        analyzing={det.analisando}
+        analysisError={det.analiseErro}
+        analysisProcessingTimeout={det.analiseTimeout}
+        analyzed={m.analisada}
+        onAnalyze={det.onAnalisar}
+        reviewBlocked={bloqueiaProvidencias(
+          det.prazoDetalhe,
+          det.intimacao?.estado ?? "",
+        )}
+        checkingReview={det.memoriaPending || det.memoriaErro}
+        resolvida={m.userStatus === "RESOLVED"}
+        ato={det.intimacao?.ai_act ?? ""}
+        tipoLabel={m.tipoLabel}
+        assunto={m.assunto}
+        summary={det.intimacao?.brief_summary ?? ""}
+        summaryFeedback={det.summaryFeedback}
+        demandKind={det.intimacao?.brief_demand_kind ?? ""}
+        demandDetail={det.intimacao?.brief_demand_detail ?? null}
+        demandTargetRole={det.intimacao?.brief_demand_target_role ?? null}
+        disposicaoBE={det.intimacao?.disposicao}
+        agreementState={det.intimacao?.agreement_state}
+        prazo={det.prazoDetalhe}
+        origemLabel={det.memoria?.origem?.label ?? null}
+        acionabilidade={det.intimacao?.acionabilidade}
+      />
+      <ClassificationResult result={det.classificationResult} />
+      <AnalysisResult result={det.analysisResult} />
+    </>
   );
 }
 

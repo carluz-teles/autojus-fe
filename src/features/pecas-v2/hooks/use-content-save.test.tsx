@@ -4,6 +4,7 @@ import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { draftFixture } from "../__tests__/fixtures";
 import type { Draft } from "../types";
 import { useContentSave } from "./use-content-save";
 import { draftKeys, useDraft } from "./use-draft";
@@ -16,7 +17,7 @@ vi.mock("../services/pecas-v2.service", async (original) => ({
 }));
 
 function draft(version: string, revision: string, html: string, second = 0) {
-  return {
+  return draftFixture({
     id: "draft-1",
     status: "DRAFT",
     sagaState: "DRAFTED",
@@ -24,7 +25,7 @@ function draft(version: string, revision: string, html: string, second = 0) {
     contentRevision: revision,
     contentHtml: html,
     updatedAt: `2026-09-25T04:00:${String(second).padStart(2, "0")}Z`,
-  } as Draft;
+  });
 }
 
 function deferred<T>() {
@@ -65,7 +66,7 @@ describe("useContentSave server body/revision reconciliation", () => {
   let client: QueryClient;
   let root: Root;
   let host: HTMLDivElement;
-  let hydrate: ReturnType<typeof vi.fn>;
+  let hydrate: ReturnType<typeof vi.fn<(html: string) => void>>;
   const interim = draft("v1", "r1", "<p>Interim</p>");
   const final = draft("v2", "r2", "<p>Final completo</p>", 10);
   async function render(value: Draft) {

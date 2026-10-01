@@ -22,18 +22,21 @@ export class ApiError extends Error {
   readonly kind: ApiErrorKind;
   readonly status: number;
   readonly details?: unknown;
+  readonly retryAfterSeconds?: number;
 
   constructor(
     kind: ApiErrorKind,
     message: string,
     status: number,
     details?: unknown,
+    retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "ApiError";
     this.kind = kind;
     this.status = status;
     this.details = details;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 
   get isAuth() {
@@ -91,7 +94,20 @@ export async function apiErrorFromResponse(res: Response): Promise<ApiError> {
   const kind = normalizeKind(body.kind, res.status);
   const message =
     body.message?.trim() || res.statusText || "Erro na requisição";
-  return new ApiError(kind, message, res.status, body.details);
+  const retry = res.headers.get("Retry-After");
+  const delay =
+    retry === null
+      ? NaN
+      : /^\d+$/.test(retry.trim())
+        ? Number(retry)
+        : Math.ceil((Date.parse(retry) - Date.now()) / 1000);
+  return new ApiError(
+    kind,
+    message,
+    res.status,
+    body.details,
+    Number.isFinite(delay) && delay >= 0 ? delay : undefined,
+  );
 }
 
 /** Falha de transporte (fetch rejeitou: offline, DNS, CORS). */

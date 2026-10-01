@@ -1,0 +1,865 @@
+{
+  "text": "Manifeste-se a parte autora sobre o endereço do réu, em 15 dias úteis. Audiência em 2026-10-20.",
+  "contract": {
+    "schema_version": "intimation-label-v1",
+    "catalog_version": "synthetic-catalog-v1",
+    "normalization_version": "raw-utf8-v1",
+    "act_types": ["manifestacao_generica", "ciencia"],
+    "legal_rules": {
+      "synthetic-rule@v1": {
+        "quantity": 15,
+        "unit": "business_days",
+        "anchor_event": "publication",
+        "start_rule": "next_business_day"
+      }
+    }
+  },
+  "cases": [
+    {
+      "name": "explicit_without_invented_due_date",
+      "valid": true,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "partial",
+          "missing_context": ["publication_date", "court_calendar"],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "explicit",
+                "quantity": 15,
+                "unit": "business_days",
+                "evidence": {
+                  "quote": "15 dias úteis",
+                  "start": 58,
+                  "end": 72
+                },
+                "anchor_event": "publication",
+                "start_rule": "next_business_day",
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "missing_context",
+                "legal_rule_ref": null,
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": null
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "unknown_catalog",
+      "valid": false,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "old",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "partial",
+          "missing_context": ["publication_date", "court_calendar"],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "explicit",
+                "quantity": 15,
+                "unit": "business_days",
+                "evidence": {
+                  "quote": "15 dias úteis",
+                  "start": 58,
+                  "end": 72
+                },
+                "anchor_event": "publication",
+                "start_rule": "next_business_day",
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "missing_context",
+                "legal_rule_ref": null,
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": null
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "another_snapshot",
+      "valid": false,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "label": {
+          "answerability": "partial",
+          "missing_context": ["publication_date", "court_calendar"],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "explicit",
+                "quantity": 15,
+                "unit": "business_days",
+                "evidence": {
+                  "quote": "15 dias úteis",
+                  "start": 58,
+                  "end": 72
+                },
+                "anchor_event": "publication",
+                "start_rule": "next_business_day",
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "missing_context",
+                "legal_rule_ref": null,
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": null
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "invented_act",
+      "valid": false,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "partial",
+          "missing_context": ["publication_date", "court_calendar"],
+          "acts": [
+            {
+              "act_type": "invented",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "explicit",
+                "quantity": 15,
+                "unit": "business_days",
+                "evidence": {
+                  "quote": "15 dias úteis",
+                  "start": 58,
+                  "end": 72
+                },
+                "anchor_event": "publication",
+                "start_rule": "next_business_day",
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "missing_context",
+                "legal_rule_ref": null,
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": null
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "utf16_instead_of_utf8_offsets",
+      "valid": false,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "partial",
+          "missing_context": ["publication_date", "court_calendar"],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "explicit",
+                "quantity": 15,
+                "unit": "business_days",
+                "evidence": {
+                  "quote": "15 dias úteis",
+                  "start": 55,
+                  "end": 72
+                },
+                "anchor_event": "publication",
+                "start_rule": "next_business_day",
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "missing_context",
+                "legal_rule_ref": null,
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": null
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "invented_quote",
+      "valid": false,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "partial",
+          "missing_context": ["publication_date", "court_calendar"],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "explicit",
+                "quantity": 15,
+                "unit": "business_days",
+                "evidence": {
+                  "quote": "10 dias úteis",
+                  "start": 58,
+                  "end": 72
+                },
+                "anchor_event": "publication",
+                "start_rule": "next_business_day",
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "missing_context",
+                "legal_rule_ref": null,
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": null
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "zero_is_not_none",
+      "valid": false,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "partial",
+          "missing_context": ["publication_date", "court_calendar"],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "explicit",
+                "quantity": 0,
+                "unit": "business_days",
+                "evidence": {
+                  "quote": "15 dias úteis",
+                  "start": 58,
+                  "end": 72
+                },
+                "anchor_event": "publication",
+                "start_rule": "next_business_day",
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "missing_context",
+                "legal_rule_ref": null,
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": null
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "unknown_field",
+      "valid": false,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "partial",
+          "missing_context": ["publication_date", "court_calendar"],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "explicit",
+                "quantity": 15,
+                "unit": "business_days",
+                "evidence": {
+                  "quote": "15 dias úteis",
+                  "start": 58,
+                  "end": 72
+                },
+                "anchor_event": "publication",
+                "start_rule": "next_business_day",
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "missing_context",
+                "legal_rule_ref": null,
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": null
+              }
+            }
+          ],
+          "abstention_reason": null
+        },
+        "confidence": 0.99
+      }
+    },
+    {
+      "name": "incomplete_marked_determinate",
+      "valid": false,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "determinate",
+          "missing_context": [],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "explicit",
+                "quantity": 15,
+                "unit": "business_days",
+                "evidence": {
+                  "quote": "15 dias úteis",
+                  "start": 58,
+                  "end": 72
+                },
+                "anchor_event": "publication",
+                "start_rule": "next_business_day",
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "missing_context",
+                "legal_rule_ref": null,
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": null
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "multi_act",
+      "valid": true,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "partial",
+          "missing_context": ["publication_date", "court_calendar"],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "explicit",
+                "quantity": 15,
+                "unit": "business_days",
+                "evidence": {
+                  "quote": "15 dias úteis",
+                  "start": 58,
+                  "end": 72
+                },
+                "anchor_event": "publication",
+                "start_rule": "next_business_day",
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "missing_context",
+                "legal_rule_ref": null,
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": null
+              }
+            },
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "explicit",
+                "quantity": 15,
+                "unit": "business_days",
+                "evidence": {
+                  "quote": "15 dias úteis",
+                  "start": 58,
+                  "end": 72
+                },
+                "anchor_event": "publication",
+                "start_rule": "next_business_day",
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "missing_context",
+                "legal_rule_ref": null,
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": null
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "valid_rule",
+      "valid": true,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "partial",
+          "missing_context": ["publication_date", "court_calendar"],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "legal_rule",
+                "quantity": 15,
+                "unit": "business_days",
+                "evidence": null,
+                "anchor_event": "publication",
+                "start_rule": "next_business_day",
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "missing_context",
+                "legal_rule_ref": "synthetic-rule@v1",
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": null
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "invented_rule",
+      "valid": false,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "partial",
+          "missing_context": ["publication_date", "court_calendar"],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "legal_rule",
+                "quantity": 15,
+                "unit": "business_days",
+                "evidence": null,
+                "anchor_event": "publication",
+                "start_rule": "next_business_day",
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "missing_context",
+                "legal_rule_ref": "unapproved",
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": null
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "incorrect_rule_quantity",
+      "valid": false,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "partial",
+          "missing_context": ["publication_date", "court_calendar"],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "legal_rule",
+                "quantity": 30,
+                "unit": "business_days",
+                "evidence": {
+                  "quote": "15 dias úteis",
+                  "start": 58,
+                  "end": 72
+                },
+                "anchor_event": "publication",
+                "start_rule": "next_business_day",
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "missing_context",
+                "legal_rule_ref": "synthetic-rule@v1",
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": null
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "fabricated_due_date_without_calendar",
+      "valid": false,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "partial",
+          "missing_context": ["publication_date", "court_calendar"],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "explicit",
+                "quantity": 15,
+                "unit": "business_days",
+                "evidence": {
+                  "quote": "15 dias úteis",
+                  "start": 58,
+                  "end": 72
+                },
+                "anchor_event": "publication",
+                "start_rule": "next_business_day",
+                "anchor_date": null,
+                "due_date": "2026-10-20",
+                "date_status": "calculated",
+                "legal_rule_ref": null,
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": null
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "insufficient_is_legitimate",
+      "valid": true,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "insufficient",
+          "missing_context": ["complete_notice"],
+          "acts": [],
+          "abstention_reason": "Trecho incompleto para identificar o ato."
+        }
+      }
+    },
+    {
+      "name": "insufficient_without_reason",
+      "valid": false,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "insufficient",
+          "missing_context": ["publication_date", "court_calendar"],
+          "acts": [],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "none_is_distinct_from_unknown",
+      "valid": true,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "determinate",
+          "missing_context": [],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "none",
+                "quantity": null,
+                "unit": null,
+                "evidence": null,
+                "anchor_event": null,
+                "start_rule": null,
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "not_applicable",
+                "legal_rule_ref": null,
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": "Fixture sintética"
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "unknown",
+      "valid": true,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "partial",
+          "missing_context": ["publication_date", "court_calendar"],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "unknown",
+                "quantity": null,
+                "unit": null,
+                "evidence": null,
+                "anchor_event": null,
+                "start_rule": null,
+                "anchor_date": null,
+                "due_date": null,
+                "date_status": "missing_context",
+                "legal_rule_ref": null,
+                "calendar_ref": null,
+                "event": null,
+                "condition": null,
+                "reason": "Fixture sintética"
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    },
+    {
+      "name": "scheduled_event",
+      "valid": true,
+      "annotation": {
+        "schema_version": "intimation-label-v1",
+        "catalog_version": "synthetic-catalog-v1",
+        "normalization_version": "raw-utf8-v1",
+        "snapshot_digest": "68f664184054471383023a05db846aa901df9e0b297bd443b0b5e04ffff478d2",
+        "label": {
+          "answerability": "determinate",
+          "missing_context": [],
+          "acts": [
+            {
+              "act_type": "manifestacao_generica",
+              "recipient": "client",
+              "actionability": "duty",
+              "evidence": {
+                "quote": "Manifeste-se a parte autora sobre o endereço do réu",
+                "start": 0,
+                "end": 53
+              },
+              "deadline": {
+                "kind": "scheduled_date",
+                "quantity": null,
+                "unit": null,
+                "evidence": {
+                  "quote": "Audiência em 2026-10-20",
+                  "start": 74,
+                  "end": 98
+                },
+                "anchor_event": null,
+                "start_rule": null,
+                "anchor_date": null,
+                "due_date": "2026-10-20",
+                "date_status": "specified",
+                "legal_rule_ref": null,
+                "calendar_ref": null,
+                "event": "hearing",
+                "condition": null,
+                "reason": null
+              }
+            }
+          ],
+          "abstention_reason": null
+        }
+      }
+    }
+  ]
+}

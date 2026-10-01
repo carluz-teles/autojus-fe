@@ -26,9 +26,11 @@ import { AutosFetchingBadge } from "@/features/configuracoes/components/autos-fe
 import { SyncAutosButton } from "@/features/configuracoes/components/sync-autos-button";
 import { AutosTree } from "@/features/documentos/components/autos-tree";
 import { PdfDrawer } from "@/features/documentos/components/pdf-drawer";
+import { BriefSummaryFeedback } from "@/features/intimacoes/components/brief-summary-feedback";
 import { CourtAccessNotice } from "@/features/onboarding/components/court-access-notice";
 import { Responsavel } from "@/features/organization/components/responsavel";
 import { ResponsavelMenu } from "@/features/organization/components/responsavel-menu";
+import { ProcessResume } from "@/features/processos/components/process-resume";
 import { ProximoPassoCard } from "@/features/processos/components/proximo-passo-card";
 import { ProcessoSituacao } from "@/features/processos/components/situacao-processo";
 import {
@@ -115,51 +117,57 @@ function Registros({ items }: { items: RegistroProcesso[] }) {
   return (
     <div className="divide-y">
       {items.map((item) => (
-        <Link
-          key={item.id}
-          href={item.href || "#"}
-          className="hover:bg-muted/40 focus-visible:ring-ring/50 flex flex-col gap-3 rounded-xl px-3 py-4 transition-colors outline-none focus-visible:ring-3 sm:flex-row sm:items-start sm:justify-between"
-        >
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-display text-base font-medium">
-                {item.titulo}
-              </h3>
-              <Badge variant={item.variant}>{item.status}</Badge>
-            </div>
-            {item.descricao && (
-              <TeorContent
-                content={item.descricao}
-                allowLinks={false}
-                className="text-muted-foreground mt-1 line-clamp-2 text-[13px] leading-relaxed"
-              />
-            )}
-            <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-              {item.meta}
-            </p>
-            {item.responsavel && (
-              <Responsavel
-                className="mt-2"
-                value={item.responsavel.id}
-                nome={item.responsavel.nome}
-              />
-            )}
-          </div>
-          <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-end">
-            {item.prazo && (
-              <div className="flex flex-col gap-1 sm:text-right">
-                <p className="text-sm font-medium tabular-nums">
-                  {item.prazo.data}
-                </p>
-                <Badge variant={item.prazo.variant}>{item.prazo.label}</Badge>
+        <article key={item.id}>
+          <Link
+            href={item.href || "#"}
+            className="hover:bg-muted/40 focus-visible:ring-ring/50 flex flex-col gap-3 rounded-xl px-3 py-4 transition-colors outline-none focus-visible:ring-3 sm:flex-row sm:items-start sm:justify-between"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-display text-base font-medium">
+                  {item.titulo}
+                </h3>
+                <Badge variant={item.variant}>{item.status}</Badge>
               </div>
-            )}
-            <ArrowRight
-              aria-hidden="true"
-              className="text-muted-foreground size-4 shrink-0"
-            />
-          </div>
-        </Link>
+              {item.descricao && (
+                <TeorContent
+                  content={item.descricao}
+                  allowLinks={false}
+                  className="text-muted-foreground mt-1 line-clamp-2 text-[13px] leading-relaxed"
+                />
+              )}
+              <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                {item.meta}
+              </p>
+              {item.responsavel && (
+                <Responsavel
+                  className="mt-2"
+                  value={item.responsavel.id}
+                  nome={item.responsavel.nome}
+                />
+              )}
+            </div>
+            <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-end">
+              {item.prazo && (
+                <div className="flex flex-col gap-1 sm:text-right">
+                  <p className="text-sm font-medium tabular-nums">
+                    {item.prazo.data}
+                  </p>
+                  <Badge variant={item.prazo.variant}>{item.prazo.label}</Badge>
+                </div>
+              )}
+              <ArrowRight
+                aria-hidden="true"
+                className="text-muted-foreground size-4 shrink-0"
+              />
+            </div>
+          </Link>
+          {item.summaryFeedback ? (
+            <div className="px-3 pb-4">
+              <BriefSummaryFeedback result={item.summaryFeedback} />
+            </div>
+          ) : null}
+        </article>
       ))}
     </div>
   );
@@ -284,6 +292,8 @@ export function ProcessoHub({ numero }: { numero: string }) {
                 </Fato>
               </dl>
             </section>
+
+            <ProcessResume processId={p.id} />
 
             {/* Hero único: o próximo passo absorve o prazo mais próximo (data + badge
                 + ato). A faixa "Prazo em atenção" vira fallback só quando o motor não

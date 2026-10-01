@@ -1,0 +1,338 @@
+import type {
+  EvaluationDelivery,
+  EvaluationPlan,
+  EvaluationPreview,
+  EvaluationRun,
+} from "../services/evaluation-schemas";
+import type {
+  FreezeEvaluationCommand,
+  ReportEvaluationCommand,
+  RunEvaluationCommand,
+} from "../services/evaluations";
+
+export function evaluationFixture() {
+  const ids = {
+    release: "11111111-1111-4111-8111-111111111111",
+    plan: "22222222-2222-4222-8222-222222222222",
+    run: "33333333-3333-4333-8333-333333333333",
+    request: "44444444-4444-4444-8444-444444444444",
+    report: "55555555-5555-4555-8555-555555555555",
+    delivery: "66666666-6666-4666-8666-666666666666",
+    task: "77777777-7777-4777-8777-777777777777",
+    gold: "88888888-8888-4888-8888-888888888888",
+  };
+  const preview = {
+    digest: "a".repeat(64),
+    selection: {
+      release_id: ids.release,
+      expected_manifest_digest: "b".repeat(64),
+      split: "validation",
+      limits: {
+        max_cases: 1,
+        max_http_calls: 1,
+        max_output_tokens: 100,
+        concurrency: 1,
+      },
+    },
+    route: {
+      task: "curation.annotate_intimation",
+      model: "synthetic/model",
+      prompt_version: "intimation-inference-v1",
+      max_tokens: 100,
+    },
+    route_digest: "c".repeat(64),
+    evaluator_version: "intimation-dimensions-v1",
+    origin: "synthetic",
+    case_count: 1,
+    planned_http_calls: 1,
+    planned_output_tokens: 100,
+  } satisfies EvaluationPreview;
+  const plan: EvaluationPlan = {
+    id: ids.plan,
+    request_id: ids.request,
+    definition_digest: preview.digest,
+    preview,
+    state: "frozen",
+    frozen_at: "2026-10-01T00:00:00Z",
+    eligible: true,
+    blockers: [],
+    execution_available: true,
+    idempotent_replay: false,
+  };
+  const telemetry = {
+    known_cost_cases: 0,
+    unknown_cost_cases: 1,
+    observed_cost_usd: "0",
+    total_cost_usd: null,
+    known_latency_cases: 0,
+    unknown_latency_cases: 1,
+    latency_ms_sum: 0,
+    known_call_cases: 0,
+    unknown_call_cases: 1,
+    observed_http_calls: 0,
+  };
+  const run: EvaluationRun = {
+    report_available: true,
+    id: ids.run,
+    plan_id: ids.plan,
+    request_id: ids.request,
+    definition_digest: preview.digest,
+    state: "uncertain",
+    failure_code: "worker_expired",
+    requested_at: plan.frozen_at,
+    finished_at: plan.frozen_at,
+    reserved_http_calls: 1,
+    reserved_output_tokens: 100,
+    case_counts: { uncertain: 1 },
+    telemetry,
+    eligible: true,
+    blockers: [],
+    idempotent_replay: false,
+  };
+  const dimension = {
+    known_targets: 1,
+    correct: 0,
+    incorrect: 0,
+    abstained: 0,
+    unavailable: 1,
+    unmatched: 0,
+    unknown_targets: 0,
+    appropriate_abstentions: 0,
+    unsupported: 0,
+    not_applicable: 0,
+  };
+  const metrics = {
+    cases: 1,
+    groups: 1,
+    coverage: "measured",
+    outcomes: { uncertain: 1 },
+    dimensions: { act_type: dimension },
+    critical_candidates: {},
+    cases_with_critical_candidate: 0,
+    all_scored_dimensions_correct: 0,
+    expected_total_abstentions: 0,
+    appropriate_total_abstentions: 0,
+    telemetry,
+  };
+  const delivery = {
+    digest: "d".repeat(64),
+    request_id: ids.request,
+    delivery_id: ids.delivery,
+    idempotent_replay: false,
+    report: {
+      schema_version: "intimation-run-report-v1",
+      id: ids.report,
+      run_id: ids.run,
+      plan_id: ids.plan,
+      release_id: ids.release,
+      definition_digest: preview.digest,
+      source_manifest_digest: preview.selection.expected_manifest_digest,
+      selected_records_digest: "e".repeat(64),
+      route_digest: preview.route_digest,
+      split: "validation",
+      run_state: "uncertain",
+      generated_at: plan.frozen_at,
+      reserved_http_calls: 1,
+      reserved_output_tokens: 100,
+      failure_codes: { worker_expired: 1 },
+      cases: [
+        {
+          task_id: ids.task,
+          gold_revision_id: ids.gold,
+          gold_digest: "f".repeat(64),
+          input_digest: "a".repeat(64),
+          prepared_digest: "a".repeat(64),
+          outcome: "uncertain",
+          failure_code: "worker_expired",
+          reserved: true,
+          receipt_digest: null,
+          receipt_late: null,
+        },
+      ],
+      evaluation: {
+        schema_version: "intimation-evaluation-v1",
+        policy_version: "intimation-dimensions-v1",
+        status: "measured",
+        weighting: "unweighted_descriptive",
+        execution_evidence: "server_recorded",
+        production_approved: false,
+        pipeline: {
+          id: "canonical-intimation-inference",
+          task: preview.route.task,
+          model: preview.route.model,
+          prompt_version: preview.route.prompt_version,
+          configuration_digest: preview.route_digest,
+        },
+        origin: "synthetic",
+        selected_split: "validation",
+        other_splits: { train: 0, test: 0 },
+        metrics,
+        strata: { rare: metrics },
+        qualities: { independent: 1 },
+        samples: [
+          {
+            id: ids.gold,
+            group_digest: "f".repeat(64),
+            stratum: "rare",
+            quality: "independent",
+            inclusion_numerator: 1,
+            inclusion_denominator: 2,
+            telemetry,
+            evaluation: {
+              policy_version: "intimation-dimensions-v1",
+              outcome: "uncertain",
+              gold_acts: 1,
+              prediction_acts: 0,
+              matched_acts: 0,
+              unmatched_gold_acts: 1,
+              unmatched_prediction_acts: 0,
+              ambiguous_alignment: false,
+              expected_total_abstention: false,
+              predicted_total_abstention: false,
+              appropriate_total_abstention: false,
+              all_scored_dimensions_correct: false,
+              dimensions: { act_type: dimension },
+              critical_candidates: [],
+            },
+          },
+        ],
+      },
+    },
+  } satisfies EvaluationDelivery;
+  const freeze: FreezeEvaluationCommand = {
+    request_id: ids.request,
+    selection: preview.selection,
+    expected_preview_digest: preview.digest,
+    confirmed: true,
+  };
+  const runCommand: RunEvaluationCommand = {
+    plan: ids.plan,
+    body: {
+      request_id: ids.request,
+      expected_definition_digest: plan.definition_digest,
+      confirmed: true,
+    },
+  };
+  const reportCommand: ReportEvaluationCommand = {
+    run: ids.run,
+    plan: ids.plan,
+    body: {
+      request_id: ids.request,
+      expected_definition_digest: plan.definition_digest,
+      confirmed_exposure: true,
+    },
+  };
+  return {
+    ids,
+    preview,
+    plan,
+    run,
+    delivery,
+    freeze,
+    runCommand,
+    reportCommand,
+  };
+}
+
+export function typeEvaluationFixture() {
+  const f = evaluationFixture();
+  const { evaluation: canonical, ...base } = f.delivery.report;
+  const telemetry = {
+    ...f.run.telemetry,
+    known_cost_cases: 1,
+    unknown_cost_cases: 0,
+    total_cost_usd: "0",
+    known_call_cases: 1,
+    unknown_call_cases: 0,
+  };
+  const type = {
+    known_targets: 0,
+    correct: 0,
+    incorrect: 0,
+    abstained: 0,
+    unavailable: 0,
+    unmatched: 0,
+    unknown_targets: 1,
+    appropriate_abstentions: 1,
+    unsupported: 0,
+    not_applicable: 0,
+  };
+  const metrics = {
+    cases: 1,
+    groups: 1,
+    coverage: "single_group" as const,
+    outcomes: { completed: 1 },
+    type,
+    expected_abstentions: 1,
+    appropriate_abstentions: 1,
+    resolved_predictions: 0,
+    critical_candidates: {},
+    telemetry,
+  };
+  const delivery = {
+    ...f.delivery,
+    report: {
+      ...base,
+      schema_version: "intimation-type-run-report-v1",
+      run_state: "completed",
+      reserved_http_calls: 0,
+      reserved_output_tokens: 0,
+      failure_codes: {},
+      cases: base.cases.map((c) => ({
+        ...c,
+        outcome: "completed" as const,
+        failure_code: null,
+        receipt_digest: "c".repeat(64),
+        receipt_late: false,
+      })),
+      type_evaluation: {
+        schema_version: "intimation-type-evaluation-v1",
+        policy_version: "type-projection-v1",
+        scope: "commercial_type_projection_only",
+        status: "measured",
+        weighting: "unweighted_descriptive",
+        execution_evidence: "server_recorded",
+        production_approved: false,
+        pipeline: {
+          id: "deterministic",
+          task: "deadline.classify_type",
+          model: "",
+          prompt_version: "deadline-type-pipeline-v1",
+          configuration_digest: base.route_digest,
+        },
+        origin: "synthetic",
+        selected_split: "validation",
+        other_splits: { train: 0, test: 0 },
+        metrics,
+        strata: { rare: metrics },
+        qualities: { blind_control: 1 },
+        samples: [
+          {
+            ...canonical.samples[0],
+            quality: "blind_control",
+            telemetry,
+            evaluation: {
+              policy_version: "type-projection-v1",
+              outcome: "completed",
+              target: { abstention_reason: "insufficient_context" },
+              prediction: {
+                act_type: "indeterminado",
+                actionability: "unresolved",
+                origin: "indeterminado",
+                type_requires_review: true,
+                interest_requires_review: true,
+                procedure_override: "",
+              },
+              resolved: false,
+              expected_abstention: true,
+              appropriate_abstention: true,
+              type,
+              critical_candidates: [],
+            },
+          },
+        ],
+      },
+    },
+  } satisfies EvaluationDelivery;
+  return { ...f, delivery };
+}

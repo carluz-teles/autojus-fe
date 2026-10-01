@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type * as IntimacoesModule from "@/features/intimacoes/hooks/use-intimacoes";
 import type { IntimacaoView } from "@/features/intimacoes/types";
 import { useTriagemPipeline } from "@/features/triagem/hooks/use-triagem-pipeline";
 
@@ -21,7 +22,7 @@ vi.mock("sonner", () => ({
   toast: { success: mocks.toastSuccess, error: mocks.toastError },
 }));
 vi.mock("@/features/intimacoes/hooks/use-intimacoes", async (original) => {
-  const actual = await original();
+  const actual = await original<typeof IntimacoesModule>();
   return {
     ...actual,
     useIntimacoes: () => ({

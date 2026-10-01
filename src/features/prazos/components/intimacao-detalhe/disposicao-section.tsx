@@ -25,11 +25,13 @@ import { Button } from "@/components/ui/button";
 import { ProvidenciaFulfillment } from "@/features/action-items/components/providencia-fulfillment";
 import { hasActionableFulfillment } from "@/features/action-items/lib/fulfillment";
 import type { ProvidenciaFulfillment as ProvidenciaFulfillmentType } from "@/features/action-items/types";
+import { BriefSummaryFeedback } from "@/features/intimacoes/components/brief-summary-feedback";
 import {
   demandKindLabel,
   demandTargetRoleLabel,
 } from "@/features/intimacoes/lib/demand-kind";
 import { tipoAtoLabel } from "@/features/intimacoes/lib/tipo-ato";
+import type { BriefSummaryResult } from "@/features/intimacoes/services/brief-summary-result";
 import type {
   BriefDemandTargetRole,
   IntimacaoAcionabilidade,
@@ -151,6 +153,7 @@ export function DisposicaoSection({
   tipoLabel,
   assunto,
   summary = "",
+  summaryFeedback = null,
   demandKind = "",
   demandDetail = null,
   demandTargetRole = null,
@@ -182,6 +185,7 @@ export function DisposicaoSection({
    *  a chip secundário; "" (sem brief ainda) preserva o comportamento anterior
    *  (`ato || tipoLabel` como frase principal). */
   summary?: string;
+  summaryFeedback?: BriefSummaryResult | null;
   /** brief_demand_kind — O QUE a intimação exige (P1-1). "" = sem brief ainda;
    *  "none"/"undetermined" são estados, não demanda, e não rendem bloco. */
   demandKind?: IntimacaoDemandKind | "";
@@ -390,6 +394,7 @@ export function DisposicaoSection({
               <p className="font-display text-lg leading-snug font-medium">
                 {summary || ato || tipoLabel}
               </p>
+              <BriefSummaryFeedback result={summaryFeedback} />
               <p className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
                 {summary && ato ? (
                   <span className="border-border/80 bg-muted/50 text-muted-foreground shrink-0 rounded px-1.5 py-px text-[10px] font-medium tracking-wide uppercase">

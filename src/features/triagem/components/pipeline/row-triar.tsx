@@ -23,6 +23,7 @@ import { useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { BriefSummaryFeedback } from "@/features/intimacoes/components/brief-summary-feedback";
 import { useLinhaPreview } from "@/features/intimacoes/hooks/use-painel-detalhe";
 import {
   onClickAbrirLinha,
@@ -197,6 +198,8 @@ export function RowTriar({
                 </span>
               </div>
             </div>
+
+            <BriefSummaryFeedback result={row.summaryFeedback ?? null} />
 
             {/* SEÇÃO DE AÇÕES — abaixo das informações, separada por um hairline
                 CONFINADO à coluna esquerda; botões alinhados à ESQUERDA. */}
@@ -384,6 +387,7 @@ export function RowReadonly({
               {row.estado.label}
             </span>
           </div>
+          <BriefSummaryFeedback result={row.summaryFeedback ?? null} />
         </div>
 
         {/* COLUNA DIREITA (só leitura): responsável e prazo LADO A LADO,

@@ -292,6 +292,8 @@ export interface SectionChangeAPI {
 }
 
 export interface ChatMessageAPI {
+  ai_result_id?: string;
+  result_origin?: string;
   changes?: SectionChangeAPI[];
   id: string;
   draft_id: string;

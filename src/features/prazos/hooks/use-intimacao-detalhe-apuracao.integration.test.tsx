@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({ fetch: vi.fn() }));
 vi.mock("@/lib/api/use-api", () => ({ useApi: () => mocks.fetch }));
 vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ orgId: null }) }));
 
-const intimation = {
+const intimation: IntimacaoDetalheView = {
   id: "intimation-1",
   cnj_number: "",
   title: "Intimação",
@@ -25,6 +25,26 @@ const intimation = {
   made_available_at: "",
   deadline_start_at: "",
   type: "INTIMACAO",
+  status: "ACTIVE",
+  resolved_at: null,
+  content_preview: "",
+  recommended_providencia: null,
+  suggested_count: 0,
+  categoria_coarse: "intimacao",
+  acionabilidade: "ato",
+  provisorio: false,
+  lifecycle: "a_triar",
+  disposicao: "excecao",
+  is_excecao: true,
+  excecao_motivo: "divergente",
+  brief_demand_kind: "",
+  brief_requires_work: false,
+  brief_work_kind: "",
+  brief_summary: "",
+  brief_demand_detail: null,
+  brief_demand_target_role: null,
+  brief_declared_deadline_days: null,
+  brief_piece_profile_key: null,
   phase: "",
   ai_act: "",
   judging_body: "",
@@ -56,7 +76,7 @@ const intimation = {
     tipo_ato: "contestacao",
     prazo_interno: null,
   },
-} as IntimacaoDetalheView;
+};
 
 function deadline(revision: number): PrazoDetalheView {
   return {
@@ -69,6 +89,32 @@ function deadline(revision: number): PrazoDetalheView {
     status: "OPEN",
     tipo_ato: "contestacao",
     tipo_ato_origem: "ia",
+    provisorio: false,
+    no_deadline_reason: null,
+    confirmacao_exigida: true,
+    prazo_interno: "2026-09-22",
+    review: {
+      tipo: {
+        status: "confirmed",
+        origin: "human",
+        reason_codes: [],
+        reason: "Fixture",
+        confirmed_by_id: "actor-1",
+        confirmed_by_name: "Revisor",
+        confirmed_at: "2026-09-01T00:00:00Z",
+        can_review: false,
+      },
+      prazo: {
+        status: "pending",
+        origin: "ia",
+        reason_codes: ["divergente"],
+        reason: "",
+        confirmed_by_id: null,
+        confirmed_by_name: null,
+        confirmed_at: null,
+        can_review: true,
+      },
+    },
     start_date: "2026-09-01",
     end_date: "2026-09-22",
     days: 15,
@@ -89,7 +135,7 @@ function deadline(revision: number): PrazoDetalheView {
       resultado: "divergente",
       decisao: "",
     },
-  } as PrazoDetalheView;
+  };
 }
 
 let hook: ReturnType<typeof useIntimacaoDetalhe> | null = null;

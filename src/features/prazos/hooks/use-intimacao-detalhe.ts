@@ -19,6 +19,9 @@ import {
   tituloIntimacao,
   TYPE_LABEL,
 } from "@/features/intimacoes/lib/labels";
+import { analysisResult } from "@/features/intimacoes/services/analysis-result";
+import { briefSummaryResult } from "@/features/intimacoes/services/brief-summary-result";
+import { classificationResult } from "@/features/intimacoes/services/classification-result";
 import type {
   IntimacaoDetalheView,
   IntimacaoUserStatus,
@@ -564,6 +567,16 @@ export function useIntimacaoDetalhe(
     // features/intimacoes) esperam o shape real do BE, não a VM derivada desta tela.
     intimacao: i,
 
+    summaryFeedback: query.isError ? null : briefSummaryResult(i),
+    classificationResult: query.isError
+      ? null
+      : classificationResult(
+          i?.deadline_classification_result,
+          i?.prazo?.deadline_id,
+        ),
+    analysisResult: query.isError
+      ? null
+      : analysisResult(i?.ai_analysis_result),
     // IA
     analisando: analisar.isPending || query.materializandoAnalise,
     analiseErro: analisar.isError,

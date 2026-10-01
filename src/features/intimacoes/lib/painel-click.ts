@@ -51,7 +51,7 @@ export function onClickAbrirLinha(
   if (!(target instanceof Element) || !e.currentTarget.contains(target)) return;
   if (
     target.closest(
-      'a, button, input, select, textarea, label, summary, [role="button"], [role="checkbox"], [role^="menuitem"], [contenteditable="true"]',
+      'a, button, input, select, textarea, label, details, summary, [role="button"], [role="checkbox"], [role^="menuitem"], [contenteditable="true"]',
     )
   )
     return;

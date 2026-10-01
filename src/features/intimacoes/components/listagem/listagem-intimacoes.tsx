@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 
 import { useListagemIntimacoes } from "../../hooks/use-listagem-intimacoes";
 import type { linhaIntimacao } from "../../lib/listagem";
+import { BriefSummaryFeedback } from "../brief-summary-feedback";
 import { UrgenciaFilter } from "../shared/urgencia-filter";
 
 type Lista = ReturnType<typeof useListagemIntimacoes>;
@@ -406,6 +407,7 @@ function LinhaIntimacao({
               className="text-foreground/85 mt-1.5 line-clamp-2 text-sm leading-relaxed"
             />
           ) : null}
+          <BriefSummaryFeedback result={r.summaryFeedback} />
         </div>
 
         {/* Cronologia (grupo real, 1 caixa) — publicação protagonista + estado/prazo. */}

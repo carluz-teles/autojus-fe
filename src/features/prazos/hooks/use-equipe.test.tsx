@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   orgId: "org_1",
   selfId: "be_self",
+  email: "self@example.com",
   dataUpdatedAt: 1,
   isSuccess: true,
   fetch: vi.fn(),

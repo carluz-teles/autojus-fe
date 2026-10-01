@@ -212,6 +212,8 @@ export interface ChatCitation {
 }
 
 export interface ChatMessage {
+  aiResultId?: string;
+  resultOrigin?: "ai" | "rule" | "ai_with_rules";
   changes?: PendingChange[];
   id: string;
   role: ChatRole;

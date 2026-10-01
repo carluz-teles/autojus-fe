@@ -10,7 +10,14 @@ import {
   transitionSnapshot,
 } from "@/lib/auth/organization-transition";
 
-import { apiFetch, apiFetchBlob, type ApiRequest } from "./client";
+import {
+  type ApiBinaryRequest,
+  type ApiBinaryResult,
+  apiFetch,
+  apiFetchBinary,
+  apiFetchBlob,
+  type ApiRequest,
+} from "./client";
 
 function useBoundRequest() {
   const { getToken, orgId } = useAuth();
@@ -22,12 +29,13 @@ function useBoundRequest() {
   return useCallback(
     async <T>(
       path: string,
-      req: Omit<ApiRequest, "getToken">,
-      blob: boolean,
+      req: Omit<ApiRequest, "getToken"> | Omit<ApiBinaryRequest, "getToken">,
+      mode: "json" | "blob" | "binary",
     ): Promise<T> => {
       const generation = transition.generation;
       const organizationId = orgId ?? null;
       const personal =
+        path === "/v1/backoffice/session" ||
         path === "/v1/identity/profile/complete" ||
         path.startsWith("/v1/lookup/") ||
         (path === "/v1/identity/me" && !organizationId);
@@ -42,7 +50,13 @@ function useBoundRequest() {
       if (req.signal?.aborted) controller.abort();
       req.signal?.addEventListener("abort", abort, { once: true });
       try {
-        const fetcher = blob ? apiFetchBlob : apiFetch;
+        const fetcher =
+          mode === "binary"
+            ? (path: string, req: ApiRequest) =>
+                apiFetchBinary(path, req as ApiBinaryRequest)
+            : mode === "blob"
+              ? apiFetchBlob
+              : apiFetch;
         const response = await fetcher(path, {
           ...req,
           signal: controller.signal,
@@ -64,6 +78,8 @@ function useBoundRequest() {
             return token;
           },
         });
+        if (controller.signal.aborted)
+          throw new DOMException("Request cancelled", "AbortError");
         if (
           !personal &&
           !isCurrentOrganizationRequest(generation, organizationId)
@@ -87,7 +103,7 @@ export function useApi() {
   const request = useBoundRequest();
   return useCallback(
     <T>(path: string, req: Omit<ApiRequest, "getToken"> = {}) =>
-      request<T>(path, req, false),
+      request<T>(path, req, "json"),
     [request],
   );
 }
@@ -103,7 +119,17 @@ export function useApiBlob() {
 
   return useCallback(
     (path: string, req: Omit<ApiRequest, "getToken"> = {}) =>
-      request<Blob>(path, req, true),
+      request<Blob>(path, req, "blob"),
     [request],
   );
 }
+
+export function useApiBinary() {
+  const request = useBoundRequest();
+  return useCallback(
+    (path: string, req: Omit<ApiBinaryRequest, "getToken">) =>
+      request<ApiBinaryResult>(path, req, "binary"),
+    [request],
+  );
+}
+export type ApiBinaryFetcher = ReturnType<typeof useApiBinary>;

@@ -11,6 +11,10 @@ import { useDocumentosDoProcesso } from "@/features/documentos/hooks/use-documen
 import { atoPublicacaoLabel } from "@/features/intimacoes/lib/labels";
 import { prazoVisivel } from "@/features/intimacoes/lib/prazo-visivel";
 import { resumoOuTeor } from "@/features/intimacoes/lib/resumo-intimacao";
+import {
+  type BriefSummaryResult,
+  briefSummaryResult,
+} from "@/features/intimacoes/services/brief-summary-result";
 import { useOrgMembersDirectory } from "@/features/organization/hooks/use-org-members-directory";
 import { usePecasByProcesso } from "@/features/pecas/hooks/use-peca";
 import { rotuloTipoPeca } from "@/features/pecas/lib/labels";
@@ -44,6 +48,7 @@ export interface RegistroProcesso {
   id: string;
   titulo: string;
   descricao?: string;
+  summaryFeedback?: BriefSummaryResult | null;
   meta: string;
   status: string;
   variant: "secondary" | "success" | "warning" | "destructive";
@@ -97,6 +102,7 @@ export function useProcessoHub(id: string) {
         // Até o BE incluir a coluna, isto cai no teor aparado (já uma melhora) e
         // passa a mostrar o resumo sozinho no dia em que o campo chegar.
         descricao: resumoOuTeor(i.brief_summary, i.content_preview),
+        summaryFeedback: briefSummaryResult(i),
         meta: `Publicada em ${formatDate(i.published_at)}`,
         responsavel: {
           id: i.assignee_user_id,

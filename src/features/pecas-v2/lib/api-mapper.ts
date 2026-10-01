@@ -321,7 +321,23 @@ function mapSectionChangeFromApi(api: SectionChangeAPI): PendingChange {
 // ── Chat ─────────────────────────────────────────────────────────────────────
 
 export function mapChatMessageFromApi(api: ChatMessageAPI): ChatMessage {
+  const origin =
+    api.result_origin === "ai" ||
+    api.result_origin === "ai_with_rules" ||
+    api.result_origin === "rule"
+      ? api.result_origin
+      : undefined;
+  const resultId =
+    api.role === "assistant" &&
+    origin &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      api.ai_result_id ?? "",
+    )
+      ? api.ai_result_id
+      : undefined;
   return {
+    aiResultId: resultId,
+    resultOrigin: origin,
     changes: (api.changes ?? []).map((change) =>
       mapSectionChangeFromApi(change),
     ),

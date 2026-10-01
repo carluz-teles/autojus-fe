@@ -1,0 +1,47 @@
+import type { Draft } from "../types";
+
+export function draftFixture(overrides: Partial<Draft> = {}): Draft {
+  return {
+    id: "draft-1",
+    pieceType: "manifestacao",
+    title: "Manifestação sintética",
+    status: "DRAFT",
+    sagaState: "DRAFTED",
+    currentVersionId: null,
+    authorship: "assistant",
+    updatedAt: "2026-09-25T04:00:00Z",
+    preamble: { paragraphs: [] },
+    sections: [],
+    intimation: {
+      id: "intimation-1",
+      title: "Fixture",
+      publishedAt: "2026-09-25",
+      teor: "Texto sintético",
+    },
+    process: {
+      courtRecordId: "case-1",
+      cnj: "",
+      classe: "",
+      assunto: "",
+      orgao: "",
+      tribunalGrau: "",
+      valor: "",
+      distribuicao: "",
+    },
+    parties: [],
+    partyGroups: [],
+    providences: [],
+    attachments: [],
+    processDocuments: [],
+    deadline: { endDate: "2026-10-01", daysLeft: 6 },
+    thesisCount: 0,
+    sentToSigningAt: null,
+    signedAt: null,
+    filedAt: null,
+    filingNumber: "",
+    signedPDFURL: null,
+    contentHtml: null,
+    contentEdited: false,
+    ...overrides,
+  };
+}

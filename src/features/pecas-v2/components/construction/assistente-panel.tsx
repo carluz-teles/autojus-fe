@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/message-scroller";
 import { SkeletonRows } from "@/components/ui/skeletons";
 import { Textarea } from "@/components/ui/textarea";
+import { AiFeedback } from "@/features/ai-feedback/components/ai-feedback";
 import { useAIExperience } from "@/lib/telemetry/use-ai-experience";
 import { cn } from "@/lib/utils";
 
@@ -370,6 +371,12 @@ function ChatBubble({
                 ))}
               </div>
             )}
+            {!isUser &&
+            msg.aiResultId &&
+            (msg.resultOrigin === "ai" ||
+              msg.resultOrigin === "ai_with_rules") ? (
+              <AiFeedback resultId={msg.aiResultId} />
+            ) : null}
           </BubbleContent>
         </Bubble>
       </MessageContent>
